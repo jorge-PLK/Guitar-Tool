@@ -40,6 +40,7 @@ Si falla: P1 → el igualado termina en una guía visual y el rig se carga a man
 - [ ] Importar WAV, FLAC o MP3 y convertir a la frecuencia de trabajo
 - [ ] Descarga de modelos la primera vez y separación en 6 stems con progreso
 - [ ] Pantalla de biblioteca
+- [ ] Sección de Ajustes en la barra lateral (icono de engranaje), con el apartado Biblioteca y equipo: carpeta de proyectos, modelos descargados, espacio en disco, limpieza y perfil de equipo
 
 Condición de paso: un tema importado y separado, con sus stems en disco.
 
@@ -58,6 +59,7 @@ Condición de paso: tocar encima de un tema sin guitarras, en bucle y al 70 %.
 
 - [ ] Selector de dispositivo y canales, guardado en el perfil de equipo
 - [ ] Calibración de latencia con un pulso y de nivel de entrada del DI
+- [ ] Apartado Audio de Ajustes: dispositivo, canales, frecuencia de muestreo y las dos calibraciones
 - [ ] Envío del backing a la pedalera para escucharlo en sus auriculares
 - [ ] Grabación simultánea del DI seco y de la señal procesada
 - [ ] Alinear las pistas grabadas con el backing usando la latencia medida
@@ -87,6 +89,7 @@ Condición de paso: toma válida a la primera en riffs sencillos.
 
 - [ ] Captura de cámara (webcam o iPhone) con el mismo reloj que el audio
 - [ ] Calibración del retardo de la cámara
+- [ ] Apartado Cámara y vídeo de Ajustes: cámara por defecto, resolución, fotogramas por segundo, retardo y exportación por defecto
 - [ ] Grabación multipista: backing, DI, procesada y micro
 - [ ] Multitoma: partes, tomas por parte, mejor toma y punch-in (el rig recomendado para cada parte llega con la Etapa 2)
 - [ ] Pantalla de grabación
@@ -113,6 +116,7 @@ Empieza cuando la Etapa 1 está en uso. Antes de la Fase 8 se hacen las pruebas 
 - [ ] Huella del tono: tercios de octava, armónicos, dinámica y anchura estéreo, con comparación nota a nota alineada en el tiempo
 - [ ] Función de distancia, prototipada primero en Python y validada con escucha A/B
 - [ ] Conector TONE3000: sesión, búsqueda, descarga y caché
+- [ ] Apartado Pedalera y TONE3000 de Ajustes: dirección del Remote Editor, firmware, estado de la conexión y cuenta de TONE3000
 - [ ] Reamp (reproducir un DI hacia la pedalera y grabar el retorno alineado) y plantillas de rig de partida para la Flex Prime
 - [ ] Selección de plantillas según la saturación de la huella, y detección de efectos en el original: delay, reverb, compresión, modulación y wah
 - [ ] Pantalla de igualar tono: espectros, candidatos y A/B

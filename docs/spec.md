@@ -64,6 +64,20 @@ El rig no cambia solo: en cada toma lo eliges tú, en la pedalera o desde la app
 - Disco: de 2 a 5 GB por tema. Una carpeta por proyecto (stems, tomas, rigs y vídeo) y opción de limpiar tomas descartadas y stems que se pueden regenerar.
 
 
+## Ajustes
+
+La app tiene una sección de Ajustes en la barra lateral, con icono de engranaje, donde se configura una vez lo que usan todas las pantallas. Lo que se elige aquí se guarda en el perfil de equipo.
+
+| Apartado | Qué se gestiona |
+|---|---|
+| Audio | Dispositivo, canales (DI seco, salida de reamp, retorno procesado y salida del backing), frecuencia de muestreo, calibración de latencia y calibración del nivel del DI |
+| Cámara y vídeo | Cámara por defecto (webcam o iPhone), resolución y fotogramas por segundo, calibración del retardo de la cámara y valores de exportación por defecto |
+| Pedalera y TONE3000 | Dirección del Remote Editor por Wi-Fi, firmware detectado, estado de la conexión, y cuenta y clave de TONE3000 |
+| Biblioteca y equipo | Carpeta de proyectos, modelos descargados y espacio en disco, limpieza, y perfil de equipo con tus guitarras y pastillas |
+
+Las pantallas de trabajo (tablatura, backing track, grabar) siguen mostrando el dispositivo y el canal en uso, pero se cambian desde Ajustes.
+
+
 ## Arquitectura técnica
 
 Decisión: app nativa de macOS en Swift y SwiftUI, sin Python en la app final. Audio, cámara (incluido el iPhone con Continuity Camera), vídeo e interfaz usan las herramientas de Apple. Los modelos se usan en Core ML y los cálculos de audio con Accelerate. Una prueba inicial en la Fase 0 comprueba que cada modelo funciona bien en Core ML; el que no, pasa a ONNX Runtime como respaldo. La única precaución de cara a una posible app nativa de Windows es que los datos de cada proyecto se guardan en un archivo dentro de su carpeta, con SwiftData solo como índice de la biblioteca.

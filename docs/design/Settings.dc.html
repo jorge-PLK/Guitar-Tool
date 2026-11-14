@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>ToneForge · Ajustes</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Space+Grotesk:wght@500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0F1113}
+a{color:#F2A33A}a:hover{color:#FFC170}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 900px; background: #0F1113; color: #E8EAED; font-family: Inter, system-ui, sans-serif; font-size: 14px">
+<nav aria-label="Secciones" style="flex: 1 1 220px; max-width: 240px; background: #15181B; border-right: 1px solid #252A2F; padding: 24px 16px; display: flex; flex-direction: column; gap: 4px; box-sizing: border-box">
+<div style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 22px; padding: 0 12px 20px">Tone<span style="color: #F2A33A">Forge</span></div>
+<sc-for list="{{nav}}" as="n" hint-placeholder-count="6">
+<a href="{{n.href}}" style="{{n.style}}">{{n.label}}</a>
+</sc-for>
+<a href="Settings.dc.html" aria-current="page" style="margin-top: auto; display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 12px; border-radius: 10px; text-decoration: none; font-weight: 500; background: #2A2116; color: #F2A33A"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>Ajustes</a>
+<div style="margin-top: 8px; padding: 12px; border-radius: 10px; background: #1C2024; display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; align-items: center; gap: 8px"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 50%; background: #4CC38A"></span><span style="font-weight: 600">Flex Prime</span></div>
+<div style="color: #9AA3AD; font-size: 12px">USB audio · Remote Editor por Wi-Fi</div>
+</div>
+</nav>
+<main style="flex: 999 1 560px; min-width: 0; padding: 28px 36px; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px">
+<div>
+<h1 style="margin: 0; font-family: 'Space Grotesk', sans-serif; font-size: 30px; font-weight: 700">Ajustes</h1>
+<p style="margin: 6px 0 0; color: #9AA3AD">Se configura una vez y lo usan todas las pantallas. Se guarda en tu perfil de equipo.</p>
+</div>
+<div role="group" aria-label="Apartados" style="display: flex; flex-wrap: wrap; gap: 4px; background: #1C2024; border: 1px solid #2A3036; border-radius: 10px; padding: 3px; align-self: flex-start">
+<sc-for list="{{tabs}}" as="t" hint-placeholder-count="4">
+<button onClick="{{t.pick}}" style="{{t.style}}">{{t.label}}</button>
+</sc-for>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+<sc-for list="{{groups}}" as="g" hint-placeholder-count="3">
+<section aria-label="{{g.title}}" style="flex: 1 1 340px; min-width: 0; background: #171A1D; border: 1px solid #252A2F; border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 14px">
+<div>
+<h2 style="margin: 0; font-family: 'Space Grotesk', sans-serif; font-size: 18px">{{g.title}}</h2>
+<p style="margin: 6px 0 0; color: #9AA3AD; font-size: 13px; line-height: 1.5">{{g.note}}</p>
+</div>
+<sc-for list="{{g.fields}}" as="f" hint-placeholder-count="3">
+<label style="display: flex; flex-direction: column; gap: 6px; color: #9AA3AD; font-size: 13px">{{f.label}}
+<select style="height: 44px; background: #1C2024; color: #E8EAED; border: 1px solid #2A3036; border-radius: 8px; padding: 0 10px; font: inherit"><option>{{f.value}}</option></select>
+</label>
+</sc-for>
+<sc-for list="{{g.inputs}}" as="i" hint-placeholder-count="1">
+<label style="display: flex; flex-direction: column; gap: 6px; color: #9AA3AD; font-size: 13px">{{i.label}}
+<input type="text" placeholder="{{i.placeholder}}" style="height: 44px; background: #1C2024; color: #E8EAED; border: 1px solid #2A3036; border-radius: 8px; padding: 0 12px; font: inherit; box-sizing: border-box">
+</label>
+</sc-for>
+<sc-for list="{{g.infos}}" as="r" hint-placeholder-count="2">
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; background: #1C2024">
+<span>{{r.label}}</span><span style="{{r.style}}">{{r.value}}</span>
+</div>
+</sc-for>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<sc-for list="{{g.actions}}" as="a" hint-placeholder-count="2">
+<button style="{{a.style}}">{{a.label}}</button>
+</sc-for>
+</div>
+</section>
+</sc-for>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+constructor(props) { super(props); this.state = { tab: 'audio' }; }
+renderVals() {
+var self = this;
+var base = 'display: flex; align-items: center; height: 44px; padding: 0 12px; border-radius: 10px; text-decoration: none; font-weight: 500; color: #C9CED4;';
+var items = [['Biblioteca','Main.dc.html'],['Igualar tono','Tone.dc.html'],['Tablatura y DI','Tab.dc.html'],['Backing track','Backing.dc.html'],['Grabar','Record.dc.html'],['Montaje','Edit.dc.html']];
+var nav = items.map(function (i) { return { label: i[0], href: i[1], style: base }; });
+var cur = this.state.tab;
+var tabDefs = [['audio', 'Audio'], ['video', 'Cámara y vídeo'], ['device', 'Pedalera y TONE3000'], ['library', 'Biblioteca y equipo']];
+var tabs = tabDefs.map(function (t) {
+var on = t[0] === cur;
+return { label: t[1], pick: function () { self.setState({ tab: t[0] }); }, style: 'height: 44px; padding: 0 18px; border: 0; border-radius: 8px; cursor: pointer; ' + (on ? 'background: #2A2116; color: #F2A33A; font: 600 14px Inter, sans-serif;' : 'background: transparent; color: #C9CED4; font: 500 14px Inter, sans-serif;') };
+});
+var ok = 'color: #6FD99E; font-weight: 600;';
+var warn = 'color: #F2A33A; font-weight: 600;';
+var neu = 'color: #C9CED4; font-weight: 600;';
+var f = function (label, value) { return { label: label, value: value }; };
+var inp = function (label, placeholder) { return { label: label, placeholder: placeholder }; };
+var r = function (label, value, style) { return { label: label, value: value, style: style }; };
+var act = function (label, primary) { return { label: label, style: 'height: 44px; padding: 0 16px; border-radius: 10px; cursor: pointer; ' + (primary ? 'border: 0; background: #F2A33A; color: #1A1206; font: 600 14px Inter, sans-serif;' : 'border: 1px solid #2A3036; background: #1C2024; color: #E8EAED; font: 500 14px Inter, sans-serif;') }; };
+var g = function (title, note, parts) { return { title: title, note: note, fields: parts.fields || [], inputs: parts.inputs || [], infos: parts.infos || [], actions: parts.actions || [] }; };
+var all = {
+audio: [
+g('Dispositivo', 'La pedalera hace de interfaz de audio por USB.', { fields: [f('Dispositivo de audio', 'HeadRush Flex Prime (USB)'), f('Frecuencia de muestreo', '48 kHz')] }),
+g('Canales', 'Qué entra y qué sale por cada canal del USB.', { fields: [f('Entrada DI (seco)', 'Entrada 3 · DI'), f('Retorno procesado', 'Entradas 1 y 2 · estéreo'), f('Salida de reamp', 'Salida 3'), f('Salida del backing', 'Salidas 1 y 2 · estéreo')] }),
+g('Calibración', 'Un pulso de prueba mide el retardo de ida y vuelta; el nivel se ajusta tocando fuerte unos segundos.', { infos: [r('Latencia', 'Calibrada', ok), r('Nivel del DI', 'Sin calibrar', warn)], actions: [act('Calibrar latencia', false), act('Calibrar nivel del DI', true)] })
+],
+video: [
+g('Cámara', 'Webcam USB o iPhone con Continuity Camera.', { fields: [f('Cámara por defecto', 'iPhone (Continuity Camera)'), f('Resolución', '1080p'), f('Fotogramas por segundo', '30 fps')] }),
+g('Sincronía', 'Una palmada o un destello en pantalla mide el retardo de la cámara respecto al audio.', { infos: [r('Retardo de cámara', 'Calibrado', ok)], actions: [act('Calibrar retardo', false)] }),
+g('Exportación por defecto', 'Se puede cambiar en cada montaje.', { fields: [f('Formato de vídeo', 'HEVC 1080p'), f('Volumen', 'Normalizado a -14 LUFS'), f('Rótulo con el título del tema', 'Sí'), f('WAV de cada pista', 'Sí')] })
+],
+device: [
+g('Flex Prime', 'El Remote Editor se sirve desde la propia pedalera por Wi-Fi.', { inputs: [inp('Dirección del Remote Editor', '[DIRECCIÓN DE TU PEDALERA]')], infos: [r('Conexión', 'Conectada', ok), r('Firmware', '[TU FIRMWARE]', neu)], actions: [act('Probar conexión', false)] }),
+g('TONE3000', 'Para buscar y descargar capturas NAM e IR.', { infos: [r('Sesión', 'Sin iniciar', warn)], actions: [act('Iniciar sesión', true)] })
+],
+library: [
+g('Biblioteca', 'Una carpeta por tema, con sus stems, tomas, rigs y vídeo.', { inputs: [inp('Carpeta de proyectos', '[TU CARPETA]')], infos: [r('Espacio usado', '[ESPACIO USADO]', neu)], actions: [act('Cambiar carpeta', false), act('Limpiar tomas descartadas y stems', false)] }),
+g('Modelos', 'Se descargan la primera vez que se usan.', { infos: [r('Separación de stems', 'Descargado', ok), r('Acordes', 'Descargado', ok), r('Transcripción de guitarra y bajo', 'Descargado', ok), r('Transcripción de batería', 'Pendiente', warn)], actions: [act('Descargar los que faltan', false)] }),
+g('Tus guitarras', 'La guitarra de cada toma se guarda con ella.', { infos: [r('Charvel Pro-Mod DK24', 'Por defecto', ok), r('Epiphone Les Paul Prophecy', '', neu), r('ESP LTD Eclipse ’87', '', neu)], actions: [act('Añadir guitarra', false)] })
+]
+};
+return { nav: nav, tabs: tabs, groups: all[cur] };
+}
+}
+</script>
+</body>
+</html>

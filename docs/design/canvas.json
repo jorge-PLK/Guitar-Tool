@@ -38,6 +38,15 @@
       "x": 1520,
       "y": 1020
     },
+    "Settings.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "is_interactive": true,
+      "title": "7 · Ajustes",
+      "w": 1440,
+      "x": 0,
+      "y": 2040
+    },
     "Tab.dc.html": {
       "expand": "fill",
       "h": 900,
@@ -81,7 +90,8 @@
     "Tab.dc.html",
     "Backing.dc.html",
     "Record.dc.html",
-    "Edit.dc.html"
+    "Edit.dc.html",
+    "Settings.dc.html"
   ],
   "pages": [],
   "title": "ToneForge – Bocetos de pantallas"
