@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>ToneForge · Montaje de vídeo</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Space+Grotesk:wght@500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0F1113}
+a{color:#F2A33A}a:hover{color:#FFC170}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 900px; background: #0F1113; color: #E8EAED; font-family: Inter, system-ui, sans-serif; font-size: 14px">
+<nav aria-label="Secciones" style="flex: 1 1 220px; max-width: 240px; background: #15181B; border-right: 1px solid #252A2F; padding: 24px 16px; display: flex; flex-direction: column; gap: 4px; box-sizing: border-box">
+<div style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 22px; padding: 0 12px 20px">Tone<span style="color: #F2A33A">Forge</span></div>
+<sc-for list="{{nav}}" as="n" hint-placeholder-count="6">
+<a href="{{n.href}}" style="{{n.style}}">{{n.label}}</a>
+</sc-for>
+<div style="margin-top: auto; padding: 12px; border-radius: 10px; background: #1C2024; display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; align-items: center; gap: 8px"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 50%; background: #4CC38A"></span><span style="font-weight: 600">Flex Prime</span></div>
+<div style="color: #9AA3AD; font-size: 12px">USB audio · Remote Editor por Wi-Fi</div>
+</div>
+</nav>
+<main style="flex: 999 1 560px; min-width: 0; padding: 28px 36px; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px">
+<div style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px">
+<div>
+<div style="color: #9AA3AD; font-size: 13px">Extremoduro · So payaso · 3 tomas</div>
+<h1 style="margin: 4px 0 0; font-family: 'Space Grotesk', sans-serif; font-size: 30px; font-weight: 700">Montaje</h1>
+</div>
+<button style="height: 44px; padding: 0 20px; border-radius: 10px; border: 0; background: #F2A33A; color: #1A1206; font: 600 14px Inter, sans-serif">Exportar vídeo</button>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 20px">
+<section aria-label="Layouts" style="flex: 1 1 260px; background: #171A1D; border: 1px solid #252A2F; border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px">
+<h2 style="margin: 0; font-family: 'Space Grotesk', sans-serif; font-size: 18px">Layout</h2>
+<sc-for list="{{layouts}}" as="l" hint-placeholder-count="4">
+<button onClick="{{l.pick}}" style="{{l.style}}">
+<span aria-hidden="true" style="{{l.thumb}}"><sc-for list="{{l.tiles}}" as="t" hint-placeholder-count="2"><span style="{{t}}"></span></sc-for></span>
+<span style="display: flex; flex-direction: column; align-items: flex-start; gap: 2px"><span style="font-weight: 600">{{l.name}}</span><span style="color: #9AA3AD; font-size: 12px">{{l.desc}}</span></span>
+</button>
+</sc-for>
+</section>
+<section aria-label="Vista previa" style="flex: 2 1 420px; min-width: 0; background: #171A1D; border: 1px solid #252A2F; border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; align-items: center; gap: 12px">
+<div style="align-self: stretch; display: flex; justify-content: space-between; color: #9AA3AD; font-size: 13px"><span>Vista previa · {{previewLabel}}</span><span>2:41 · Solo</span></div>
+<sc-if value="{{isPortrait}}" hint-placeholder-val="{{ true }}">
+<div style="width: 270px; height: 480px; border-radius: 18px; background: #0B0C0E; border: 1px solid #2A3036; padding: 10px; box-sizing: border-box; display: flex; flex-direction: column; gap: 8px">
+<div style="flex: 1; border-radius: 12px; background: radial-gradient(ellipse at 50% 45%, #3A2E1E, #15120D 75%); box-shadow: 0 8px 24px rgba(0,0,0,0.5); position: relative; display: flex; align-items: flex-end; padding: 12px; box-sizing: border-box"><span style="font-weight: 600; font-size: 13px; padding: 4px 8px; border-radius: 6px; background: rgba(15,17,19,0.7)">Solo · encuadre de la guitarra</span></div>
+</div>
+</sc-if>
+<sc-if value="{{isLandscape}}" hint-placeholder-val="{{ false }}">
+<div style="width: 100%; max-width: 560px; aspect-ratio: 16 / 9; border-radius: 14px; background: #0B0C0E; border: 1px solid #2A3036; padding: 10px; box-sizing: border-box; display: flex; gap: 8px">
+<div style="flex: 1; border-radius: 10px; background: radial-gradient(ellipse at 50% 45%, #1E2A3A, #0D1015 75%); display: flex; align-items: flex-end; padding: 10px"><span style="font-size: 12px; font-weight: 600; padding: 3px 7px; border-radius: 6px; background: rgba(15,17,19,0.7)">Robe</span></div>
+<div style="flex: 1; border-radius: 10px; background: radial-gradient(ellipse at 50% 45%, #3A2E1E, #15120D 75%); display: flex; align-items: flex-end; padding: 10px"><span style="font-size: 12px; font-weight: 600; padding: 3px 7px; border-radius: 6px; background: rgba(15,17,19,0.7)">Uoho</span></div>
+</div>
+</sc-if>
+<div style="display: flex; gap: 10px; align-items: center">
+<button aria-label="Reproducir vista previa" style="width: 44px; height: 44px; border-radius: 50%; border: 0; background: #F2A33A; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="#1A1206"><path d="M7 4l13 8-13 8z"></path></svg></button>
+<span style="color: #C9CED4; font-size: 13px">Vista previa en tiempo real con transiciones</span>
+</div>
+</section>
+<section aria-label="Transiciones y exportación" style="flex: 1 1 260px; background: #171A1D; border: 1px solid #252A2F; border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px">
+<h2 style="margin: 0; font-family: 'Space Grotesk', sans-serif; font-size: 18px">Transiciones</h2>
+<sc-for list="{{trans}}" as="t" hint-placeholder-count="5">
+<div style="display: flex; justify-content: space-between; padding: 10px 12px; border-radius: 10px; background: #1C2024"><span style="color: #C9CED4">{{t.k}}</span><span style="font-weight: 600">{{t.v}}</span></div>
+</sc-for>
+<h2 style="margin: 8px 0 0; font-family: 'Space Grotesk', sans-serif; font-size: 18px">Exportación</h2>
+<sc-for list="{{exp}}" as="e" hint-placeholder-count="4">
+<label style="display: flex; align-items: center; gap: 10px; color: #C9CED4"><input type="checkbox" checked style="width: 18px; height: 18px; accent-color: #F2A33A">{{e}}</label>
+</sc-for>
+</section>
+</div>
+<section aria-label="Línea de tiempo del montaje" style="background: #171A1D; border: 1px solid #252A2F; border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; gap: 4px; padding-left: 110px">
+<sc-for list="{{sections}}" as="s" hint-placeholder-count="6">
+<div style="{{s.style}}">{{s.label}}</div>
+</sc-for>
+</div>
+<sc-for list="{{lanes}}" as="ln" hint-placeholder-count="3">
+<div style="display: flex; align-items: center; gap: 10px">
+<span style="flex: 0 0 100px; color: #C9CED4; font-weight: 600">{{ln.name}}</span>
+<div style="flex: 1; display: flex; gap: 4px; height: 30px">
+<sc-for list="{{ln.cells}}" as="c" hint-placeholder-count="6">
+<div style="{{c}}"></div>
+</sc-for>
+</div>
+</div>
+</sc-for>
+<p style="margin: 0; padding-left: 110px; color: #9AA3AD; font-size: 12px">Barra llena = en pantalla. La solista solo aparece en el solo; la entrada empieza 0,3 s antes de la primera nota.</p>
+</section>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+constructor(props) { super(props); this.state = { layout: 'single' }; }
+renderVals() {
+var self = this;
+var base = 'display: flex; align-items: center; height: 44px; padding: 0 12px; border-radius: 10px; text-decoration: none; font-weight: 500;';
+var items = [['Biblioteca','Main.dc.html'],['Igualar tono','Tone.dc.html'],['Tablatura y DI','Tab.dc.html'],['Backing track','Backing.dc.html'],['Grabar','Record.dc.html'],['Montaje','Edit.dc.html']];
+var active = 'Montaje';
+var nav = items.map(function (i) { return { label: i[0], href: i[1], style: base + (i[0] === active ? 'background: #2A2116; color: #F2A33A;' : 'color: #C9CED4;') }; });
+var tile = 'flex: 1; border-radius: 3px; background: #5A636C;';
+var defs = [
+{ id: 'side', name: 'Landscape · lado a lado', desc: '1920 × 1080', thumb: 'width: 64px; height: 36px; flex-direction: row;', n: 2 },
+{ id: 'grid', name: 'Landscape · rejilla', desc: '1920 × 1080 · 3 o 4 tomas', thumb: 'width: 64px; height: 36px; flex-direction: row; flex-wrap: wrap;', n: 4 },
+{ id: 'stack', name: 'Portrait · apilado', desc: '1080 × 1920', thumb: 'width: 30px; height: 52px; flex-direction: column;', n: 2 },
+{ id: 'single', name: 'Portrait · plano único', desc: 'Rítmica y solista, guitarra a pantalla completa', thumb: 'width: 30px; height: 52px; flex-direction: column;', n: 1 }
+];
+var cur = this.state.layout;
+var layouts = defs.map(function (d) {
+var on = d.id === cur;
+var tiles = [];
+for (var i = 0; i < d.n; i++) { tiles.push(d.id === 'grid' ? 'flex: 0 0 calc(50% - 2px); height: 16px; border-radius: 3px; background: #5A636C;' : tile); }
+return { name: d.name, desc: d.desc, tiles: tiles, pick: function () { self.setState({ layout: d.id }); },
+style: 'display: flex; align-items: center; gap: 14px; min-height: 64px; padding: 10px 12px; border-radius: 12px; text-align: left; color: #E8EAED; font: 500 14px Inter, sans-serif; cursor: pointer; ' + (on ? 'background: #221B12; border: 1px solid #F2A33A;' : 'background: #1C2024; border: 1px solid #2A3036;'),
+thumb: 'flex: 0 0 auto; display: flex; gap: 3px; padding: 4px; border-radius: 6px; background: #0F1113; box-sizing: content-box; ' + d.thumb };
+});
+var portrait = cur === 'stack' || cur === 'single';
+var secs = [['Intro', 1], ['Estrofa', 2], ['Estribillo', 1.5], ['Estrofa', 2], ['Solo', 1.2], ['Estribillo', 1.5]];
+var sections = secs.map(function (s) { return { label: s[0], style: 'flex: ' + s[1] + ' 1 0; height: 24px; border-radius: 6px; display: flex; align-items: center; padding: 0 8px; font-size: 12px; font-weight: 600; ' + (s[0] === 'Solo' ? 'background: #2A2116; color: #F2A33A;' : 'background: #1F242A; color: #C9CED4;') }; });
+var cell = function (w, on, c) { return 'flex: ' + w + ' 1 0; border-radius: 6px; ' + (on ? 'background: ' + c + ';' : 'background: #1C2024; border: 1px dashed #2A3036;'); };
+var lane = function (name, c, pattern) { return { name: name, cells: secs.map(function (s, i) { return cell(s[1], pattern[i], c); }) }; };
+var single = cur === 'single';
+return {
+nav: nav,
+layouts: layouts,
+isPortrait: portrait,
+isLandscape: !portrait,
+previewLabel: portrait ? '1080 × 1920' : '1920 × 1080',
+trans: [{ k: 'Recolocación', v: 'Muelle · 0,5 s' }, { k: 'Entrada', v: 'Escala 92→100 % + nitidez' }, { k: 'Anticipación al solo', v: '0,3 s' }, { k: 'Fundido de audio', v: '80 ms' }, { k: 'Esquinas', v: 'Redondeadas + sombra' }],
+exp: ['HEVC 1080p · 30 fps', 'Volumen normalizado a -14 LUFS', 'Rótulo con el título del tema', 'WAV de cada pista'],
+sections: sections,
+lanes: [lane('Robe', '#5BC0EB', single ? [false, false, false, false, false, false] : [true, true, true, true, false, true]), lane('Uoho', '#F2A33A', [true, true, true, true, false, true]), lane('Solo', '#B79CFF', [false, false, false, false, true, false])]
+};
+}
+}
+</script>
+</body>
+</html>

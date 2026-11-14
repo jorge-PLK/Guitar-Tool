@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>ToneForge · Tablatura y DI</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Space+Grotesk:wght@500;700&amp;family=JetBrains+Mono:wght@500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0F1113}
+a{color:#F2A33A}a:hover{color:#FFC170}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 900px; background: #0F1113; color: #E8EAED; font-family: Inter, system-ui, sans-serif; font-size: 14px">
+<nav aria-label="Secciones" style="flex: 1 1 220px; max-width: 240px; background: #15181B; border-right: 1px solid #252A2F; padding: 24px 16px; display: flex; flex-direction: column; gap: 4px; box-sizing: border-box">
+<div style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 22px; padding: 0 12px 20px">Tone<span style="color: #F2A33A">Forge</span></div>
+<sc-for list="{{nav}}" as="n" hint-placeholder-count="6">
+<a href="{{n.href}}" style="{{n.style}}">{{n.label}}</a>
+</sc-for>
+<div style="margin-top: auto; padding: 12px; border-radius: 10px; background: #1C2024; display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; align-items: center; gap: 8px"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 50%; background: #4CC38A"></span><span style="font-weight: 600">Flex Prime</span></div>
+<div style="color: #9AA3AD; font-size: 12px">USB audio · Remote Editor por Wi-Fi</div>
+</div>
+</nav>
+<main style="flex: 999 1 560px; min-width: 0; padding: 28px 36px; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px">
+<div style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px">
+<div>
+<div style="color: #9AA3AD; font-size: 13px">Extremoduro · So payaso · Uoho · Estribillo</div>
+<h1 style="margin: 4px 0 0; font-family: 'Space Grotesk', sans-serif; font-size: 30px; font-weight: 700">Tablatura y grabación del DI</h1>
+</div>
+<div style="display: flex; gap: 10px">
+<button style="height: 40px; padding: 0 14px; border-radius: 8px; border: 1px solid #2A3036; background: #1C2024; color: #E8EAED; font: 500 13px Inter, sans-serif">Editar notas</button>
+<button style="height: 40px; padding: 0 14px; border-radius: 8px; border: 1px solid #2A3036; background: #1C2024; color: #E8EAED; font: 500 13px Inter, sans-serif">Exportar a Guitar Pro</button>
+</div>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 20px">
+<section aria-label="Tablatura" style="flex: 3 1 560px; min-width: 0; background: #171A1D; border: 1px solid #252A2F; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; justify-content: space-between; color: #9AA3AD; font-size: 13px; flex-wrap: wrap; gap: 8px"><span>Transcripción automática · revisa y corrige si hace falta</span><span>Afinación estándar · 4/4 · 132 BPM</span></div>
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="2">
+<div style="position: relative; height: 150px; overflow: hidden">
+<sc-for list="{{lines}}" as="l" hint-placeholder-count="6">
+<div aria-hidden="true" style="{{l.style}}"></div>
+</sc-for>
+<div aria-hidden="true" style="position: absolute; left: 50%; top: 10px; width: 1px; height: 125px; background: #4A525A"></div>
+<div style="position: absolute; left: 0; top: 0; height: 150px; display: flex; flex-direction: column; justify-content: space-between; padding: 4px 0; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #9AA3AD"><span>e</span><span>B</span><span>G</span><span>D</span><span>A</span><span>E</span></div>
+<sc-for list="{{r.notes}}" as="nt" hint-placeholder-count="16">
+<div style="{{nt.style}}">{{nt.f}}</div>
+</sc-for>
+<sc-if value="{{r.cursor}}" hint-placeholder-val="{{ true }}">
+<div aria-hidden="true" style="position: absolute; left: 38%; top: 0; width: 3px; height: 150px; border-radius: 2px; background: #F2A33A; box-shadow: 0 0 12px rgba(242,163,58,0.6)"></div>
+</sc-if>
+</div>
+</sc-for>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding-top: 8px; border-top: 1px solid #252A2F">
+<button aria-label="Volver al inicio" style="width: 44px; height: 44px; border-radius: 50%; border: 1px solid #2A3036; background: #1C2024; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#E8EAED" stroke-width="2"><path d="M6 5v14M19 5l-9 7 9 7z"></path></svg></button>
+<button aria-label="Reproducir" style="width: 52px; height: 52px; border-radius: 50%; border: 0; background: #F2A33A; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="#1A1206"><path d="M7 4l13 8-13 8z"></path></svg></button>
+<button style="height: 44px; padding: 0 18px; border-radius: 999px; border: 0; background: #C8433A; color: #FFFFFF; font: 600 14px Inter, sans-serif; display: flex; align-items: center; gap: 8px"><span aria-hidden="true" style="width: 10px; height: 10px; border-radius: 50%; background: #FFFFFF"></span>Grabar toma</button>
+<label style="display: flex; align-items: center; gap: 10px; color: #C9CED4; margin-left: 8px">Tempo <input type="range" min="40" max="100" value="80" style="width: 140px; accent-color: #F2A33A"> <span style="font-weight: 600; color: #E8EAED">80 %</span></label>
+<label style="display: flex; align-items: center; gap: 8px; color: #C9CED4"><input type="checkbox" checked style="width: 18px; height: 18px; accent-color: #F2A33A">Metrónomo</label>
+<label style="display: flex; align-items: center; gap: 8px; color: #C9CED4"><input type="checkbox" checked style="width: 18px; height: 18px; accent-color: #F2A33A">Bucle</label>
+<label style="display: flex; align-items: center; gap: 8px; color: #C9CED4"><input type="checkbox" checked style="width: 18px; height: 18px; accent-color: #F2A33A">Cuenta de 1 compás</label>
+</div>
+</section>
+<aside aria-label="Entrada y validación" style="flex: 1 1 280px; display: flex; flex-direction: column; gap: 20px">
+<section style="background: #171A1D; border: 1px solid #252A2F; border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 14px">
+<h2 style="margin: 0; font-family: 'Space Grotesk', sans-serif; font-size: 18px">Entrada</h2>
+<label style="display: flex; flex-direction: column; gap: 6px; color: #9AA3AD; font-size: 13px">Dispositivo
+<select style="height: 40px; background: #1C2024; color: #E8EAED; border: 1px solid #2A3036; border-radius: 8px; padding: 0 10px; font: inherit"><option>HeadRush Flex Prime (USB)</option></select>
+</label>
+<label style="display: flex; flex-direction: column; gap: 6px; color: #9AA3AD; font-size: 13px">Canal DI (seco)
+<select style="height: 40px; background: #1C2024; color: #E8EAED; border: 1px solid #2A3036; border-radius: 8px; padding: 0 10px; font: inherit"><option>Entrada 3 · DI</option></select>
+</label>
+<label style="display: flex; flex-direction: column; gap: 6px; color: #9AA3AD; font-size: 13px">Guitarra
+<select style="height: 40px; background: #1C2024; color: #E8EAED; border: 1px solid #2A3036; border-radius: 8px; padding: 0 10px; font: inherit"><option>Charvel Pro-Mod DK24 · puente</option><option>Epiphone Les Paul Prophecy</option><option>ESP LTD Eclipse &#39;87</option></select>
+</label>
+<div>
+<div style="display: flex; justify-content: space-between; color: #9AA3AD; font-size: 12px"><span>Nivel DI</span><span>-12 dBFS pico</span></div>
+<div aria-hidden="true" style="height: 10px; border-radius: 5px; background: #252A2F; margin-top: 6px; overflow: hidden"><div style="width: 68%; height: 10px; background: #4CC38A"></div></div>
+</div>
+</section>
+<section style="background: #171A1D; border: 1px solid #252A2F; border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px">
+<h2 style="margin: 0; font-family: 'Space Grotesk', sans-serif; font-size: 18px">Última toma</h2>
+<sc-for list="{{checks}}" as="c" hint-placeholder-count="4">
+<div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-radius: 10px; background: #1C2024">
+<span>{{c.label}}</span><span style="{{c.style}}">{{c.value}}</span>
+</div>
+</sc-for>
+<a href="Tone.dc.html" style="display: flex; align-items: center; justify-content: center; height: 44px; border-radius: 10px; background: #F2A33A; color: #1A1206; text-decoration: none; font-weight: 600; margin-top: 4px">Usar como DI y optimizar</a>
+</section>
+</aside>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+var base = 'display: flex; align-items: center; height: 44px; padding: 0 12px; border-radius: 10px; text-decoration: none; font-weight: 500;';
+var items = [['Biblioteca','Main.dc.html'],['Igualar tono','Tone.dc.html'],['Tablatura y DI','Tab.dc.html'],['Backing track','Backing.dc.html'],['Grabar','Record.dc.html'],['Montaje','Edit.dc.html']];
+var active = 'Tablatura y DI';
+var nav = items.map(function (i) { return { label: i[0], href: i[1], style: base + (i[0] === active ? 'background: #2A2116; color: #F2A33A;' : 'color: #C9CED4;') }; });
+var lines = [];
+for (var s = 0; s < 6; s++) { lines.push({ style: 'position: absolute; left: 22px; right: 0; top: ' + (12 + s * 24) + 'px; height: 1px; background: #3A4148;' }); }
+var mk = function (seq, played) {
+return seq.map(function (n, i) {
+var x = 6 + i * (90 / seq.length);
+var past = played && x < 38;
+return { f: String(n[1]), style: 'position: absolute; left: calc(' + x + '% + 22px); top: ' + (3 + n[0] * 24) + 'px; min-width: 18px; padding: 0 3px; height: 18px; border-radius: 4px; background: #171A1D; text-align: center; font-family: JetBrains Mono, monospace; font-size: 13px; font-weight: 700; line-height: 18px; color: ' + (past ? '#F2A33A' : '#E8EAED') + ';' };
+});
+};
+var a = [[5,0],[4,2],[3,2],[5,0],[4,2],[3,2],[5,3],[4,5],[5,0],[4,2],[3,2],[5,0],[4,2],[3,2],[5,5],[4,7]];
+var b = [[4,0],[3,2],[2,2],[4,0],[3,2],[2,2],[4,3],[3,5],[5,3],[4,5],[3,5],[5,3],[4,5],[3,5],[5,2],[4,4]];
+var ok = 'color: #6FD99E; font-weight: 600;';
+var warn = 'color: #F2A33A; font-weight: 600;';
+return {
+nav: nav,
+lines: lines,
+rows: [{ notes: mk(a, true), cursor: true }, { notes: mk(b, false), cursor: false }],
+checks: [{ label: 'Afinación', value: 'Correcta', style: ok }, { label: 'Timing', value: '± 12 ms', style: ok }, { label: 'Clipping', value: 'Ninguno', style: ok }, { label: 'Notas acertadas', value: '94 %', style: warn }]
+};
+}
+}
+</script>
+</body>
+</html>
