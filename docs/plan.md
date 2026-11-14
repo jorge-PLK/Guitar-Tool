@@ -1,6 +1,6 @@
 # ToneForge · Plan de implementación
 
-Copia local de la pestaña «Plan» del doc de spec (leída el 14/11/2026, rev 50).
+Fuente de verdad del plan desde el 15/11/2026 (ADR-002); antes, copia de la pestaña «Plan» del doc de spec (rev 50).
 Spec completa: [spec.md](spec.md). Bocetos de pantallas: [design/](design/).
 
 Once fases (0 a 10) en dos etapas: primero la herramienta de estudio y la grabación con vídeo; después el igualado de tono en la pedalera. Cada fase termina en algo que se puede probar y tiene una condición de paso. Sin fechas: la duración depende de lo que salga en la Fase 0.
@@ -141,6 +141,31 @@ Gigboard con firmware NAM custom y Spark GO y NEO, si se confirman.
 
 La Etapa 1 no depende del Remote Editor ni de TONE3000. La tablatura (5) depende de las fases 3 y 4; la grabación (6), también de la 3 y la 4; el montaje (7), de la 6. En la Etapa 2, el igualado (9) depende de P1 y de la fase 8.
 
+### Orden de ejecución
+
+Mismo número de orden: se pueden hacer en paralelo o en cualquier orden entre sí. Las dependencias de las fases 5, 6, 7 y 9 y de las pruebas de la Etapa 2 son las del párrafo anterior; las demás están deducidas de lo que necesita cada tarea. Los modelos son los de «Modelos por fase».
+
+| Orden | Qué | Va después de | Pedalera | Orquestador | Agentes |
+|---|---|---|---|---|---|
+| 1 | P4 · Modelos a Core ML | Nada | No | Opus | Opus |
+| 1 | P6 · Calidad al 50 % | Nada | No | Opus | Sonnet |
+| 1 | P2 · Audio USB | Nada | Sí | Opus | Sonnet |
+| 2 | Fase 1 · Base y biblioteca | P4 | No | Opus | Sonnet |
+| 3 | Fase 2 · Herramienta de estudio | Fase 1, P6 | No | Opus | Opus (pulso, acordes) · Sonnet (reproductor, pantalla) |
+| 4 | Fase 3 · Audio con la pedalera | P2, Fase 2 | Sí | Opus | Opus (latencia, alineado) · Sonnet (selector, Ajustes de audio) |
+| 4 | Fase 4 · Guitarras y secciones | Fase 2 | No | Opus | Opus (separación A/B, clasificación) · Sonnet (interfaz) |
+| 5 | Fase 5 · Tablatura y DI guiado | Fases 3 y 4 | Sí | Opus | Opus (cuerdas y trastes, batería) · Sonnet (alphaTab, validación) |
+| 5 | Fase 6 · Grabación con vídeo | Fases 3 y 4 | Sí | Opus | Opus (reloj común) · Sonnet (multitoma, pantalla) |
+| 6 | Fase 7 · Montaje | Fase 6 | No | Fable | Opus (compositor, encuadre) · Sonnet (layouts, exportación, pantalla) |
+| 7 | P1 · Remote Editor | Etapa 1 en uso | Sí | Fable | Opus (análisis del tráfico) · Sonnet (scripts) |
+| 7 | P3 · TONE3000 | Etapa 1 en uso | No | Fable | Sonnet |
+| 7 | P5 · Velocidad del bucle | P1 | Sí | Fable | Sonnet |
+| 8 | Fase 8 · Análisis del tono | P3, Fase 5 | Sí | Fable | Opus (huella, distancia) · Sonnet (TONE3000, pantalla) |
+| 9 | Fase 9 · Igualado en la pedalera | P1, Fase 8 | Sí | Fable | Opus (HeadRushKit, optimizador) · Sonnet (catálogo, knobs) |
+| 10 | Fase 10 · Ampliaciones (v2) | Fase 9 | Otro hardware | Sin definir | Sin definir |
+
+Sin pedalera se puede avanzar con P4, P6 y las fases 1, 2 y 4. La primera vez que hace falta conectarla es P2, que bloquea la Fase 3 pero nada de lo anterior. P4, P6 y P2 comparten una sesión orquestadora; P1, P3 y P5, otra.
+
 ## Estimación de tiempos
 
 Entre 48 y 79 horas de trabajo con Claude Code: de 31 a 51 la Etapa 1 y de 17 a 28 la Etapa 2. Recalibrada con experiencia real (tareas estimadas en 1 o 2 semanas han llevado 5 o 6 horas). Marca el ritmo lo que solo se puede hacer con la pedalera y de oído. No incluye una posible versión de Windows.
@@ -162,6 +187,32 @@ Entre 48 y 79 horas de trabajo con Claude Code: de 31 a 51 la Etapa 1 y de 17 a 
 En calendario, con unas 10 horas a la semana: la Etapa 1 en 3 a 5 semanas y todo en 5 a 8.
 
 La mayor incertidumbre no es de horas sino de resultado: si el Remote Editor no se deja controlar (P1), la Fase 9 cambia de forma, no de duración.
+
+## Modelos por fase
+
+Cada fase la lleva una sesión orquestadora que escribe la mini-spec, reparte el trabajo en agentes de modelo igual o menor y revisa lo que devuelven. El orquestador no programa las partes: decide, integra y comprueba la condición de paso. Reparto propuesto el 15/11/2026, sin datos medidos todavía en este proyecto: se ajusta con lo que salga en la Fase 0.
+
+| Fase | Orquestador inicial | Agentes | Por qué |
+|---|---|---|---|
+| 0. Pruebas P2, P4 y P6 | Opus | Opus para la conversión a Core ML (P4); Sonnet para los scripts de P2 y P6 | Scripts cortos e independientes; lo difícil es solo la conversión |
+| 1. Base y biblioteca | Opus | Sonnet para paquetes, modelo de datos, importación y pantallas | APIs de Apple documentadas y trabajo guiado por la spec |
+| 2. Herramienta de estudio | Opus | Opus para pulso y acordes; Sonnet para reproductor y pantalla | Integrar modelos es lo delicado; el resto es interfaz |
+| 3. Audio con la pedalera | Opus | Opus para latencia y alineado; Sonnet para selector y Ajustes de audio | La precisión de 1 ms pide cuidado, no un modelo mayor |
+| 4. Guitarras y secciones | Opus | Opus para la separación A/B y la clasificación; Sonnet para la interfaz | Procesado de señal acotado |
+| 5. Tablatura y DI guiado | Opus | Opus para cuerdas y trastes y para la batería; Sonnet para alphaTab y validación de la toma | Fase larga pero de piezas conocidas |
+| 6. Grabación con vídeo | Opus | Opus para el reloj común de audio y vídeo; Sonnet para multitoma y pantalla | La sincronía es el único punto fino |
+| 7. Montaje | Fable | Opus para el compositor y el encuadre; Sonnet para layouts, exportación y pantalla | Compositor propio fotograma a fotograma, poco documentado |
+| Pruebas P1, P3 y P5 | Fable | Opus para analizar el tráfico capturado; Sonnet para los scripts | Ingeniería inversa de un protocolo sin documentar |
+| 8. Análisis del tono | Fable | Opus para huella y distancia; Sonnet para el conector TONE3000 y la pantalla | Diseñar la medida de parecido decide el resultado de la v1 |
+| 9. Igualado en la pedalera | Fable | Opus para HeadRushKit y el optimizador; Sonnet para el catálogo de bloques y la vista de knobs | Bucle cerrado sobre hardware real con protocolo propio |
+
+Reglas comunes:
+
+- Subir el orquestador de Opus a Fable solo si un mismo problema falla dos veces, y volver a Opus al resolverlo.
+- Las ediciones mecánicas (renombrar, cambios de uno o dos ficheros) van a Haiku o Sonnet.
+- Localizar código va siempre a un agente, no al orquestador.
+- Una sesión por fase y `/clear` al cerrarla: el contexto acumulado cuesta más que la diferencia entre modelos.
+- Lo que solo se puede comprobar con la pedalera o de oído no mejora con un modelo mayor.
 
 ## Primer paso
 

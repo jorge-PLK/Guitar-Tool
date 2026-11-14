@@ -1,6 +1,8 @@
 
 # ToneForge – Spec de app de escritorio para igualar tonos
 
+Fuente de verdad de la spec desde el 15/11/2026 (ADR-002); antes, copia del doc de spec de Claude Docs.
+
 ·
 
 

@@ -1,0 +1,23 @@
+.DS_Store
+
+# Informes y logs de Tools/test.sh, capturas de tf-qa
+Temp/
+
+# Swift / Xcode
+.build/
+.swiftpm/
+DerivedData/
+xcuserdata/
+*.xcuserstate
+
+# Python de desarrollo (conversión de modelos)
+Tools/py/.venv/
+__pycache__/
+
+# Salidas de las pruebas de la Fase 0: pesos, modelos convertidos, audios de comparación
+Probes/*/out/
+Probes/*/*/out/
+
+# Claude Code local
+.claude/settings.local.json
+.claude/worktrees/
