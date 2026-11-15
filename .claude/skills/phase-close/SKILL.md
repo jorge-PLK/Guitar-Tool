@@ -36,7 +36,7 @@ Lee en `docs/plan.md` la condición de paso de la fase. Si se demuestra con un t
 
 ## 5. Commit
 
-- Enseña la lista final de ficheros y el mensaje antes de hacer el commit.
+- Haz el commit directamente, sin pedir confirmación a Jorge (lo pidió el 15/11/2026); enseña después el hash y la lista de ficheros.
 - Mensaje en inglés, imperativo, con el estilo de `git log -5 --format='%s%n%b'` (p. ej. `Close Phase 1: library and stem separation (ADR-004)`).
 - **Sin** trailer `Co-Authored-By`.
 - En la rama `fase-N`. `git add` con rutas explícitas, nunca `git add -A`. Sin push ni merge a `main`: eso lo decide Jorge.
