@@ -5,6 +5,13 @@ import SwiftUI
 struct ToneForgeApp: App {
     @State private var model = AppModel()
 
+    init() {
+        #if DEBUG
+        // Las capturas no heredan el estado restaurado (SceneStorage: rejilla expandida, tamaño de ventana…).
+        if LaunchOptions().snapshot != nil { UserDefaults.standard.register(defaults: ["ApplePersistenceIgnoreState": true]) }
+        #endif
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()

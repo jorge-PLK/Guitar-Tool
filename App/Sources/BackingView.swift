@@ -90,7 +90,11 @@ struct BackingContent: View {
                     banner
                     BackingTimelineCard(session: session, ctl: ctl, time: time,
                                         expanded: $chordsExpanded, editMode: $chordsEdit)
-                    BackingMixer(session: session, ctl: ctl, meters: meters, compact: chordsExpanded)
+                    HStack(alignment: .top, spacing: 20) {
+                        BackingMixer(session: session, ctl: ctl, meters: meters, compact: chordsExpanded)
+                            .frame(maxWidth: .infinity)
+                        if ctl.hasGuitar { ComparePanel(ctl: ctl).frame(width: 300) }
+                    }
                 }
             }
             .padding(.horizontal, 36).padding(.vertical, 28)

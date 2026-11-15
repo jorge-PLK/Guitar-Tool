@@ -13,3 +13,5 @@ Una línea por ADR; el texto está en `docs/adr/ADR-NNN.md`. Nuevo ADR = fichero
 - [ADR-009](adr/ADR-009.md) · 2026-11-15 · Herramienta de estudio: reproductor con Varispeed, análisis de pulso, acordes y tonalidad en la app, y stems vacíos (Fase 2)
 - [ADR-010](adr/ADR-010.md) · 2026-11-15 · El DI guiado sale de la Fase 5 y pasa a la Fase 8a; la Fase 5 pasa a ser «Tablatura»
 - [ADR-011](adr/ADR-011.md) · 2026-11-15 · Cierre de la Fase 2b: SourceKit, helpers embebidos (yt-dlp, Deno, ffmpeg propio), listas y álbumes, repetidos, y eliminar, editar y re-encolar en la biblioteca
+- [ADR-012](adr/ADR-012.md) · 2026-11-15 · Fase 3 genérica (sin Flex Prime cableada) y el DI y el reamp salen de la Etapa 1
+- [ADR-013](adr/ADR-013.md) · 2026-11-15 · Cierre de la Fase 3: audio con el dispositivo

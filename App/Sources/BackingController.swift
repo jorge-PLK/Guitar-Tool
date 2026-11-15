@@ -17,16 +17,32 @@ final class BackingController {
     /// Bucle activo (no se guarda: cada sesión empieza sin bucle).
     private(set) var loop: ClosedRange<Double>?
     private(set) var loopName: String?
+    /// Audio con el dispositivo (grabar y A/B); lo asigna la app al abrir el tema.
+    @ObservationIgnored weak var audio: AudioController?
+
+    // A/B (mini-spec Fase 3, «A/B dentro de la mezcla»).
+    /// Id del canal «Tú» en el reproductor (no coincide con el de ningún stem).
+    static let takeChannelID = "take"
+    private(set) var compareMode: CompareMode = .original
+    /// Toma cargada en el reproductor (canal «Tú»).
+    private(set) var loadedTake: Take?
+    /// Ganancia de `LoudnessMatch` aplicada al cargarla; nil si no se pudo medir (silencio).
+    private(set) var takeGainDB: Double?
+    /// Fader actual del canal «Tú» (arranca en la ganancia igualada).
+    private(set) var takeFaderDB = 0.0
+    private(set) var takeError: String?
+    /// Tu nivel en directo menos el del stem (dB), mientras el A/B está en «Tú en directo».
+    private(set) var liveDifferenceDB: Double?
 
     /// Volumen global en dB (del perfil de equipo, igual en todos los temas).
     private(set) var masterGainDB: Double
     /// La app lo usa para guardar el perfil.
     var onMasterChange: ((Double) -> Void)?
 
-    init(session: StudySession, masterGainDB: Double = 0) {
+    init(session: StudySession, masterGainDB: Double = 0, output: OutputSelection = OutputSelection()) {
         self.session = session
         self.masterGainDB = masterGainDB
-        player = StudyPlayer(devices: CoreAudioDeviceProvider())
+        player = StudyPlayer(devices: CoreAudioDeviceProvider(), output: output)
         player.masterGainDB = masterGainDB
         loadTracks()
     }
@@ -52,7 +68,7 @@ final class BackingController {
         for kind in session.audibleStems where tracks.contains(where: { $0.id == kind.rawValue }) {
             let m = session.mix(for: kind)
             player.setGain(kind.rawValue, dB: m.gainDB)
-            player.setMute(kind.rawValue, m.muted)
+            player.setMute(kind.rawValue, kind == .guitar ? effectiveGuitarMute : m.muted)
             player.setSolo(kind.rawValue, m.solo)
         }
         player.rate = settings.rate
@@ -134,7 +150,7 @@ final class BackingController {
     func toggleMute(_ kind: StemKind) {
         let m = !session.mix(for: kind).muted
         session.updateMix(kind) { $0.muted = m }
-        player.setMute(kind.rawValue, m)
+        player.setMute(kind.rawValue, kind == .guitar ? effectiveGuitarMute : m)
     }
 
     func toggleSolo(_ kind: StemKind) {
@@ -147,6 +163,84 @@ final class BackingController {
     var hasGuitar: Bool { session.audibleStems.contains(.guitar) }
     var guitarsOff: Bool { session.mix(for: .guitar).muted }
     func toggleWithoutGuitars() { if hasGuitar { toggleMute(.guitar) } }
+
+    // MARK: A/B
+
+    /// Mute del stem de guitarra tal como lo ve el reproductor: el del usuario, salvo en B (silenciado).
+    /// El del usuario (el guardado en el proyecto) no se toca nunca.
+    private var effectiveGuitarMute: Bool {
+        MixCompare.stemMuted(mode: compareMode, userMuted: session.mix(for: .guitar).muted)
+    }
+
+    var lastTake: Take? { session.playableTakes.last }
+
+    func applyCompareMute() {
+        if hasGuitar { player.setMute(StemKind.guitar.rawValue, effectiveGuitarMute) }
+        if loadedTake != nil { player.setMute(Self.takeChannelID, compareMode != .lastTake) }
+    }
+
+    func setCompare(_ mode: CompareMode) {
+        guard mode != compareMode, hasGuitar else { return }
+        compareMode = mode
+        liveDifferenceDB = nil
+        applyCompareMute()
+        if mode == .lastTake, let t = lastTake, loadedTake != t { Task { await loadLastTake() } }
+    }
+
+    /// Lo llama el controlador de audio al guardar una toma (nueva) o corregir las sin calibrar.
+    func takesChanged(isNew: Bool) {
+        Task { await loadLastTake() }
+    }
+
+    /// Carga la última toma no descartada como canal «Tú», igualada en sonoridad al stem de guitarra.
+    func loadLastTake() async {
+        guard let t = lastTake, let rel = t.processedFile, let start = t.songStart, let fs = t.sampleRate else { return }
+        if loadedTake == t { return }
+        let url = session.layout.folder.appendingPathComponent(rel)
+        let stemURL = session.layout.stemURL(.guitar)
+        let hasStem = hasGuitar
+        let match = await Task.detached { () -> LoudnessMatch.Result? in
+            guard hasStem, let take = try? AudioSamples.read(url), let frames = take.first?.count, frames > 0,
+                  let stem = try? AudioSamples.read(stemURL, from: start, seconds: Double(frames) / fs) else { return nil }
+            return LoudnessMatch.gain(take: take, stem: stem, sampleRate: fs)
+        }.value
+        let gain = match?.unclampedGainDB == nil ? nil : match?.gainDB
+        do {
+            try player.setTake(TakeTrack(id: Self.takeChannelID, url: url, songStart: start, gainDB: gain ?? 0,
+                                         muted: compareMode != .lastTake))
+            loadedTake = t
+            takeGainDB = gain
+            takeFaderDB = gain ?? 0
+            takeError = nil
+        } catch {
+            loadedTake = nil
+            takeGainDB = nil
+            takeError = "No se pudo cargar la toma (\(error))."
+        }
+        applyCompareMute()
+    }
+
+    func setTakeGain(_ dB: Double) {
+        let g = min(max(dB, Self.faderRange.lowerBound), Self.faderRange.upperBound)
+        takeFaderDB = g
+        player.setGain(Self.takeChannelID, dB: g)
+    }
+
+    /// Diferencia de nivel en directo: tu procesada (3 s) frente al stem en el tramo recién tocado, con su fader.
+    func refreshLiveDifference() async {
+        guard compareMode == .live, hasGuitar else { liveDifferenceDB = nil; return }
+        let live = audio?.liveGuitarLevelDB()
+        let seconds = AudioSession.liveLevelSeconds
+        let from = max(0, player.currentTime - seconds)
+        let url = session.layout.stemURL(.guitar)
+        let stemRMS = await Task.detached { () -> Double? in
+            guard let x = try? AudioSamples.read(url, from: from, seconds: seconds) else { return nil }
+            return AudioSamples.rmsDB(x)
+        }.value
+        guard compareMode == .live else { return }
+        liveDifferenceDB = MixCompare.liveDifferenceDB(liveDB: live, stemRMSDB: stemRMS,
+                                                       faderDB: session.mix(for: .guitar).gainDB)
+    }
 
     #if DEBUG
     /// Estado inicial para capturas, sin reproducir.

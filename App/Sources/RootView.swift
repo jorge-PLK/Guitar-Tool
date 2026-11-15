@@ -85,10 +85,10 @@ struct Sidebar: View {
     private var deviceCard: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
-                Circle().fill(model.flexPrime.isConnected ? Color(hex: 0x4CC38A) : TF.muted).frame(width: 8, height: 8)
-                Text("Flex Prime").font(TF.body(14, .semibold))
+                Circle().fill(model.audioDevice.chosenUID == nil || model.audioDevice.isConnected ? Color(hex: 0x4CC38A) : TF.muted).frame(width: 8, height: 8)
+                Text(model.audioDevice.title).font(TF.body(14, .semibold))
             }
-            Text(model.flexPrime.isConnected ? "Conectada por USB" : "Sin conectar").font(TF.body(12)).foregroundStyle(TF.muted)
+            Text(model.audioDevice.subtitle).font(TF.body(12)).foregroundStyle(TF.muted)
         }
         .padding(12).frame(maxWidth: .infinity, alignment: .leading)
         .background(TF.field, in: RoundedRectangle(cornerRadius: 10))

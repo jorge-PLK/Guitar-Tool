@@ -38,6 +38,9 @@ struct BackingMixer: View {
                                     MixerChannel(name: name, kind: kind, session: session, ctl: ctl, meter: meters[kind.rawValue])
                                 }
                             }
+                            if ctl.loadedTake != nil {
+                                TakeChannel(ctl: ctl, meter: meters[BackingController.takeChannelID])
+                            }
                         }
                         .padding(.bottom, 4)
                     }

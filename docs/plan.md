@@ -70,17 +70,19 @@ Importar temas desde un enlace de YouTube o de Spotify. El audio sale de YouTube
 
 Condición de paso: pegar un enlace de YouTube y otro de Spotify deja cada tema en la biblioteca listo para separar, sin más paso manual que elegir candidato; pegar una lista o un álbum, marcar parte de sus temas y pulsar «Descargar y procesar» los deja importados y separados; y la prueba ampliada con al menos cinco temas (uno sin subida oficial, uno con el directo dominante y uno largo) queda anotada en `docs/probes/P7-fuentes.md` con cuántos aciertan el candidato correcto. *Cumplida el 15/11/2026, confirmada por Jorge en la app (ADR-011). La prueba ampliada (7 temas, 5 aciertos) no cubrió el tema sin subida oficial ni el directo dominante claro.*
 
-### Fase 3 · Audio con la pedalera (RF1)
+### Fase 3 · Audio con el dispositivo (RF1)
 
-- [ ] Selector de dispositivo y canales, guardado en el perfil de equipo
-- [ ] Calibración de latencia con un pulso y de nivel de entrada del DI
-- [ ] Apartado Audio de Ajustes: dispositivo, canales, frecuencia de muestreo y las dos calibraciones
-- [ ] Envío del backing a la pedalera para escucharlo en sus auriculares
-- [ ] Grabación simultánea del DI seco y de la señal procesada
-- [ ] Alinear las pistas grabadas con el backing usando la latencia medida
-- [ ] A/B de tu guitarra contra la original dentro de la mezcla
+- [x] Selector de dispositivo de entrada y de salida y de canales (guitarra y backing), guardado en el perfil de equipo, sin nada cableado a la Flex Prime
+- [x] Calibración de latencia con un pulso (bucle de cable)
+- [x] Apartado Audio de Ajustes: dispositivos, canales, frecuencia de muestreo y calibración de latencia
+- [x] Envío del backing al dispositivo elegido
+- [x] Grabación de la señal procesada
+- [x] Alinear la toma con el backing usando la latencia medida y el retardo del rig de cada toma
+- [x] A/B de tu guitarra contra la original dentro de la mezcla (en directo y última toma)
 
-Condición de paso: toma grabada alineada con el backing con error menor de 1 ms.
+Condición de paso: toma grabada alineada con el backing con error menor de 1 ms. *Cumplida el 15/11/2026 (0,010 ms en una toma de comprobación de 60 s recién calibrada, con `tf-audio verify`; ADR-013). Límite conocido: la latencia de la Flex Prime se acorta a escalones de 12 muestras (0,25 ms) que el HAL no refleja; Jorge lo acepta y no hay corrección.*
+
+El DI (canal, nivel, DI seco) y el reamp salieron de esta fase el 15/11/2026 (ADR-012).
 
 ### Fase 4 · Guitarras y secciones (RF6, parte de RF5)
 
@@ -106,7 +108,7 @@ El DI guiado (grabar y validar la toma) salió de esta fase el 15/11/2026: solo 
 - [ ] Captura de cámara (webcam o iPhone) con el mismo reloj que el audio
 - [ ] Calibración del retardo de la cámara
 - [ ] Apartado Cámara y vídeo de Ajustes: cámara por defecto, resolución, fotogramas por segundo, retardo y exportación por defecto
-- [ ] Grabación multipista: backing, DI, procesada y micro
+- [ ] Grabación multipista: backing, procesada y micro (sin DI; ADR-012)
 - [ ] Multitoma: partes, tomas por parte, mejor toma y punch-in (el rig recomendado para cada parte llega con la Etapa 2)
 - [ ] Pantalla de grabación
 
@@ -131,6 +133,7 @@ Empieza cuando la Etapa 1 está en uso. Antes de la Fase 8 se hacen las pruebas 
 
 Grabar el DI siguiendo la tablatura, para tener la toma que después se reamplifica. Viene de la antigua Fase 5.
 
+- [ ] Canal del DI, calibración de su nivel y grabación del DI seco, ocultos al usuario (ADR-012)
 - [ ] Grabar la toma con cuenta atrás, siguiendo la tablatura, y validarla: afinación, timing y clipping
 - [ ] Guardar la toma como DI para el igualado
 
@@ -178,7 +181,7 @@ Mismo número de orden: se pueden hacer en paralelo o en cualquier orden entre s
 | 2 | Fase 1 · Base y biblioteca | P4 | No | Opus | Sonnet |
 | 3 | Fase 2 · Herramienta de estudio | Fase 1, P6 | No | Opus | Opus (pulso, acordes) · Sonnet (reproductor, pantalla) |
 | 3 | Fase 2b · Fuentes externas | Fase 1, P7 | No | Opus | Sonnet (conectores y pantallas) |
-| 4 | Fase 3 · Audio con la pedalera | P2, Fase 2 | Sí | Opus | Opus (latencia, alineado) · Sonnet (selector, Ajustes de audio) |
+| 4 | Fase 3 · Audio con el dispositivo | P2, Fase 2 | Sí | Opus | Opus (latencia, alineado) · Sonnet (selector, Ajustes de audio) |
 | 4 | Fase 4 · Guitarras y secciones | Fase 2 | No | Opus | Opus (separación A/B, clasificación) · Sonnet (interfaz) |
 | 5 | Fase 5 · Tablatura | Fase 4 | No | Opus | Opus (cuerdas y trastes, batería) · Sonnet (alphaTab) |
 | 5 | Fase 6 · Grabación con vídeo | Fases 3 y 4 | Sí | Opus | Opus (reloj común) · Sonnet (multitoma, pantalla) |
@@ -195,7 +198,7 @@ Sin pedalera se puede avanzar con P4, P6 y las fases 1, 2, 2b, 4 y 5. La primera
 
 ## Estimación de tiempos
 
-Entre 53 y 87 horas de trabajo con Claude Code: de 35 a 57 la Etapa 1 y de 18 a 30 la Etapa 2 (al mover el DI guiado a la Etapa 2 se le asignaron 1 a 2 horas de las 7 a 12 de la antigua Fase 5; el total no cambia). Recalibrada con experiencia real (tareas estimadas en 1 o 2 semanas han llevado 5 o 6 horas). Marca el ritmo lo que solo se puede hacer con la pedalera y de oído. No incluye una posible versión de Windows.
+Entre 55 y 89 horas de trabajo con Claude Code: de 37 a 59 la Etapa 1 y de 18 a 30 la Etapa 2 (al mover el DI guiado a la Etapa 2 se le asignaron 1 a 2 horas de las 7 a 12 de la antigua Fase 5; el total no cambia). Recalibrada con experiencia real (tareas estimadas en 1 o 2 semanas han llevado 5 o 6 horas). Marca el ritmo lo que solo se puede hacer con la pedalera y de oído. No incluye una posible versión de Windows.
 
 | Fase | Horas | Acumulado | Qué marca el ritmo |
 |---|---|---|---|
@@ -203,15 +206,15 @@ Entre 53 y 87 horas de trabajo con Claude Code: de 35 a 57 la Etapa 1 y de 18 a 
 | 1. Base y biblioteca | 2 a 3 | 5 a 8 | Descarga de modelos y primera separación |
 | 2. Herramienta de estudio | 4 a 6 | 9 a 14 | Revisar acordes y pulso en temas reales |
 | 2b. Fuentes externas | 5 a 8 | 14 a 22 | Compilar ffmpeg y probar descargas reales con varios temas |
-| 3. Audio con la pedalera | 2 a 4 | 16 a 26 | Pruebas de latencia y niveles con la Flex Prime |
-| 4. Guitarras y secciones | 3 a 5 | 19 a 31 | Escuchar si la separación A/B convence |
-| 5. Tablatura (guitarras, bajo y batería) | 6 a 10 | 25 a 41 | Corregir transcripciones; la batería es lo más incierto |
-| 6. Grabación con vídeo | 4 a 6 | 29 a 47 | Sincronía de cámara y pruebas de tomas |
-| 7. Montaje | 6 a 10 | 35 a 57 | Ajustar transiciones y encuadre a la vista |
-| Pruebas P1, P3 y P5 | 4 a 6 | 39 a 63 | Capturar el tráfico del Remote Editor |
-| 8a. DI guiado | 1 a 2 | 40 a 65 | Tocar las tomas y ver si la validación acierta |
-| 8. Análisis del tono | 5 a 7 | 45 a 72 | Reamp y validar de oído la medida de parecido |
-| 9. Igualado en la pedalera | 8 a 15 | 53 a 87 | Catálogo de bloques y afinar el bucle con hardware real |
+| 3. Audio con el dispositivo | 4 a 6 | 18 a 28 | Pruebas de latencia y niveles con la Flex Prime |
+| 4. Guitarras y secciones | 3 a 5 | 21 a 33 | Escuchar si la separación A/B convence |
+| 5. Tablatura (guitarras, bajo y batería) | 6 a 10 | 27 a 43 | Corregir transcripciones; la batería es lo más incierto |
+| 6. Grabación con vídeo | 4 a 6 | 31 a 49 | Sincronía de cámara y pruebas de tomas |
+| 7. Montaje | 6 a 10 | 37 a 59 | Ajustar transiciones y encuadre a la vista |
+| Pruebas P1, P3 y P5 | 4 a 6 | 41 a 65 | Capturar el tráfico del Remote Editor |
+| 8a. DI guiado | 1 a 2 | 42 a 67 | Tocar las tomas y ver si la validación acierta |
+| 8. Análisis del tono | 5 a 7 | 47 a 74 | Reamp y validar de oído la medida de parecido |
+| 9. Igualado en la pedalera | 8 a 15 | 55 a 89 | Catálogo de bloques y afinar el bucle con hardware real |
 
 En calendario, con unas 10 horas a la semana: la Etapa 1 en 4 a 6 semanas y todo en 5 a 9.
 
@@ -227,7 +230,7 @@ Cada fase la lleva una sesión orquestadora que escribe la mini-spec, reparte el
 | 1. Base y biblioteca | Opus | Sonnet para paquetes, modelo de datos, importación y pantallas; Opus para la integración del separador | APIs de Apple documentadas y trabajo guiado por la spec; el separador pide integrar el modelo |
 | 2. Herramienta de estudio | Opus | Opus para pulso y acordes; Sonnet para reproductor y pantalla | Integrar modelos es lo delicado; el resto es interfaz |
 | 2b. Fuentes externas | Opus | Sonnet para conectores y pantallas | APIs y scripts documentados (P7); sin modelos que integrar |
-| 3. Audio con la pedalera | Opus | Opus para latencia y alineado; Sonnet para selector y Ajustes de audio | La precisión de 1 ms pide cuidado, no un modelo mayor |
+| 3. Audio con el dispositivo | Opus | Opus para latencia y alineado; Sonnet para selector y Ajustes de audio | La precisión de 1 ms pide cuidado, no un modelo mayor |
 | 4. Guitarras y secciones | Opus | Opus para la separación A/B y la clasificación; Sonnet para la interfaz | Procesado de señal acotado |
 | 5. Tablatura | Opus | Opus para cuerdas y trastes y para la batería; Sonnet para alphaTab | Fase larga pero de piezas conocidas |
 | 6. Grabación con vídeo | Opus | Opus para el reloj común de audio y vídeo; Sonnet para multitoma y pantalla | La sincronía es el único punto fino |

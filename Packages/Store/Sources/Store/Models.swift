@@ -184,8 +184,35 @@ public struct Take: Codable, Sendable, Equatable {
     public var discarded: Bool
     public var createdAt: Date
 
+    // Grabación con el dispositivo (mini-spec Fase 3, «Grabación»). Todos opcionales y aditivos: las tomas
+    // anteriores no los traen.
+    /// Instante del tema (s) al que corresponde la muestra 0 del fichero ya alineado.
+    public var songStart: Double?
+    public var sampleRate: Double?
+    /// Latencia con la que se alineó, en muestras con decimales.
+    public var latencySamples: Double?
+    /// Retardo del rig medido en esta toma (o el último fiable), en muestras.
+    public var rigDelaySamples: Double?
+    public var rigDelayReliable: Bool?
+    /// false = alineada con la latencia declarada por el dispositivo, sin calibrar.
+    public var latencyCalibrated: Bool?
+    /// Clave con la que se calibró; permite recolocar la toma al calibrar después.
+    public var calibrationKey: CalibrationKey?
+    public var clock: ClockMode?
+
     public init(id: UUID = UUID(), guitarId: UUID? = nil, sectionId: UUID? = nil, diFile: String? = nil,
-                processedFile: String? = nil, micFile: String? = nil, discarded: Bool = false, createdAt: Date = Date()) {
+                processedFile: String? = nil, micFile: String? = nil, discarded: Bool = false, createdAt: Date = Date(),
+                songStart: Double? = nil, sampleRate: Double? = nil, latencySamples: Double? = nil,
+                rigDelaySamples: Double? = nil, rigDelayReliable: Bool? = nil, latencyCalibrated: Bool? = nil,
+                calibrationKey: CalibrationKey? = nil, clock: ClockMode? = nil) {
+        self.songStart = songStart
+        self.sampleRate = sampleRate
+        self.latencySamples = latencySamples
+        self.rigDelaySamples = rigDelaySamples
+        self.rigDelayReliable = rigDelayReliable
+        self.latencyCalibrated = latencyCalibrated
+        self.calibrationKey = calibrationKey
+        self.clock = clock
         self.id = id
         self.guitarId = guitarId
         self.sectionId = sectionId

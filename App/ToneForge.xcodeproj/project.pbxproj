@@ -7,13 +7,16 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		04B1AF2C73E562A2CE7D0244 /* AudioDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4214C2F048A90BD78E099B14 /* AudioDemo.swift */; };
 		0626EDAA3F887CDEBD256D14 /* BackingMixer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E711FA42A2A180AD5FB35C3 /* BackingMixer.swift */; };
-		0F44D837A0B1DD98C2322E38 /* FlexPrimeMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0047CD671C9AEC3053061691 /* FlexPrimeMonitor.swift */; };
 		134191F8B9AC4B09EE2E60EC /* ToneForgeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75A7F55F6E6CA6C725218127 /* ToneForgeApp.swift */; };
+		1D7D3E31BDA14BA30D5A6915 /* CalibrationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD842C108EE8790376C50154 /* CalibrationSheet.swift */; };
 		22FB99040C9A3A5490D4AB8E /* ChordGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0287422B5C2A670824F3C9C5 /* ChordGrid.swift */; };
 		2C2B9FE6AAC7B958F3E4A8F1 /* StudySession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 205EBA0C766248D3D5BA3D6D /* StudySession.swift */; };
 		367912D9D2B87FF85C3BD016 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B9A686802572ACB6B1A8CC04 /* Assets.xcassets */; };
 		41A89E8D66E34069176DF099 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6454D99769C07D228948A88A /* RootView.swift */; };
+		4BCCA97CF11A6AD269E470C0 /* AudioSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AFD947BF6B4A2CCF53571E1 /* AudioSettingsView.swift */; };
+		4DD74AEC9DA1B4E64FB4434B /* BackingRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB2EA898094A818B3F3AD211 /* BackingRecord.swift */; };
 		4FBC14B59C61E87856A72D6A /* ModelKit in Frameworks */ = {isa = PBXBuildFile; productRef = A69DFC994093C85D635994FE /* ModelKit */; };
 		5B7C970A73829188FB47C9B4 /* BackingController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D4CF1DC9FDEAB554C9AD979 /* BackingController.swift */; };
 		6193C9D14BAEB11B56782763 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E90B1053A3471D11C92D139D /* AppModel.swift */; };
@@ -27,6 +30,9 @@
 		ADF0053AD91B682E0C5B1EBE /* LinkImportDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B5FC3CE1DF0872CDBB3FBA9 /* LinkImportDemo.swift */; };
 		AF1B1A342114D331C7F9D61D /* ChordDiagram.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02E595FBE0F3410852A2CA67 /* ChordDiagram.swift */; };
 		B5CFEE7DB885C39DD2CA1778 /* SourceKit in Frameworks */ = {isa = PBXBuildFile; productRef = CCAB4C8959EC7AC83B04E254 /* SourceKit */; };
+		C1E6534D276240792E8943B7 /* AudioDeviceMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCBB981D7D3174527E92BBED /* AudioDeviceMonitor.swift */; };
+		CD4EA14A1429A5610CC5182C /* AudioBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = E75DDB3F364F1B5378F62689 /* AudioBridge.swift */; };
+		CDD866DEEE759DF8CEB932EB /* AudioController.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC5E5FAEC08FEB5F90C75D18 /* AudioController.swift */; };
 		D8E41E9844B3FEFAEBBB7CB5 /* ExternalSources.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDE3261796229D3052B07781 /* ExternalSources.swift */; };
 		E2387454B5475F6956E87AEF /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3EE15103E9ACEAD7E554968 /* Theme.swift */; };
 		E80C7A8E62607DD51E4D80BA /* BTC_large_voca_fp16.mlpackage.zip in Resources */ = {isa = PBXBuildFile; fileRef = CC43CDA6D40FEAD57D19FD5F /* BTC_large_voca_fp16.mlpackage.zip */; };
@@ -38,9 +44,9 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		0047CD671C9AEC3053061691 /* FlexPrimeMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlexPrimeMonitor.swift; sourceTree = "<group>"; };
 		0287422B5C2A670824F3C9C5 /* ChordGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChordGrid.swift; sourceTree = "<group>"; };
 		02E595FBE0F3410852A2CA67 /* ChordDiagram.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChordDiagram.swift; sourceTree = "<group>"; };
+		0AFD947BF6B4A2CCF53571E1 /* AudioSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioSettingsView.swift; sourceTree = "<group>"; };
 		0B25179B33ED0A82BB871284 /* Store */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Store; path = ../Packages/Store; sourceTree = SOURCE_ROOT; };
 		0B5FC3CE1DF0872CDBB3FBA9 /* LinkImportDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkImportDemo.swift; sourceTree = "<group>"; };
 		0DFE1412D14EAB4A01F76F6F /* SourceKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = SourceKit; path = ../Packages/SourceKit; sourceTree = SOURCE_ROOT; };
@@ -50,6 +56,7 @@
 		28E679F0268528B203E07B9D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		29EE870241AE799869F0237A /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		2E711FA42A2A180AD5FB35C3 /* BackingMixer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackingMixer.swift; sourceTree = "<group>"; };
+		4214C2F048A90BD78E099B14 /* AudioDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioDemo.swift; sourceTree = "<group>"; };
 		50A04723931020D3F8A07685 /* ToneForge.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ToneForge.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		600C6F9C627112F722163FBE /* StudyKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = StudyKit; path = ../Packages/StudyKit; sourceTree = SOURCE_ROOT; };
 		6454D99769C07D228948A88A /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
@@ -59,14 +66,19 @@
 		9671A99E86917B93EDEFF6AC /* AudioKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = AudioKit; path = ../Packages/AudioKit; sourceTree = SOURCE_ROOT; };
 		B9A686802572ACB6B1A8CC04 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B9D4AE74EA55983C1B4E52E0 /* LinkImportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkImportSheet.swift; sourceTree = "<group>"; };
+		BB2EA898094A818B3F3AD211 /* BackingRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackingRecord.swift; sourceTree = "<group>"; };
+		BCBB981D7D3174527E92BBED /* AudioDeviceMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioDeviceMonitor.swift; sourceTree = "<group>"; };
 		C753425F92D8228D372C046A /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
 		CC43CDA6D40FEAD57D19FD5F /* BTC_large_voca_fp16.mlpackage.zip */ = {isa = PBXFileReference; lastKnownFileType = archive.zip; path = BTC_large_voca_fp16.mlpackage.zip; sourceTree = "<group>"; };
 		CF8F42FD35B0D453C6F9E5EA /* Adapters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Adapters.swift; sourceTree = "<group>"; };
 		D3EE15103E9ACEAD7E554968 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		D7A71A84EB1D1CD867197AAC /* PlaylistImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaylistImport.swift; sourceTree = "<group>"; };
 		E27D5B253DA1C4343F39E6BA /* BackingTimeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackingTimeline.swift; sourceTree = "<group>"; };
+		E75DDB3F364F1B5378F62689 /* AudioBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioBridge.swift; sourceTree = "<group>"; };
 		E7E70B03C10E548B408195F3 /* StudyBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudyBridge.swift; sourceTree = "<group>"; };
 		E90B1053A3471D11C92D139D /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		FC5E5FAEC08FEB5F90C75D18 /* AudioController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioController.swift; sourceTree = "<group>"; };
+		FD842C108EE8790376C50154 /* CalibrationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalibrationSheet.swift; sourceTree = "<group>"; };
 		FDE3261796229D3052B07781 /* ExternalSources.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalSources.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -119,14 +131,20 @@
 			children = (
 				CF8F42FD35B0D453C6F9E5EA /* Adapters.swift */,
 				E90B1053A3471D11C92D139D /* AppModel.swift */,
+				E75DDB3F364F1B5378F62689 /* AudioBridge.swift */,
+				FC5E5FAEC08FEB5F90C75D18 /* AudioController.swift */,
+				4214C2F048A90BD78E099B14 /* AudioDemo.swift */,
+				BCBB981D7D3174527E92BBED /* AudioDeviceMonitor.swift */,
+				0AFD947BF6B4A2CCF53571E1 /* AudioSettingsView.swift */,
 				1D4CF1DC9FDEAB554C9AD979 /* BackingController.swift */,
 				2E711FA42A2A180AD5FB35C3 /* BackingMixer.swift */,
+				BB2EA898094A818B3F3AD211 /* BackingRecord.swift */,
 				E27D5B253DA1C4343F39E6BA /* BackingTimeline.swift */,
 				80314A23F60B85C95E45E709 /* BackingView.swift */,
+				FD842C108EE8790376C50154 /* CalibrationSheet.swift */,
 				02E595FBE0F3410852A2CA67 /* ChordDiagram.swift */,
 				0287422B5C2A670824F3C9C5 /* ChordGrid.swift */,
 				FDE3261796229D3052B07781 /* ExternalSources.swift */,
-				0047CD671C9AEC3053061691 /* FlexPrimeMonitor.swift */,
 				28E679F0268528B203E07B9D /* Info.plist */,
 				C753425F92D8228D372C046A /* LibraryView.swift */,
 				0B5FC3CE1DF0872CDBB3FBA9 /* LinkImportDemo.swift */,
@@ -309,14 +327,20 @@
 			files = (
 				792E4D46568BA44D26D66655 /* Adapters.swift in Sources */,
 				6193C9D14BAEB11B56782763 /* AppModel.swift in Sources */,
+				CD4EA14A1429A5610CC5182C /* AudioBridge.swift in Sources */,
+				CDD866DEEE759DF8CEB932EB /* AudioController.swift in Sources */,
+				04B1AF2C73E562A2CE7D0244 /* AudioDemo.swift in Sources */,
+				C1E6534D276240792E8943B7 /* AudioDeviceMonitor.swift in Sources */,
+				4BCCA97CF11A6AD269E470C0 /* AudioSettingsView.swift in Sources */,
 				5B7C970A73829188FB47C9B4 /* BackingController.swift in Sources */,
 				0626EDAA3F887CDEBD256D14 /* BackingMixer.swift in Sources */,
+				4DD74AEC9DA1B4E64FB4434B /* BackingRecord.swift in Sources */,
 				6EDCD951F3C93FFB3F0ED07D /* BackingTimeline.swift in Sources */,
 				AD36FEE8831300E05B5B6D3F /* BackingView.swift in Sources */,
+				1D7D3E31BDA14BA30D5A6915 /* CalibrationSheet.swift in Sources */,
 				AF1B1A342114D331C7F9D61D /* ChordDiagram.swift in Sources */,
 				22FB99040C9A3A5490D4AB8E /* ChordGrid.swift in Sources */,
 				D8E41E9844B3FEFAEBBB7CB5 /* ExternalSources.swift in Sources */,
-				0F44D837A0B1DD98C2322E38 /* FlexPrimeMonitor.swift in Sources */,
 				912BF217E571DAB8F8AAB440 /* LibraryView.swift in Sources */,
 				ADF0053AD91B682E0C5B1EBE /* LinkImportDemo.swift in Sources */,
 				ED68697F6C6612643F6A614B /* LinkImportSheet.swift in Sources */,

@@ -35,9 +35,13 @@ public struct EquipmentProfile: Codable, Sendable, Equatable {
     /// Volumen global de la pantalla Backing (stems + metrónomo), en dB; igual en todos los temas.
     public var masterGainDB: Double
 
+    /// Dispositivo, canales y calibración de latencia (mini-spec Fase 3). Aditivo: un perfil antiguo no lo trae.
+    public var audio: AudioSettings?
+
     public init(projectsFolder: URL? = nil, workingSampleRate: Double = EquipmentProfile.defaultSampleRate,
-                guitars: [OwnedGuitar] = [], masterGainDB: Double = 0) {
+                guitars: [OwnedGuitar] = [], masterGainDB: Double = 0, audio: AudioSettings? = nil) {
         self.masterGainDB = masterGainDB
+        self.audio = audio
         self.projectsFolder = projectsFolder
         self.workingSampleRate = Self.allowedSampleRates.contains(workingSampleRate) ? workingSampleRate : Self.defaultSampleRate
         var g = guitars
@@ -50,7 +54,8 @@ public struct EquipmentProfile: Codable, Sendable, Equatable {
         self.init(projectsFolder: try c.decodeIfPresent(URL.self, forKey: .projectsFolder),
                   workingSampleRate: try c.decodeIfPresent(Double.self, forKey: .workingSampleRate) ?? Self.defaultSampleRate,
                   guitars: try c.decodeIfPresent([OwnedGuitar].self, forKey: .guitars) ?? [],
-                  masterGainDB: try c.decodeIfPresent(Double.self, forKey: .masterGainDB) ?? 0)
+                  masterGainDB: try c.decodeIfPresent(Double.self, forKey: .masterGainDB) ?? 0,
+                  audio: try c.decodeIfPresent(AudioSettings.self, forKey: .audio))
     }
 
     /// Como mucho una por defecto: se conserva la primera marcada.

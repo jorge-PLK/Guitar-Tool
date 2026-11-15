@@ -41,13 +41,13 @@ Los once requisitos son viables; RF3 (editar la Flex Prime) es el de más riesgo
 
 | ID | Requisito | Comportamiento | Dependencia o duda |
 |---|---|---|---|
-| RF1 | Conexión directa de la pedalera | Selector de dispositivo de audio y de canales: entrada DI (seco), salida de reamp hacia la pedalera y retorno procesado. Calibración automática de latencia y nivel con un pulso de prueba. | La Flex Prime actúa como interfaz USB (P2, firmware 5.2.0, sin driver): 4 entradas y 4 salidas. Entrada al Mac: ch1/ch2 procesado, ch3 DI seco, ch4 copia del DI. Salida del Mac: ch1/ch2 directo a salidas y auriculares sin pasar por el rig (el backing), ch3 entrada del rig en USB Mode Reamp. El retorno no incluye el backing. La latencia declarada por el dispositivo (1200 muestras) no es fiable: la medida fue de 2416 muestras (50,3 ms) y varía ~1,2 ms según el rig, así que se calibra con pulso. Admite 44,1, 48 y 96 kHz; 44,1 kHz es posible y es la nativa de los modelos. |
+| RF1 | Conexión directa de la pedalera | Dispositivo genérico (cualquier pedalera o interfaz): entrada y salida elegibles por separado, con canales de guitarra y de backing. Calibración automática de latencia con un pulso de prueba. El DI y el reamp pasan a la Etapa 2 (ADR-012). | Medido en la Fase 3 (ADR-013, 48 kHz, búfer 512): ida y vuelta de 1339,27 a 1566,24 muestras (27,9 a 32,6 ms) por la guitarra del canal 1, y retardo del rig vacío de 70,7 muestras; la latencia se acorta a escalones de 12 muestras (0,25 ms) que el HAL no refleja (límite conocido). La Flex Prime actúa como interfaz USB (P2, firmware 5.2.0, sin driver): 4 entradas y 4 salidas. Entrada al Mac: ch1/ch2 procesado, ch3 DI seco, ch4 copia del DI. Salida del Mac: ch1/ch2 directo a salidas y auriculares sin pasar por el rig (el backing), ch3 entrada del rig en USB Mode Reamp. El retorno no incluye el backing. La latencia declarada por el dispositivo (1200 muestras) no es fiable: la medida fue de 2416 muestras (50,3 ms) y varía ~1,2 ms según el rig, así que se calibra con pulso. Admite 44,1, 48 y 96 kHz; 44,1 kHz es posible y es la nativa de los modelos. |
 | RF2 | Tablatura con play para grabar el DI | Genera la tab de la sección objetivo (riff o solo) a partir de la guitarra aislada, editable. Reproduce con cursor, metrónomo y tempo variable. Graba la toma y la valida: afinación, timing y clipping. | Transcripción con basic-pitch y render con alphaTab. Reutilizable la herramienta audio → Guitar Pro del proyecto estilo Rocksmith. |
 | RF3 | Editar presets de la Flex Prime desde la app | Lee y escribe rigs: bloques, parámetros, escenas, carga de NAM e IR. | El Remote Editor se sirve desde la propia pedalera por Wi-Fi: hay que hacer ingeniería inversa de su API HTTP o WebSocket. El MIDI solo admite Program Change, CC y Clock. Plan B: copiar rigs por USB Transfer. |
 | RF4 | Conexión a TONE3000 | Inicio de sesión, búsqueda y descarga de NAM (A2) e IR, filtrados por marca y modelo del ampli original. Envío directo a la pedalera. | La API nació dando acceso a tonos creados o favoritos del usuario. Verificar que la búsqueda en todo el catálogo ya está abierta. |
 | RF5 | Tonos rítmico y solista | Detecta o deja marcar las secciones en la forma de onda. Genera dos escenas en el mismo rig: solista con más ganancia y medios, +2 a 3 dB y delay corto. | El solo suele llevar otra toma u otro equipo: cada sección se iguala por separado. |
 | RF6 | Guitarras por separado (p. ej. Robe y Uoho) | Separa las guitarras del tema, propone dos pistas y el usuario las nombra y elige cuál igualar. | Todo en local, sin APIs de pago: aislar guitarras con un modelo local y separar A/B por panorama estéreo. Solista frente a rítmica, por heurística con Basic Pitch (acordes = rítmica, notas sueltas = solista) y marcado manual. Calidad parcial cuando ambas tocan lo mismo doblado. |
-| RF7 | Modo backing track | Mezclador con mute, solo y volumen por stem (voz, batería, bajo, resto y cada guitarra separada). Quitar todas las guitarras o solo las elegidas, p. ej. quitar a Uoho y dejar a Robe. Bucle de secciones, tempo variable sin cambiar el tono y metrónomo opcional. Tu guitarra suena por la Flex Prime a la vez (monitorización directa, sin latencia añadida) y se puede grabar la toma: seca (DI) y procesada.Para analizar mejor: A/B de tu tono contra la guitarra original dentro de la mezcla y no en aislado, medida de la diferencia en vivo y la toma grabada se puede usar como DI para el reamp (RF2). | Reutiliza los stems ya separados en RF6: no añade modelos. Cambio de tempo con AVAudioUnitTimePitch. Si se quita una sola guitarra de dos, puede quedar algo de ella en la otra pista. |
+| RF7 | Modo backing track | Mezclador con mute, solo y volumen por stem (voz, batería, bajo, resto y cada guitarra separada). Quitar todas las guitarras o solo las elegidas, p. ej. quitar a Uoho y dejar a Robe. Bucle de secciones, tempo variable sin cambiar el tono y metrónomo opcional. Tu guitarra suena por la Flex Prime a la vez (monitorización directa, sin latencia añadida) y se puede grabar la toma: procesada en la Etapa 1; el DI seco queda para la Etapa 2 (ADR-012). Para analizar mejor: A/B de tu tono contra la guitarra original dentro de la mezcla y no en aislado, medida de la diferencia en vivo y la toma grabada se puede usar como DI para el reamp (RF2). | Reutiliza los stems ya separados en RF6: no añade modelos. Cambio de tempo con AVAudioUnitTimePitch. Si se quita una sola guitarra de dos, puede quedar algo de ella en la otra pista. |
 | RF8 | Modo grabación (vídeo + audio multipista) | Graba a la vez la webcam y el audio sobre el backing track. El audio se guarda en pistas separadas y alineadas: backing (estéreo), guitarra DI (seco), guitarra procesada de la Flex Prime (estéreo) y micro opcional. Exporta el vídeo con la mezcla y los WAV de cada pista para remezclar después.Sincronía: el audio manda; el vídeo se alinea por marcas de tiempo y una calibración inicial (palmada o destello en pantalla) corrige el retardo de la cámara. | AVCaptureSession para la cámara y AVAudioEngine para el audio, con el mismo reloj de host. Webcam a 1080p y 30 o 60 fps según lo que dé la cámara. |
 | RF9 | Modo multitoma y montaje en un único vídeo | Eliges qué partes vas a grabar a partir de las guitarras separadas (p. ej. rítmica de Robe, rítmica de Uoho y solo). En cada toma suena el backing sin esa parte y con tus tomas anteriores. Puedes repetir partes y elegir la mejor toma de cada una.Al final monta todo en un vídeo con layouts landscape (1920 × 1080: lado a lado o rejilla) y portrait (1080 × 1920: apilado vertical).Solista: su vídeo y su audio solo aparecen en las secciones de solo (RF5); el resto del tiempo su recuadro desaparece y el layout se redistribuye.Portrait con una rítmica y una solista: un solo plano a pantalla completa, la rítmica durante el tema y la solista en los solos, con encuadre recortado sobre la guitarra para que se vea lo más grande posible. | Montaje con AVMutableComposition + AVVideoComposition y exportación HEVC o H.264 con AVAssetWriter. Encuadre automático con Vision (pose corporal: muñecas, codos y torso delimitan la guitarra), con ajuste manual del recorte por toma. Transiciones suaves y modernas: los recuadros se recolocan y cambian de tamaño con animación tipo muelle (ease-in-out, unos 0,5 s); el que entra aparece con escala del 92 al 100 %, opacidad y un desenfoque que se aclara; el que sale hace lo inverso. Esquinas redondeadas y sombra suave en los recuadros. Las transiciones van alineadas al pulso del tema y empiezan unos 0,3 s antes del solo, para que la solista esté a pantalla completa en la primera nota. El audio de la solista entra y sale con fundidos de 50 a 100 ms, sin cortes. Compositor de vídeo propio (AVVideoCompositing con Metal o Core Image) que interpola cada fotograma; vista previa en tiempo real antes de exportar. |
 | RF10 | Herramientas de estudio tipo Riffstation | Detecta acordes sincronizados con el tema y muestra su diagrama, con el actual y el siguiente. Detecta tempo, pulso y tonalidad. Velocidad del 50 al 200 % sin cambiar la afinación, transponer, afinación fina en cents y capo virtual. Bucles ajustados al pulso y metrónomo sincronizado. Los acordes se pueden corregir a mano. | Acordes con BTC (transformer, código MIT, vocabulario grande de 170 acordes) en Core ML, aplicado sobre los stems sin voz ni batería para acertar más. Pulso con Beat This!; el tempo es la media de los intervalos entre pulsos. Cambio de tempo y tono con AVAudioUnitTimePitch. Se integra en la pantalla de backing track. |
@@ -72,7 +72,7 @@ La app tiene una sección de Ajustes en la barra lateral, con icono de engranaje
 
 | Apartado | Qué se gestiona |
 |---|---|
-| Audio | Salida del backing (hoy sin selector: la Flex Prime si está conectada, por sus canales 1/2, y si no la salida por defecto; el selector llega en la Fase 3), volumen master global (en el perfil de equipo, igual en todos los temas), dispositivo, canales (DI seco, salida de reamp, retorno procesado y salida del backing), frecuencia de muestreo (de trabajo, global, 44,1 o 48 kHz; cada proyecto guarda la suya y se reconvierte solo al abrirlo, en segundo plano y sin avisar; los stems se remuestrean, no se vuelven a separar), calibración de latencia y calibración del nivel del DI |
+| Audio | Dispositivos de entrada y de salida, canales de guitarra y de backing, volumen master global (en el perfil de equipo, igual en todos los temas), frecuencia de muestreo (de trabajo, global, 44,1 o 48 kHz; cada proyecto guarda la suya y se reconvierte solo al abrirlo, en segundo plano y sin avisar; los stems se remuestrean, no se vuelven a separar) y calibración de latencia. El DI seco, la salida de reamp y la calibración del nivel del DI llegan en la Etapa 2 (ADR-012) |
 | Cámara y vídeo | Cámara por defecto (webcam o iPhone), resolución y fotogramas por segundo, calibración del retardo de la cámara y valores de exportación por defecto |
 | Pedalera y TONE3000 | Dirección del Remote Editor por Wi-Fi, firmware detectado, estado de la conexión, y cuenta y clave de TONE3000 |
 | Biblioteca y equipo | Carpeta de proyectos (se pregunta en el primer arranque, con `~/Music/ToneForge` como propuesta; «Cambiar carpeta» pregunta cada vez: Mover, Solo apuntar o Cancelar, y Mover borra el original solo al final), modelos descargados y espacio en disco, limpieza, y perfil de equipo con tus guitarras y pastillas. Bloque «Fuentes externas»: versión de yt-dlp en uso (embebida o actualizada), de Deno y de ffmpeg, con «Actualizar yt-dlp» y «Volver a la embebida» (ADR-011) |
@@ -88,7 +88,7 @@ Decisión: app nativa de macOS en Swift y SwiftUI, sin Python en la app final. A
 |---|---|---|
 | UI | Proyectos, forma de onda, espectros, A/B, vista visual de la cadena de señal con knobs | SwiftUI (macOS 15+), Swift Charts, Canvas; tablatura con alphaTab dentro de un WKWebView |
 | Datos | Perfil de equipo, proyectos, rigs generados, caché de NAM e IR | Archivo de proyecto (JSON) en la carpeta de cada tema; SwiftData como índice de la biblioteca |
-| Motor de audio | Elegir dispositivo y canales, reproducir el DI hacia la pedalera, grabar el retorno, calibrar latencia con un pulso | AVAudioEngine sobre CoreAudio |
+| Motor de audio | Elegir dispositivo y canales, mandar el backing al dispositivo, grabar la guitarra, calibrar latencia con un pulso | `AudioSession` sobre `AudioIO` (CoreAudio real y simulada); el reproductor se aloja en la sesión con `AVAudioEngine` en render manual en tiempo real, donde `AVAudioUnitTimePitch` retrasa 4096 muestras (0 en offline) y los stems salen de `StemFeed` (ADR-013) |
 | Separación | Aislar guitarras del tema | BS-RoFormer SW (6 stems, pesos de uso personal) con el Core ML publicado de gridshift, unidades CPU+GPU; Neural Engine prohibido (colgó el Mac). Respaldo: BSRoformer.cpp con GGUF q8 en Metal (de momento solo el protocolo `StemSeparating`, sin integrar C++). HTDemucs descartado (pierde en SDR y en escucha ciega). Se ejecuta en un proceso aparte (`tf-separate`, embebido en la app), uno por tema, vigilado por `MemoryGuard` con límite de 10 GB: 0,32× la duración del tema y unos 3,3 GB de pico. ADR-004, ADR-007 |
 | Transcripción | Audio → notas → tablatura de guitarras y bajo, y partitura de batería | Basic Pitch, con su modelo Core ML oficial, para guitarras y bajo; batería con ADTOF (puerto `xavriley/ADTOF-pytorch`; CC BY-NC-SA, uso personal, no redistribuir) en Core ML FP32 con GRU nativa, solo CPU, macOS 15. Sustituye a Omnizart. ADR-006 |
 | Acordes y pulso | Acordes sincronizados, tempo, compases y tonalidad | BTC (vocabulario grande, 170) en Core ML FP16 en Neural Engine (pesos no comerciales: válido en uso personal); preproceso CQT compatible con librosa portado a Swift con filtro FIR Kaiser en lugar de soxr (error medio 5,2e-6 frente a librosa). Pulso con Beat This! `final0` (MIT), `mlmodelc` comunitario `jessengatai/supracut-beat-this` en CPU+GPU; log-mel con módulo / 32 (sqrt(n_fft)); tempo = media de los intervalos entre pulsos, no la mediana (a 50 fps va a saltos de 20 ms). Tonalidad por perfiles de Temperley sobre el croma del CQT y el histograma de acordes (validada a ciegas por Jorge en un tema real). El análisis corre en el proceso de la app (~0,3–0,7 GB, 2–3 s por tema). ADR-006, ADR-009 |
@@ -316,6 +316,140 @@ Con una lista de YouTube no hay paso 2. La propuesta del paso 2 no es una elecci
 De 5 a 8 horas con las listas (de 3 a 5 sin ellas). Fila para la tabla del plan: «2b. Fuentes externas · 5 a 8 · marca el ritmo compilar ffmpeg y probar descargas reales con varios temas»; los acumulados posteriores suben lo mismo.
 
 Condición de paso: pegar un enlace de YouTube y otro de Spotify deja cada tema en la biblioteca listo para separar, sin más paso manual que elegir candidato; pegar una lista o un álbum, marcar parte de sus temas y pulsar «Descargar y procesar» los deja importados y separados; y la prueba ampliada con al menos cinco temas (uno sin subida oficial, uno con el directo dominante y uno largo) queda anotada en `docs/probes/P7-fuentes.md` con cuántos aciertan el candidato correcto.
+
+
+## Audio con el dispositivo (mini-spec de la Fase 3)
+
+Elegir dispositivo y canales, calibrar la latencia, mandar el backing al dispositivo, grabar la señal procesada y alinearla con el backing (RF1, parte de RF7). Estado: implementada y cerrada el 15/11/2026 (ADR-013).
+
+Decidido por Jorge el 15/11/2026:
+
+- **Nada cableado a la Flex Prime.** La app trabaja con cualquier pedalera o interfaz: se elige entre todas las entradas y salidas del sistema y se asigna cada canal a mano. Ninguna lógica mira el nombre del dispositivo.
+- **Entrada y salida pueden ser dispositivos distintos**, con corrección de deriva.
+- **El DI sale de la Etapa 1.** En esta fase no hay canal de DI, ni calibración de su nivel, ni grabación del DI seco: la app no pide nada sobre el DI. Todo ello pasa a la Etapa 2 (Fase 8a), y allí irá oculto al usuario. Esto cambia las casillas de la Fase 3 del plan y la pista de DI de la Fase 6: va en un ADR nuevo.
+- **A/B:** en directo y con la última toma.
+
+### Dispositivo y canales
+
+Lo que se guarda en el perfil de equipo (`EquipmentProfile.audio`, opcional y aditivo; un perfil antiguo se lee sin él):
+
+| Campo | Contenido |
+|---|---|
+| `outputDeviceUID` | Dispositivo de salida. Vacío = salida por defecto del sistema |
+| `inputDeviceUID` | Dispositivo de entrada. Vacío = sin entrada (no se puede grabar) |
+| `backingOut` | Par de canales de salida del backing. Por defecto 1 y 2 |
+| `guitarIn` | Uno o dos canales de entrada con tu guitarra tal como suena (la señal procesada) |
+| `bufferFrames` | 512 fijo (el probado en el soak de P2); no se enseña |
+| `latency` | Última calibración de latencia, con el canal de referencia interno si lo hay (ver abajo) |
+
+Reglas:
+
+- Los selectores listan todos los dispositivos con entradas y todos los que tienen salidas, por separado, con el número de canales de cada uno. Al elegir un dispositivo, el backing queda en 1 y 2 y los demás papeles sin asignar. Para saber qué canal es cuál, cada canal de entrada muestra un medidor en vivo en el propio selector.
+- Para grabar hace falta `guitarIn`. Un canal no puede tener dos papeles.
+- **Mismo dispositivo en entrada y salida:** un solo reloj, se abre tal cual. **Dispositivos distintos:** la app crea un dispositivo agregado privado (no aparece en el sistema) con la salida como reloj maestro y corrección de deriva en la entrada, y lo destruye al cerrar. La toma guarda con cuál de los dos modos se grabó.
+- **Convivencia con la Fase 2:** desaparece la salida automática. `OutputRouting.isFlexPrime`, `flexPrimeName` y `flexPrimeOutputs` se eliminan; el backing sale por `outputDeviceUID` y `backingOut`, y si no hay nada elegido o el dispositivo no está, por la salida por defecto del sistema, canales 1 y 2. `FlexPrimeMonitor` pasa a `AudioDeviceMonitor` y la barra lateral muestra el nombre del dispositivo elegido y si está conectado. Consecuencia: tras actualizar hay que elegir la pedalera una vez en Ajustes.
+- **Dispositivo no conectado:** el backing sigue por la salida por defecto; grabar, calibrar y el A/B en directo quedan desactivados con el motivo a la vista. La configuración no se borra y se recupera sola al reconectar. Si se desconecta a mitad de toma, la toma se detiene y se guarda lo grabado.
+- **Frecuencia:** al abrir el dispositivo la app le pide la frecuencia de trabajo. Si el dispositivo no la acepta (la Flex Prime solo la cambia desde su menú), el backing sigue sonando (el motor convierte), pero grabar y calibrar se bloquean con el aviso «El dispositivo está a X kHz y la frecuencia de trabajo es Y kHz» y el botón «Usar X kHz como frecuencia de trabajo». Un cambio de frecuencia caduca la calibración.
+
+### Calibración de latencia
+
+Qué se mide: las muestras entre que una señal sale por el canal izquierdo de `backingOut` y vuelve por el primer canal de `guitarIn`. Es justo el desfase que tendrá una toma respecto al backing que se oye. Hace falta un bucle físico: un cable de una salida del dispositivo a su entrada de guitarra. Es el único método que vale para cualquier equipo e incluye los conversores.
+
+- **Señal:** barrido logarítmico de 500 Hz a 8 kHz, 100 ms, con fundidos de 5 ms, a −12 dBFS. 10 repeticiones cada 500 ms; la primera se descarta.
+- **Detección:** correlación cruzada con el barrido enviado (filtro adaptado). Se toma la primera llegada, no el máximo: el pico más temprano que alcance el 50 % del mayor, para que un eco del bucle no engañe. Submuestra por interpolación sinc de la correlación alrededor del pico.
+- **Resultado:** mediana de las 9 medidas, en muestras con decimales, y dispersión (máximo menos mínimo). Válida si la dispersión es de 0,1 ms o menos y el pico destaca 20 dB sobre el fondo. Si no, se dice por qué: sin señal (falta el cable), saturada (bajar volumen) o inestable.
+- **Lo que se guarda:** latencia, dispersión, fecha y la clave: UID de entrada y de salida, frecuencia, búfer, canal de referencia y canal de salida.
+- **Caducidad:** la calibración vale mientras la clave no cambie. Si cambia cualquier campo, el estado pasa a «Sin calibrar». No caduca por tiempo; se enseña la fecha.
+- **Sin calibrar no se bloquea la grabación** (decisión de Jorge). Lo que se mide en cada toma es solo el retardo del rig; la latencia de ida y vuelta (unos 50 ms con la Flex Prime) solo sale del pulso con cable. Por eso, sin calibración válida la toma se alinea con la latencia que declara el dispositivo (poco fiable: en P2 declaraba 25 ms y eran 50), se marca con `latencyCalibrated = false` y Backing avisa de que puede ir desfasada decenas de ms. Al calibrar después, las tomas sin calibrar hechas con esa misma clave se vuelven a desplazar solas con la latencia buena.
+- **Variación entre rigs: se corrige en cada toma, sin preguntar nada.** Durante la calibración el barrido llega a todos los canales de entrada del dispositivo, no solo a `guitarIn`. Si alguno que no es `guitarIn` lo recibe antes, ese canal lleva la señal sin pasar por el rig: la app lo guarda como canal de referencia interno (`referenceIn`) junto con su latencia, que no depende del rig. No se enseña ni se graba. En cada toma se mide el retardo de `guitarIn` respecto a ese canal (ver Alineado). Si ningún canal llega antes (una interfaz sin rig dentro), no hay referencia ni hace falta: la latencia calibrada de `guitarIn` vale tal cual.
+- **Con una pedalera el bucle realimenta** (entrada → rig → salida → cable → entrada). Por eso se calibra con un rig vacío o con el volumen del rig bajo, y por eso se toma la primera llegada. Además, el bucle a través del rig oscila (se midieron tonos de 2794 y 2255 Hz a −21 y −18 dBFS) y falsea la medida: se recomienda silenciar el rig y medir por el canal seco, o dejar el volumen muy bajo. `tf-audio verify` responde «NO CONCLUYENTE» si detecta oscilación (pico ≥ −60 dBFS y ≥ 30 dB sobre su entorno).
+
+Medido con la Flex Prime (ADR-013): la variación entre reinicios seguidos del motor es 0,00 muestras, así que la calibración vale entre reinicios y no hace falta calibrar por sesión. Límite conocido del aparato, aceptado por Jorge (no se aprecia de oído): su latencia se acorta a escalones de 12 muestras exactas (0,25 ms), que el HAL no refleja y que sobreviven al cierre de la sesión. Se midieron 0 escalones en una toma de 60 s, 24 muestras en otra y 36 (0,75 ms) en una de 300 s. No hay corrección: `verify` registra las marcas de host (`Temp/tf-audio/verify-hal.csv`) para saber si el Mac puede verlo, y la compensación (`--track-host`) no está hecha. La regla de caducidad no cambia.
+
+### DI: fuera de esta fase
+
+Pasa a la Fase 8a, junto con el DI guiado (ADR-010): el canal del DI, la calibración de su nivel (queda apuntado para entonces lo hablado: pico entre −12 y −3 dBFS tocando fuerte, por guitarra), la grabación del DI seco y «Usar la última toma como DI». La salida de reamp tampoco se incluye: ni en Ajustes ni en el perfil, hasta la Etapa 2 o hasta que Jorge lo indique. También sale de la Fase 6 la pista de DI del multipista. Lo único que queda aquí es el canal de referencia interno de la calibración, que la app encuentra sola y usa solo para medir el retardo del rig. En la Etapa 2 nada de esto se le pide al usuario de forma directa. El pendiente «Calibración del nivel de entrada del DI» sigue abierto. El boceto de Ajustes muestra «Entrada DI» y «Calibrar nivel del DI»: no se construyen.
+
+### Grabación
+
+- Botón «Grabar» de la pantalla Backing. Graba desde la posición actual hasta que se pulsa parar, con el backing sonando por `backingOut`.
+- **Fichero:** `takes/<id>/processed.wav` (mono o estéreo, según `guitarIn`), WAV float32 a la frecuencia del proyecto.
+- **Se guarda ya alineado:** la muestra 0 corresponde al instante `songStart` del tema. Quien lo lea después no necesita saber nada de latencias.
+- **`Take` gana campos opcionales**, todos aditivos: `songStart` (segundos), `sampleRate`, `latencySamples`, `rigDelaySamples`, `rigDelayReliable`, `latencyCalibrated`, `calibrationKey` y `clock` (`single` o `aggregate`). `processedFile` ya existe; `diFile` se queda vacío hasta la Etapa 2. `schemaVersion` sigue en 2 y no hay migración, como pasó con `origin`.
+
+### Alineado con el backing
+
+1. El reproductor publica un ancla al arrancar: qué posición del tema corresponde a qué muestra de salida, contando la latencia de sus propios nodos (Varispeed y TimePitch).
+2. Las muestras de entrada llegan con su marca de tiempo. La posición del tema de cada muestra grabada es la del ancla menos la latencia calibrada.
+3. Si hay canal de referencia interno, el retardo del rig en esa toma se mide por correlación cruzada de las envolventes de `guitarIn` y del canal de referencia, en una ventana de 0 a 20 ms. Si el pico no es claro (mucho delay o reverb), se usa el último valor fiable, la toma se marca con `rigDelayReliable = false` y se avisa. El canal de referencia se escucha solo para medir: no se guarda en disco.
+4. La toma se desplaza la latencia de la referencia más el retardo del rig, redondeado a muestras enteras; el resto, de media muestra como mucho (unos 10 µs), se ignora. Sin canal de referencia, se desplaza la latencia calibrada de `guitarIn`.
+
+**Demostración sin hardware (tests de la puerta).** `SimulatedAudioIO` devuelve por la entrada lo que sale por la salida con una latencia conocida, con decimales, y admite saturación, ruido y deriva en ppm. Con él:
+
+- La calibración recupera la latencia con error de 0,05 muestras o menos, a 44,1 y 48 kHz, con latencias con decimales, ruido a −60 dB y un eco posterior más fuerte que la primera llegada.
+- Falla con el motivo correcto sin señal, con saturación y con dispersión alta.
+- **Test de la condición de paso:** el reproductor en render offline toca un backing con clics; el dispositivo simulado lo devuelve con latencia L; se calibra, se graba una toma y se comprueba que cada clic de la toma alineada cae donde el del backing con error de 1 muestra o menos (0,02 ms), al principio y al final de una toma de 60 s. Se repite arrancando a mitad de tema.
+- La calibración aguanta una vuelta saturada (como la de un rig con ganancia) con error de 1 muestra o menos.
+- Con un canal simulado que llega antes que `guitarIn`, la calibración lo elige como referencia; sin él, no elige ninguno.
+- El retardo del rig por toma se recupera con error de 2 muestras o menos con saturación, también cuando es distinto del que había al calibrar, y se marca como no fiable con un delay del 100 %.
+- Con una calibración de otra clave, la toma se graba con la latencia declarada y queda marcada como sin calibrar; al calibrar después se corrige y pasa el test de la condición de paso.
+
+**Demostración con hardware (condición de paso).** Una toma de comprobación con el cable puesto: `tf-audio verify` (y lo mismo desde la app) reproduce 60 s de clics, graba la vuelta, alinea y da el error de cada clic en muestras y en ms, con el máximo y la pendiente (la pendiente es la deriva sin corregir, lo que importa con dos dispositivos). Pasa si el máximo es menor de 1 ms. Después, una toma tocada sobre un tema, para oírla.
+
+### A/B dentro de la mezcla
+
+Panel «Comparar en la mezcla» de Backing, sobre el stem de guitarra (con la Fase 4 se podrá elegir cuál).
+
+- **A · Original:** el stem de guitarra suena.
+- **B · Tú en directo:** el stem se silencia y te oyes por la monitorización del dispositivo. La app no controla ese volumen, así que no compensa: enseña la diferencia de nivel en dB (RMS de tu procesada en los últimos 3 s frente al del stem en ese tramo, con su fader) para que la ajustes en el aparato.
+- **B · Última toma:** el stem se silencia y suena tu toma procesada, alineada, por la misma cadena que los stems (sigue la velocidad). Se iguala en sonoridad al stem de forma automática: RMS con ponderación K sobre el tramo de la toma, sin contar silencios, con tope de ±12 dB; la ganancia aplicada se enseña. La toma aparece como canal «Tú» en el mezclador.
+- La medida de diferencia de tono («Diferencia en directo» del boceto) es de la Etapa 2; aquí solo nivel.
+
+### Ajustes · Audio
+
+Como el boceto, con los cambios de arriba: grupo Dispositivo (entrada, salida, frecuencia), grupo Canales (entrada de guitarra y salida del backing, con medidores de entrada) y grupo Calibración (estado y fecha de la latencia y el botón «Calibrar latencia», con su hoja: instrucciones, progreso, resultado en números). Nada de DI.
+
+### Código
+
+Todo el audio en **AudioKit**; Store solo guarda datos y no depende de AudioKit (la app hace de puente, como hasta ahora).
+
+| Pieza | Paquete | Qué hace |
+|---|---|---|
+| `AudioDevice`, `AudioDeviceProviding` | AudioKit | Dispositivos con entradas y salidas, frecuencias admitidas, cambios. Sustituye a `AudioOutputDevice`. `CoreAudioDeviceProvider` y `SimulatedDeviceProvider` |
+| `AudioSetup`, `AudioRouting` | AudioKit | Configuración resuelta (dispositivos, canales, modo de reloj) y la regla de la salida por defecto |
+| `AudioIO` → `CoreAudioIO`, `SimulatedAudioIO` | AudioKit | El protocolo detrás del que queda el hardware: abrir una sesión dúplex, entregar la entrada con marcas de tiempo y emitir la salida. La versión real incluye el agregado privado |
+| `LatencyProbe`, `LatencyCalibrator` | AudioKit | Barrido, detección de primera llegada con submuestra y estadística |
+| `TakeRecorder`, `TakeAligner` | AudioKit | Captura y escritura del WAV alineado |
+| `LoudnessMatch` | AudioKit | Ganancia de la toma frente al stem |
+| `StudyPlayer` | AudioKit | Ancla de reproducción, pista de toma con desplazamiento y salida según `AudioSetup` |
+| `tf-audio` | AudioKit | Ejecutable de desarrollo, no se embebe: `devices`, `latency`, `verify`, `record`. Da números y deja los WAV en `Temp/` |
+| `AudioSettings`, `LatencyCalibration`, campos de `Take` | Store | Datos |
+| Ajustes · Audio, `AudioDeviceMonitor`, grabar y A/B en Backing | App | Interfaz y cableado |
+
+Reparto: tres tandas. Primera, en paralelo: señal y simulador (`tf-engineer`) y datos de Store más dispositivos genéricos (`tf-implementer`). Segunda, en paralelo: E/S real, grabador, reproductor y `tf-audio` (`tf-engineer`) y Ajustes · Audio (`tf-implementer`). Tercera: grabar y A/B en Backing (`tf-implementer`). Luego `tf-qa`.
+
+### Medidas con hardware (las hace Jorge)
+
+Con la Flex Prime: USB Mode **Live**, 48 kHz, búfer 512. Montaje real usado (ADR-013): rig silenciado y `--guitar 3`, es decir, midiendo por el canal seco, porque el bucle a través del rig oscila. Cable de jack de la salida principal izquierda (o de auriculares) a la entrada de guitarra, con el volumen de salida a un tercio. En Ajustes: entrada y salida «HeadRush Flex Prime», backing 1 y 2, guitarra 1 y 2. Con otro aparato, lo mismo con sus canales.
+
+1. `tf-audio latency --restarts 5`: latencia en ms, dispersión y variación entre reinicios.
+2. `tf-audio verify`: error de alineado máximo y pendiente. Esto es la condición de paso.
+3. Repetir 2 con entrada y salida en dispositivos distintos, para ver qué deja la corrección de deriva.
+4. Quitar el cable, cargar un rig real y grabar una toma tocada: oír el A/B.
+
+### Reglas propias de esta fase (aprobadas por Jorge el 15/11/2026)
+
+- Solo se graba a velocidad del 100 % y con el bucle desactivado; con otra velocidad, el botón se desactiva y dice por qué.
+- Sin cuenta atrás ni margen previo en esta fase: llegan con la pantalla de grabación (Fase 6) y el DI guiado (Fase 8a).
+- Búfer fijo de 512, sin selector.
+- El aviso y el botón de frecuencia descritos arriba.
+- La latencia sin calibrar no bloquea la grabación: avisa, marca la toma y la corrige al calibrar.
+
+### Estimación y condición de paso
+
+De 4 a 6 horas, frente a las 2 a 4 del plan. La diferencia: dispositivos genéricos en lugar de la Flex Prime fija, entrada y salida en dispositivos distintos y el A/B con la toma grabada; quitar el DI resta cerca de una hora. Fila para el plan: «3. Audio con el dispositivo · 4 a 6 · marca el ritmo las pruebas de latencia y niveles con el hardware».
+
+Condición de paso: toma grabada alineada con el backing con error menor de 1 ms, medido con la toma de comprobación de Jorge.
 
 
 ## Fases y roadmap

@@ -586,6 +586,21 @@ public actor Library {
         }
     }
 
+    /// Añade una toma grabada al proyecto (mini-spec Fase 3, «Grabación»). Solo toca `takes`. Si ya hay una con
+    /// ese id, la sustituye.
+    public func saveTake(id: UUID, take: Take) async throws {
+        try await saveTakes(id: id, [take])
+    }
+
+    /// Añade o sustituye (por id) varias tomas de una vez, p. ej. las corregidas al calibrar. Solo toca `takes`.
+    public func saveTakes(id: UUID, _ takes: [Take]) async throws {
+        try await mutate(id) { p in
+            for t in takes {
+                if let i = p.takes.firstIndex(where: { $0.id == t.id }) { p.takes[i] = t } else { p.takes.append(t) }
+            }
+        }
+    }
+
     /// Corrige a mano título y artista (recortados). Título vacío → `emptyTitle` y no se guarda; artista vacío → `nil`.
     /// No renombra la carpeta ni toca `source/`, `audio/`, stems ni `origin`.
     public func updateSongInfo(id: UUID, title: String, artist: String?) async throws {

@@ -14,7 +14,8 @@ import os
 struct TimePitchSetting: Equatable, Sendable {
     /// Paso de la velocidad del TimePitch (medido; ver arriba).
     static let rateQuantum = 256.0
-    /// Retardo del Varispeed, en muestras (medido a 48 kHz con un impulso: 47, también a rate 1).
+    /// Retardo del Varispeed, en muestras (medido con un impulso: 47 a 44,1, 48 y 96 kHz, también a rate 1;
+    /// `PlayerHostingTests.testVarispeedDelayIsModelledAtEachSampleRate`).
     static let varispeedDelayFrames = 47.0
     /// Desplazamiento del TimePitch recién reiniciado: `k·(1 − 1/rate)` muestras de salida (ajuste lineal
     /// medido 0,5…2,0 a 48 kHz; residuo ≤ 3 ms, fluctúa ±1,5 ms con la fase de cada evento frente a la trama).
@@ -128,6 +129,9 @@ struct ClockState: Sendable {
     var clicks: [ClickFrame] = []
     var metronomeOn = false
     var metronomeGain: Float = 1
+    /// Reproductor alojado en una sesión de `AudioIO`: muestra de la sesión menos muestra del motor
+    /// (`HostedRenderer`). `nil` fuera de una sesión o antes del primer bloque.
+    var hostOffset: Double?
 
     func cumFrame(atOutput y: Double) -> Double {
         (y - runStartFrame - latencyFrames) * rate

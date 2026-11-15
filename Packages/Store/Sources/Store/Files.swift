@@ -127,6 +127,11 @@ public struct ProjectLayout: Sendable, Equatable {
     /// Ruta relativa de un stem (`stems/drums.wav`).
     public static func stemRelativePath(_ kind: StemKind) -> String { "stems/\(kind.rawValue).wav" }
 
+    /// Toma grabada y alineada (mini-spec Fase 3, «Grabación»): `takes/<id>/processed.wav`.
+    public static func processedRelativePath(takeId: UUID) -> String { "takes/\(takeId.uuidString)/processed.wav" }
+
+    public func processedURL(takeId: UUID) -> URL { url(relative: Self.processedRelativePath(takeId: takeId)) }
+
     /// Resuelve una ruta relativa (con `/`) dentro de la carpeta.
     public func url(relative: String) -> URL { folder.appendingPathComponent(relative) }
 

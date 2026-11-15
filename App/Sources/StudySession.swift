@@ -138,6 +138,33 @@ final class StudySession {
         study.player = p
     }
 
+    // MARK: Tomas (mini-spec Fase 3, «Grabación»)
+
+    /// Último fallo al guardar tomas en `project.json` (nil si fue bien).
+    private(set) var takeSaveError: String?
+
+    /// Tomas con fichero alineado que se pueden oír, de la más antigua a la más reciente.
+    var playableTakes: [Take] {
+        project.takes.filter { !$0.discarded && $0.processedFile != nil && $0.songStart != nil && $0.sampleRate != nil }
+            .sorted { $0.createdAt < $1.createdAt }
+    }
+
+    /// Añade o sustituye (por id) tomas del proyecto y las guarda ya (solo toca `takes`).
+    func saveTakes(_ takes: [Take]) {
+        for t in takes {
+            if let i = project.takes.firstIndex(where: { $0.id == t.id }) { project.takes[i] = t } else { project.takes.append(t) }
+        }
+        let id = projectID, library = library
+        Task { [weak self] in
+            do {
+                try await library.saveTakes(id: id, takes)
+                self?.takeSaveError = nil
+            } catch {
+                self?.takeSaveError = "No se pudo guardar la toma en el proyecto (\(error))."
+            }
+        }
+    }
+
     // MARK: Guardado con rebote
 
     private func scheduleSave() {

@@ -32,7 +32,7 @@ struct SettingsView: View {
                 .overlay(RoundedRectangle(cornerRadius: 10).stroke(TF.fieldLine))
 
                 switch model.settingsTab {
-                case .audio: AudioSettings()
+                case .audio: AudioSettingsView()
                 case .video:
                     SettingsGroup(title: "Cámara y vídeo", note: "Cámara, sincronía y exportación por defecto.") {
                         phase("Llega en la Fase 6")
@@ -84,29 +84,6 @@ struct InfoRow<Trailing: View>: View {
         }
         .padding(.horizontal, 12).padding(.vertical, 10)
         .background(TF.field, in: RoundedRectangle(cornerRadius: 10))
-    }
-}
-
-struct AudioSettings: View {
-    @Environment(AppModel.self) private var model
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            SettingsGroup(title: "Frecuencia de trabajo",
-                          note: "Los temas se convierten a esta frecuencia al importarlos. Al cambiarla, los temas existentes se reconvierten al abrirlos.") {
-                Picker("Frecuencia de trabajo", selection: Binding(
-                    get: { model.profile.workingSampleRate }, set: { model.setSampleRate($0) })) {
-                    ForEach(EquipmentProfile.allowedSampleRates, id: \.self) { Text(Fmt.rate($0)).tag($0) }
-                }
-                .pickerStyle(.segmented).labelsHidden().frame(width: 220)
-            }
-            SettingsGroup(title: "Dispositivo y canales", note: "La pedalera hace de interfaz de audio por USB.") {
-                phase("Llega en la Fase 3")
-            }
-            SettingsGroup(title: "Calibración", note: "Latencia de ida y vuelta y nivel del DI.") {
-                phase("Llega en la Fase 3")
-            }
-        }
     }
 }
 

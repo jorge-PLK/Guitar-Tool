@@ -1,6 +1,26 @@
 import AVFoundation
 import Observation
 
+/// Pista de toma («Tú», mini-spec Fase 3, «A/B dentro de la mezcla»): una toma ya alineada cuya muestra 0
+/// cae en `songStart` del tema. Suena por la misma cadena que los stems (sigue velocidad, tono y bucle) y
+/// aparece en `tracks` como un canal más, con su ganancia (la de `LoudnessMatch`) y su mute.
+public struct TakeTrack: Sendable, Equatable {
+    /// Id del canal en el mezclador (no debe coincidir con el de un stem).
+    public var id: String
+    public var url: URL
+    public var songStart: Double
+    public var gainDB: Double
+    public var muted: Bool
+
+    public init(id: String, url: URL, songStart: Double, gainDB: Double = 0, muted: Bool = false) {
+        self.id = id
+        self.url = url
+        self.songStart = songStart
+        self.gainDB = gainDB
+        self.muted = muted
+    }
+}
+
 /// Reproductor de estudio (mini-spec Fase 2 §1 AudioKit).
 ///
 /// Grafo: un `AVAudioPlayerNode` por stem → mezclador por canal → submezcla → Varispeed (corrección
@@ -29,10 +49,18 @@ import Observation
 /// de nivel comparten estado con cerrojos injustos (`PlaybackClock`, `MeterStore`); la programación de
 /// los stems vive en la cola serie de `StemScheduler`. Los avisos de dispositivos llegan en otra cola
 /// y se pasan al actor principal.
+///
+/// **Alojado en una sesión (Fase 3).** Con `attach(to:)` el motor pasa a `manualRenderingMode(.realtime)`
+/// y lo renderiza el `render` de la `AudioSession` (`HostedRenderer`): backing y grabación con un solo reloj,
+/// el del dispositivo. `playbackAnchor` queda entonces en la línea de tiempo de la sesión. `detach()` (o el
+/// fin de la sesión) lo devuelve a su propia salida según `AudioRouting`.
 @MainActor
 @Observable
 public final class StudyPlayer {
+    /// Stems y, al final, la pista de toma si la hay.
     public private(set) var tracks: [Track] = []
+    /// Pista de toma en uso.
+    public private(set) var take: TakeTrack?
     public private(set) var duration: Double = 0
     public private(set) var isPlaying = false
     /// Nombre de la salida en uso («» si no hay ninguna).
@@ -60,6 +88,12 @@ public final class StudyPlayer {
     @ObservationIgnored private var clickNode: AVAudioSourceNode?
     @ObservationIgnored private var players: [AVAudioPlayerNode] = []
     @ObservationIgnored private var channels: [AVAudioMixerNode] = []
+    /// Formato de cada stem (el de su fichero), en el orden de `channels`.
+    @ObservationIgnored private var stemFormats: [AVAudioFormat] = []
+    /// Alojado en tiempo real: la fuente de cada stem (en lugar del player) y su nodo, en la entrada 1 del
+    /// mezclador del canal. Vacío en cualquier otro modo.
+    @ObservationIgnored private var feeds: [StemFeed] = []
+    @ObservationIgnored private var feedNodes: [AVAudioSourceNode] = []
     @ObservationIgnored private let clock = PlaybackClock()
     @ObservationIgnored private let scheduler: StemScheduler
     @ObservationIgnored private let meterStore = MeterStore()
@@ -71,26 +105,36 @@ public final class StudyPlayer {
     @ObservationIgnored private var output: OutputController?
     @ObservationIgnored private(set) var appliedRoute: OutputRoute?
     @ObservationIgnored private var configObserver: (any NSObjectProtocol)?
+    @ObservationIgnored private var stemTracks: [Track] = []
+    @ObservationIgnored private var host: HostedRenderer?
+    @ObservationIgnored private weak var hostSession: AudioSession?
 
     static let offlineBlock: AVAudioFrameCount = 512
+    /// Bloque máximo del motor alojado (el de la sesión es 512; los saltos se recuperan por trozos).
+    static let hostedMaxFrames: AVAudioFrameCount = 4_096
 
-    /// Reproductor en tiempo real con salida según `OutputRouting`.
-    public convenience init(devices: any AudioDeviceProviding = CoreAudioDeviceProvider()) {
-        self.init(offline: false, devices: devices)
+    /// Reproductor en tiempo real con salida según `AudioRouting`.
+    public convenience init(devices: any AudioDeviceProviding = CoreAudioDeviceProvider(),
+                            output: OutputSelection = OutputSelection()) {
+        self.init(offline: false, devices: devices, selection: output)
     }
 
-    /// Render offline (`manualRenderingMode`) para tests; no suena. Con `devices`, la ruta solo se anota.
-    convenience init(offlineWith devices: (any AudioDeviceProviding)? = nil) {
-        self.init(offline: true, devices: devices)
+    /// Cambia el dispositivo y el par de canales del backing (los del perfil de equipo).
+    public func setOutput(_ selection: OutputSelection) { output?.select(selection) }
+
+    /// Render offline (`manualRenderingMode`) para tests y `tf-audio --simulated`; no suena. Con `devices`, la
+    /// ruta solo se anota. Alojado en una sesión (`attach(to:)`), la sesión lo renderiza bloque a bloque.
+    public convenience init(offlineWith devices: (any AudioDeviceProviding)? = nil, output: OutputSelection = OutputSelection()) {
+        self.init(offline: true, devices: devices, selection: output)
     }
 
-    private init(offline: Bool, devices: (any AudioDeviceProviding)?) {
+    private init(offline: Bool, devices: (any AudioDeviceProviding)?, selection: OutputSelection) {
         self.offline = offline
         scheduler = StemScheduler(clock: clock)
         timePitch.overlap = StudyPlayerConstants.timePitchOverlap
         for node in [submix, varispeed, timePitch, postMix] as [AVAudioNode] { engine.attach(node) }
         if let devices {
-            let controller = OutputController(provider: devices)
+            let controller = OutputController(provider: devices, selection: selection)
             output = controller
             controller.onRouteChange = { [weak self] route in self?.routeChanged(route) }
             applyRoute(controller.route)
@@ -106,7 +150,34 @@ public final class StudyPlayer {
 
     // MARK: Carga
 
+    /// Carga los stems de un tema (quita la pista de toma).
     public func load(tracks newTracks: [Track]) throws {
+        try rebuild(stems: newTracks, take: nil)
+    }
+
+    /// Pone o quita la pista de toma («Tú»). Conserva la mezcla de los stems, la posición y si sonaba.
+    /// La toma debe estar a la frecuencia de los stems.
+    public func setTake(_ newTake: TakeTrack?) throws {
+        guard !stemTracks.isEmpty else { throw StudyPlayerError.noTracks }
+        let wasPlaying = isPlaying
+        let t = currentTime
+        let stemMix = Array(mix.prefix(stemTracks.count))
+        try rebuild(stems: stemTracks, take: newTake)
+        for (i, m) in stemMix.enumerated() { mix[i] = m }
+        applyMix()
+        pausedTime = t
+        if wasPlaying { try play() }
+    }
+
+    private static func open(_ url: URL) throws -> (AVAudioFile, AVAudioFile) {
+        do {
+            return (try AVAudioFile(forReading: url), try AVAudioFile(forReading: url))
+        } catch {
+            throw StudyPlayerError.unreadable(url.lastPathComponent)
+        }
+    }
+
+    private func rebuild(stems newTracks: [Track], take newTake: TakeTrack?) throws {
         guard !newTracks.isEmpty else { throw StudyPlayerError.noTracks }
         if isPlaying { pause() }
         scheduler.stop()
@@ -114,13 +185,7 @@ public final class StudyPlayer {
         var rate: Double?
         var length: Int64 = 0
         for track in newTracks {
-            let file: AVAudioFile, reader: AVAudioFile
-            do {
-                file = try AVAudioFile(forReading: track.url)
-                reader = try AVAudioFile(forReading: track.url)
-            } catch {
-                throw StudyPlayerError.unreadable(track.url.lastPathComponent)
-            }
+            let (file, reader) = try Self.open(track.url)
             let r = file.processingFormat.sampleRate
             if let rate, rate != r { throw StudyPlayerError.sampleRateMismatch }
             rate = r
@@ -128,8 +193,21 @@ public final class StudyPlayer {
             stems.append(.init(player: AVAudioPlayerNode(), file: file, reader: reader))
         }
         let sr = rate!
+        if let newTake {
+            let (file, reader) = try Self.open(newTake.url)
+            guard file.processingFormat.sampleRate == sr else { throw StudyPlayerError.sampleRateMismatch }
+            var s = StemScheduler.Stem(player: AVAudioPlayerNode(), file: file, reader: reader)
+            s.offset = Int64((newTake.songStart * sr).rounded())
+            s.silence = StemScheduler.silence(format: file.processingFormat,
+                                              frames: Int64(StudyPlayerConstants.chunkSeconds * sr))
+            stems.append(s)
+        }
+        // Alojado a otra frecuencia ya no vale: vuelve a su propia salida.
+        if let host, host.sampleRate != sr { detach() }
 
+        host?.deactivate()
         engine.stop()
+        removeFeeds()
         for (p, c) in zip(players, channels) {
             c.removeTap(onBus: 0)
             engine.detach(p)
@@ -151,14 +229,18 @@ public final class StudyPlayer {
         }
         players = stems.map(\.player)
         channels = newChannels
-        tracks = newTracks
-        mix = newTracks.map { _ in StemMix() }
+        stemFormats = stems.map(\.file.processingFormat)
+        stemTracks = newTracks
+        take = newTake
+        tracks = newTracks + (newTake.map { [Track(id: $0.id, url: $0.url)] } ?? [])
+        mix = newTracks.map { _ in StemMix() } + (newTake.map { [StemMix(gainDB: $0.gainDB, muted: $0.muted)] } ?? [])
         lengthFrames = length
         duration = Double(length) / sr
         pausedTime = 0
         scheduler.configure(stems: stems, length: length, sampleRate: sr) { [weak self] generation in
             Task { @MainActor in await self?.reachedEnd(generation) }
         }
+        if host != nil && !offline { installFeeds() }
         applyMix()
         loop = loopValue
         applyMetronome()
@@ -212,8 +294,8 @@ public final class StudyPlayer {
     public var currentTime: Double {
         guard isPlaying, sampleRate > 0 else { return pausedTime }
         let sr = sampleRate
-        let realtime = !offline
-        let latency = realtime ? engine.outputNode.presentationLatency * sr : 0
+        let realtime = !offline && host == nil
+        let latency = host?.presentationLatencyFrames ?? (realtime ? engine.outputNode.presentationLatency * sr : 0)
         let frame = clock.read { s -> Double in
             guard !s.pendingStart else { return s.startSongFrame }
             var y = s.lastRenderStart + s.lastRenderFrames
@@ -249,22 +331,41 @@ public final class StudyPlayer {
             c.startSongFrame = Double(frame)
             c.spans.removeAll(keepingCapacity: true)
         }
-        runGeneration = scheduler.start(songFrame: frame, loop: loopFrames, realtime: !offline)
+        runGeneration = scheduler.start(songFrame: frame, loop: loopFrames, realtime: !offline,
+                                        buffered: host != nil && !offline)
+        // En tiempo real (con dispositivo o alojado) el motor arranca en cada pasada: un `play()` sin hora
+        // antes del primer render del motor empieza en ese render.
         if !offline {
             do { try engine.start() } catch {
                 stopRun()
                 throw StudyPlayerError.engine("\(error)")
             }
         }
-        // En tiempo real el primer ciclo llega milisegundos después de `start()`: los players arrancan antes.
-        for p in players { p.play() }
+        if host != nil && !offline {
+            // Alojado en tiempo real suenan las fuentes, no los players: el render está apagado hasta
+            // `activate()` y `start()` es síncrono, así que el primer bloque entrega la muestra 0 de la pasada.
+            // El TimePitch en `manualRenderingMode(.realtime)` retrasa su salida lo que declara en `latency`
+            // (medido: 4096 muestras a 44,1 y 48 kHz, con o sin bypass, cualquier bloque; en `.offline`
+            // declara 0 y no retrasa): se suma al ancla.
+            let extra = Self.timePitchRealtimeDelayFrames(timePitch, sampleRate: sampleRate)
+            hostedTimePitchFrames = extra
+            clock.update { $0.latencyFrames = s.latencyFrames + extra }
+            for f in feeds { f.start() }
+        } else {
+            // En tiempo real el primer ciclo llega milisegundos después de `start()`: los players arrancan antes.
+            // Alojado offline, el render está apagado hasta `activate()`: el primer bloque ya los encuentra en marcha.
+            for p in players { p.play() }
+        }
+        host?.activate()
         isPlaying = true
     }
 
     private func stopRun() {
+        host?.deactivate()
         scheduler.stop()
         if !offline { engine.stop() }
         for p in players { p.stop() }
+        for f in feeds { f.stop() }
         clock.update { $0.running = false }
     }
 
@@ -288,12 +389,14 @@ public final class StudyPlayer {
     public func setGain(_ id: String, dB: Double) {
         guard let i = index(of: id) else { return }
         mix[i].gainDB = dB
+        if take?.id == id { take?.gainDB = dB }
         applyMix()
     }
 
     public func setMute(_ id: String, _ muted: Bool) {
         guard let i = index(of: id) else { return }
         mix[i].muted = muted
+        if take?.id == id { take?.muted = muted }
         applyMix()
     }
 
@@ -405,14 +508,15 @@ public final class StudyPlayer {
     // MARK: Salida
 
     private func routeChanged(_ route: OutputRoute?) {
-        if isPlaying { pause() }
+        if isPlaying && host == nil { pause() }
         applyRoute(route)
     }
 
     private func applyRoute(_ route: OutputRoute?) {
         appliedRoute = route
         outputDeviceName = route?.device.name ?? ""
-        guard !offline, let route else { return }
+        // Alojado, la salida es la de la sesión; la ruta se aplica al volver (`detach`).
+        guard !offline, host == nil, let route else { return }
         engine.stop()
         do {
             try engine.outputNode.auAudioUnit.setDeviceID(route.device.id)
@@ -423,9 +527,148 @@ public final class StudyPlayer {
     }
 
     private func engineConfigurationChanged() {
+        guard host == nil else { return }
         if isPlaying { pause() }
         output?.refresh()
         applyRoute(output?.route)
+    }
+
+    // MARK: Alojado en una sesión (mini-spec Fase 3, «Alineado con el backing» 1)
+
+    /// El motor lo renderiza una `AudioSession`.
+    public var isHosted: Bool { host != nil }
+
+    /// Pasa a sonar dentro de `session` (por sus canales de backing), con el reloj del dispositivo. Hace
+    /// falta un tema cargado a la frecuencia de la sesión. Conserva la posición y si sonaba. Si la sesión se
+    /// corta (desconexión, cambio de frecuencia), vuelve solo a su propia salida.
+    public func attach(to session: AudioSession) throws {
+        guard sampleRate > 0, !players.isEmpty else { throw StudyPlayerError.noTracks }
+        guard abs(session.sampleRate - sampleRate) < 0.5 else { throw StudyPlayerError.sampleRateMismatch }
+        if host != nil { detach() }
+        let wasPlaying = isPlaying
+        let t = currentTime
+        if isPlaying { pause() }
+        engine.stop()
+        let stereo = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 2)!
+        do {
+            if offline {
+                try engine.start()
+            } else {
+                // El bloque de render vale desde aquí; el motor arranca en cada pasada (`startRun`).
+                try engine.enableManualRenderingMode(.realtime, format: stereo, maximumFrameCount: Self.hostedMaxFrames)
+                installFeeds()
+            }
+        } catch {
+            if !offline { engine.disableManualRenderingMode() }
+            applyRoute(output?.route)
+            throw StudyPlayerError.engine("\(error)")
+        }
+        let topUp: (@Sendable () -> Void)? = offline ? Self.topUpClosure(scheduler) : nil
+        let block: AVAudioEngineManualRenderingBlock = engine.manualRenderingBlock
+        let renderer = HostedRenderer(block: block, clock: clock,
+                                      maxFrames: Int(engine.manualRenderingMaximumFrameCount), sampleRate: sampleRate,
+                                      presentationLatencyFrames: session.outputLatencyFrames, topUp: topUp)
+        host = renderer
+        hostSession = session
+        session.setPlayer(renderer) { [weak self] in
+            Task { @MainActor in self?.sessionEnded(renderer) }
+        }
+        pausedTime = t
+        if wasPlaying { try play() }
+    }
+
+    /// Vuelve a su propia salida (según `AudioRouting`). Conserva la posición y si sonaba.
+    public func detach() {
+        guard host != nil else { return }
+        let wasPlaying = isPlaying
+        let t = currentTime
+        if isPlaying { pause() }
+        hostSession?.setPlayer(nil, onEnd: nil)
+        host?.deactivate()
+        host = nil
+        hostSession = nil
+        engine.stop()
+        removeFeeds()
+        clock.update { $0.hostOffset = nil }
+        if offline {
+            try? engine.start()
+        } else {
+            engine.disableManualRenderingMode()
+            applyRoute(output?.route)
+        }
+        pausedTime = t
+        if wasPlaying { try? play() }
+    }
+
+    /// Crea una `StemFeed` por stem, conectada a la entrada 1 del mezclador de su canal, y se las da al
+    /// programador. Con el motor parado.
+    private func installFeeds() {
+        removeFeeds()
+        for (i, format) in stemFormats.enumerated() where i < channels.count {
+            let feed = StemFeed(format: format)
+            let node = feed.makeNode()
+            engine.attach(node)
+            engine.connect(node, to: channels[i], fromBus: 0, toBus: 1, format: format)
+            feeds.append(feed)
+            feedNodes.append(node)
+        }
+        scheduler.setFeeds(feeds)
+    }
+
+    /// Quita las fuentes del modo alojado en tiempo real. Con el motor parado.
+    private func removeFeeds() {
+        guard !feeds.isEmpty || !feedNodes.isEmpty else { return }
+        scheduler.setFeeds([])
+        for f in feeds { f.stop() }
+        for n in feedNodes { engine.detach(n) }
+        feeds = []
+        feedNodes = []
+    }
+
+    /// Retardo que declara el TimePitch, en muestras enteras (en `.realtime`, 4096; en `.offline`, 0).
+    static func timePitchRealtimeDelayFrames(_ node: AVAudioNode, sampleRate: Double) -> Double {
+        (node.latency * sampleRate).rounded()
+    }
+
+    /// Muestras dadas como silencio por falta de datos en las fuentes del modo alojado en tiempo real.
+    var feedUnderrunFrames: Int { feeds.reduce(0) { $0 + $1.underrunFrames } }
+
+    /// Retardo del TimePitch sumado al ancla en la última pasada alojada en tiempo real.
+    private var hostedTimePitchFrames = 0.0
+
+    /// Diagnóstico del modo alojado (`nil` sin alojar): vacíos de las fuentes, saltos y recuperaciones del
+    /// render, y la latencia de nodos sumada al ancla.
+    public var hostedDiagnostics: HostedPlaybackDiagnostics? {
+        guard let host else { return nil }
+        return HostedPlaybackDiagnostics(render: host.stats, feedUnderrunFrames: feedUnderrunFrames,
+                                         timePitchLatencyFrames: hostedTimePitchFrames,
+                                         anchorLatencyFrames: clock.read { $0.latencyFrames })
+    }
+
+    /// Fuera del actor: se llama en el hilo de render.
+    private nonisolated static func topUpClosure(_ scheduler: StemScheduler) -> @Sendable () -> Void {
+        { scheduler.topUp() }
+    }
+
+    private func sessionEnded(_ renderer: HostedRenderer) {
+        guard host === renderer else { return }
+        detach()
+    }
+
+    // MARK: Ancla de reproducción (mini-spec Fase 3, «Alineado con el backing» 1)
+
+    /// Qué posición del tema suena en qué muestra de salida en la pasada en curso, contando la latencia de
+    /// Varispeed y TimePitch. La muestra está en la línea de tiempo del render del motor (en offline,
+    /// `manualRenderingSampleTime`) o, alojado en una sesión, en la de la sesión (`AudioIOBuffer.sampleTime`).
+    /// `nil` parado o antes del primer ciclo de render de la pasada.
+    public var playbackAnchor: PlaybackAnchor? {
+        if let host { return host.anchor }
+        let sr = sampleRate
+        return clock.read { s -> PlaybackAnchor? in
+            guard s.running, !s.pendingStart, sr > 0 else { return nil }
+            return PlaybackAnchor(songTime: s.startSongFrame / sr, outputSample: s.runStartFrame + s.latencyFrames,
+                                  sampleRate: sr, rate: s.rate)
+        }
     }
 
     // MARK: Solo para tests (render offline)

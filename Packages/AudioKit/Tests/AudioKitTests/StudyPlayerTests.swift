@@ -496,35 +496,25 @@ final class StudyPlayerTests: XCTestCase {
 
     // MARK: Salida
 
-    let builtIn = AudioOutputDevice(id: 1, uid: "BuiltIn", name: "Altavoces del MacBook Pro", outputChannels: 2)
-    let flex = AudioOutputDevice(id: 7, uid: "Flex", name: "HeadRush Flex Prime", outputChannels: 4)
-
-    func testRoutePrefersFlexPrimeOnOutputs1And2() {
-        let r = OutputRouting.route(devices: [builtIn, flex], defaultDevice: builtIn)
-        XCTAssertEqual(r, OutputRoute(device: flex, channelMap: [0, 1, -1, -1]))
-    }
-
-    func testRouteFallsBackToTheDefaultOutput() {
-        XCTAssertEqual(OutputRouting.route(devices: [builtIn], defaultDevice: builtIn),
-                       OutputRoute(device: builtIn, channelMap: nil))
-        XCTAssertNil(OutputRouting.route(devices: [], defaultDevice: nil))
-    }
+    let builtIn = AudioDevice(id: 1, uid: "BuiltIn", name: "Altavoces del MacBook Pro", outputChannels: 2)
+    let pedal = AudioDevice(id: 7, uid: "Pedal", name: "Interfaz de prueba", inputChannels: 4, outputChannels: 4)
 
     @MainActor
-    func testPlugAndUnplugPauseAndReroute() async throws {
+    func testPlugAndUnplugChosenDevicePauseAndReroute() async throws {
         let sim = SimulatedDeviceProvider(devices: [builtIn], defaultID: 1)
         let (p, dir) = try makePlayer([("s0", sine(4, 440, 0.1), sine(4, 440, 0.1))], devices: sim)
         defer { try? FileManager.default.removeItem(at: dir) }
+        p.setOutput(OutputSelection(deviceUID: "Pedal", left: 3, right: 4))
         XCTAssertEqual(p.outputDeviceName, builtIn.name)
         XCTAssertNil(p.appliedRoute?.channelMap)
 
         try p.play()
         _ = try p.renderOffline(frames: 9_600)
-        sim.plug(flex)
+        sim.plug(pedal)
         for _ in 0..<100 where p.isPlaying { await Task.yield() }
         XCTAssertFalse(p.isPlaying)
-        XCTAssertEqual(p.outputDeviceName, flex.name)
-        XCTAssertEqual(p.appliedRoute?.channelMap, [0, 1, -1, -1])
+        XCTAssertEqual(p.outputDeviceName, pedal.name)
+        XCTAssertEqual(p.appliedRoute?.channelMap, [-1, -1, 0, 1])
         XCTAssertEqual(p.currentTime, 0.2, accuracy: 0.001)
 
         try p.play()

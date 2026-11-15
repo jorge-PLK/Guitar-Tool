@@ -4,8 +4,8 @@ App de escritorio para macOS (Swift/SwiftUI) que iguala el tono de un tema reamp
 
 ## Estado actual
 
-Fase 2b · Fuentes externas cerrada el 15/11/2026 (ADR-011).
-Siguiente: Fase 3 · Audio con la pedalera, en la rama `fase-3`.
+Fase 3 · Audio con el dispositivo cerrada el 15/11/2026 (ADR-012, ADR-013).
+Siguiente: Fase 4 · Guitarras y secciones, ya en marcha en el worktree `fase-4` (rebase sobre `fase-3`; ADR desde el 014).
 P1, P3 y P5 quedan para el comienzo de la Etapa 2.
 
 ## Contexto: leer solo lo que haga falta
@@ -32,7 +32,7 @@ P1, P3 y P5 quedan para el comienzo de la Etapa 2.
 - **`Tools/test.sh`** sin argumentos: `swift test` de cada paquete + build de la app, salida resumida (totales, fallos, errores con fichero:línea). Escribe `Temp/last-run.txt`, que es lo que lee `commit-gate.sh`. **`Tools/test.sh <Paquete> [Filtro]`** mientras se itera (no escribe `last-run.txt`). Salida 0 verde, 1 fallos, 2 compilación o nada que probar. Logs completos en `Temp/logs/`.
 - Nunca `xcodebuild` ni `swift test` a pelo: miles de líneas que se quedan en contexto.
 - Los tests pesados con modelo se activan con `TF_MODEL_TESTS=1` y se lanzan siempre bajo `Probes/P4-modelos/common/guard.py`, de uno en uno.
-- **El hardware y el oído son de Jorge.** Ningún agente toca la Flex Prime ni decide si algo suena bien: devuelve números (latencia en ms, distancia, desfase) y el comando o el WAV para que Jorge lo pruebe. Lo visual de la app lo juzga el hilo principal leyendo la captura.
+- **El hardware y el oído son de Jorge.** Ningún agente toca el dispositivo de audio ni decide si algo suena bien: devuelve números (latencia en ms, distancia, desfase) y el comando o el WAV para que Jorge lo pruebe. Lo visual de la app lo juzga el hilo principal leyendo la captura.
 
 ## Subagentes: uno por trabajo
 

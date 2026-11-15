@@ -216,6 +216,27 @@ final class StemEmptyAndAnalysisTests: XCTestCase {
         XCTAssertEqual(p.stems.count, 6)
     }
 
+    func testSaveTakesAddsAndReplacesByIdWithoutTouchingStudy() async throws {
+        let env = try await Env()
+        let id = try await env.library.importSong(from: try env.makeSource("a.mp3", content: "A"))
+        await env.library.waitForSeparations()
+        let key = CalibrationKey(inputUID: "in", outputUID: "", sampleRate: 48_000, bufferFrames: 512,
+                                 inputChannel: 1, outputChannel: 1)
+        var take = Take(processedFile: ProjectLayout.processedRelativePath(takeId: UUID()), createdAt: whole(),
+                        songStart: 12, sampleRate: 48_000, latencySamples: 1_200, latencyCalibrated: false,
+                        calibrationKey: key, clock: .single)
+        try await env.library.saveTake(id: id, take: take)
+        var p = try await env.project(id)
+        XCTAssertEqual(p.takes, [take])
+        let other = Take(createdAt: whole())
+        take.latencyCalibrated = true
+        take.songStart = 11.9
+        try await env.library.saveTakes(id: id, [take, other])
+        p = try await env.project(id)
+        XCTAssertEqual(p.takes, [take, other])
+        XCTAssertEqual(p.separation.state, .done)
+    }
+
     private struct Boom: Error {}
 
     /// Interrupción al medir un proyecto ya separado: project.json queda con isEmpty antes de borrar el WAV,

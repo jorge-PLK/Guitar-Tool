@@ -1,3 +1,4 @@
+import AudioKit
 import AppKit
 import Foundation
 import ModelKit
@@ -139,11 +140,41 @@ final class AppModel {
     var backing: BackingController?
     /// Tema sobre el que actúa la pantalla Backing (el último abierto en la biblioteca).
     var backingTarget: UUID?
-    /// Flex Prime conectada por USB (lista de salidas de CoreAudio).
-    let flexPrime = FlexPrimeMonitor()
+    /// Dispositivo de salida elegido en el perfil y si está conectado.
+    let audioDevice: AudioDeviceMonitor
+    /// Proveedor de dispositivos de los selectores de Ajustes · Audio (simulado con `--screen settings-audio` en DEBUG).
+    @ObservationIgnored let deviceProvider: AudioDeviceProviding
+    /// Audio con el dispositivo (mini-spec Fase 3): sesión, medidores, calibración y grabación.
+    let audio: AudioController
+    /// Hoja «Calibrar latencia» abierta (Ajustes · Audio).
+    var showCalibrationSheet = false
+
+    private static func makeDeviceProvider() -> AudioDeviceProviding {
+        #if DEBUG
+        if AudioDemo.screens.contains(LaunchOptions().screen ?? "") {
+            return SimulatedDeviceProvider(devices: [
+                AudioDevice(id: 1, uid: "sim-flex", name: "HeadRush Flex Prime (USB)", inputChannels: 4, outputChannels: 4, sampleRates: [48000]),
+                AudioDevice(id: 2, uid: "sim-builtin", name: "Altavoces del MacBook Pro", outputChannels: 2, sampleRates: [44100, 48000]),
+                AudioDevice(id: 3, uid: "sim-mic", name: "Micrófono del MacBook Pro", inputChannels: 1, sampleRates: [44100, 48000]),
+            ], defaultID: 2)
+        }
+        #endif
+        return CoreAudioDeviceProvider()
+    }
 
     // Datos
-    var profile = EquipmentProfile()
+    var profile = EquipmentProfile() {
+        didSet {
+            audioDevice.choose(uid: profile.audio?.outputDeviceUID)
+            backing?.player.setOutput(outputSelection)
+            audio.update(profile: profile)
+        }
+    }
+    /// Salida del backing según el perfil (dispositivo y par de canales).
+    var outputSelection: OutputSelection {
+        let a = profile.audio
+        return OutputSelection(deviceUID: a?.outputDeviceUID, left: a?.backingOut.left ?? 1, right: a?.backingOut.right ?? 2)
+    }
     var needsFolder = false
     var entries: [LibraryEntryInfo] = []
     var separationProgress: [UUID: Double] = [:]
@@ -195,6 +226,18 @@ final class AppModel {
         if let d = LaunchOptions().supportDir { dir = d }
         #endif
         supportDir = dir
+        let provider = Self.makeDeviceProvider()
+        deviceProvider = provider
+        #if DEBUG
+        let simulated = AudioDemo.screens.contains(LaunchOptions().screen ?? "")
+        audioDevice = simulated ? AudioDeviceMonitor(provider: provider, observeChanges: false) : AudioDeviceMonitor()
+        #else
+        audioDevice = AudioDeviceMonitor()
+        #endif
+        audio = AudioController(provider: provider, list: AudioDeviceList(provider: provider))
+        #if DEBUG
+        if AudioDemo.screens.contains(LaunchOptions().screen ?? "") { audio.makeIO = AudioDemo.makeIO }
+        #endif
         profileStore = ProfileStore(url: dir.appendingPathComponent("profile.json"))
         modelStore = ModelStore(root: dir.appendingPathComponent("Models", isDirectory: true),
                                 bundleResourceDirectory: Bundle.main.resourceURL)
@@ -202,6 +245,13 @@ final class AppModel {
         sources = ExternalSources(
             bundleDirectory: Bundle.main.executableURL?.deletingLastPathComponent() ?? Bundle.main.bundleURL,
             supportDirectory: dir.appendingPathComponent("Helpers", isDirectory: true))
+        audio.onCalibrationSaved = { [weak self] cal in
+            guard let self else { return }
+            var a = self.profile.audio ?? AudioSettings()
+            a.latency = cal
+            self.profile.audio = a
+            self.saveProfile()
+        }
     }
 
     // MARK: Arranque
@@ -276,6 +326,22 @@ final class AppModel {
         switch options.screen {
         case "settings-library": section = .settings; settingsTab = .library
         case "settings": section = .settings
+        case "settings-audio":
+            // Dispositivos y E/S simulados (ver `makeDeviceProvider`); el perfil se toca solo en memoria, sin guardar.
+            section = .settings; settingsTab = .audio
+            profile.audio = AudioSettings(outputDeviceUID: "sim-flex", inputDeviceUID: "sim-flex", guitarIn: [1])
+        case "calibration-sheet":
+            // Igual y, además, calibra de verdad contra la E/S simulada y enseña la hoja con el resultado.
+            section = .settings; settingsTab = .audio
+            profile.audio = AudioSettings(outputDeviceUID: "sim-flex", inputDeviceUID: "sim-flex", guitarIn: [1])
+            showCalibrationSheet = true
+            Task { try? await Task.sleep(for: .seconds(1)); await audio.calibrate() }
+        case "backing-ab":
+            // Backing con E/S simulada: ver `runAudioDemo` (calibra, graba una toma y deja el A/B en «Última toma»).
+            profile.audio = AudioSettings(outputDeviceUID: "sim-flex", inputDeviceUID: "sim-flex", guitarIn: [1])
+            let match = entries.first { e in options.project.map { e.folderName == $0 || e.title == $0 } ?? true }
+            backingTarget = match?.id
+            section = .backing
         case "detail-first": if let first = entries.first { await open(first.id) }
         case "backing":
             let match = entries.first { e in options.project.map { e.folderName == $0 || e.title == $0 } ?? true }
@@ -531,9 +597,12 @@ final class AppModel {
             guard section == .backing else { return }
             let session = StudySession(project: project, folder: folder, library: library, analysisState: state)
             study = session
-            let controller = BackingController(session: session, masterGainDB: profile.masterGainDB)
+            let controller = BackingController(session: session, masterGainDB: profile.masterGainDB, output: outputSelection)
             controller.onMasterChange = { [weak self] dB in self?.setMasterGain(dB) }
             backing = controller
+            controller.audio = audio
+            audio.onTakesChanged = { [weak controller] isNew in controller?.takesChanged(isNew: isNew) }
+            audio.bind(player: controller.player, study: session)
             #if DEBUG
             applyLaunchOptions(to: session)
             #endif
@@ -555,6 +624,8 @@ final class AppModel {
 
     func closeStudy() async {
         backing?.stop()
+        audio.unbind()
+        audio.onTakesChanged = nil
         backing = nil
         await study?.flush()
         study = nil
@@ -570,6 +641,7 @@ final class AppModel {
     /// sigan vivos reciben SIGKILL.
     func flushForTermination() {
         backing?.stop()
+        audio.unbind()
         if let t = masterSaveTask { t.cancel(); masterSaveTask = nil; saveProfile() }
         let start = Date()
         linkImport?.cancel()
@@ -612,14 +684,29 @@ final class AppModel {
         let delay = options.snapshotDelay
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(delay))
+            if options.screen == "calibration-sheet" {
+                // La calibración va a ritmo real: se espera al resultado (máx. 2 min) en vez de fiarse del retardo.
+                let deadline = Date().addingTimeInterval(120)
+                while Date() < deadline {
+                    if case .finished = audio.calibrationPhase { break }
+                    try? await Task.sleep(for: .milliseconds(250))
+                }
+                try? await Task.sleep(for: .milliseconds(800))
+            }
             if let window = NSApp.windows.first(where: { $0.contentView != nil }),
                let view = (window.attachedSheet ?? window).contentView {
                 // Con una hoja abierta (--link-import-demo) se captura la hoja, que es otra ventana.
-                if window.attachedSheet == nil { window.setContentSize(CGSize(width: 1440, height: 900)) }
-                // Ojo: un ScrollView de primer nivel (Ajustes) sale en blanco con cacheDisplay aunque la vista esté bien;
-                // para esas pantallas se captura con `screencapture` desde fuera.
+                if window.attachedSheet == nil {
+                    window.setContentSize(CGSize(width: 1440, height: 900))
+                    window.orderFrontRegardless()
+                    try? await Task.sleep(for: .milliseconds(600))
+                }
                 view.layoutSubtreeIfNeeded()
-                if let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
+                // Un ScrollView de primer nivel (Ajustes, Backing) sale en blanco con cacheDisplay aunque la vista esté bien
+                // (no es un fallo de la app): la ventana propia se captura con el compositor, sin permiso de pantalla.
+                if window.attachedSheet == nil, let png = Self.compositedPNG(of: window) {
+                    try? png.write(to: url)
+                } else if let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
                     view.cacheDisplay(in: view.bounds, to: rep)
                     try? rep.representation(using: .png, properties: [:])?.write(to: url)
                 }
@@ -630,6 +717,16 @@ final class AppModel {
         }
     }
 
+    /// PNG de la ventana tal como la compone WindowServer (`CGWindowListCreateImage`, que el SDK marca no disponible: se carga por dlsym).
+    private static func compositedPNG(of window: NSWindow) -> Data? {
+        typealias Fn = @convention(c) (CGRect, UInt32, UInt32, UInt32) -> Unmanaged<CGImage>?
+        guard let sym = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "CGWindowListCreateImage") else { return nil }
+        let create = unsafeBitCast(sym, to: Fn.self)
+        // optionIncludingWindow = 1 << 3; boundsIgnoreFraming = 1 << 0 (sin sombra).
+        guard let cg = create(.null, 1 << 3, UInt32(window.windowNumber), 1 << 0)?.takeRetainedValue() else { return nil }
+        return NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:])
+    }
+
     /// Estado inicial de Backing para capturas (sin reproducir).
     private func applyLaunchOptions(to session: StudySession) {
         switch options.analysisState {
@@ -638,6 +735,7 @@ final class AppModel {
         case "missing"?: session.setAnalysisState(.missing)
         default: break
         }
+        if options.screen == "backing-ab" { runAudioDemo() }
         backing?.apply(rate: options.rate, transpose: options.transpose, capo: options.capo,
                        muted: options.mute, loop: options.loop, seek: options.seek)
     }

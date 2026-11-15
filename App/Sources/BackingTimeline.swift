@@ -34,6 +34,7 @@ struct BackingTimelineCard: View {
                 infoRow
                 ProgressBarView(session: session, ctl: ctl, time: time, duration: duration)
                 transport
+                RecordStatus(session: session, ctl: ctl)
             }
             .padding(.horizontal, 18).padding(.vertical, 16)
         }
@@ -330,6 +331,7 @@ struct BackingTimelineCard: View {
                 .toggleStyle(.checkbox).font(TF.body(13)).foregroundStyle(TF.text2)
                 .disabled(session.beats == nil)
             Spacer(minLength: 0)
+            RecordButton(ctl: ctl)
         }
     }
 }
