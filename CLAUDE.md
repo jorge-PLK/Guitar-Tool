@@ -4,8 +4,9 @@ App de escritorio para macOS (Swift/SwiftUI) que iguala el tono de un tema reamp
 
 ## Estado actual
 
-Spec, plan y bocetos (7 pantallas, Ajustes incluida) cerrados el 14 y 15/11/2026. Sin código todavía.
-Siguiente: Fase 0, pruebas P2 (audio USB) y P4 (modelos a Core ML), en la rama `fase-0`.
+Fase 0 · Etapa 1 cerrada el 15/11/2026 (P2, P4, P6; ADR-004 a 006).
+Siguiente: Fase 1 · Base y biblioteca, en la rama `fase-1`.
+P1, P3 y P5 quedan para el comienzo de la Etapa 2.
 
 ## Contexto: leer solo lo que haga falta
 

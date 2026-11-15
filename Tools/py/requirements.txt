@@ -1,0 +1,39 @@
+# Herramientas de desarrollo (conversión y validación de modelos). Python 3.12.
+# Crear: uv venv --python 3.12 Tools/py/.venv
+# Instalar: uv pip install --python Tools/py/.venv/bin/python -r Tools/py/requirements.txt
+# torch fijado a 2.7.0: es el máximo que soporta coremltools 9.0 (_TORCH_MAX_VERSION).
+torch==2.7.0
+torchaudio==2.7.0
+coremltools==9.0
+onnx==1.23.2
+onnxruntime==1.32.0
+onnxscript==0.7.2
+# numpy < 2.5: con 2.5 coremltools 9.0 falla en _cast ("only 0-dimensional arrays can be converted")
+numpy==2.3.5
+scipy==1.18.1
+soundfile==0.14.0
+psutil==7.2.2
+pyyaml==6.0.3
+# dependencias del código de Music-Source-Separation-Training (BS-RoFormer)
+einops==0.8.2
+rotary-embedding-torch==0.9.2
+beartype==0.23.1
+ml-collections==1.1.0
+omegaconf==2.4.0
+librosa==1.0.1
+# Beat This! (P4 A4a): remuestreo oficial a 22050 Hz; el código del repo va por sys.path, sin instalar
+soxr==1.1.0
+# HTDemucs 6s (P4 A3, solo medición del original). Instalar con -c requirements.txt para no tocar torch/numpy.
+demucs==4.0.1
+dora-search==0.1.13
+julius==0.2.8
+lameenc==1.9.0
+openunmix==1.3.0
+retrying==1.4.2
+submitit==1.5.4
+treetable==0.2.6
+# P4 A4b (ADTOF): métricas de onsets, sonoridad de escucha y MIDI
+mir_eval==0.8.2
+pyloudnorm==0.1.1
+future==1.0.0
+mido==1.3.3

@@ -40,7 +40,7 @@ bump() { [ "$1" -gt "$status" ] && status=$1; }
 # Errores de compilación (no los fallos de XCTest, que también llevan "error: -[").
 compile_errors() { grep -E ': error: ' "$1" | grep -vE 'error: -\[' | sort -u | head -15; }
 
-for pkg in "${pkgs[@]}"; do
+for pkg in ${pkgs[@]+"${pkgs[@]}"}; do   # bash 3.2 + set -u: array vacío
   log="Temp/logs/$pkg.log"
   args=(test --package-path "Packages/$pkg")
   [ -n "$filter" ] && args+=(--filter "$filter")
