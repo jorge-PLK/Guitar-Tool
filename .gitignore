@@ -21,3 +21,6 @@ Probes/*/*/out/
 # Claude Code local
 .claude/settings.local.json
 .claude/worktrees/
+
+# Helpers embebidos (yt-dlp, Deno, ffmpeg): se regeneran con Tools/helpers/*.sh
+Vendor/helpers/

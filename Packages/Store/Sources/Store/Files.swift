@@ -98,6 +98,8 @@ public enum ProjectFile {
 
 public struct ProjectLayout: Sendable, Equatable {
     public static let audioRelativePath = "audio/song.wav"
+    /// Carátula de un tema importado desde un enlace (mini-spec Fase 2b, «Datos»).
+    public static let coverRelativePath = "source/cover.jpg"
 
     public let folder: URL
 
@@ -105,6 +107,7 @@ public struct ProjectLayout: Sendable, Equatable {
 
     public var projectFile: URL { folder.appendingPathComponent("project.json") }
     public var sourceDir: URL { folder.appendingPathComponent("source", isDirectory: true) }
+    public var coverFile: URL { folder.appendingPathComponent(Self.coverRelativePath) }
     public var audioDir: URL { folder.appendingPathComponent("audio", isDirectory: true) }
     public var audioFile: URL { folder.appendingPathComponent(Self.audioRelativePath) }
     public var stemsDir: URL { folder.appendingPathComponent("stems", isDirectory: true) }

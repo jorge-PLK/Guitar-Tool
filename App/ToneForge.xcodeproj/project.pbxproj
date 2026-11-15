@@ -12,6 +12,7 @@
 		134191F8B9AC4B09EE2E60EC /* ToneForgeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75A7F55F6E6CA6C725218127 /* ToneForgeApp.swift */; };
 		22FB99040C9A3A5490D4AB8E /* ChordGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0287422B5C2A670824F3C9C5 /* ChordGrid.swift */; };
 		2C2B9FE6AAC7B958F3E4A8F1 /* StudySession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 205EBA0C766248D3D5BA3D6D /* StudySession.swift */; };
+		367912D9D2B87FF85C3BD016 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B9A686802572ACB6B1A8CC04 /* Assets.xcassets */; };
 		41A89E8D66E34069176DF099 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6454D99769C07D228948A88A /* RootView.swift */; };
 		4FBC14B59C61E87856A72D6A /* ModelKit in Frameworks */ = {isa = PBXBuildFile; productRef = A69DFC994093C85D635994FE /* ModelKit */; };
 		5B7C970A73829188FB47C9B4 /* BackingController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D4CF1DC9FDEAB554C9AD979 /* BackingController.swift */; };
@@ -23,11 +24,16 @@
 		976B522F8C79F93AD139D6D1 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29EE870241AE799869F0237A /* SettingsView.swift */; };
 		987AAB0BD5B34F97B1B4E55F /* StudyBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7E70B03C10E548B408195F3 /* StudyBridge.swift */; };
 		AD36FEE8831300E05B5B6D3F /* BackingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80314A23F60B85C95E45E709 /* BackingView.swift */; };
+		ADF0053AD91B682E0C5B1EBE /* LinkImportDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B5FC3CE1DF0872CDBB3FBA9 /* LinkImportDemo.swift */; };
 		AF1B1A342114D331C7F9D61D /* ChordDiagram.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02E595FBE0F3410852A2CA67 /* ChordDiagram.swift */; };
+		B5CFEE7DB885C39DD2CA1778 /* SourceKit in Frameworks */ = {isa = PBXBuildFile; productRef = CCAB4C8959EC7AC83B04E254 /* SourceKit */; };
+		D8E41E9844B3FEFAEBBB7CB5 /* ExternalSources.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDE3261796229D3052B07781 /* ExternalSources.swift */; };
 		E2387454B5475F6956E87AEF /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3EE15103E9ACEAD7E554968 /* Theme.swift */; };
 		E80C7A8E62607DD51E4D80BA /* BTC_large_voca_fp16.mlpackage.zip in Resources */ = {isa = PBXBuildFile; fileRef = CC43CDA6D40FEAD57D19FD5F /* BTC_large_voca_fp16.mlpackage.zip */; };
+		ED68697F6C6612643F6A614B /* LinkImportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9D4AE74EA55983C1B4E52E0 /* LinkImportSheet.swift */; };
 		EF26AC39FD0E22A482154B90 /* AudioKit in Frameworks */ = {isa = PBXBuildFile; productRef = B2EF94E80837CC81D491FB08 /* AudioKit */; };
 		F164393E1DEA5F0D460044AE /* StudyKit in Frameworks */ = {isa = PBXBuildFile; productRef = 0A39F9963BDB534B4F4520BB /* StudyKit */; };
+		FD3BE747626A40ED22BA8A2E /* PlaylistImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7A71A84EB1D1CD867197AAC /* PlaylistImport.swift */; };
 		FFD37BCED14F6D643ED7B263 /* StemKit in Frameworks */ = {isa = PBXBuildFile; productRef = BF731584D8521CF63A9BC971 /* StemKit */; };
 /* End PBXBuildFile section */
 
@@ -36,6 +42,8 @@
 		0287422B5C2A670824F3C9C5 /* ChordGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChordGrid.swift; sourceTree = "<group>"; };
 		02E595FBE0F3410852A2CA67 /* ChordDiagram.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChordDiagram.swift; sourceTree = "<group>"; };
 		0B25179B33ED0A82BB871284 /* Store */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Store; path = ../Packages/Store; sourceTree = SOURCE_ROOT; };
+		0B5FC3CE1DF0872CDBB3FBA9 /* LinkImportDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkImportDemo.swift; sourceTree = "<group>"; };
+		0DFE1412D14EAB4A01F76F6F /* SourceKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = SourceKit; path = ../Packages/SourceKit; sourceTree = SOURCE_ROOT; };
 		1D4CF1DC9FDEAB554C9AD979 /* BackingController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackingController.swift; sourceTree = "<group>"; };
 		1EB495D8D35277ACBF6C671B /* StemKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = StemKit; path = ../Packages/StemKit; sourceTree = SOURCE_ROOT; };
 		205EBA0C766248D3D5BA3D6D /* StudySession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudySession.swift; sourceTree = "<group>"; };
@@ -49,13 +57,17 @@
 		75A7F55F6E6CA6C725218127 /* ToneForgeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToneForgeApp.swift; sourceTree = "<group>"; };
 		80314A23F60B85C95E45E709 /* BackingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackingView.swift; sourceTree = "<group>"; };
 		9671A99E86917B93EDEFF6AC /* AudioKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = AudioKit; path = ../Packages/AudioKit; sourceTree = SOURCE_ROOT; };
+		B9A686802572ACB6B1A8CC04 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		B9D4AE74EA55983C1B4E52E0 /* LinkImportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkImportSheet.swift; sourceTree = "<group>"; };
 		C753425F92D8228D372C046A /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
 		CC43CDA6D40FEAD57D19FD5F /* BTC_large_voca_fp16.mlpackage.zip */ = {isa = PBXFileReference; lastKnownFileType = archive.zip; path = BTC_large_voca_fp16.mlpackage.zip; sourceTree = "<group>"; };
 		CF8F42FD35B0D453C6F9E5EA /* Adapters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Adapters.swift; sourceTree = "<group>"; };
 		D3EE15103E9ACEAD7E554968 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		D7A71A84EB1D1CD867197AAC /* PlaylistImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaylistImport.swift; sourceTree = "<group>"; };
 		E27D5B253DA1C4343F39E6BA /* BackingTimeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackingTimeline.swift; sourceTree = "<group>"; };
 		E7E70B03C10E548B408195F3 /* StudyBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudyBridge.swift; sourceTree = "<group>"; };
 		E90B1053A3471D11C92D139D /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		FDE3261796229D3052B07781 /* ExternalSources.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalSources.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -68,6 +80,7 @@
 				4FBC14B59C61E87856A72D6A /* ModelKit in Frameworks */,
 				FFD37BCED14F6D643ED7B263 /* StemKit in Frameworks */,
 				F164393E1DEA5F0D460044AE /* StudyKit in Frameworks */,
+				B5CFEE7DB885C39DD2CA1778 /* SourceKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -79,9 +92,18 @@
 			children = (
 				9E7DF7CD24EBA77EAD5E5873 /* Models */,
 				9DE596F979B79291EEE2908F /* Packages */,
+				3961451DF9C69321CC55BFD5 /* Resources */,
 				509D064F60C6B577BAD5E721 /* Sources */,
 				45A58DFB792B6DA8CF4AFCD0 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		3961451DF9C69321CC55BFD5 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				B9A686802572ACB6B1A8CC04 /* Assets.xcassets */,
+			);
+			path = Resources;
 			sourceTree = "<group>";
 		};
 		45A58DFB792B6DA8CF4AFCD0 /* Products */ = {
@@ -103,9 +125,13 @@
 				80314A23F60B85C95E45E709 /* BackingView.swift */,
 				02E595FBE0F3410852A2CA67 /* ChordDiagram.swift */,
 				0287422B5C2A670824F3C9C5 /* ChordGrid.swift */,
+				FDE3261796229D3052B07781 /* ExternalSources.swift */,
 				0047CD671C9AEC3053061691 /* FlexPrimeMonitor.swift */,
 				28E679F0268528B203E07B9D /* Info.plist */,
 				C753425F92D8228D372C046A /* LibraryView.swift */,
+				0B5FC3CE1DF0872CDBB3FBA9 /* LinkImportDemo.swift */,
+				B9D4AE74EA55983C1B4E52E0 /* LinkImportSheet.swift */,
+				D7A71A84EB1D1CD867197AAC /* PlaylistImport.swift */,
 				6454D99769C07D228948A88A /* RootView.swift */,
 				29EE870241AE799869F0237A /* SettingsView.swift */,
 				E7E70B03C10E548B408195F3 /* StudyBridge.swift */,
@@ -121,6 +147,7 @@
 			children = (
 				9671A99E86917B93EDEFF6AC /* AudioKit */,
 				6776133E7FA6353546A3F0BD /* ModelKit */,
+				0DFE1412D14EAB4A01F76F6F /* SourceKit */,
 				1EB495D8D35277ACBF6C671B /* StemKit */,
 				0B25179B33ED0A82BB871284 /* Store */,
 				600C6F9C627112F722163FBE /* StudyKit */,
@@ -146,6 +173,7 @@
 			buildPhases = (
 				B2F49BA63AC132C56CE33578 /* Sources */,
 				8607D37F0B09AF9123E3BACD /* Embed tf-separate */,
+				4032CDA79D255DF2F955DAA2 /* Embed helpers */,
 				8E974F1120375271849A7EBC /* Resources */,
 				39014CF2C0D9AFC359B3D19C /* Frameworks */,
 			);
@@ -160,6 +188,7 @@
 				A69DFC994093C85D635994FE /* ModelKit */,
 				BF731584D8521CF63A9BC971 /* StemKit */,
 				0A39F9963BDB534B4F4520BB /* StudyKit */,
+				CCAB4C8959EC7AC83B04E254 /* SourceKit */,
 			);
 			productName = ToneForge;
 			productReference = 50A04723931020D3F8A07685 /* ToneForge.app */;
@@ -192,6 +221,7 @@
 			packageReferences = (
 				F8772B98128A8FB2D647BBD7 /* XCLocalSwiftPackageReference "../Packages/AudioKit" */,
 				A138270A86F0AA6EB1900CDF /* XCLocalSwiftPackageReference "../Packages/ModelKit" */,
+				B5B9847CF23A784E5CE34C1C /* XCLocalSwiftPackageReference "../Packages/SourceKit" */,
 				1D121B800B90CA6E83BF375F /* XCLocalSwiftPackageReference "../Packages/StemKit" */,
 				B8CD7D01F4A15EA4DE8E8BF9 /* XCLocalSwiftPackageReference "../Packages/Store" */,
 				AD32809C8BBB0395EA0AAEA2 /* XCLocalSwiftPackageReference "../Packages/StudyKit" */,
@@ -211,6 +241,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				367912D9D2B87FF85C3BD016 /* Assets.xcassets in Resources */,
 				E80C7A8E62607DD51E4D80BA /* BTC_large_voca_fp16.mlpackage.zip in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -218,6 +249,30 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
+		4032CDA79D255DF2F955DAA2 /* Embed helpers */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/../Vendor/helpers/yt-dlp",
+				"$(SRCROOT)/../Vendor/helpers/deno",
+				"$(SRCROOT)/../Vendor/helpers/ffmpeg",
+			);
+			name = "Embed helpers";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(EXECUTABLE_FOLDER_PATH)/yt-dlp",
+				"$(TARGET_BUILD_DIR)/$(EXECUTABLE_FOLDER_PATH)/deno",
+				"$(TARGET_BUILD_DIR)/$(EXECUTABLE_FOLDER_PATH)/ffmpeg",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e\nSRC=\"$SRCROOT/../Vendor/helpers\"\nfor H in yt-dlp deno ffmpeg; do\n  if [ ! -x \"$SRC/$H\" ]; then\n    if [ \"$H\" = ffmpeg ]; then S=Tools/helpers/build-ffmpeg.sh; else S=Tools/helpers/fetch.sh; fi\n    echo \"error: falta Vendor/helpers/$H; lanza $S\" >&2\n    exit 1\n  fi\ndone\nDESTDIR=\"$TARGET_BUILD_DIR/$EXECUTABLE_FOLDER_PATH\"\nmkdir -p \"$DESTDIR\"\nfor H in yt-dlp deno ffmpeg; do\n  cp -f \"$SRC/$H\" \"$DESTDIR/$H\"\n  codesign --force --sign \"${EXPANDED_CODE_SIGN_IDENTITY:--}\" --timestamp=none \"$DESTDIR/$H\"\ndone\n";
+		};
 		8607D37F0B09AF9123E3BACD /* Embed tf-separate */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
@@ -260,8 +315,12 @@
 				AD36FEE8831300E05B5B6D3F /* BackingView.swift in Sources */,
 				AF1B1A342114D331C7F9D61D /* ChordDiagram.swift in Sources */,
 				22FB99040C9A3A5490D4AB8E /* ChordGrid.swift in Sources */,
+				D8E41E9844B3FEFAEBBB7CB5 /* ExternalSources.swift in Sources */,
 				0F44D837A0B1DD98C2322E38 /* FlexPrimeMonitor.swift in Sources */,
 				912BF217E571DAB8F8AAB440 /* LibraryView.swift in Sources */,
+				ADF0053AD91B682E0C5B1EBE /* LinkImportDemo.swift in Sources */,
+				ED68697F6C6612643F6A614B /* LinkImportSheet.swift in Sources */,
+				FD3BE747626A40ED22BA8A2E /* PlaylistImport.swift in Sources */,
 				41A89E8D66E34069176DF099 /* RootView.swift in Sources */,
 				976B522F8C79F93AD139D6D1 /* SettingsView.swift in Sources */,
 				987AAB0BD5B34F97B1B4E55F /* StudyBridge.swift in Sources */,
@@ -476,6 +535,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../Packages/StudyKit;
 		};
+		B5B9847CF23A784E5CE34C1C /* XCLocalSwiftPackageReference "../Packages/SourceKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../Packages/SourceKit;
+		};
 		B8CD7D01F4A15EA4DE8E8BF9 /* XCLocalSwiftPackageReference "../Packages/Store" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../Packages/Store;
@@ -506,6 +569,10 @@
 		BF731584D8521CF63A9BC971 /* StemKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = StemKit;
+		};
+		CCAB4C8959EC7AC83B04E254 /* SourceKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SourceKit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

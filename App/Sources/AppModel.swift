@@ -2,6 +2,7 @@ import AppKit
 import Foundation
 import ModelKit
 import Observation
+import SourceKit
 import UniformTypeIdentifiers
 import Store
 
@@ -32,6 +33,11 @@ struct LaunchOptions {
     var chordsEdit = false
     /// Escribe en `Temp/p8/grid-hit.txt` el resultado de la comprobación del hit-test de la rejilla y de la tira.
     var gridHitSelftest = false
+    /// Abre la hoja «Desde enlace» con datos simulados (sin red): vacio, resolviendo, candidatos, descargando, error o youtube.
+    var linkImportDemo: String?
+    /// Detalle de Biblioteca con la edición de título y artista activada / diálogo «¿Eliminar…?» del primer tema.
+    var detailEdit = false
+    var deleteDialog = false
 
     init(_ args: [String] = CommandLine.arguments) {
         var i = 1
@@ -61,6 +67,9 @@ struct LaunchOptions {
             case ("--grid-hit-selftest", _): gridHitSelftest = true
             case ("--import", let v?): importFiles.append(path(v)); i += 1
             case ("--screen", let v?): screen = v; i += 1
+            case ("--link-import-demo", let v?): linkImportDemo = v; i += 1
+            case ("--detail-edit", _): detailEdit = true
+            case ("--delete-dialog", _): deleteDialog = true
             default: break
             }
             i += 1
@@ -86,6 +95,23 @@ struct ProjectDetail: Identifiable {
     let project: Project
     let folder: URL
     let stems: [(kind: StemKind, bytes: Int64, isEmpty: Bool)]
+}
+
+struct TrashRequest: Identifiable {
+    let id = UUID()
+    let projectID: UUID
+    let title: String
+    let stems: Int
+    let takes: Int
+    let videos: Int
+
+    /// Lo que se va con el tema, para el diálogo.
+    var contents: String {
+        var parts = [stems == 0 ? "sus stems" : (stems == 1 ? "1 stem" : "\(stems) stems")]
+        if takes > 0 { parts.append(takes == 1 ? "1 toma" : "\(takes) tomas") }
+        if videos > 0 { parts.append(videos == 1 ? "1 vídeo" : "\(videos) vídeos") }
+        return parts.joined(separator: ", ")
+    }
 }
 
 struct CleanupRequest: Identifiable {
@@ -131,14 +157,27 @@ final class AppModel {
     var duplicateID: UUID?
     var notice: Notice?
     var cleanupRequest: CleanupRequest?
+    var trashRequest: TrashRequest?
     var pendingFolder: URL?
     var relocationProgress: Double?
+    /// Hoja «Importar desde enlace» abierta (nil = cerrada).
+    var linkImport: LinkImportSession?
+    /// Lista o álbum en importación. Vive aquí, no en la hoja: se puede cerrar la hoja y la cola sigue.
+    var playlistImport: PlaylistImportSession?
+    /// `videoID` de temas de lista que la biblioteca ya tenía al importarlos (cuentan como «en la biblioteca»).
+    @ObservationIgnored private var playlistDuplicates: Set<String> = []
+
+    // Fuentes externas (Ajustes)
+    enum YtDlpUpdateStatus: Equatable { case idle, updating, done(String), failed(String) }
+    var toolsInfo: ExternalToolsInfo?
+    var ytDlpUpdateStatus: YtDlpUpdateStatus = .idle
 
     @ObservationIgnored let supportDir: URL
     @ObservationIgnored let profileStore: ProfileStore
     @ObservationIgnored private var masterSaveTask: Task<Void, Never>?
     @ObservationIgnored let modelStore: ModelStore
     @ObservationIgnored let studyAnalyzer: AppStudyAnalyzer
+    @ObservationIgnored let sources: ExternalSources
     @ObservationIgnored private(set) var library: Library?
     @ObservationIgnored private var eventTask: Task<Void, Never>?
     @ObservationIgnored private var started = false
@@ -160,6 +199,9 @@ final class AppModel {
         modelStore = ModelStore(root: dir.appendingPathComponent("Models", isDirectory: true),
                                 bundleResourceDirectory: Bundle.main.resourceURL)
         studyAnalyzer = AppStudyAnalyzer(modelStore: modelStore)
+        sources = ExternalSources(
+            bundleDirectory: Bundle.main.executableURL?.deletingLastPathComponent() ?? Bundle.main.bundleURL,
+            supportDirectory: dir.appendingPathComponent("Helpers", isDirectory: true))
     }
 
     // MARK: Arranque
@@ -172,6 +214,7 @@ final class AppModel {
         listenToModels()
 
         #if DEBUG
+        assert(PossibleDuplicate.selfCheck(), "Normalización de «posible repetido»")
         for zip in options.installModelFrom {
             let id = zip.lastPathComponent.contains("BeatThis") ? ModelCatalog.beatsBeatThis.id : Self.modelID
             do { _ = try await modelStore.install(id, fromArchive: zip) } catch { notify("No se pudo instalar el modelo", error) }
@@ -181,6 +224,10 @@ final class AppModel {
             saveProfile()
         }
         #endif
+
+        // Temporales huérfanos de una ejecución anterior; antes de que nada pueda estar usándolos.
+        SourceImporter.removeOrphanedDownloads()
+        if let root = profile.projectsFolder { Library.removeOrphanTemporaries(in: root) }
 
         guard profile.projectsFolder != nil else { needsFolder = true; return }
         await bootstrap()
@@ -236,6 +283,8 @@ final class AppModel {
             section = .backing
         default: break
         }
+        if let demo = options.linkImportDemo { openLinkImportDemo(demo) }
+        if options.deleteDialog, let first = entries.first { requestTrash(first) }
         #endif
     }
 
@@ -298,6 +347,129 @@ final class AppModel {
         panel.allowedContentTypes = ["wav", "flac", "mp3"].compactMap { UTType(filenameExtension: $0) }
         guard panel.runModal() == .OK else { return }
         importFiles(panel.urls)
+    }
+
+    // MARK: Importar desde enlace
+
+    func openLinkImport() {
+        guard library != nil else { return }
+        linkImport = LinkImportSession(hooks: .init(
+            makeImporter: { [sources] in try await sources.makeImporter() },
+            existingProject: { [weak self] videoID in await self?.library?.project(withVideoID: videoID)?.id },
+            store: { [weak self] source, progress in _ = try await self?.storeImported(source, progress: progress) },
+            updateYtDlp: { [sources] in try await sources.updateYtDlp() },
+            lookup: { [weak self] in await self?.scanLibraryIDs() ?? LibraryLookup() },
+            open: { [weak self] id in self?.openFromSheet(id) },
+            makePlaylist: { [weak self] in
+                guard let self else { throw SourceError.cancelled }
+                return try await self.makePlaylistSession()
+            },
+            discardPlaylist: { [weak self] in self?.playlistImport = nil },
+            close: { [weak self] dup in self?.closeLinkImport(duplicate: dup) }))
+        linkImport?.playlist = playlistImport
+    }
+
+    func closeLinkImport(duplicate: UUID? = nil) {
+        linkImport = nil
+        // Una lista sin cola en marcha (temas, revisión, resumen) no se conserva al cerrar con el botón.
+        if let p = playlistImport, !p.isLive { playlistImport = nil }
+        if let duplicate { duplicateID = duplicate }
+        Task { await refresh() }
+    }
+
+    /// Prepara la sesión de lista (`PlaylistImporter` con yt-dlp, ffmpeg y el cierre que importa y separa).
+    func makePlaylistSession() async throws -> PlaylistImportSession {
+        playlistDuplicates = []
+        let importer = try await sources.makePlaylistImporter { [weak self] source in
+            try await self?.storePlaylistTrack(source)
+        }
+        let session = PlaylistImportSession(importer: importer, hooks: playlistHooks())
+        playlistImport = session
+        return session
+    }
+
+    func playlistHooks() -> PlaylistImportSession.Hooks {
+        .init(updateYtDlp: { [sources] in try await sources.updateYtDlp() },
+              lookup: { [weak self] in await self?.scanLibraryIDs() ?? LibraryLookup() },
+              open: { [weak self] id in self?.openFromSheet(id) },
+              duplicateVideoIDs: { [weak self] in self?.playlistDuplicates ?? [] })
+    }
+
+    /// Identificadores de Spotify y de YouTube que ya tiene la biblioteca, para los cierres de duplicados de SourceKit
+    /// (síncronos; el escaneo de `Library.project(withSpotifyID:)` / `project(withVideoID:)` se hace una vez por pasada).
+    func scanLibraryIDs() async -> LibraryLookup {
+        guard let root = profile.projectsFolder else { return LibraryLookup() }
+        return await Task.detached {
+            var found = LibraryLookup()
+            for p in ProjectScanner.scan(root: root).found {
+                guard let o = p.project.song.origin else { continue }
+                let t = ExistingTrack(id: p.project.id, title: p.project.song.title, artist: p.project.song.artist)
+                if let s = o.spotifyID { found.spotify[s] = t }
+                if let v = o.videoID { found.video[v] = t }
+            }
+            return found
+        }.value.withTracks(entries.map { ExistingTrack(id: $0.id, title: $0.title, artist: $0.artist) })
+    }
+
+    /// «Abrir» en la hoja: la cierra y abre el proyecto como al pulsar «Abrir» en la Biblioteca.
+    func openFromSheet(_ id: UUID) {
+        closeLinkImport()
+        Task { await open(id) }
+    }
+
+    /// Un tema de la lista: importa y encola su separación, como al separar a mano. Un duplicado no es un fallo.
+    private func storePlaylistTrack(_ source: ImportedSource) async throws {
+        do {
+            let id = try await storeImported(source) { _ in }
+            do { try await library?.separate(id: id) } catch { notify("No se pudo separar \(source.title)", error) }
+        } catch LibraryError.duplicate {
+            playlistDuplicates.insert(source.origin.videoID)
+        }
+        await refresh()
+    }
+
+    /// Importa el WAV descargado con título, artista, origen y carátula (convertida a JPEG). La carpeta temporal
+    /// la borra quien llama (`ImportedSource.cleanUp`), también si esto falla.
+    @discardableResult
+    private func storeImported(_ source: ImportedSource, progress: @escaping @Sendable (Double) -> Void) async throws -> UUID {
+        guard let library else { throw LibraryError.workInProgress }
+        var cover: URL?
+        if let art = source.artworkURL {
+            let out = source.workDirectory.appendingPathComponent("cover-converted.jpg")
+            if CoverConverter.jpeg(from: art, to: out) { cover = out }
+        }
+        let meta = ImportMetadata(title: source.title, artist: source.artist.isEmpty ? nil : source.artist,
+                                  origin: SongOrigin(source.origin), artworkFile: cover)
+        return try await library.importSong(from: source.wavURL, metadata: meta, progress: progress)
+    }
+
+    // MARK: Fuentes externas (Ajustes)
+
+    func loadToolsInfo() async { toolsInfo = await sources.toolsInfo() }
+
+    func updateYtDlp() {
+        guard ytDlpUpdateStatus != .updating else { return }
+        ytDlpUpdateStatus = .updating
+        Task {
+            do {
+                let info = try await sources.updateYtDlp()
+                await loadToolsInfo()
+                ytDlpUpdateStatus = toolsInfo?.ytDlpOrigin == .updated
+                    ? .done("yt-dlp actualizado a \(info.version).")
+                    : .done("Ya tienes la última versión (\(info.version)).")
+            } catch {
+                let e = error as? SourceError
+                ytDlpUpdateStatus = .failed(e.map { SourceMessages.text(for: $0).title + ": " + SourceMessages.text(for: $0).detail }
+                                            ?? error.localizedDescription)
+            }
+        }
+    }
+
+    func revertYtDlp() {
+        Task {
+            do { try await sources.removeUpdate(); ytDlpUpdateStatus = .idle } catch { notify("No se pudo volver a la embebida", error) }
+            await loadToolsInfo()
+        }
     }
 
     func importFiles(_ urls: [URL]) {
@@ -388,18 +560,33 @@ final class AppModel {
         study = nil
     }
 
-    /// Al salir de la app: guarda lo pendiente de forma síncrona (acotada a 2 s).
+    /// Tope total del cierre (guardado del estudio + cancelar trabajos + esperar a los hijos).
+    static let terminationBudget: TimeInterval = 3
+    /// Parte del tope tras la que se manda SIGKILL a los hijos que sigan vivos (la gracia de SIGTERM de los runners es 5 s).
+    static let terminationKillAfter: TimeInterval = 2
+
+    /// Al salir de la app: guarda lo pendiente, cancela separación, colas e importaciones de enlace y espera
+    /// (acotado a `terminationBudget`) a que `tf-separate`, `yt-dlp`, `deno` y `ffmpeg` hayan muerto; los que
+    /// sigan vivos reciben SIGKILL.
     func flushForTermination() {
         backing?.stop()
         if let t = masterSaveTask { t.cancel(); masterSaveTask = nil; saveProfile() }
-        guard let library, let s = study else { return }
-        let (id, study, sections) = (s.projectID, s.study, s.sections)
-        let done = DispatchSemaphore(value: 0)
-        Task.detached {
-            try? await library.saveStudy(id: id, study: study, sections: sections)
-            done.signal()
+        let start = Date()
+        linkImport?.cancel()
+        playlistImport?.cancelLoading()
+        playlistImport?.cancel()
+        if let library {
+            let saved = study.map { ($0.projectID, $0.study, $0.sections) }
+            let done = DispatchSemaphore(value: 0)
+            Task.detached {
+                if let (id, study, sections) = saved { try? await library.saveStudy(id: id, study: study, sections: sections) }
+                await library.stopAllForShutdown()
+                done.signal()
+            }
+            _ = done.wait(timeout: .now() + Self.terminationKillAfter)
         }
-        _ = done.wait(timeout: .now() + 2)
+        ChildProcesses.terminateAll(waiting: max(0.2, Self.terminationBudget - Date().timeIntervalSince(start)),
+                                    killAfter: max(0, Self.terminationKillAfter - Date().timeIntervalSince(start)))
     }
 
     private var analysisPinned: Bool {
@@ -425,14 +612,20 @@ final class AppModel {
         let delay = options.snapshotDelay
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(delay))
-            if let window = NSApp.windows.first(where: { $0.contentView != nil }), let view = window.contentView {
-                window.setContentSize(CGSize(width: 1440, height: 900))
+            if let window = NSApp.windows.first(where: { $0.contentView != nil }),
+               let view = (window.attachedSheet ?? window).contentView {
+                // Con una hoja abierta (--link-import-demo) se captura la hoja, que es otra ventana.
+                if window.attachedSheet == nil { window.setContentSize(CGSize(width: 1440, height: 900)) }
+                // Ojo: un ScrollView de primer nivel (Ajustes) sale en blanco con cacheDisplay aunque la vista esté bien;
+                // para esas pantallas se captura con `screencapture` desde fuera.
                 view.layoutSubtreeIfNeeded()
                 if let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
                     view.cacheDisplay(in: view.bounds, to: rep)
                     try? rep.representation(using: .png, properties: [:])?.write(to: url)
                 }
             }
+            // Con una hoja abierta terminate(_:) no sale; en capturas basta salir directamente.
+            if NSApp.windows.contains(where: { $0.attachedSheet != nil }) { exit(0) }
             NSApp.terminate(nil)
         }
     }
@@ -489,6 +682,64 @@ final class AppModel {
             } catch { notify("No se pudo limpiar", error) }
             await refresh()
         }
+    }
+
+    // MARK: Eliminar tema (Papelera o borrado definitivo)
+
+    /// Prepara la confirmación con lo que se va con el tema: stems, tomas y vídeos (lo que dice su `project.json`).
+    func requestTrash(_ e: LibraryEntryInfo) {
+        var videos = 0
+        if let f = folder(of: e), let p = try? ProjectFile.load(folder: f) { videos = p.videos.count }
+        trashRequest = TrashRequest(projectID: e.id, title: e.title, stems: e.stemCount, takes: e.takeCount, videos: videos)
+    }
+
+    /// Suelta el tema si está abierto (reproductor, Backing, detalle) y lo mueve a la Papelera. Si falla, no se toca
+    /// nada y el aviso dice el motivo y recuerda «Eliminar del disco»; nunca se borra solo.
+    func performTrash(_ r: TrashRequest) { remove(r, permanently: false) }
+
+    /// Igual que `performTrash`, pero borra la carpeta del disco (no se puede deshacer).
+    func performDelete(_ r: TrashRequest) { remove(r, permanently: true) }
+
+    private func remove(_ r: TrashRequest, permanently: Bool) {
+        guard let library else { return }
+        Task {
+            if study?.projectID == r.projectID { await closeStudy() }
+            if backingTarget == r.projectID { backingTarget = nil }
+            do {
+                if permanently { try await library.deleteProject(id: r.projectID) }
+                else { try await library.trashProject(id: r.projectID) }
+                if detail?.id == r.projectID { detail = nil }
+                separationProgress[r.projectID] = nil
+                failures[r.projectID] = nil
+            } catch {
+                if permanently {
+                    notify("No se pudo eliminar del disco", error)
+                } else {
+                    notice = Notice(title: "No se pudo mover a la Papelera",
+                                    message: Self.describe(error) + " No se ha borrado nada; te queda «Eliminar del disco».")
+                }
+            }
+            await refresh()
+        }
+    }
+
+    /// Corrige título y artista a mano. Refresca la tabla, el detalle abierto y la cabecera de Backing (`study.reload()`
+    /// relee `project.json`; no toca el estado de estudio sin guardar). Devuelve `false` si no se pudo guardar.
+    @discardableResult
+    func updateSongInfo(id: UUID, title: String, artist: String) async -> Bool {
+        guard let library else { return false }
+        do {
+            try await library.updateSongInfo(id: id, title: title, artist: artist)
+        } catch LibraryError.emptyTitle {
+            notice = Notice(title: "Falta el título", message: "El título no puede quedar vacío.")
+            return false
+        } catch { notify("No se pudo guardar el título", error); return false }
+        if let d = detail, d.id == id, let p = try? ProjectFile.load(folder: d.folder) {
+            detail = ProjectDetail(project: p, folder: d.folder, stems: d.stems)
+        }
+        if study?.projectID == id { study?.reload() }
+        await refresh()
+        return true
     }
 
     // MARK: Ajustes
@@ -568,9 +819,48 @@ final class AppModel {
         switch error as? LibraryError {
         case .busy?: return "El tema está ocupado (separándose o reconvirtiéndose)."
         case .workInProgress?: return "Hay una separación en curso o en cola."
+        case .unsafeDeletion?: return "La carpeta del tema no es un proyecto válido de la biblioteca; no se ha borrado nada."
         case .projectNotFound?: return "No se encuentra el proyecto en la carpeta."
         case .duplicate?: return "Ese tema ya está en la biblioteca."
         default: return error.localizedDescription
         }
+    }
+}
+
+/// Procesos descendientes de la app (los que lanzaron los runners). Solo toca los nuestros: `proc_listpids` por padre.
+enum ChildProcesses {
+    /// Pids vivos (sin zombis) que descienden de `root`.
+    static func descendants(of root: pid_t = getpid()) -> [pid_t] {
+        var result: [pid_t] = []
+        var frontier = [root]
+        while let parent = frontier.popLast() {
+            var buf = [pid_t](repeating: 0, count: 256)
+            let bytes = proc_listpids(UInt32(PROC_PPID_ONLY), UInt32(parent), &buf, Int32(buf.count * MemoryLayout<pid_t>.size))
+            guard bytes > 0 else { continue }
+            for pid in buf.prefix(Int(bytes) / MemoryLayout<pid_t>.size) where pid > 0 {
+                var info = proc_bsdshortinfo()
+                let n = proc_pidinfo(pid, PROC_PIDT_SHORTBSDINFO, 0, &info, Int32(MemoryLayout<proc_bsdshortinfo>.size))
+                if n > 0, info.pbsi_status == UInt32(SZOMB) { continue }
+                result.append(pid)
+                frontier.append(pid)
+            }
+        }
+        return result
+    }
+
+    /// Espera hasta `waiting` s a que no quede ningún descendiente; pasados `killAfter` s manda SIGKILL a los que queden.
+    static func terminateAll(waiting: TimeInterval, killAfter: TimeInterval) {
+        let start = Date()
+        var killed = false
+        while Date().timeIntervalSince(start) < waiting {
+            let alive = descendants()
+            if alive.isEmpty { return }
+            if !killed, Date().timeIntervalSince(start) >= killAfter {
+                for pid in alive { kill(pid, SIGKILL) }
+                killed = true
+            }
+            usleep(50_000)
+        }
+        for pid in descendants() { kill(pid, SIGKILL) }
     }
 }

@@ -51,6 +51,46 @@ public struct Stem: Codable, Sendable, Equatable {
     }
 }
 
+/// Origen de un tema importado desde un enlace (mini-spec Fase 2b, «Datos»). Los campos que pueden faltar son opcionales.
+public struct SongOrigin: Codable, Sendable, Equatable {
+    public enum Kind: String, Codable, Sendable, Equatable {
+        case youtube, spotify
+    }
+
+    public var kind: Kind
+    /// El enlace pegado.
+    public var url: String
+    public var videoID: String?
+    public var channel: String?
+    public var spotifyID: String?
+    public var album: String?
+    /// Relativa: `source/cover.jpg`.
+    public var artwork: String?
+    public var codec: String?
+    public var ytDlpVersion: String?
+    public var importedAt: Date
+    /// Lista de la que vino el tema (mini-spec Fase 2b, «Listas»). Aditivo: sin ella no se escribe la clave.
+    public var playlistID: String?
+    public var playlistName: String?
+
+    public init(kind: Kind, url: String, videoID: String? = nil, channel: String? = nil, spotifyID: String? = nil,
+                album: String? = nil, artwork: String? = nil, codec: String? = nil, ytDlpVersion: String? = nil,
+                importedAt: Date = Date(), playlistID: String? = nil, playlistName: String? = nil) {
+        self.playlistID = playlistID
+        self.playlistName = playlistName
+        self.kind = kind
+        self.url = url
+        self.videoID = videoID
+        self.channel = channel
+        self.spotifyID = spotifyID
+        self.album = album
+        self.artwork = artwork
+        self.codec = codec
+        self.ytDlpVersion = ytDlpVersion
+        self.importedAt = importedAt
+    }
+}
+
 public struct Song: Codable, Sendable, Equatable {
     public var title: String
     public var artist: String?
@@ -66,10 +106,13 @@ public struct Song: Codable, Sendable, Equatable {
     public var sampleRate: Double
     /// Segundos.
     public var duration: Double
+    /// Solo si el tema vino de un enlace (mini-spec Fase 2b, «Datos»). Aditivo: no sube `schemaVersion`.
+    public var origin: SongOrigin?
 
     public init(title: String, artist: String? = nil, source: String, sourceSHA256: String, sourceFormat: String,
                 sourceSampleRate: Double, sourceChannels: Int, audio: String = ProjectLayout.audioRelativePath,
-                sampleRate: Double, duration: Double) {
+                sampleRate: Double, duration: Double, origin: SongOrigin? = nil) {
+        self.origin = origin
         self.title = title
         self.artist = artist
         self.source = source

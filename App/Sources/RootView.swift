@@ -27,6 +27,7 @@ struct RootView: View {
         .sheet(isPresented: Binding(get: { model.needsFolder }, set: { _ in })) {
             FirstRunSheet().interactiveDismissDisabled(true)
         }
+        .sheet(item: $model.linkImport) { LinkImportSheet(session: $0) }
         .alert(item: $model.notice) { n in
             Alert(title: Text(n.title), message: Text(n.message), dismissButton: .default(Text("Aceptar")))
         }
@@ -38,7 +39,7 @@ struct RootView: View {
             }
             Button("Cancelar", role: .cancel) { model.duplicateID = nil }
         } message: {
-            Text("Ya hay un proyecto con el mismo audio (mismo SHA-256). ¿Quieres abrirlo?")
+            Text("Ya hay un proyecto con el mismo audio (mismo SHA-256) o con el mismo vídeo de origen. ¿Quieres abrirlo?")
         }
     }
 }

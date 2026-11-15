@@ -25,6 +25,8 @@ packages:
     path: ../Packages/StemKit
   StudyKit:
     path: ../Packages/StudyKit
+  SourceKit:
+    path: ../Packages/SourceKit
 targets:
   ToneForge:
     type: application
@@ -35,12 +37,15 @@ targets:
       - path: Resources/Models
         includes: ["*.zip"]
         buildPhase: resources
+      # Icono de la app: los PNG salen de Resources/AppIcon.svg con Tools/make-icon.sh.
+      - path: Resources/Assets.xcassets
     dependencies:
       - package: Store
       - package: AudioKit
       - package: ModelKit
       - package: StemKit
       - package: StudyKit
+      - package: SourceKit
     postCompileScripts:
       # Helper de separación embebido: Contents/MacOS/tf-separate, siempre en release (la velocidad importa)
       # y firmado con la identidad de la app antes de que se firme el bundle.
@@ -68,6 +73,34 @@ targets:
           mkdir -p "$(dirname "$DEST")"
           cp -f "$BIN" "$DEST"
           codesign --force --sign "${EXPANDED_CODE_SIGN_IDENTITY:--}" --timestamp=none "$DEST"
+      # Helpers de fuentes externas (spec, «Helpers embebidos»): yt-dlp, deno y ffmpeg en Contents/MacOS/,
+      # firmados con la identidad de la app. Salen de Vendor/helpers/ (no versionado).
+      - name: Embed helpers
+        basedOnDependencyAnalysis: true
+        inputFiles:
+          - $(SRCROOT)/../Vendor/helpers/yt-dlp
+          - $(SRCROOT)/../Vendor/helpers/deno
+          - $(SRCROOT)/../Vendor/helpers/ffmpeg
+        outputFiles:
+          - $(TARGET_BUILD_DIR)/$(EXECUTABLE_FOLDER_PATH)/yt-dlp
+          - $(TARGET_BUILD_DIR)/$(EXECUTABLE_FOLDER_PATH)/deno
+          - $(TARGET_BUILD_DIR)/$(EXECUTABLE_FOLDER_PATH)/ffmpeg
+        script: |
+          set -e
+          SRC="$SRCROOT/../Vendor/helpers"
+          for H in yt-dlp deno ffmpeg; do
+            if [ ! -x "$SRC/$H" ]; then
+              if [ "$H" = ffmpeg ]; then S=Tools/helpers/build-ffmpeg.sh; else S=Tools/helpers/fetch.sh; fi
+              echo "error: falta Vendor/helpers/$H; lanza $S" >&2
+              exit 1
+            fi
+          done
+          DESTDIR="$TARGET_BUILD_DIR/$EXECUTABLE_FOLDER_PATH"
+          mkdir -p "$DESTDIR"
+          for H in yt-dlp deno ffmpeg; do
+            cp -f "$SRC/$H" "$DESTDIR/$H"
+            codesign --force --sign "${EXPANDED_CODE_SIGN_IDENTITY:--}" --timestamp=none "$DESTDIR/$H"
+          done
     info:
       path: Sources/Info.plist
       properties:
@@ -81,6 +114,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: local.toneforge.ToneForge
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: Sources/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
 schemes:
   ToneForge:
     build:

@@ -11,3 +11,5 @@ Una línea por ADR; el texto está en `docs/adr/ADR-NNN.md`. Nuevo ADR = fichero
 - [ADR-007](adr/ADR-007.md) · 2026-11-15 · Base y biblioteca: frecuencia de trabajo elegible, separación en proceso aparte con `MemoryGuard` y paquete ModelKit (Fase 1)
 - [ADR-008](adr/ADR-008.md) · 2026-11-15 · Importar temas desde un enlace de YouTube o Spotify: audio de YouTube con yt-dlp, Opus a WAV, helpers embebidos; fase 2b (P7)
 - [ADR-009](adr/ADR-009.md) · 2026-11-15 · Herramienta de estudio: reproductor con Varispeed, análisis de pulso, acordes y tonalidad en la app, y stems vacíos (Fase 2)
+- [ADR-010](adr/ADR-010.md) · 2026-11-15 · El DI guiado sale de la Fase 5 y pasa a la Fase 8a; la Fase 5 pasa a ser «Tablatura»
+- [ADR-011](adr/ADR-011.md) · 2026-11-15 · Cierre de la Fase 2b: SourceKit, helpers embebidos (yt-dlp, Deno, ffmpeg propio), listas y álbumes, repetidos, y eliminar, editar y re-encolar en la biblioteca

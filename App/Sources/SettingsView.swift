@@ -118,10 +118,10 @@ struct LibrarySettings: View {
     var body: some View {
         @Bindable var model = model
         HStack(alignment: .top, spacing: 20) {
-            VStack(spacing: 20) { library; models }.frame(maxWidth: .infinity)
+            VStack(spacing: 20) { library; models; externalSources }.frame(maxWidth: .infinity)
             guitars.frame(maxWidth: .infinity)
         }
-        .task { await model.refresh() }
+        .task { await model.refresh(); await model.loadToolsInfo() }
         .sheet(item: $guitarDraft) { d in
             GuitarEditor(draft: d) { model.upsertGuitar($0) }
         }
@@ -186,6 +186,32 @@ struct LibrarySettings: View {
                     Button("Descargar") { model.downloadModel() }.buttonStyle(PrimaryButton())
                 default: EmptyView()
                 }
+            }
+        }
+    }
+
+    private var externalSources: some View {
+        let info = model.toolsInfo
+        let updated = info?.ytDlpOrigin == .updated
+        return SettingsGroup(title: "Fuentes externas",
+                             note: "Importar desde enlace usa yt-dlp, Deno y ffmpeg, que van dentro de la app. Si YouTube cambia y las descargas fallan, actualiza yt-dlp.") {
+            InfoRow(label: "yt-dlp") {
+                Text(info == nil ? "comprobando…" : (info?.ytDlpVersion ?? "no disponible")).fontWeight(.semibold).foregroundStyle(TF.text2)
+                if let o = info?.ytDlpOrigin { Chip(text: o == .updated ? "actualizada" : "embebida", kind: o == .updated ? .ok : .neutral) }
+            }
+            InfoRow(label: "Deno") { Text(info == nil ? "comprobando…" : (info?.denoVersion ?? "no disponible")).fontWeight(.semibold).foregroundStyle(TF.text2) }
+            InfoRow(label: "ffmpeg") { Text(info == nil ? "comprobando…" : (info?.ffmpegVersion ?? "no disponible")).fontWeight(.semibold).foregroundStyle(TF.text2) }
+            switch model.ytDlpUpdateStatus {
+            case .idle: EmptyView()
+            case .updating: ProgressView().progressViewStyle(.linear).tint(TF.accent)
+            case .done(let m): Text(m).font(TF.body(13)).foregroundStyle(TF.ok)
+            case .failed(let m): Text(m).font(TF.body(13)).foregroundStyle(TF.danger).fixedSize(horizontal: false, vertical: true)
+            }
+            HStack(spacing: 8) {
+                Button("Actualizar yt-dlp") { model.updateYtDlp() }.buttonStyle(PrimaryButton())
+                    .disabled(model.ytDlpUpdateStatus == .updating)
+                Button("Volver a la embebida") { model.revertYtDlp() }.buttonStyle(SecondaryButton())
+                    .disabled(!updated || model.ytDlpUpdateStatus == .updating)
             }
         }
     }

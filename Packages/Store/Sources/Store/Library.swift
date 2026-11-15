@@ -22,6 +22,22 @@ public struct ImportedAudioInfo: Sendable, Equatable {
     }
 }
 
+/// Metadatos opcionales al importar desde un enlace (mini-spec Fase 2b, «Datos»).
+public struct ImportMetadata: Sendable, Equatable {
+    public var title: String?
+    public var artist: String?
+    public var origin: SongOrigin?
+    /// Fichero de carátula; se copia a `source/cover.jpg`.
+    public var artworkFile: URL?
+
+    public init(title: String? = nil, artist: String? = nil, origin: SongOrigin? = nil, artworkFile: URL? = nil) {
+        self.title = title
+        self.artist = artist
+        self.origin = origin
+        self.artworkFile = artworkFile
+    }
+}
+
 public protocol AudioImporting: Sendable {
     func importAudio(from source: URL, to destination: URL, sampleRate: Double,
                      progress: @escaping @Sendable (Double) -> Void) async throws -> ImportedAudioInfo
@@ -73,6 +89,10 @@ public enum LibraryError: Error, Equatable, Sendable {
     case workInProgress
     case destinationNotEmpty(URL)
     case sizeMismatch(String)
+    /// `deleteProject` se negó a borrar: la carpeta no es un proyecto del índice, hijo directo de la carpeta de proyectos.
+    case unsafeDeletion(URL)
+    /// El título corregido a mano está vacío.
+    case emptyTitle
 }
 
 public enum LibraryEvent: Sendable, Equatable {
@@ -94,6 +114,8 @@ public enum LibraryEvent: Sendable, Equatable {
     case rateMigrationFinished(UUID)
     case rateMigrationFailed(UUID, String)
     case cleaned(UUID)
+    /// El proyecto se movió a la Papelera y salió del índice.
+    case trashed(UUID)
     case indexChanged
     case relocated(URL)
 }
@@ -122,8 +144,13 @@ public struct DiskUsageReport: Sendable, Equatable {
 // MARK: - Library
 
 public actor Library {
-    /// Motivo con el que `recoverInterrupted` marca las separaciones que quedaron a medias.
+    /// Motivo histórico con el que se marcaban las separaciones que quedaron a medias (ahora se re-encolan).
     public static let interruptedMessage = "interrumpida"
+    /// Motivo con el que `recoverInterrupted` marca un tema interrumpido del que no queda ni el audio ni el original.
+    public static let missingAudioMessage = "falta el audio"
+    /// Prefijos de las carpetas temporales que `removeOrphanTemporaries` borra al arrancar.
+    static let importingPrefix = ".importing-"
+    static let migratingPrefix = ".migrating-"
 
     public nonisolated let events: AsyncStream<LibraryEvent>
     private nonisolated let continuation: AsyncStream<LibraryEvent>.Continuation
@@ -144,6 +171,14 @@ public actor Library {
     var stemFileRemover: @Sendable (URL) throws -> Void = { url in
         if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
     }
+    /// Movimiento a la Papelera; inyectable para que los tests no ensucien la Papelera real.
+    var projectTrasher: @Sendable (URL) throws -> Void = { url in
+        try FileManager.default.trashItem(at: url, resultingItemURL: nil)
+    }
+    /// Borrado definitivo de la carpeta de un proyecto; inyectable para simular fallos en tests.
+    var projectDeleter: @Sendable (URL) throws -> Void = { url in try FileManager.default.removeItem(at: url) }
+    func setProjectDeleter(_ f: @escaping @Sendable (URL) throws -> Void) { projectDeleter = f }
+    func setProjectTrasher(_ f: @escaping @Sendable (URL) throws -> Void) { projectTrasher = f }
     func setStemFileRemover(_ f: @escaping @Sendable (URL) throws -> Void) { stemFileRemover = f }
 
     private var queue: [UUID] = []
@@ -153,6 +188,8 @@ public actor Library {
     private var cancelRequested: Set<UUID> = []
     private var cancelWaiters: [UUID: [CheckedContinuation<Void, Never>]] = [:]
     private var migrations: [UUID: Task<Void, Never>] = [:]
+    /// Cierre de la app en curso: no se encolan más trabajos y la cancelación no toca el estado guardado.
+    private var shuttingDown = false
 
     public init(root: URL, profile: ProfileStore, index: LibraryIndex, importer: any AudioImporting,
                 separator: any StemSeparating, autoSeparate: Bool = true,
@@ -211,14 +248,32 @@ public actor Library {
         ProjectScanner.scan(root: root).found.first { $0.project.song.sourceSHA256 == sha }?.project.id
     }
 
-    public func importSong(from source: URL, progress: @escaping @Sendable (Double) -> Void = { _ in }) async throws -> UUID {
+    private func existingProject(withVideoID videoID: String) -> Project? {
+        ProjectScanner.scan(root: root).found.first { $0.project.song.origin?.videoID == videoID }?.project
+    }
+
+    /// Proyecto ya importado con ese `videoID` de YouTube (para avisar antes de descargar; mini-spec Fase 2b, «Tema repetido»).
+    public func project(withVideoID videoID: String) -> Project? {
+        existingProject(withVideoID: videoID)
+    }
+
+    /// Proyecto ya importado con ese id de Spotify (para marcar temas de una lista; mini-spec Fase 2b, «Listas»).
+    public func project(withSpotifyID spotifyID: String) -> Project? {
+        ProjectScanner.scan(root: root).found.first { $0.project.song.origin?.spotifyID == spotifyID }?.project
+    }
+
+    public func importSong(from source: URL, metadata: ImportMetadata? = nil,
+                           progress: @escaping @Sendable (Double) -> Void = { _ in }) async throws -> UUID {
         let fm = FileManager.default
+        if let vid = metadata?.origin?.videoID, let dup = existingProject(withVideoID: vid) {
+            throw LibraryError.duplicate(dup.id)
+        }
         let sha = try await Task.detached { try Library.sha256(of: source) }.value
         if let dup = existingProject(withSHA: sha) { throw LibraryError.duplicate(dup) }
 
         try fm.createDirectory(at: root, withIntermediateDirectories: true)
         let rate = workingRate()
-        let tmpDir = root.appendingPathComponent(".importing-\(UUID().uuidString)", isDirectory: true)
+        let tmpDir = root.appendingPathComponent("\(Library.importingPrefix)\(UUID().uuidString)", isDirectory: true)
         try fm.createDirectory(at: tmpDir, withIntermediateDirectories: true)
         defer { FileOps.removeIfExists(tmpDir) }
         let tmpWav = tmpDir.appendingPathComponent("song.wav")
@@ -226,9 +281,17 @@ public actor Library {
 
         // Sin suspensiones desde aquí hasta crear la carpeta: el nombre único no se pisa.
         if let dup = existingProject(withSHA: sha) { throw LibraryError.duplicate(dup) }
+        if let vid = metadata?.origin?.videoID, let dup = existingProject(withVideoID: vid) {
+            throw LibraryError.duplicate(dup.id)
+        }
+        // Con metadatos del enlace, título y artista salen de ahí y no del fichero.
         let fileTitle = source.deletingPathExtension().lastPathComponent
-        let title = (info.title?.isEmpty == false ? info.title : nil) ?? fileTitle
-        let artist = (info.artist?.isEmpty == false) ? info.artist : nil
+        let metaTitle = (metadata?.title?.isEmpty == false) ? metadata?.title : nil
+        let metaArtist = (metadata?.artist?.isEmpty == false) ? metadata?.artist : nil
+        let title = metaTitle ?? (info.title?.isEmpty == false ? info.title : nil) ?? fileTitle
+        let artist = metaArtist ?? ((info.artist?.isEmpty == false) ? info.artist : nil)
+        var origin = metadata?.origin
+        if metadata?.artworkFile != nil { origin?.artwork = ProjectLayout.coverRelativePath }
         let folderName = FolderNaming.uniqueName(base: FolderNaming.baseName(title: title, artist: artist), in: root)
         let folder = root.appendingPathComponent(folderName, isDirectory: true)
         let layout = ProjectLayout(folder: folder)
@@ -238,10 +301,11 @@ public actor Library {
         let project = Project(
             song: Song(title: title, artist: artist, source: sourceRel, sourceSHA256: sha,
                        sourceFormat: info.sourceFormat, sourceSampleRate: info.sourceSampleRate,
-                       sourceChannels: info.sourceChannels, sampleRate: rate, duration: info.duration))
+                       sourceChannels: info.sourceChannels, sampleRate: rate, duration: info.duration, origin: origin))
         do {
             try layout.createSkeleton()
             try fm.copyItem(at: source, to: layout.url(relative: sourceRel))
+            if let cover = metadata?.artworkFile { try fm.copyItem(at: cover, to: layout.coverFile) }
             try fm.moveItem(at: tmpWav, to: layout.audioFile)
             try ProjectFile.save(project, to: folder)
         } catch {
@@ -263,7 +327,7 @@ public actor Library {
         guard FileManager.default.fileExists(atPath: ProjectLayout(folder: folder).projectFile.path) else {
             throw LibraryError.projectNotFound(id)
         }
-        guard !queue.contains(id), currentID != id else { return }
+        guard !shuttingDown, !queue.contains(id), currentID != id else { return }
         postQueue.removeAll { $0 == id }
         try await mutate(id) { $0.separation = SeparationState(state: .queued) }
         queue.append(id)
@@ -285,6 +349,18 @@ public actor Library {
                 cancelWaiters[id, default: []].append(c)
             }
         }
+    }
+
+    /// Cierre de la app: vacía las colas y cancela la separación en curso y las reconversiones SIN cambiar el
+    /// estado guardado (lo que estaba `queued` o `running` sigue así en disco y `recoverInterrupted` lo
+    /// re-encola al arrancar). No espera a que el proceso hijo termine: eso lo vigila quien llama.
+    public func stopAllForShutdown() async {
+        shuttingDown = true
+        queue.removeAll()
+        postQueue.removeAll()
+        currentTask?.cancel()
+        for m in migrations.values { m.cancel() }
+        while let w = worker { await w.value }
     }
 
     /// Para tests y cierre ordenado: espera a que la cola de separación quede vacía.
@@ -334,7 +410,7 @@ public actor Library {
             guard let f = await locate(id) else { throw LibraryError.projectNotFound(id) }
             folder = f
             let layout = ProjectLayout(folder: f)
-            if !cancelRequested.contains(id) {
+            if !cancelRequested.contains(id) && !shuttingDown {
                 let project = try await mutate(id) { $0.separation = SeparationState(state: .running) }
                 cont.yield(.separationStarted(id))
                 let fm = FileManager.default
@@ -351,7 +427,7 @@ public actor Library {
                 let out = layout.stemsPartialDir
                 let task = Task { try await sep.separate(input: input, outputDirectory: out) { cont.yield(.separationProgress(id, $0)) } }
                 currentTask = task
-                if cancelRequested.contains(id) { task.cancel() }
+                if cancelRequested.contains(id) || shuttingDown { task.cancel() }
                 try await task.value
                 if !cancelRequested.contains(id) {
                     let stems = try await promotePartialStems(layout)
@@ -368,7 +444,7 @@ public actor Library {
                 }
             }
         } catch {
-            if !cancelRequested.contains(id) { failure = error.localizedDescription }
+            if !cancelRequested.contains(id) && !shuttingDown { failure = error.localizedDescription }
         }
 
         if cancelRequested.remove(id) != nil {
@@ -422,20 +498,67 @@ public actor Library {
         FileOps.removeIfExists(layout.stemsPartialDir)
     }
 
-    /// Al arrancar: `queued|running` → `failed` («interrumpida»). Devuelve los ids afectados.
+    /// Al arrancar: borra `stems/.partial` y re-encola la separación de cada tema que quedó `queued` o `running`.
+    /// Orden estable: primero el que estaba `running` (era la cabeza de la cola) y después los `queued` por
+    /// `updatedAt` (el instante en que se encolaron, que es lo que persiste de la cola en memoria), con
+    /// `createdAt` y nombre de carpeta como desempate. Si no queda ni el audio ni el original, ese tema pasa a
+    /// `failed` («falta el audio») sin bloquear a los demás; si el modelo falta, falla al separar con su motivo.
+    /// Los stems de un tema ya `done` se conservan hasta que termine la nueva separación.
+    /// Devuelve los ids afectados (re-encolados o fallidos), en ese orden.
     @discardableResult
     public func recoverInterrupted() async throws -> [UUID] {
+        let pending = ProjectScanner.scan(root: root).found.filter {
+            ($0.project.separation.state == .queued || $0.project.separation.state == .running) && !isSeparating($0.project.id)
+        }.sorted { a, b in
+            let (ra, rb) = (a.project.separation.state == .running, b.project.separation.state == .running)
+            if ra != rb { return ra }
+            if a.project.updatedAt != b.project.updatedAt { return a.project.updatedAt < b.project.updatedAt }
+            if a.project.createdAt != b.project.createdAt { return a.project.createdAt < b.project.createdAt }
+            return a.folder.lastPathComponent < b.folder.lastPathComponent
+        }
         var recovered: [UUID] = []
-        for s in ProjectScanner.scan(root: root).found {
-            let st = s.project.separation.state
-            guard st == .queued || st == .running, !isSeparating(s.project.id) else { continue }
-            FileOps.removeIfExists(ProjectLayout(folder: s.folder).stemsPartialDir)
-            try await mutate(s.project.id) {
-                $0.separation = SeparationState(state: .failed, error: Library.interruptedMessage)
+        for s in pending {
+            let layout = ProjectLayout(folder: s.folder)
+            FileOps.removeIfExists(layout.stemsPartialDir)
+            let fm = FileManager.default
+            let hasAudio = fm.fileExists(atPath: layout.audioFile.path)
+                || fm.fileExists(atPath: layout.url(relative: s.project.song.source).path)
+            if hasAudio {
+                try await mutate(s.project.id) { $0.separation = SeparationState(state: .queued) }
+                try await separate(id: s.project.id)
+            } else {
+                try await mutate(s.project.id) {
+                    $0.separation = SeparationState(state: .failed, error: Library.missingAudioMessage)
+                }
             }
             recovered.append(s.project.id)
         }
         return recovered
+    }
+
+    /// Al arrancar, antes de que nada las use: borra `.importing-*` de la carpeta de proyectos y `.migrating-*`
+    /// dentro de cada proyecto. Ambas son temporales regenerables: la importación se repite desde el original y
+    /// la reconversión se rehace desde `source/` (los swaps son atómicos por fichero y `sampleRate` solo cambia
+    /// al final), así que borrarlas no pierde datos, tampoco de una mudanza en modo «Mover».
+    /// Solo esos prefijos exactos. Devuelve cuántas carpetas borró.
+    @discardableResult
+    public nonisolated static func removeOrphanTemporaries(in root: URL) -> Int {
+        let fm = FileManager.default
+        var removed = 0
+        let top = (try? fm.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)) ?? []
+        for url in top {
+            let name = url.lastPathComponent
+            if name.hasPrefix(importingPrefix) {
+                FileOps.removeIfExists(url); removed += 1
+                continue
+            }
+            guard !name.hasPrefix(".") else { continue }
+            let inner = (try? fm.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)) ?? []
+            for u in inner where u.lastPathComponent.hasPrefix(migratingPrefix) {
+                FileOps.removeIfExists(u); removed += 1
+            }
+        }
+        return removed
     }
 
     // MARK: Abrir y reconversión de frecuencia
@@ -461,6 +584,19 @@ public actor Library {
             $0.study = study
             $0.sections = sections
         }
+    }
+
+    /// Corrige a mano título y artista (recortados). Título vacío → `emptyTitle` y no se guarda; artista vacío → `nil`.
+    /// No renombra la carpeta ni toca `source/`, `audio/`, stems ni `origin`.
+    public func updateSongInfo(id: UUID, title: String, artist: String?) async throws {
+        let t = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty else { throw LibraryError.emptyTitle }
+        let a = artist?.trimmingCharacters(in: .whitespacesAndNewlines)
+        try await mutate(id) {
+            $0.song.title = t
+            $0.song.artist = (a?.isEmpty ?? true) ? nil : a
+        }
+        continuation.yield(.indexChanged)
     }
 
     // MARK: Medida de stems y análisis de estudio
@@ -555,7 +691,7 @@ public actor Library {
             guard project.song.sampleRate != target else { return }
             continuation.yield(.rateMigrationStarted(id))
 
-            let tmpDir = folder.appendingPathComponent(".migrating-\(UUID().uuidString)", isDirectory: true)
+            let tmpDir = folder.appendingPathComponent("\(Library.migratingPrefix)\(UUID().uuidString)", isDirectory: true)
             try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
             defer { FileOps.removeIfExists(tmpDir) }
 
@@ -578,6 +714,51 @@ public actor Library {
             continuation.yield(.rateMigrationFailed(id, error.localizedDescription))
         }
     }
+
+    // MARK: Borrado
+
+    /// Mueve la carpeta del proyecto a la Papelera y quita su entrada del índice. Nunca borra de forma definitiva:
+    /// si el movimiento falla, lanza el error y no toca nada. Si el tema está en cola o separándose, lo cancela antes.
+    public func trashProject(id: UUID) async throws {
+        let folder = try await stopWork(forRemoving: id)
+        try projectTrasher(folder)
+        try await removeFromIndex(id)
+        continuation.yield(.trashed(id))
+        continuation.yield(.indexChanged)
+    }
+
+    /// Borra la carpeta del proyecto de forma DEFINITIVA (no pasa por la Papelera). Mismos pasos previos que
+    /// `trashProject`. Salvaguarda: la carpeta tiene que ser la que el índice asigna a ese id, hija directa de la
+    /// carpeta de proyectos actual y con su `project.json` dentro; si no, lanza `unsafeDeletion` y no borra nada.
+    /// La entrada del índice se quita solo si el borrado salió bien. Emite `.trashed` (sale del índice igual).
+    public func deleteProject(id: UUID) async throws {
+        let folder = try await stopWork(forRemoving: id)
+        guard let name = await index.folderName(for: id), folder.lastPathComponent == name,
+              folder.deletingLastPathComponent().standardizedFileURL.path == root.standardizedFileURL.path,
+              !name.isEmpty, !name.hasPrefix("."),
+              FileManager.default.fileExists(atPath: ProjectLayout(folder: folder).projectFile.path) else {
+            throw LibraryError.unsafeDeletion(folder)
+        }
+        try projectDeleter(folder)
+        try await removeFromIndex(id)
+        continuation.yield(.trashed(id))
+        continuation.yield(.indexChanged)
+    }
+
+    /// Pasos previos comunes a Papelera y borrado: cancela separación (en cola o en marcha), análisis y reconversión.
+    private func stopWork(forRemoving id: UUID) async throws -> URL {
+        guard let folder = await locate(id) else { throw LibraryError.projectNotFound(id) }
+        if queue.contains(id) || currentID == id { try await cancelSeparation(id: id) }
+        postQueue.removeAll { $0 == id }
+        while currentPostID == id, let w = worker { await w.value }
+        if let m = migrations[id] {
+            m.cancel()
+            await m.value
+        }
+        return folder
+    }
+
+    private func removeFromIndex(_ id: UUID) async throws { try await index.remove(id: id) }
 
     // MARK: Limpieza y espacio
 

@@ -138,9 +138,10 @@ final class LibraryTests: XCTestCase {
 
         let recovered = try await env.library.recoverInterrupted()
         XCTAssertEqual(recovered, [id])
+        await env.library.waitForSeparations()
         let after = try await env.project(id)
-        XCTAssertEqual(after.separation.state, .failed)
-        XCTAssertEqual(after.separation.error, "interrumpida")
+        XCTAssertEqual(after.separation.state, .done, "se re-encola y termina con el separador simulado")
+        XCTAssertNil(after.separation.error)
         XCTAssertFalse(FileManager.default.fileExists(atPath: ProjectLayout(folder: folder).stemsPartialDir.path))
     }
 

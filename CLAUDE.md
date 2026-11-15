@@ -4,8 +4,8 @@ App de escritorio para macOS (Swift/SwiftUI) que iguala el tono de un tema reamp
 
 ## Estado actual
 
-Fase 2 · Herramienta de estudio cerrada el 15/11/2026 (ADR-009).
-Siguiente: Fase 2b · Fuentes externas (ADR-008), en la rama `fase-2b`.
+Fase 2b · Fuentes externas cerrada el 15/11/2026 (ADR-011).
+Siguiente: Fase 3 · Audio con la pedalera, en la rama `fase-3`.
 P1, P3 y P5 quedan para el comienzo de la Etapa 2.
 
 ## Contexto: leer solo lo que haga falta
@@ -23,6 +23,7 @@ P1, P3 y P5 quedan para el comienzo de la Etapa 2.
 
 - `Packages/<Kit>/`: un paquete Swift por módulo con sus tests (nombres en `docs/plan.md`, «Forma de trabajo», incluido ModelKit). Lo que depende de la pedalera va detrás de un protocolo con versión simulada.
 - `App/`: proyecto Xcode generado con XcodeGen (`App/project.yml`; regenerar con `xcodegen generate --spec App/project.yml`), solo UI y cableado. Embebe el helper `tf-separate` (de StemKit). La lógica y sus tests viven en los paquetes.
+- `Vendor/helpers/`: helpers embebidos (yt-dlp, Deno, ffmpeg), no se versiona; se generan con `Tools/helpers/fetch.sh` y `build-ffmpeg.sh`.
 - `Probes/P<n>-<tema>/`: scripts de la Fase 0 (Python o Swift). Fuera de la puerta de tests.
 - `Tools/`: scripts de desarrollo (`test.sh`; entorno Python en `Tools/py/.venv`). `Temp/`: informes y logs, no se versiona.
 

@@ -8,7 +8,7 @@ Once fases (0 a 10) en dos etapas: primero la herramienta de estudio y la grabac
 ## Forma de trabajo
 
 - Spec primero: cada fase empieza con una mini-spec de sus módulos (entradas, salidas, casos de prueba) antes de escribir código.
-- Un paquete Swift por módulo, con sus tests: AudioKit propio (E/S y reproducción), StemKit (separación), ModelKit (descarga y compilación de modelos), StudyKit (acordes, pulso, bucles), AnalysisKit (huella y distancia), MatchKit (optimizador), HeadRushKit, Tone3000Kit, TabKit, VideoKit y Store (archivo de proyecto e índice en SwiftData).
+- Un paquete Swift por módulo, con sus tests: AudioKit propio (E/S y reproducción), StemKit (separación), ModelKit (descarga y compilación de modelos), SourceKit (fuentes externas: YouTube y Spotify), StudyKit (acordes, pulso, bucles), AnalysisKit (huella y distancia), MatchKit (optimizador), HeadRushKit, Tone3000Kit, TabKit, VideoKit y Store (archivo de proyecto e índice en SwiftData).
 - Audios de prueba fijos en el repositorio: 3 temas cortos, 3 DI propios y sus resultados esperados, para probar análisis y distancia sin hardware.
 - Lo que depende de la pedalera va detrás de una interfaz con una versión simulada, así el resto avanza aunque la Flex Prime no esté conectada.
 - Una rama por fase; la fase se cierra cuando cumple su condición de paso y la spec queda actualizada con lo aprendido.
@@ -27,7 +27,7 @@ Siete pruebas cortas e independientes, en scripts sueltos (Python o Swift), que 
 - [x] P4 Modelos: convertir BS-RoFormer SW y BTC a Core ML y comprobar que dan el mismo resultado que el original y a buena velocidad; el que no funcione bien pasa a ONNX Runtime como respaldo. Comparar la separación con HTDemucs 6 stems en 3 temas y medir tiempos. Elegir el modelo de pulso y el de transcripción de batería. *Elegidos BS-RoFormer SW (Core ML publicado, CPU+GPU), BTC, Beat This! y ADTOF; ver `docs/probes/P4-modelos.md`.*
 - [ ] P5 Velocidad del bucle: medir cuánto tarda la pedalera en aplicar un cambio de parámetro, en cambiar de bloque y en cargar un NAM, para estimar cuánto dura un igualado. *Etapa 2.*
 - [x] P6 Velocidad: comparar la calidad al 50 % de AVAudioUnitTimePitch y de Rubber Band. *Gana `AVAudioUnitTimePitch` con overlap 8; Rubber Band no hace falta; ver `docs/probes/P6-timepitch.md`.*
-- [x] P7 Fuentes externas: de un enlace de Spotify a un fichero de audio local sin credenciales, con yt-dlp. *Superada con un tema (18-24 s); Opus → WAV; ver `docs/probes/P7-fuentes.md` y ADR-008. Falta oído de Jorge y más temas.*
+- [x] P7 Fuentes externas: de un enlace de Spotify a un fichero de audio local sin credenciales, con yt-dlp. *Superada con un tema (18-24 s) y ampliada a 7 temas, con 5 de 7 aciertos en el candidato; Opus → WAV, y Jorge dio por bueno Opus de oído el 15/11/2026; ver `docs/probes/P7-fuentes.md`, ADR-008 y ADR-011. Sin oír los WAV de la prueba ampliada ni cubrir temas sin subida oficial.*
 
 Condición de paso: para la Etapa 1, audio grabado por USB y un tema separado en local; para la Etapa 2, un parámetro cambiado desde script y un reamp grabado. *Etapa 1 cumplida (audio grabado por USB en P2; tema separado en local en `Probes/P4-modelos/bs_roformer_sw/out/stems/T1/`), confirmada por Jorge el 15/11/2026. Etapa 2 pendiente.*
 
@@ -60,12 +60,15 @@ Condición de paso: tocar encima de un tema sin guitarras, en bucle y al 70 %. *
 
 Importar temas desde un enlace de YouTube o de Spotify. El audio sale de YouTube con yt-dlp; de Spotify solo se leen metadatos. Probado en P7 (`docs/probes/P7-fuentes.md`) con un solo tema.
 
-- [ ] Lectura de metadatos de Spotify (página embed, sin credenciales)
-- [ ] Búsqueda en YouTube y selector de candidatos con la diferencia de duración
-- [ ] Descarga Opus → WAV e importación a la biblioteca
-- [ ] Helpers embebidos (yt-dlp, Deno, ffmpeg) y su actualización
+- [x] Lectura de metadatos de Spotify (página embed, sin credenciales) *(`SourceKitTests`, 63 tests; embed grabado en P7)*
+- [x] Búsqueda en YouTube y selector de candidatos con la diferencia de duración *(`SourceKitTests`; capturas en `Temp/p9/`; prueba ampliada de P7: 5 de 7 aciertan)*
+- [x] Descarga Opus → WAV e importación a la biblioteca *(`SourceKitTests`, `StoreTests` 69 tests; prueba ampliada de P7: 5 descargas en Opus, WAV de 48 kHz y 24 bit)*
+- [x] Helpers embebidos (yt-dlp, Deno, ffmpeg) y su actualización *(`SourceKitTests` (`HelperLocator`, `YtDlpUpdater`); capturas de Ajustes en `Temp/p9/`)*
+- [x] Listas de Spotify y de YouTube y álbumes de Spotify: marcar temas, revisión en lote y cola «Descargar y procesar» *(`SourceKitTests` (`PlaylistTests`); capturas en `Temp/p9/`; embeds de lista y álbum en la prueba ampliada)*
+- [x] Repetidos: bloqueo por identificador de Spotify y `videoID`, y aviso suave por título y artista *(`StoreTests` (`OriginTests`); capturas en `Temp/p9/`)*
+- [x] Eliminar un tema, editar título y artista, y re-encolar al arrancar las separaciones interrumpidas *(`StoreTests` (`TrashTests`, `RecoveryTests`); capturas en `Temp/p9/`)*
 
-Condición de paso (provisional): pegar un enlace de YouTube o de Spotify deja el tema en la biblioteca listo para separar, sin pasos manuales.
+Condición de paso: pegar un enlace de YouTube y otro de Spotify deja cada tema en la biblioteca listo para separar, sin más paso manual que elegir candidato; pegar una lista o un álbum, marcar parte de sus temas y pulsar «Descargar y procesar» los deja importados y separados; y la prueba ampliada con al menos cinco temas (uno sin subida oficial, uno con el directo dominante y uno largo) queda anotada en `docs/probes/P7-fuentes.md` con cuántos aciertan el candidato correcto. *Cumplida el 15/11/2026, confirmada por Jorge en la app (ADR-011). La prueba ampliada (7 temas, 5 aciertos) no cubrió el tema sin subida oficial ni el directo dominante claro.*
 
 ### Fase 3 · Audio con la pedalera (RF1)
 
@@ -89,14 +92,14 @@ Condición de paso: toma grabada alineada con el backing con error menor de 1 ms
 
 Condición de paso: Robe y Uoho en pistas distintas en 3 temas de prueba.
 
-### Fase 5 · Tablatura y DI guiado (RF2, RF11)
+### Fase 5 · Tablatura (parte de RF2, RF11)
 
 - [ ] Transcribir las guitarras con Basic Pitch y asignar cuerdas y trastes; transcribir también el bajo (4 cuerdas) y la batería (modelo aparte: bombo, caja y charles como mínimo)
 - [ ] Tablatura con alphaTab, cursor, edición y exportación a un único archivo de Guitar Pro con guitarras, bajo y batería, comprobado en Guitar Pro
-- [ ] Grabar la toma con cuenta atrás y validarla: afinación, timing y clipping
-- [ ] Guardar la toma como DI para el igualado de la Etapa 2
 
-Condición de paso: toma válida a la primera en riffs sencillos.
+Condición de paso: tablatura de un tema con guitarras, bajo y batería exportada y abierta en Guitar Pro.
+
+El DI guiado (grabar y validar la toma) salió de esta fase el 15/11/2026: solo hace falta para el igualado y pasa a la Fase 8a, en la Etapa 2.
 
 ### Fase 6 · Grabación con vídeo (RF8, parte de RF9)
 
@@ -120,9 +123,18 @@ Condición de paso: 3 tomas grabadas y alineadas a menos de 1 fotograma.
 
 Condición de paso: vídeo final exportado en portrait y en landscape.
 
-## Etapa 2 · Igualado de tono (fases 8 y 9)
+## Etapa 2 · Igualado de tono (fases 8a, 8 y 9)
 
-Empieza cuando la Etapa 1 está en uso. Antes de la Fase 8 se hacen las pruebas P1, P3 y P5 de la Fase 0.
+Empieza cuando la Etapa 1 está en uso. Antes de la Fase 8 se hacen las pruebas P1, P3 y P5 de la Fase 0 y, en paralelo con ellas, la Fase 8a.
+
+### Fase 8a · DI guiado (parte de RF2)
+
+Grabar el DI siguiendo la tablatura, para tener la toma que después se reamplifica. Viene de la antigua Fase 5.
+
+- [ ] Grabar la toma con cuenta atrás, siguiendo la tablatura, y validarla: afinación, timing y clipping
+- [ ] Guardar la toma como DI para el igualado
+
+Condición de paso: toma válida a la primera en riffs sencillos.
 
 ### Fase 8 · Análisis del tono (RF4)
 
@@ -152,7 +164,7 @@ Gigboard con firmware NAM custom y Spark GO y NEO, si se confirman.
 
 ## Dependencias
 
-La Etapa 1 no depende del Remote Editor ni de TONE3000. La tablatura (5) depende de las fases 3 y 4; la grabación (6), también de la 3 y la 4; el montaje (7), de la 6. En la Etapa 2, el igualado (9) depende de P1 y de la fase 8.
+La Etapa 1 no depende del Remote Editor ni de TONE3000. La tablatura (5) depende de la fase 4; la grabación (6), de la 3 y la 4; el montaje (7), de la 6. En la Etapa 2, el DI guiado (8a) depende de las fases 3 y 5; el análisis del tono (8), de P3 y de la 8a; el igualado (9), de P1 y de la fase 8.
 
 ### Orden de ejecución
 
@@ -168,37 +180,40 @@ Mismo número de orden: se pueden hacer en paralelo o en cualquier orden entre s
 | 3 | Fase 2b · Fuentes externas | Fase 1, P7 | No | Opus | Sonnet (conectores y pantallas) |
 | 4 | Fase 3 · Audio con la pedalera | P2, Fase 2 | Sí | Opus | Opus (latencia, alineado) · Sonnet (selector, Ajustes de audio) |
 | 4 | Fase 4 · Guitarras y secciones | Fase 2 | No | Opus | Opus (separación A/B, clasificación) · Sonnet (interfaz) |
-| 5 | Fase 5 · Tablatura y DI guiado | Fases 3 y 4 | Sí | Opus | Opus (cuerdas y trastes, batería) · Sonnet (alphaTab, validación) |
+| 5 | Fase 5 · Tablatura | Fase 4 | No | Opus | Opus (cuerdas y trastes, batería) · Sonnet (alphaTab) |
 | 5 | Fase 6 · Grabación con vídeo | Fases 3 y 4 | Sí | Opus | Opus (reloj común) · Sonnet (multitoma, pantalla) |
 | 6 | Fase 7 · Montaje | Fase 6 | No | Fable | Opus (compositor, encuadre) · Sonnet (layouts, exportación, pantalla) |
 | 7 | P1 · Remote Editor | Etapa 1 en uso | Sí | Fable | Opus (análisis del tráfico) · Sonnet (scripts) |
 | 7 | P3 · TONE3000 | Etapa 1 en uso | No | Fable | Sonnet |
 | 7 | P5 · Velocidad del bucle | P1 | Sí | Fable | Sonnet |
-| 8 | Fase 8 · Análisis del tono | P3, Fase 5 | Sí | Fable | Opus (huella, distancia) · Sonnet (TONE3000, pantalla) |
+| 7 | Fase 8a · DI guiado | Fases 3 y 5 | Sí | Opus | Sonnet (grabación y validación de la toma) |
+| 8 | Fase 8 · Análisis del tono | P3, Fase 8a | Sí | Fable | Opus (huella, distancia) · Sonnet (TONE3000, pantalla) |
 | 9 | Fase 9 · Igualado en la pedalera | P1, Fase 8 | Sí | Fable | Opus (HeadRushKit, optimizador) · Sonnet (catálogo, knobs) |
 | 10 | Fase 10 · Ampliaciones (v2) | Fase 9 | Otro hardware | Sin definir | Sin definir |
 
-Sin pedalera se puede avanzar con P4, P6 y las fases 1, 2 y 4. La primera vez que hace falta conectarla es P2, que bloquea la Fase 3 pero nada de lo anterior. P4, P6 y P2 comparten una sesión orquestadora; P1, P3 y P5, otra.
+Sin pedalera se puede avanzar con P4, P6 y las fases 1, 2, 2b, 4 y 5. La primera vez que hace falta conectarla es P2, que bloquea la Fase 3 pero nada de lo anterior. P4, P6 y P2 comparten una sesión orquestadora; P1, P3 y P5, otra.
 
 ## Estimación de tiempos
 
-Entre 48 y 79 horas de trabajo con Claude Code: de 31 a 51 la Etapa 1 y de 17 a 28 la Etapa 2. Recalibrada con experiencia real (tareas estimadas en 1 o 2 semanas han llevado 5 o 6 horas). Marca el ritmo lo que solo se puede hacer con la pedalera y de oído. No incluye una posible versión de Windows.
+Entre 53 y 87 horas de trabajo con Claude Code: de 35 a 57 la Etapa 1 y de 18 a 30 la Etapa 2 (al mover el DI guiado a la Etapa 2 se le asignaron 1 a 2 horas de las 7 a 12 de la antigua Fase 5; el total no cambia). Recalibrada con experiencia real (tareas estimadas en 1 o 2 semanas han llevado 5 o 6 horas). Marca el ritmo lo que solo se puede hacer con la pedalera y de oído. No incluye una posible versión de Windows.
 
 | Fase | Horas | Acumulado | Qué marca el ritmo |
 |---|---|---|---|
 | 0. Pruebas P2, P4 y P6 | 3 a 5 | 3 a 5 | Probar el USB y convertir modelos |
 | 1. Base y biblioteca | 2 a 3 | 5 a 8 | Descarga de modelos y primera separación |
 | 2. Herramienta de estudio | 4 a 6 | 9 a 14 | Revisar acordes y pulso en temas reales |
-| 3. Audio con la pedalera | 2 a 4 | 11 a 18 | Pruebas de latencia y niveles con la Flex Prime |
-| 4. Guitarras y secciones | 3 a 5 | 14 a 23 | Escuchar si la separación A/B convence |
-| 5. Tablatura (guitarras, bajo y batería) y DI guiado | 7 a 12 | 21 a 35 | Corregir transcripciones; la batería es lo más incierto |
-| 6. Grabación con vídeo | 4 a 6 | 25 a 41 | Sincronía de cámara y pruebas de tomas |
-| 7. Montaje | 6 a 10 | 31 a 51 | Ajustar transiciones y encuadre a la vista |
-| Pruebas P1, P3 y P5 | 4 a 6 | 35 a 57 | Capturar el tráfico del Remote Editor |
-| 8. Análisis del tono | 5 a 7 | 40 a 64 | Reamp y validar de oído la medida de parecido |
-| 9. Igualado en la pedalera | 8 a 15 | 48 a 79 | Catálogo de bloques y afinar el bucle con hardware real |
+| 2b. Fuentes externas | 5 a 8 | 14 a 22 | Compilar ffmpeg y probar descargas reales con varios temas |
+| 3. Audio con la pedalera | 2 a 4 | 16 a 26 | Pruebas de latencia y niveles con la Flex Prime |
+| 4. Guitarras y secciones | 3 a 5 | 19 a 31 | Escuchar si la separación A/B convence |
+| 5. Tablatura (guitarras, bajo y batería) | 6 a 10 | 25 a 41 | Corregir transcripciones; la batería es lo más incierto |
+| 6. Grabación con vídeo | 4 a 6 | 29 a 47 | Sincronía de cámara y pruebas de tomas |
+| 7. Montaje | 6 a 10 | 35 a 57 | Ajustar transiciones y encuadre a la vista |
+| Pruebas P1, P3 y P5 | 4 a 6 | 39 a 63 | Capturar el tráfico del Remote Editor |
+| 8a. DI guiado | 1 a 2 | 40 a 65 | Tocar las tomas y ver si la validación acierta |
+| 8. Análisis del tono | 5 a 7 | 45 a 72 | Reamp y validar de oído la medida de parecido |
+| 9. Igualado en la pedalera | 8 a 15 | 53 a 87 | Catálogo de bloques y afinar el bucle con hardware real |
 
-En calendario, con unas 10 horas a la semana: la Etapa 1 en 3 a 5 semanas y todo en 5 a 8.
+En calendario, con unas 10 horas a la semana: la Etapa 1 en 4 a 6 semanas y todo en 5 a 9.
 
 La mayor incertidumbre no es de horas sino de resultado: si el Remote Editor no se deja controlar (P1), la Fase 9 cambia de forma, no de duración.
 
@@ -214,10 +229,11 @@ Cada fase la lleva una sesión orquestadora que escribe la mini-spec, reparte el
 | 2b. Fuentes externas | Opus | Sonnet para conectores y pantallas | APIs y scripts documentados (P7); sin modelos que integrar |
 | 3. Audio con la pedalera | Opus | Opus para latencia y alineado; Sonnet para selector y Ajustes de audio | La precisión de 1 ms pide cuidado, no un modelo mayor |
 | 4. Guitarras y secciones | Opus | Opus para la separación A/B y la clasificación; Sonnet para la interfaz | Procesado de señal acotado |
-| 5. Tablatura y DI guiado | Opus | Opus para cuerdas y trastes y para la batería; Sonnet para alphaTab y validación de la toma | Fase larga pero de piezas conocidas |
+| 5. Tablatura | Opus | Opus para cuerdas y trastes y para la batería; Sonnet para alphaTab | Fase larga pero de piezas conocidas |
 | 6. Grabación con vídeo | Opus | Opus para el reloj común de audio y vídeo; Sonnet para multitoma y pantalla | La sincronía es el único punto fino |
 | 7. Montaje | Fable | Opus para el compositor y el encuadre; Sonnet para layouts, exportación y pantalla | Compositor propio fotograma a fotograma, poco documentado |
 | Pruebas P1, P3 y P5 | Fable | Opus para analizar el tráfico capturado; Sonnet para los scripts | Ingeniería inversa de un protocolo sin documentar |
+| 8a. DI guiado | Opus | Sonnet para la grabación y la validación de la toma | Fase corta sobre el audio de la Fase 3 y la tablatura de la Fase 5 |
 | 8. Análisis del tono | Fable | Opus para huella y distancia; Sonnet para el conector TONE3000 y la pantalla | Diseñar la medida de parecido decide el resultado de la v1 |
 | 9. Igualado en la pedalera | Fable | Opus para HeadRushKit y el optimizador; Sonnet para el catálogo de bloques y la vista de knobs | Bucle cerrado sobre hardware real con protocolo propio |
 

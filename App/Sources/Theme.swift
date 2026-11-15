@@ -36,22 +36,54 @@ enum TF {
 }
 
 struct PrimaryButton: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(TF.body(14, .semibold)).foregroundStyle(TF.accentInk)
+            .font(TF.body(14, .semibold)).foregroundStyle(isEnabled ? TF.accentInk : TF.muted)
             .padding(.horizontal, 20).frame(height: 44)
-            .background(TF.accent.opacity(configuration.isPressed ? 0.8 : 1), in: RoundedRectangle(cornerRadius: 10))
+            .background(isEnabled ? TF.accent.opacity(configuration.isPressed ? 0.8 : 1) : TF.neutralBg,
+                        in: RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(isEnabled ? .clear : TF.fieldLine))
     }
 }
 
 struct SecondaryButton: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
     var height: CGFloat = 44
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(TF.body(14, .medium)).foregroundStyle(TF.text)
+            .font(TF.body(14, .medium)).foregroundStyle(isEnabled ? TF.text : TF.muted)
             .padding(.horizontal, 16).frame(height: height)
             .background(TF.field.opacity(configuration.isPressed ? 0.7 : 1), in: RoundedRectangle(cornerRadius: 10))
             .overlay(RoundedRectangle(cornerRadius: 10).stroke(TF.fieldLine))
+            .opacity(isEnabled ? 1 : 0.6)
+    }
+}
+
+/// Barra de progreso en el color de acento (la `ProgressView` lineal sale gris con la ventana inactiva).
+/// Sin valor, un tramo que va y viene.
+struct AccentBar: View {
+    var value: Double?
+    var height: CGFloat = 6
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule().fill(TF.field)
+                if let v = value {
+                    Capsule().fill(TF.accent).frame(width: max(height, geo.size.width * min(1, max(0, v))))
+                } else {
+                    TimelineView(.animation) { ctx in
+                        let t = ctx.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.6) / 1.6
+                        let w = geo.size.width * 0.3
+                        Capsule().fill(TF.accent).frame(width: w)
+                            .offset(x: (geo.size.width - w) * (0.5 - 0.5 * cos(t * 2 * .pi)))
+                    }
+                }
+            }
+            .clipShape(Capsule())
+        }
+        .frame(height: height)
     }
 }
 

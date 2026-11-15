@@ -17,6 +17,15 @@ struct LibraryView: View {
         } message: { r in
             Text("Se borrarán tomas descartadas y stems por \(Fmt.bytes(r.bytes)). Los stems se pueden volver a generar.")
         }
+        .confirmationDialog("¿Eliminar “\(model.trashRequest?.title ?? "")”?", isPresented: Binding(
+            get: { model.trashRequest != nil }, set: { if !$0 { model.trashRequest = nil } }),
+            titleVisibility: .visible, presenting: model.trashRequest) { r in
+            Button("Mover a la Papelera") { model.performTrash(r) }.keyboardShortcut(.defaultAction)
+            Button("Eliminar del disco", role: .destructive) { model.performDelete(r) }
+            Button("Cancelar", role: .cancel) {}
+        } message: { r in
+            Text("Se va con el tema: \(r.contents). Si se está separando o está abierto en Backing, se detiene primero.\nEliminar del disco no se puede deshacer. La Papelera conserva la carpeta hasta que la vacíes.")
+        }
     }
 
     private var list: some View {
@@ -36,7 +45,25 @@ struct LibraryView: View {
                 Text("Tus temas, sus guitarras separadas y los rigs igualados.").foregroundStyle(TF.muted)
             }
             Spacer()
-            Button("Importar tema") { model.pickAndImport() }.buttonStyle(PrimaryButton())
+            if let p = model.playlistImport, let text = p.indicator {
+                Button { model.openLinkImport() } label: {
+                    HStack(spacing: 8) {
+                        if p.isLive { ProgressView().controlSize(.small) } else { Image(systemName: "checkmark.circle") }
+                        Text(text).font(TF.body(13, .medium))
+                    }
+                    .foregroundStyle(TF.accent)
+                    .padding(.horizontal, 12).frame(height: 36)
+                    .background(TF.accentBg, in: Capsule())
+                    .contentShape(Capsule())
+                }
+                .buttonStyle(.plain).help("Ver la importación de la lista")
+                .padding(.trailing, 8)
+            }
+            Menu("Importar tema") {
+                Button("Desde fichero…") { model.pickAndImport() }
+                Button("Desde enlace…") { model.openLinkImport() }
+            }
+            .menuStyle(.button).buttonStyle(PrimaryButton()).menuIndicator(.hidden).fixedSize()
         }
     }
 
@@ -61,7 +88,7 @@ struct LibraryView: View {
     }
 
     private enum Col {
-        static let guitars: CGFloat = 150, rigs: CGFloat = 70, takes: CGFloat = 70, state: CGFloat = 150, actions: CGFloat = 90
+        static let guitars: CGFloat = 150, rigs: CGFloat = 70, takes: CGFloat = 70, state: CGFloat = 150, actions: CGFloat = 134
     }
 
     private func headCell(_ t: String, _ w: CGFloat? = nil) -> some View {
@@ -100,7 +127,7 @@ struct LibraryView: View {
                     Divider().overlay(TF.line)
                     VStack(spacing: 6) {
                         Text("Todavía no hay temas").font(TF.body(15, .semibold))
-                        Text("Importa un wav, flac o mp3, o arrástralo a esta ventana.").foregroundStyle(TF.muted)
+                        Text("Importa un wav, flac o mp3, arrástralo a esta ventana o pega un enlace de YouTube o Spotify.").foregroundStyle(TF.muted)
                     }
                     .frame(maxWidth: .infinity).padding(.vertical, 48)
                 }
@@ -120,9 +147,12 @@ struct LibraryView: View {
             Text(e.rigCount == 0 ? "—" : "\(e.rigCount)").foregroundStyle(TF.text2).frame(width: Col.rigs, alignment: .leading)
             Text(e.takeCount == 0 ? "—" : "\(e.takeCount)").foregroundStyle(TF.text2).frame(width: Col.takes, alignment: .leading)
             chip(e).frame(width: Col.state, alignment: .leading)
-            Button("Abrir") { Task { await model.open(e.id) } }
-                .buttonStyle(SecondaryButton(height: 36))
-                .frame(width: Col.actions, alignment: .trailing)
+            HStack(spacing: 8) {
+                TrashRowButton { model.requestTrash(e) }
+                Button("Abrir") { Task { await model.open(e.id) } }
+                    .buttonStyle(SecondaryButton(height: 36))
+            }
+            .frame(width: Col.actions, alignment: .trailing)
         }
         .padding(.horizontal, 20).padding(.vertical, 14)
         .contentShape(Rectangle())
@@ -132,6 +162,8 @@ struct LibraryView: View {
             Button("Limpiar…") { model.requestCleanup(id: e.id, title: "Limpiar «\(e.title)»") }
                 .disabled(model.isSeparating(e))
             Button("Mostrar en Finder") { if let f = model.folder(of: e) { model.showInFinder(f) } }
+            Divider()
+            Button("Eliminar…") { model.requestTrash(e) }
         }
     }
 
@@ -149,16 +181,89 @@ struct LibraryView: View {
 struct ProjectDetailView: View {
     @Environment(AppModel.self) private var model
     let detail: ProjectDetail
+    @State private var editing = false
+    @State private var draftTitle = ""
+    @State private var draftArtist = ""
+    @FocusState private var titleFocused: Bool
+
+    private func startEditing() {
+        draftTitle = detail.project.song.title
+        draftArtist = detail.project.song.artist ?? ""
+        editing = true
+        titleFocused = true
+    }
+
+    private func saveEdit() {
+        Task { if await model.updateSongInfo(id: detail.id, title: draftTitle, artist: draftArtist) { editing = false } }
+    }
+
+    private func editField(_ label: String, text: Binding<String>, focus: FocusState<Bool>.Binding? = nil) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label).font(TF.body(13)).foregroundStyle(TF.muted)
+            TextField(label, text: text).textFieldStyle(.plain)
+                .padding(.horizontal, 12).frame(height: 40)
+                .background(TF.field, in: RoundedRectangle(cornerRadius: 8))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(TF.fieldLine))
+                .modifier(OptionalFocus(focus: focus))
+                .onSubmit(saveEdit)
+        }
+    }
+
+    private struct OptionalFocus: ViewModifier {
+        let focus: FocusState<Bool>.Binding?
+        @ViewBuilder func body(content: Content) -> some View {
+            if let focus { content.focused(focus) } else { content }
+        }
+    }
+
+    @ViewBuilder private var titleBlock: some View {
+        let song = detail.project.song
+        if editing {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .center, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        editField("Título", text: $draftTitle, focus: $titleFocused)
+                        editField("Artista", text: $draftArtist)
+                    }
+                    Button {
+                        swap(&draftTitle, &draftArtist)
+                    } label: {
+                        Image(systemName: "arrow.up.arrow.down").font(.system(size: 14))
+                            .foregroundStyle(TF.muted)
+                            .frame(width: 36, height: 36)
+                            .background(TF.field, in: RoundedRectangle(cornerRadius: 10))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(TF.fieldLine))
+                    }
+                    .buttonStyle(.plain)
+                    .help("Intercambiar título y artista").accessibilityLabel("Intercambiar título y artista")
+                }
+                HStack(spacing: 10) {
+                    Button("Guardar", action: saveEdit).buttonStyle(PrimaryButton())
+                        .disabled(draftTitle.trimmingCharacters(in: .whitespaces).isEmpty)
+                    Button("Cancelar") { editing = false }.buttonStyle(SecondaryButton(height: 36))
+                        .keyboardShortcut(.cancelAction)
+                }
+            }
+            .frame(maxWidth: 480, alignment: .leading)
+        } else {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 10) {
+                    Text(song.title).font(TF.display(32))
+                    Button(action: startEditing) { Image(systemName: "pencil") }
+                        .buttonStyle(.plain).foregroundStyle(TF.muted)
+                        .help("Editar título y artista").accessibilityLabel("Editar título y artista")
+                }
+                if let a = song.artist { Text(a).foregroundStyle(TF.muted) }
+            }
+        }
+    }
 
     var body: some View {
         let song = detail.project.song
         VStack(alignment: .leading, spacing: 24) {
             Button { model.detail = nil } label: { Label("Biblioteca", systemImage: "chevron.left") }
                 .buttonStyle(.plain).foregroundStyle(TF.accent)
-            VStack(alignment: .leading, spacing: 6) {
-                Text(song.title).font(TF.display(32))
-                if let a = song.artist { Text(a).foregroundStyle(TF.muted) }
-            }
+            titleBlock
             Card {
                 VStack(spacing: 0) {
                     info("Frecuencia", Fmt.rate(song.sampleRate))
@@ -191,10 +296,18 @@ struct ProjectDetailView: View {
                         .buttonStyle(PrimaryButton())
                 }
                 Button("Mostrar en Finder") { model.showInFinder(detail.folder) }.buttonStyle(SecondaryButton())
+                Spacer()
+                Button("Eliminar…") {
+                    if let e = model.entries.first(where: { $0.id == detail.id }) { model.requestTrash(e) }
+                }
+                .buttonStyle(.plain).foregroundStyle(TF.muted)
             }
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 40).padding(.vertical, 32)
+        #if DEBUG
+        .onAppear { if model.options.detailEdit { startEditing() } }
+        #endif
     }
 
     private var stateText: String {
@@ -210,5 +323,25 @@ struct ProjectDetailView: View {
     private func info(_ k: String, _ v: String) -> some View {
         HStack { Text(k).foregroundStyle(TF.muted); Spacer(); Text(v).fontWeight(.semibold) }
             .padding(.horizontal, 20).padding(.vertical, 10)
+    }
+}
+
+/// Botón cuadrado solo con icono, junto a «Abrir»: gris discreto y rojo al pasar el ratón.
+private struct TrashRowButton: View {
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "trash").font(.system(size: 14))
+                .foregroundStyle(hovering ? TF.danger : TF.muted)
+                .frame(width: 36, height: 36)
+                .background(TF.field, in: RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(TF.fieldLine))
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .help("Eliminar…")
+        .accessibilityLabel("Eliminar")
     }
 }

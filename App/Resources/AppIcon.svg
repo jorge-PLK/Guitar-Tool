@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Icono de ToneForge (variante B1, yunque TF en dos tonos). Fuente de Assets.xcassets/AppIcon.appiconset:
+       regenerar los PNG con Tools/make-icon.sh. -->
+  <defs>
+    <linearGradient id="g-dark" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#262B31"/><stop offset="1" stop-color="#0F1113"/>
+    </linearGradient>
+    <linearGradient id="g-amber" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFC170"/><stop offset="1" stop-color="#EE9624"/>
+    </linearGradient>
+    <linearGradient id="g-steel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#E8EAED"/><stop offset="1" stop-color="#8E98A3"/>
+    </linearGradient>
+  </defs>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#g-dark)"/>
+  <rect x="103" y="103" width="818" height="818" rx="182" fill="none" stroke="#3A424A" stroke-width="6"/>
+  <g transform="translate(-6 -71)" stroke-width="14" stroke-linejoin="round">
+    <path d="M230 330 L558 330 L558 430 L488 430 L488 720 L392 720 L392 430 Q282 424 202 344 Q206 330 230 330 Z" fill="url(#g-steel)" stroke="url(#g-steel)"/>
+    <path d="M594 330 L836 330 L836 430 L690 430 L690 500 L772 500 L772 580 L690 580 L690 720 L594 720 Z" fill="url(#g-amber)" stroke="url(#g-amber)"/>
+    <path d="M362 760 L722 760 L776 836 L308 836 Z" fill="#6B747E" stroke="#6B747E"/>
+  </g>
+</svg>
