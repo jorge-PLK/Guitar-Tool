@@ -21,6 +21,19 @@ final class ProfileTests: XCTestCase {
         XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: store.url.deletingLastPathComponent().path), ["profile.json"])
     }
 
+    func testMasterGainDefaultsToZeroAndRoundTrips() throws {
+        let dir = try makeTempDir()
+        let store = ProfileStore(url: dir.appendingPathComponent("p/profile.json"))
+        try FileManager.default.createDirectory(at: store.url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data(#"{"workingSampleRate":48000,"guitars":[]}"#.utf8).write(to: store.url)   // perfil anterior a P8
+        var p = try store.load()
+        XCTAssertEqual(p.masterGainDB, 0)
+        XCTAssertEqual(p.workingSampleRate, 48000)
+        p.masterGainDB = -4.5
+        try store.save(p)
+        XCTAssertEqual(try store.load().masterGainDB, -4.5)
+    }
+
     func testOnlyOneDefaultGuitarAndValidRate() {
         var p = EquipmentProfile(workingSampleRate: 96000, guitars: [
             OwnedGuitar(name: "A", isDefault: true), OwnedGuitar(name: "B", isDefault: true)])

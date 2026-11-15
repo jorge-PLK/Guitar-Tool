@@ -23,17 +23,24 @@ packages:
     path: ../Packages/ModelKit
   StemKit:
     path: ../Packages/StemKit
+  StudyKit:
+    path: ../Packages/StudyKit
 targets:
   ToneForge:
     type: application
     platform: macOS
     sources:
       - Sources
+      # Modelos embebidos (BTC): zips que ModelStore copia del bundle y compila la primera vez.
+      - path: Resources/Models
+        includes: ["*.zip"]
+        buildPhase: resources
     dependencies:
       - package: Store
       - package: AudioKit
       - package: ModelKit
       - package: StemKit
+      - package: StudyKit
     postCompileScripts:
       # Helper de separación embebido: Contents/MacOS/tf-separate, siempre en release (la velocidad importa)
       # y firmado con la identidad de la app antes de que se firme el bundle.

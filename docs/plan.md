@@ -19,7 +19,7 @@ La pedalera se usa solo como interfaz de audio, con el rig que esté cargado: no
 
 ### Fase 0 · Pruebas de riesgo
 
-Seis pruebas cortas e independientes, en scripts sueltos (Python o Swift), que deciden el resto del plan. Para la Etapa 1 solo hacen falta P2, P4 y P6; P1, P3 y P5 se dejan para el comienzo de la Etapa 2.
+Siete pruebas cortas e independientes, en scripts sueltos (Python o Swift), que deciden el resto del plan. Para la Etapa 1 solo hacen falta P2, P4 y P6; P1, P3 y P5 se dejan para el comienzo de la Etapa 2. P7 se añadió el 15/11/2026 para la Fase 2b (ADR-008).
 
 - [ ] P1 Remote Editor: capturar el tráfico navegador ↔ pedalera y documentar cómo listar rigs, leer un rig, cambiar un parámetro, cargar un rig y subir un NAM o un IR. Anotar la versión de firmware. *Etapa 2.*
 - [x] P2 Audio USB: qué canales de entrada y salida expone la Flex Prime, si da el DI seco, si acepta reamp, a qué frecuencia de muestreo trabaja y si el retorno procesado incluye lo que se le envía por USB (el backing). *Superada, sin plan B; ver `docs/probes/P2-audio-usb.md`.*
@@ -27,6 +27,7 @@ Seis pruebas cortas e independientes, en scripts sueltos (Python o Swift), que d
 - [x] P4 Modelos: convertir BS-RoFormer SW y BTC a Core ML y comprobar que dan el mismo resultado que el original y a buena velocidad; el que no funcione bien pasa a ONNX Runtime como respaldo. Comparar la separación con HTDemucs 6 stems en 3 temas y medir tiempos. Elegir el modelo de pulso y el de transcripción de batería. *Elegidos BS-RoFormer SW (Core ML publicado, CPU+GPU), BTC, Beat This! y ADTOF; ver `docs/probes/P4-modelos.md`.*
 - [ ] P5 Velocidad del bucle: medir cuánto tarda la pedalera en aplicar un cambio de parámetro, en cambiar de bloque y en cargar un NAM, para estimar cuánto dura un igualado. *Etapa 2.*
 - [x] P6 Velocidad: comparar la calidad al 50 % de AVAudioUnitTimePitch y de Rubber Band. *Gana `AVAudioUnitTimePitch` con overlap 8; Rubber Band no hace falta; ver `docs/probes/P6-timepitch.md`.*
+- [x] P7 Fuentes externas: de un enlace de Spotify a un fichero de audio local sin credenciales, con yt-dlp. *Superada con un tema (18-24 s); Opus → WAV; ver `docs/probes/P7-fuentes.md` y ADR-008. Falta oído de Jorge y más temas.*
 
 Condición de paso: para la Etapa 1, audio grabado por USB y un tema separado en local; para la Etapa 2, un parámetro cambiado desde script y un reamp grabado. *Etapa 1 cumplida (audio grabado por USB en P2; tema separado en local en `Probes/P4-modelos/bs_roformer_sw/out/stems/T1/`), confirmada por Jorge el 15/11/2026. Etapa 2 pendiente.*
 
@@ -46,14 +47,25 @@ Condición de paso: un tema importado y separado, con sus stems en disco. *Cumpl
 
 ### Fase 2 · Herramienta de estudio (RF7, RF10)
 
-- [ ] Reproductor de stems sincronizados con volumen, silenciar y solo
-- [ ] Velocidad del 50 al 200 %, transposición, afinación fina y capo virtual
-- [ ] Detección de pulso, tempo, compases y tonalidad
-- [ ] Detección de acordes, tira de acordes con diagramas y corrección a mano
-- [ ] Secciones del tema, bucles ajustados al pulso y metrónomo
-- [ ] Pantalla de backing track
+- [x] Reproductor de stems sincronizados con volumen, silenciar y solo *(`StudyPlayerTests`, AudioKit, 32 tests)*
+- [x] Velocidad del 50 al 200 %, transposición, afinación fina y capo virtual *(`StudyPlayerTests`: 10 s al 70 % → 14,2876 s, +200 cents = 493,883 Hz; el capo cambia solo los diagramas, `ChordTests`)*
+- [x] Detección de pulso, tempo, compases y tonalidad *(`BeatTests`, `BeatHeavyModelTests`, `ChordRecognizerTests` (tonalidad), `ChordHeavyModelTests`)*
+- [x] Detección de acordes, tira de acordes con diagramas y corrección a mano *(`ChordRecognizerTests`, `ChordHeavyModelTests`, `ChordTests` y capturas revisadas por el orquestador)*
+- [x] Secciones del tema, bucles ajustados al pulso y metrónomo *(`StudyPlayerTests` (bucle y clics), `BeatTests` (imán) y capturas)*
+- [x] Pantalla de backing track *(capturas revisadas por el orquestador, `Temp/p8/`)*
 
-Condición de paso: tocar encima de un tema sin guitarras, en bucle y al 70 %.
+Condición de paso: tocar encima de un tema sin guitarras, en bucle y al 70 %. *Cumplida el 15/11/2026, confirmada por Jorge tocando por la Flex Prime: tema sin guitarras, en bucle y al 70 % (ADR-009).*
+
+### Fase 2b · Fuentes externas (ADR-008)
+
+Importar temas desde un enlace de YouTube o de Spotify. El audio sale de YouTube con yt-dlp; de Spotify solo se leen metadatos. Probado en P7 (`docs/probes/P7-fuentes.md`) con un solo tema.
+
+- [ ] Lectura de metadatos de Spotify (página embed, sin credenciales)
+- [ ] Búsqueda en YouTube y selector de candidatos con la diferencia de duración
+- [ ] Descarga Opus → WAV e importación a la biblioteca
+- [ ] Helpers embebidos (yt-dlp, Deno, ffmpeg) y su actualización
+
+Condición de paso (provisional): pegar un enlace de YouTube o de Spotify deja el tema en la biblioteca listo para separar, sin pasos manuales.
 
 ### Fase 3 · Audio con la pedalera (RF1)
 
@@ -153,6 +165,7 @@ Mismo número de orden: se pueden hacer en paralelo o en cualquier orden entre s
 | 1 | P2 · Audio USB | Nada | Sí | Opus | Sonnet |
 | 2 | Fase 1 · Base y biblioteca | P4 | No | Opus | Sonnet |
 | 3 | Fase 2 · Herramienta de estudio | Fase 1, P6 | No | Opus | Opus (pulso, acordes) · Sonnet (reproductor, pantalla) |
+| 3 | Fase 2b · Fuentes externas | Fase 1, P7 | No | Opus | Sonnet (conectores y pantallas) |
 | 4 | Fase 3 · Audio con la pedalera | P2, Fase 2 | Sí | Opus | Opus (latencia, alineado) · Sonnet (selector, Ajustes de audio) |
 | 4 | Fase 4 · Guitarras y secciones | Fase 2 | No | Opus | Opus (separación A/B, clasificación) · Sonnet (interfaz) |
 | 5 | Fase 5 · Tablatura y DI guiado | Fases 3 y 4 | Sí | Opus | Opus (cuerdas y trastes, batería) · Sonnet (alphaTab, validación) |
@@ -198,6 +211,7 @@ Cada fase la lleva una sesión orquestadora que escribe la mini-spec, reparte el
 | 0. Pruebas P2, P4 y P6 | Opus | Opus para la conversión a Core ML (P4); Sonnet para los scripts de P2 y P6 | Scripts cortos e independientes; lo difícil es solo la conversión |
 | 1. Base y biblioteca | Opus | Sonnet para paquetes, modelo de datos, importación y pantallas; Opus para la integración del separador | APIs de Apple documentadas y trabajo guiado por la spec; el separador pide integrar el modelo |
 | 2. Herramienta de estudio | Opus | Opus para pulso y acordes; Sonnet para reproductor y pantalla | Integrar modelos es lo delicado; el resto es interfaz |
+| 2b. Fuentes externas | Opus | Sonnet para conectores y pantallas | APIs y scripts documentados (P7); sin modelos que integrar |
 | 3. Audio con la pedalera | Opus | Opus para latencia y alineado; Sonnet para selector y Ajustes de audio | La precisión de 1 ms pide cuidado, no un modelo mayor |
 | 4. Guitarras y secciones | Opus | Opus para la separación A/B y la clasificación; Sonnet para la interfaz | Procesado de señal acotado |
 | 5. Tablatura y DI guiado | Opus | Opus para cuerdas y trastes y para la batería; Sonnet para alphaTab y validación de la toma | Fase larga pero de piezas conocidas |

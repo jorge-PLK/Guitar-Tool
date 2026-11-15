@@ -16,9 +16,11 @@ public enum ModelError: Error, LocalizedError, Equatable {
     case unzipFailed(String)
     case packageNotFound(String)
     case busy(String)
+    case bundledResourceMissing(String)
 
     public var errorDescription: String? {
         switch self {
+        case .bundledResourceMissing(let n): return "No se encuentra \(n) entre los recursos de la app."
         case .unknownModel(let id): return "Modelo desconocido: \(id)."
         case .hashMismatch(let e, let a): return "La suma SHA-256 no coincide (esperada \(e.prefix(12))…, obtenida \(a.prefix(12))…)."
         case .unzipFailed(let m): return "No se pudo descomprimir el modelo: \(m)"
@@ -108,9 +110,11 @@ public actor ModelStore {
     private enum Source: Sendable {
         case download
         case archive(URL)
+        case bundled(URL)
     }
 
     private let root: URL
+    private let bundleResourceDirectory: URL?
     private let descriptors: [String: ModelDescriptor]
     private let downloader: ModelDownloading
     private let compiler: ModelCompiling
@@ -120,8 +124,10 @@ public actor ModelStore {
     public init(root: URL = ModelStore.defaultRoot,
                 catalog: [ModelDescriptor] = ModelCatalog.all,
                 downloader: ModelDownloading = URLSessionDownloader(),
-                compiler: ModelCompiling = CoreMLCompiler()) {
+                compiler: ModelCompiling = CoreMLCompiler(),
+                bundleResourceDirectory: URL? = nil) {
         self.root = root
+        self.bundleResourceDirectory = bundleResourceDirectory
         self.descriptors = Dictionary(catalog.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         self.downloader = downloader
         self.compiler = compiler
@@ -139,6 +145,14 @@ public actor ModelStore {
     public func ensureInstalled(_ id: String, progress: @escaping @Sendable (Double) -> Void) async throws -> URL {
         guard let d = descriptors[id] else { throw ModelError.unknownModel(id) }
         if case .installed(let url, _) = hub.get(id) { progress(1); return url }
+        if d.archiveKind == .bundledZippedMLPackage {
+            let name = d.url.lastPathComponent
+            guard let dir = bundleResourceDirectory,
+                  FileManager.default.fileExists(atPath: dir.appendingPathComponent(name).path) else {
+                throw ModelError.bundledResourceMissing(name)
+            }
+            return try await run(d, source: .bundled(dir.appendingPathComponent(name)), progress: progress)
+        }
         return try await run(d, source: .download, progress: progress)
     }
 
@@ -209,6 +223,9 @@ public actor ModelStore {
                 fanout.report(1)
             case .archive(let url):
                 archive = url
+            case .bundled(let url):
+                archive = staging.appendingPathComponent("archive.zip")
+                try fm.copyItem(at: url, to: archive)
             }
 
             hub.set(d.id, .verifying)
@@ -223,7 +240,8 @@ public actor ModelStore {
             let package = unzipped.appendingPathComponent(d.packageName)
             guard fm.fileExists(atPath: package.path) else { throw ModelError.packageNotFound(d.packageName) }
 
-            let compiled = try await compiler.compile(package)
+            // El `.mlmodelc` ya viene compilado: no se llama al compilador.
+            let compiled = d.archiveKind == .zippedCompiledModel ? package : try await compiler.compile(package)
             let final = dir.appendingPathComponent(d.compiledName, isDirectory: true)
             try? fm.removeItem(at: final)
             try? fm.removeItem(at: dir.appendingPathComponent("manifest.json"))

@@ -39,7 +39,30 @@ public extension StemSeparating {
     var modelIdentifier: String? { nil }
 }
 
+/// Mide un stem ya escrito y dice si es silencio (regla de la mini-spec Fase 2, «Stems vacíos»); la implementa la app.
+public protocol StemLevelMeasuring: Sendable {
+    func isSilent(stem: URL) async throws -> Bool
+}
+
+/// Análisis de estudio (pulso, acordes, tonalidad) de un proyecto ya separado; la implementa la app.
+/// Escribe `ProjectLayout.analysisCache`. Store no conoce StudyKit.
+public protocol StudyAnalyzing: Sendable {
+    /// `true` si `cache/analysis.json` existe y su huella coincide con la del proyecto y los modelos actuales.
+    func isCurrent(project: Project, layout: ProjectLayout) async -> Bool
+    func analyze(project: Project, layout: ProjectLayout) async throws
+}
+
 // MARK: - Tipos públicos
+
+/// Estado del análisis de estudio de un proyecto.
+public enum AnalysisState: Sendable, Equatable {
+    /// Sin análisis (o sin analizador / sin separación terminada).
+    case missing
+    /// En cola o en marcha.
+    case analyzing
+    case ready
+    case failed(String)
+}
 
 public enum LibraryError: Error, Equatable, Sendable {
     /// El original ya existe en otro proyecto (mismo SHA-256); la app decide.
@@ -60,6 +83,13 @@ public enum LibraryEvent: Sendable, Equatable {
     case separationFinished(UUID)
     case separationFailed(UUID, String)
     case separationCancelled(UUID)
+    /// Análisis de estudio en la cola posterior a la separación (misma cola de uno en uno).
+    case analysisQueued(UUID)
+    case analysisStarted(UUID)
+    case analysisFinished(UUID)
+    case analysisFailed(UUID, String)
+    /// Se midió el nivel de los stems (`Stem.isEmpty` y `levelMeasured` actualizados en `project.json`).
+    case stemsMeasured(UUID)
     case rateMigrationStarted(UUID)
     case rateMigrationFinished(UUID)
     case rateMigrationFailed(UUID, String)
@@ -104,6 +134,17 @@ public actor Library {
     private let importer: any AudioImporting
     private let separator: any StemSeparating
     private let autoSeparate: Bool
+    private let levelMeter: (any StemLevelMeasuring)?
+    private let analyzer: (any StudyAnalyzing)?
+
+    /// Trabajos posteriores (medir stems y analizar). Se sirven antes que la siguiente separación: son cortos.
+    private var postQueue: [UUID] = []
+    private var currentPostID: UUID?
+    /// Borrado de WAV de stems vacíos; interno para que los tests simulen una interrupción tras guardar `project.json`.
+    var stemFileRemover: @Sendable (URL) throws -> Void = { url in
+        if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
+    }
+    func setStemFileRemover(_ f: @escaping @Sendable (URL) throws -> Void) { stemFileRemover = f }
 
     private var queue: [UUID] = []
     private var worker: Task<Void, Never>?
@@ -114,7 +155,10 @@ public actor Library {
     private var migrations: [UUID: Task<Void, Never>] = [:]
 
     public init(root: URL, profile: ProfileStore, index: LibraryIndex, importer: any AudioImporting,
-                separator: any StemSeparating, autoSeparate: Bool = true) {
+                separator: any StemSeparating, autoSeparate: Bool = true,
+                levelMeter: (any StemLevelMeasuring)? = nil, analyzer: (any StudyAnalyzing)? = nil) {
+        self.levelMeter = levelMeter
+        self.analyzer = analyzer
         let (stream, cont) = AsyncStream.makeStream(of: LibraryEvent.self)
         self.events = stream
         self.continuation = cont
@@ -220,6 +264,7 @@ public actor Library {
             throw LibraryError.projectNotFound(id)
         }
         guard !queue.contains(id), currentID != id else { return }
+        postQueue.removeAll { $0 == id }
         try await mutate(id) { $0.separation = SeparationState(state: .queued) }
         queue.append(id)
         continuation.yield(.separationQueued(id))
@@ -258,7 +303,14 @@ public actor Library {
     }
 
     private func runQueue() async {
-        while !queue.isEmpty {
+        while !queue.isEmpty || !postQueue.isEmpty {
+            if !postQueue.isEmpty {
+                let id = postQueue.removeFirst()
+                currentPostID = id
+                await runPostProcessing(id)
+                currentPostID = nil
+                continue
+            }
             let id = queue.removeFirst()
             currentID = id
             await runSeparation(id)
@@ -268,7 +320,10 @@ public actor Library {
         worker = nil
     }
 
-    private func isSeparating(_ id: UUID) -> Bool { queue.contains(id) || currentID == id }
+    /// Separándose o con trabajo posterior (medida / análisis) pendiente o en marcha.
+    private func isSeparating(_ id: UUID) -> Bool {
+        queue.contains(id) || currentID == id || postQueue.contains(id) || currentPostID == id
+    }
 
     private func runSeparation(_ id: UUID) async {
         let cont = continuation
@@ -299,12 +354,17 @@ public actor Library {
                 if cancelRequested.contains(id) { task.cancel() }
                 try await task.value
                 if !cancelRequested.contains(id) {
-                    let stems = try promotePartialStems(layout)
+                    let stems = try await promotePartialStems(layout)
                     try await mutate(id) {
                         $0.stems = stems
                         $0.separation = SeparationState(state: .done, model: sep.modelIdentifier, finishedAt: Date())
                     }
+                    try deleteEmptyStemFiles(stems, layout: layout)
                     cont.yield(.separationFinished(id))
+                    if analyzer != nil {
+                        postQueue.append(id)
+                        cont.yield(.analysisQueued(id))
+                    }
                 }
             }
         } catch {
@@ -324,18 +384,42 @@ public actor Library {
     }
 
     /// Mueve `.partial/<kind>.wav` → `stems/<kind>.wav` (atómico por fichero) y devuelve la lista de stems.
-    private func promotePartialStems(_ layout: ProjectLayout) throws -> [Stem] {
+    /// Los silenciosos (regla de «Stems vacíos») no se promueven: se descartan y se borra el WAV anterior, si lo había.
+    /// Orden seguro ante interrupciones: aquí no se borra nada de los vacíos; `runSeparation` guarda `project.json`
+    /// y solo entonces llama a `deleteEmptyStemFiles` (y limpia `.partial`).
+    private func promotePartialStems(_ layout: ProjectLayout) async throws -> [Stem] {
         let fm = FileManager.default
         try fm.createDirectory(at: layout.stemsDir, withIntermediateDirectories: true)
         var stems: [Stem] = []
         for kind in StemKind.allCases {
             let src = layout.stemsPartialDir.appendingPathComponent("\(kind.rawValue).wav")
             guard fm.fileExists(atPath: src.path) else { continue }
+            let rel = ProjectLayout.stemRelativePath(kind)
+            var measured = false
+            if let levelMeter {
+                do {
+                    if try await levelMeter.isSilent(stem: src) {
+                        stems.append(Stem(kind: kind, file: rel, isEmpty: true, levelMeasured: true))
+                        continue
+                    }
+                    measured = true
+                } catch {
+                    // No se pudo medir: se conserva y se reintenta al abrir.
+                }
+            }
             try FileOps.atomicReplace(layout.stemURL(kind), with: src)
-            stems.append(Stem(kind: kind, file: ProjectLayout.stemRelativePath(kind)))
+            stems.append(Stem(kind: kind, file: rel, levelMeasured: measured))
+        }
+        return stems
+    }
+
+    /// Borra los WAV de los stems `isEmpty` (de `stems/` y de `.partial`) y quita `.partial`. Idempotente.
+    private func deleteEmptyStemFiles(_ stems: [Stem], layout: ProjectLayout) throws {
+        for s in stems where s.isEmpty {
+            try stemFileRemover(layout.stemURL(s.kind))
+            try stemFileRemover(layout.stemsPartialDir.appendingPathComponent("\(s.kind.rawValue).wav"))
         }
         FileOps.removeIfExists(layout.stemsPartialDir)
-        return stems
     }
 
     /// Al arrancar: `queued|running` → `failed` («interrumpida»). Devuelve los ids afectados.
@@ -361,9 +445,103 @@ public actor Library {
         guard let folder = await locate(id) else { throw LibraryError.projectNotFound(id) }
         let project = try ProjectFile.load(folder: folder)
         if project.song.sampleRate != workingRate(), migrations[id] == nil {
-            migrations[id] = Task { await self.migrate(id) }
+            migrations[id] = Task {
+                await self.migrate(id)
+                _ = try? await self.ensureAnalysis(id: id)
+            }
         }
+        _ = try? await ensureAnalysis(id: id)
         return project
+    }
+
+    /// Guarda lo del usuario en la herramienta de estudio (`project.json`): correcciones, bucles, mezcla, ajustes y secciones.
+    /// Solo toca esos campos, así que es seguro mientras hay una separación o un análisis en marcha.
+    public func saveStudy(id: UUID, study: StudyState, sections: [Section]) async throws {
+        try await mutate(id) {
+            $0.study = study
+            $0.sections = sections
+        }
+    }
+
+    // MARK: Medida de stems y análisis de estudio
+
+    /// Estado del análisis; si falta o está desfasado (o quedan stems por medir) lo encola en la misma cola
+    /// de uno en uno. Idempotente. Sin analizador, solo programa la medida de stems pendientes.
+    @discardableResult
+    public func ensureAnalysis(id: UUID) async throws -> AnalysisState {
+        guard let folder = await locate(id) else { throw LibraryError.projectNotFound(id) }
+        let project = try ProjectFile.load(folder: folder)
+        guard project.separation.state == .done, !queue.contains(id), currentID != id else { return .missing }
+        if postQueue.contains(id) || currentPostID == id { return analyzer == nil ? .missing : .analyzing }
+        // Durante la reconversión no se toca: al terminar `open` vuelve a pedirlo.
+        guard migrations[id] == nil else { return .missing }
+        let needsMeasure = needsStemWork(project, layout: ProjectLayout(folder: folder))
+        var current = false
+        if let analyzer { current = await analyzer.isCurrent(project: project, layout: ProjectLayout(folder: folder)) }
+        if !needsMeasure && (analyzer == nil || current) { return current ? .ready : .missing }
+        postQueue.append(id)
+        if analyzer != nil { continuation.yield(.analysisQueued(id)) }
+        startWorkerIfNeeded()
+        return analyzer != nil ? .analyzing : .missing
+    }
+
+    /// Hay que medir (con medidor) o completar un borrado interrumpido (stem `isEmpty` con fichero presente).
+    private func needsStemWork(_ project: Project, layout: ProjectLayout) -> Bool {
+        project.stems.contains { s in
+            (levelMeter != nil && !s.levelMeasured && !s.isEmpty)
+                || (s.isEmpty && FileManager.default.fileExists(atPath: layout.stemURL(s.kind).path))
+        }
+    }
+
+    /// Un stem no vacío sin fichero (proyecto dañado) significa que hay que reseparar el tema.
+    public func needsReseparation(id: UUID) async throws -> Bool {
+        guard let folder = await locate(id) else { throw LibraryError.projectNotFound(id) }
+        let project = try ProjectFile.load(folder: folder)
+        let layout = ProjectLayout(folder: folder)
+        guard project.separation.state == .done else { return false }
+        return project.stems.contains { !$0.isEmpty && !FileManager.default.fileExists(atPath: layout.stemURL($0.kind).path) }
+    }
+
+    /// Mide los stems sin medir y guarda `project.json` ANTES de borrar ningún WAV; luego borra los vacíos
+    /// (incluidos los que quedaron de un borrado interrumpido).
+    private func measureStems(_ id: UUID, folder: URL) async throws -> Project {
+        let layout = ProjectLayout(folder: folder)
+        var project = try ProjectFile.load(folder: folder)
+        if let levelMeter, project.stems.contains(where: { !$0.levelMeasured && !$0.isEmpty }) {
+            var stems = project.stems
+            for i in stems.indices where !stems[i].levelMeasured && !stems[i].isEmpty {
+                let url = layout.stemURL(stems[i].kind)
+                guard FileManager.default.fileExists(atPath: url.path) else { continue }   // dañado: no se mide
+                guard let silent = try? await levelMeter.isSilent(stem: url) else { continue }
+                if silent { stems[i].isEmpty = true }
+                stems[i].levelMeasured = true
+            }
+            project = try await mutate(id) { $0.stems = stems }
+        }
+        try deleteEmptyStemFiles(project.stems, layout: layout)
+        continuation.yield(.stemsMeasured(id))
+        return project
+    }
+
+    private func runPostProcessing(_ id: UUID) async {
+        let cont = continuation
+        do {
+            guard let folder = await locate(id) else { return }
+            var project = try ProjectFile.load(folder: folder)
+            guard project.separation.state == .done else { return }
+            if needsStemWork(project, layout: ProjectLayout(folder: folder)) {
+                project = try await measureStems(id, folder: folder)
+            }
+            guard let analyzer else { return }
+            let layout = ProjectLayout(folder: folder)
+            cont.yield(.analysisStarted(id))
+            if await !analyzer.isCurrent(project: project, layout: layout) {
+                try await analyzer.analyze(project: project, layout: layout)
+            }
+            cont.yield(.analysisFinished(id))
+        } catch {
+            if analyzer != nil { cont.yield(.analysisFailed(id, error.localizedDescription)) }
+        }
     }
 
     private func migrate(_ id: UUID) async {
@@ -386,7 +564,7 @@ public actor Library {
             _ = try await importer.importAudio(from: layout.url(relative: project.song.source), to: newSong,
                                                sampleRate: target, progress: { _ in })
             swaps.append((layout.audioFile, newSong))
-            for stem in project.stems {
+            for stem in project.stems where !stem.isEmpty && FileManager.default.fileExists(atPath: layout.stemURL(stem.kind).path) {
                 let tmp = tmpDir.appendingPathComponent("\(stem.kind.rawValue).wav")
                 try await importer.resample(layout.stemURL(stem.kind), to: tmp, sampleRate: target)
                 swaps.append((layout.stemURL(stem.kind), tmp))
@@ -447,7 +625,7 @@ public actor Library {
     public func relocate(to newRoot: URL, mode: RelocationMode) async throws {
         let oldRoot = root
         guard newRoot.standardizedFileURL != oldRoot.standardizedFileURL else { return }
-        guard queue.isEmpty, currentID == nil, migrations.isEmpty else { throw LibraryError.workInProgress }
+        guard queue.isEmpty, currentID == nil, postQueue.isEmpty, currentPostID == nil, migrations.isEmpty else { throw LibraryError.workInProgress }
 
         var copied: [String] = []
         switch mode {

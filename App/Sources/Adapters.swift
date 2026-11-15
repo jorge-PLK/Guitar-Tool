@@ -3,6 +3,7 @@ import Foundation
 import ModelKit
 import StemKit
 import Store
+import StudyKit
 
 /// Adaptador `AudioImporting` sobre `AudioKit.AudioImporter`.
 struct AppAudioImporter: AudioImporting {
@@ -76,5 +77,73 @@ struct AppStemSeparator: StemSeparating {
         case .cancelled: return CancellationError()
         case .invalidInput(let m): return SeparationFailure(message: "Entrada no válida: \(m)")
         }
+    }
+}
+
+/// Adaptador `StemLevelMeasuring` sobre `StemLevelMeter` (regla de «Stems vacíos»: RMS < −60 y pico < −40 dBFS).
+struct AppStemLevelMeter: StemLevelMeasuring {
+    func isSilent(stem: URL) async throws -> Bool {
+        try await Task.detached(priority: .utility) { try StemLevelMeter.isEmpty(url: stem) }.value
+    }
+}
+
+/// Adaptador `StudyAnalyzing` sobre StudyKit: pulso sobre la mezcla, acordes sobre los stems armónicos no vacíos
+/// (o la mezcla si no hay stems), tonalidad y caché con huella en `cache/analysis.json`.
+struct AppStudyAnalyzer: StudyAnalyzing {
+    /// Súbela al cambiar cualquier algoritmo de StudyKit que altere el resultado: invalida las cachés.
+    static let algorithmVersion = 1
+    /// Mini-spec Fase 2 §1 StudyKit: acordes sobre bass + guitar + other + piano.
+    static let harmonicStems: [StemKind] = [.bass, .guitar, .other, .piano]
+
+    let modelStore: ModelStore
+
+    struct MissingSeparation: LocalizedError {
+        var errorDescription: String? { "El tema no tiene una separación terminada." }
+    }
+
+    static func fingerprint(for project: Project) -> AnalysisFingerprint? {
+        guard let finished = project.separation.finishedAt else { return nil }
+        let beat = ModelCatalog.beatsBeatThis, chord = ModelCatalog.chordsBTC
+        return AnalysisFingerprint(
+            beatModelID: beat.id, beatModelVersion: beat.version,
+            chordModelID: chord.id, chordModelVersion: chord.version,
+            algorithmVersion: algorithmVersion,
+            separationModel: project.separation.model ?? "", separationFinishedAt: finished,
+            sourceSHA256: project.song.sourceSHA256)
+    }
+
+    /// El análisis guardado si existe y su huella coincide con la del proyecto; nil si falta o está desfasado.
+    static func loadCached(project: Project, layout: ProjectLayout) -> StudyAnalysis? {
+        guard let fp = fingerprint(for: project) else { return nil }
+        return AnalysisCache.load(StudyAnalysis.self, at: layout.analysisCache, expecting: fp)
+    }
+
+    /// Stems que alimentan los acordes: los armónicos no vacíos y con fichero; si no hay, la mezcla.
+    static func chordInputs(project: Project, layout: ProjectLayout) -> [URL] {
+        let fm = FileManager.default
+        let stems = harmonicStems.compactMap { kind -> URL? in
+            guard let s = project.stems.first(where: { $0.kind == kind }), !s.isEmpty else { return nil }
+            let url = layout.stemURL(kind)
+            return fm.fileExists(atPath: url.path) ? url : nil
+        }
+        return stems.isEmpty ? [layout.audioFile] : stems
+    }
+
+    func isCurrent(project: Project, layout: ProjectLayout) async -> Bool {
+        Self.loadCached(project: project, layout: layout) != nil
+    }
+
+    func analyze(project: Project, layout: ProjectLayout) async throws {
+        guard let fingerprint = Self.fingerprint(for: project) else { throw MissingSeparation() }
+        let beatModel = try await modelStore.ensureInstalled(ModelCatalog.beatsBeatThis.id) { _ in }
+        let chordModel = try await modelStore.ensureInstalled(ModelCatalog.chordsBTC.id) { _ in }
+        try Task.checkCancellation()
+        let beats = try await BeatAnalyzer(modelURL: beatModel).analyze(mix: layout.audioFile)
+        try Task.checkCancellation()
+        let chords = try await ChordRecognizer(modelURL: chordModel)
+            .analyze(stems: Self.chordInputs(project: project, layout: layout))
+        let key = KeyDetector.detect(chroma: chords.chroma, segments: chords.segments)
+        try AnalysisCache.save(StudyAnalysis(beats: beats, chords: chords, key: key),
+                               fingerprint: fingerprint, to: layout.analysisCache)
     }
 }

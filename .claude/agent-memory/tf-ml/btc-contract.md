@@ -15,5 +15,7 @@ metadata:
 - Convertir solo self_attn_layers + output_projection: (1,108,144) → logits (1,108,170); argmax fuera. ct.convert tarda 3 s, primer intento bien.
 - Modelo de 3 M parámetros: el ANE con ventana de 108 tramas es seguro (pico < 2 GB, compila en unos 4 s) y MLComputePlan (coremltools.models.compute_plan) funciona para contar operaciones por dispositivo.
 
+- La receta de tonalidad vive en `fixtures/make_fase2_fixtures.py`, que parsea argumentos y escribe fixtures al importarse: no se puede importar; copiar sus funciones (cqt_abs, fold_chroma, segments, chord_histogram, key_estimate). Para un tema nuevo de principio a fin hay un guion de ejemplo en `Temp/jorge-roce/analyze.py` (decode con ffmpeg → sep → btc → key). Avisos de librosa «n_fft=512 is too large» en el último trozo corto: normales.
+
 **Why:** los tres primeros fallos fueron de compatibilidad del código de 2019, no de conversión.
 **How to apply:** reutilizar btc_common.py; para otro modelo pequeño, el ANE con ventana fija es la primera opción. Ver [[coreml-env-traps]].

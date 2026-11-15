@@ -4,8 +4,8 @@ App de escritorio para macOS (Swift/SwiftUI) que iguala el tono de un tema reamp
 
 ## Estado actual
 
-Fase 1 · Base y biblioteca cerrada el 15/11/2026 (ADR-007).
-Siguiente: Fase 2 · Herramienta de estudio, en la rama `fase-2`.
+Fase 2 · Herramienta de estudio cerrada el 15/11/2026 (ADR-009).
+Siguiente: Fase 2b · Fuentes externas (ADR-008), en la rama `fase-2b`.
 P1, P3 y P5 quedan para el comienzo de la Etapa 2.
 
 ## Contexto: leer solo lo que haga falta

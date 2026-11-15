@@ -223,9 +223,11 @@ Contrato para `BeatKit`:
 | Salidas | `beat` y `downbeat`, `[1, 1500]`, logits; 50 fps |
 | Troceado | 1500 tramas (30 s), borde de 6: primer trozo con 6 de relleno a la izquierda, solape de 6, último trozo alineado al final; en el solape manda el anterior; por debajo de 30 s se rellena |
 | Postproceso «minimal» | máximo local en ventana de 7, logit > 0, se funden picos adyacentes, downbeat al pulso más cercano |
-| Preproceso | mono por media, 22 050 Hz, STFT 1024 hop 441 Hann centrada (`reflect`), módulo / sqrt(Σ win²), mel Slaney 128 bandas 30–11000 Hz sin normalizar, log1p(1000·x) |
+| Preproceso | mono por media, 22 050 Hz, STFT 1024 hop 441 Hann centrada (`reflect`), módulo / sqrt(n_fft) = / 32, mel Slaney 128 bandas 30–11000 Hz sin normalizar, log1p(1000·x) |
 
 El banco mel está en `musetric/beat-this-onnx/mel-filterbank.bin`.
+
+Corrección de la Fase 2 (ADR-009): el módulo se divide por sqrt(n_fft) = 32, como el código oficial, no por sqrt(Σ win²) como decía esta tabla. Con el relleno a 1500 tramas, en los temas de menos de 30 s los pulsos coinciden en torno al 96 %.
 
 Portar a Swift: remuestreo (`AVAudioConverter`), log-mel con vDSP, troceado, postproceso y tempo por media.
 

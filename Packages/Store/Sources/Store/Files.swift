@@ -114,6 +114,9 @@ public struct ProjectLayout: Sendable, Equatable {
     public var rigsDir: URL { folder.appendingPathComponent("rigs", isDirectory: true) }
     public var cacheDir: URL { folder.appendingPathComponent("cache", isDirectory: true) }
 
+    /// Análisis automático de estudio (pulso, acordes, tonalidad); regenerable, lo limpia `ProjectCleaner` con `cache/`.
+    public var analysisCache: URL { cacheDir.appendingPathComponent("analysis.json") }
+
     public func stemURL(_ kind: StemKind) -> URL {
         stemsDir.appendingPathComponent("\(kind.rawValue).wav")
     }

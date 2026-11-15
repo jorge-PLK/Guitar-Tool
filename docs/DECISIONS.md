@@ -9,3 +9,5 @@ Una línea por ADR; el texto está en `docs/adr/ADR-NNN.md`. Nuevo ADR = fichero
 - [ADR-005](adr/ADR-005.md) · 2026-11-15 · Motor de tempo: `AVAudioUnitTimePitch` con overlap 8; Rubber Band no hace falta
 - [ADR-006](adr/ADR-006.md) · 2026-11-15 · Modelos de estudio (BTC, Beat This!, ADTOF) y cierre de la Fase 0 · Etapa 1
 - [ADR-007](adr/ADR-007.md) · 2026-11-15 · Base y biblioteca: frecuencia de trabajo elegible, separación en proceso aparte con `MemoryGuard` y paquete ModelKit (Fase 1)
+- [ADR-008](adr/ADR-008.md) · 2026-11-15 · Importar temas desde un enlace de YouTube o Spotify: audio de YouTube con yt-dlp, Opus a WAV, helpers embebidos; fase 2b (P7)
+- [ADR-009](adr/ADR-009.md) · 2026-11-15 · Herramienta de estudio: reproductor con Varispeed, análisis de pulso, acordes y tonalidad en la app, y stems vacíos (Fase 2)

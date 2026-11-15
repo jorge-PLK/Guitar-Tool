@@ -32,8 +32,12 @@ public struct EquipmentProfile: Codable, Sendable, Equatable {
         didSet { Self.normalizeDefault(&guitars) }
     }
 
+    /// Volumen global de la pantalla Backing (stems + metrónomo), en dB; igual en todos los temas.
+    public var masterGainDB: Double
+
     public init(projectsFolder: URL? = nil, workingSampleRate: Double = EquipmentProfile.defaultSampleRate,
-                guitars: [OwnedGuitar] = []) {
+                guitars: [OwnedGuitar] = [], masterGainDB: Double = 0) {
+        self.masterGainDB = masterGainDB
         self.projectsFolder = projectsFolder
         self.workingSampleRate = Self.allowedSampleRates.contains(workingSampleRate) ? workingSampleRate : Self.defaultSampleRate
         var g = guitars
@@ -45,7 +49,8 @@ public struct EquipmentProfile: Codable, Sendable, Equatable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.init(projectsFolder: try c.decodeIfPresent(URL.self, forKey: .projectsFolder),
                   workingSampleRate: try c.decodeIfPresent(Double.self, forKey: .workingSampleRate) ?? Self.defaultSampleRate,
-                  guitars: try c.decodeIfPresent([OwnedGuitar].self, forKey: .guitars) ?? [])
+                  guitars: try c.decodeIfPresent([OwnedGuitar].self, forKey: .guitars) ?? [],
+                  masterGainDB: try c.decodeIfPresent(Double.self, forKey: .masterGainDB) ?? 0)
     }
 
     /// Como mucho una por defecto: se conserva la primera marcada.

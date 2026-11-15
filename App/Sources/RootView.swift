@@ -12,6 +12,7 @@ struct RootView: View {
             Group {
                 switch model.section {
                 case .library: LibraryView()
+                case .backing: BackingView()
                 case .settings: SettingsView()
                 }
             }
@@ -46,43 +47,51 @@ struct Sidebar: View {
     @Environment(AppModel.self) private var model
 
     private let future: [(String, String)] = [
-        ("Igualar tono", "Fase 8–9"), ("Tablatura y DI", "Fase 5"), ("Backing track", "Fase 2"),
-        ("Grabar", "Fase 6"), ("Montaje", "Fase 7"),
+        ("Igualar tono", "Fase 8–9"), ("Tablatura y DI", "Fase 5"),
     ]
+    private let later: [(String, String)] = [("Grabar", "Fase 6"), ("Montaje", "Fase 7")]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             (Text("Tone") + Text("Forge").foregroundStyle(TF.accent))
                 .font(TF.display(22)).padding(.horizontal, 12).padding(.bottom, 20)
             navRow("Biblioteca", icon: "music.note.list", active: model.section == .library) { model.section = .library; model.detail = nil }
-            ForEach(future, id: \.0) { item in
-                HStack {
-                    Text(item.0)
-                    Spacer()
-                    Text(item.1).font(TF.body(11, .medium)).padding(.horizontal, 7).padding(.vertical, 2)
-                        .background(TF.neutralBg, in: Capsule())
-                }
-                .font(TF.body(14, .medium)).foregroundStyle(TF.muted.opacity(0.7))
-                .padding(.horizontal, 12).frame(height: 44)
-                .accessibilityHint("Disponible en la \(item.1)")
-            }
+            ForEach(future, id: \.0, content: futureRow)
+            navRow("Backing track", icon: "slider.vertical.3", active: model.section == .backing) { model.section = .backing }
+            ForEach(later, id: \.0, content: futureRow)
             Spacer()
             navRow("Ajustes", icon: "gearshape", active: model.section == .settings) { model.section = .settings }
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 8) {
-                    Circle().fill(TF.muted).frame(width: 8, height: 8)
-                    Text("Flex Prime").font(TF.body(14, .semibold))
-                }
-                Text("Sin conectar").font(TF.body(12)).foregroundStyle(TF.muted)
-            }
-            .padding(12).frame(maxWidth: .infinity, alignment: .leading)
-            .background(TF.field, in: RoundedRectangle(cornerRadius: 10))
-            .padding(.top, 8)
+            deviceCard
         }
         .padding(.horizontal, 16).padding(.vertical, 24)
         .frame(maxHeight: .infinity)
         .background(TF.sidebar)
         .overlay(alignment: .trailing) { Rectangle().fill(TF.line).frame(width: 1) }
+    }
+
+    private func futureRow(_ item: (String, String)) -> some View {
+        HStack {
+            Text(item.0)
+            Spacer()
+            Text(item.1).font(TF.body(11, .medium)).padding(.horizontal, 7).padding(.vertical, 2)
+                .background(TF.neutralBg, in: Capsule())
+        }
+        .font(TF.body(14, .medium)).foregroundStyle(TF.muted.opacity(0.7))
+        .padding(.horizontal, 12).frame(height: 44)
+        .accessibilityHint("Disponible en la \(item.1)")
+    }
+
+    private var deviceCard: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Circle().fill(model.flexPrime.isConnected ? Color(hex: 0x4CC38A) : TF.muted).frame(width: 8, height: 8)
+                Text("Flex Prime").font(TF.body(14, .semibold))
+            }
+            Text(model.flexPrime.isConnected ? "Conectada por USB" : "Sin conectar").font(TF.body(12)).foregroundStyle(TF.muted)
+        }
+        .padding(12).frame(maxWidth: .infinity, alignment: .leading)
+        .background(TF.field, in: RoundedRectangle(cornerRadius: 10))
+        .padding(.top, 8)
     }
 
     private func navRow(_ title: String, icon: String, active: Bool, action: @escaping () -> Void) -> some View {

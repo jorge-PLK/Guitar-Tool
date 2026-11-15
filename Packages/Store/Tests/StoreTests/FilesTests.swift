@@ -15,11 +15,59 @@ final class FilesTests: XCTestCase {
     func testNewerSchemaThrowsTypedError() throws {
         let dir = try makeTempDir()
         var p = makeFullProject()
-        p.schemaVersion = 2
+        p.schemaVersion = 3
         try ProjectFile.save(p, to: dir)
         XCTAssertThrowsError(try ProjectFile.load(folder: dir)) {
-            XCTAssertEqual($0 as? ProjectFileError, .unsupportedSchema(found: 2, supported: 1))
+            XCTAssertEqual($0 as? ProjectFileError, .unsupportedSchema(found: 3, supported: 2))
         }
+    }
+
+    func testV1ProjectReadsAsV2AndSavesAsV2() throws {
+        let dir = try makeTempDir()
+        try ProjectFile.save(makeFullProject(), to: dir)
+        let file = ProjectLayout(folder: dir).projectFile
+        // Reescribe como v1: versión 1 y sin la clave `study`.
+        let obj = try JSONSerialization.jsonObject(with: Data(contentsOf: file)) as! [String: Any]
+        var v1 = obj
+        v1["schemaVersion"] = 1
+        v1.removeValue(forKey: "study")
+        try JSONSerialization.data(withJSONObject: v1).write(to: file)
+
+        let loaded = try ProjectFile.load(folder: dir)
+        XCTAssertEqual(loaded.schemaVersion, 2)
+        XCTAssertEqual(loaded.study, StudyState())
+        try ProjectFile.save(loaded, to: dir)
+        let saved = try JSONSerialization.jsonObject(with: Data(contentsOf: file)) as! [String: Any]
+        XCTAssertEqual(saved["schemaVersion"] as? Int, 2)
+        XCTAssertNotNil(saved["study"])
+    }
+
+    func testV2StudyStateRoundTrip() throws {
+        let dir = try makeTempDir()
+        var p = makeFullProject()
+        p.study = StudyState(
+            chordOverrides: [ChordOverride(start: 1.5, end: 3, index: 15)],
+            keyOverride: "A minor",
+            loops: [Loop(name: "Solo", start: 10, end: 20.5)],
+            mixer: [StemMix(kind: .guitar, gainDB: -6, muted: true), StemMix(kind: .vocals, solo: true)],
+            player: PlayerSettings(rate: 0.7, transpose: -2, fineCents: 15, capo: 3, metronomeOn: true, metronomeGainDB: -4))
+        try ProjectFile.save(p, to: dir)
+        XCTAssertEqual(try ProjectFile.load(folder: dir), p)
+        XCTAssertEqual(try ProjectFile.load(folder: dir).schemaVersion, 2)
+    }
+
+    func testCleanerRemovesAnalysisCache() throws {
+        let dir = try makeTempDir()
+        let l = ProjectLayout(folder: dir)
+        try l.createSkeleton()
+        XCTAssertEqual(l.analysisCache.path, dir.appendingPathComponent("cache/analysis.json").path)
+        try Data("{}".utf8).write(to: l.analysisCache)
+        let p = makeFullProject()
+        try ProjectFile.save(p, to: dir)
+        let plan = ProjectCleaner.plan(folder: dir, project: p)
+        XCTAssertTrue(plan.urls.contains { $0.lastPathComponent == "analysis.json" })
+        try ProjectCleaner.execute(plan)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: l.analysisCache.path))
     }
 
     func testAtomicWriteLeavesNoTemporaries() throws {

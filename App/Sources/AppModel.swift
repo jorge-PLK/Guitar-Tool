@@ -10,9 +10,28 @@ import Store
 struct LaunchOptions {
     var supportDir: URL?
     var projectsFolder: URL?
-    var installModelFrom: URL?
+    /// Zips de modelo a instalar sin red (el nombre decide cuál: «BeatThis» = Beat This!, el resto = separador).
+    var installModelFrom: [URL] = []
     var importFiles: [URL] = []
     var screen: String?
+    // Backing (capturas): proyecto por nombre de carpeta o título, y estado inicial sin reproducir sonido.
+    var project: String?
+    var seek: Double?
+    var loop: ClosedRange<Double>?
+    var rate: Double?
+    var mute: [String] = []
+    var transpose: Int?
+    var capo: Int?
+    /// «missing», «analyzing» o «failed»: fuerza el estado del análisis y no lanza el real.
+    var analysisState: String?
+    /// Guarda la ventana en PNG tras `snapshotDelay` s y sale (capturas sin permiso de grabación de pantalla).
+    var snapshot: URL?
+    var snapshotDelay = 4.0
+    /// Backing: rejilla de acordes expandida / modo edición de acordes activo.
+    var chordsExpanded = false
+    var chordsEdit = false
+    /// Escribe en `Temp/p8/grid-hit.txt` el resultado de la comprobación del hit-test de la rejilla y de la tira.
+    var gridHitSelftest = false
 
     init(_ args: [String] = CommandLine.arguments) {
         var i = 1
@@ -23,7 +42,23 @@ struct LaunchOptions {
             switch (a, next) {
             case ("--support-dir", let v?): supportDir = path(v); i += 1
             case ("--projects-folder", let v?): projectsFolder = path(v); i += 1
-            case ("--install-model-from", let v?): installModelFrom = path(v); i += 1
+            case ("--install-model-from", let v?): installModelFrom.append(path(v)); i += 1
+            case ("--project", let v?): project = v; i += 1
+            case ("--seek", let v?): seek = Double(v); i += 1
+            case ("--loop", let v?):
+                let p = v.split(separator: ",").compactMap { Double($0) }
+                if p.count == 2, p[1] > p[0] { loop = p[0]...p[1] }
+                i += 1
+            case ("--rate", let v?): rate = Double(v); i += 1
+            case ("--mute", let v?): mute.append(v); i += 1
+            case ("--transpose", let v?): transpose = Int(v); i += 1
+            case ("--capo", let v?): capo = Int(v); i += 1
+            case ("--analysis-state", let v?): analysisState = v; i += 1
+            case ("--snapshot", let v?): snapshot = path(v); i += 1
+            case ("--snapshot-delay", let v?): snapshotDelay = Double(v) ?? 4; i += 1
+            case ("--chords-expanded", _): chordsExpanded = true
+            case ("--chords-edit", _): chordsEdit = true
+            case ("--grid-hit-selftest", _): gridHitSelftest = true
             case ("--import", let v?): importFiles.append(path(v)); i += 1
             case ("--screen", let v?): screen = v; i += 1
             default: break
@@ -34,7 +69,7 @@ struct LaunchOptions {
 }
 #endif
 
-enum AppSection: Hashable { case library, settings }
+enum AppSection: Hashable { case library, backing, settings }
 enum SettingsTab: String, CaseIterable, Identifiable {
     case audio = "Audio", video = "Cámara y vídeo", device = "Pedalera y TONE3000", library = "Biblioteca y equipo"
     var id: String { rawValue }
@@ -50,7 +85,7 @@ struct ProjectDetail: Identifiable {
     var id: UUID { project.id }
     let project: Project
     let folder: URL
-    let stems: [(kind: StemKind, bytes: Int64)]
+    let stems: [(kind: StemKind, bytes: Int64, isEmpty: Bool)]
 }
 
 struct CleanupRequest: Identifiable {
@@ -72,6 +107,14 @@ final class AppModel {
     var section: AppSection = .library
     var settingsTab: SettingsTab = .audio
     var detail: ProjectDetail?
+    /// Estado de estudio del tema abierto en Backing (P7b); nil si no hay ninguno.
+    var study: StudySession?
+    /// Reproductor y ajustes de Backing del tema abierto (P7b).
+    var backing: BackingController?
+    /// Tema sobre el que actúa la pantalla Backing (el último abierto en la biblioteca).
+    var backingTarget: UUID?
+    /// Flex Prime conectada por USB (lista de salidas de CoreAudio).
+    let flexPrime = FlexPrimeMonitor()
 
     // Datos
     var profile = EquipmentProfile()
@@ -93,7 +136,9 @@ final class AppModel {
 
     @ObservationIgnored let supportDir: URL
     @ObservationIgnored let profileStore: ProfileStore
+    @ObservationIgnored private var masterSaveTask: Task<Void, Never>?
     @ObservationIgnored let modelStore: ModelStore
+    @ObservationIgnored let studyAnalyzer: AppStudyAnalyzer
     @ObservationIgnored private(set) var library: Library?
     @ObservationIgnored private var eventTask: Task<Void, Never>?
     @ObservationIgnored private var started = false
@@ -112,7 +157,9 @@ final class AppModel {
         #endif
         supportDir = dir
         profileStore = ProfileStore(url: dir.appendingPathComponent("profile.json"))
-        modelStore = ModelStore(root: dir.appendingPathComponent("Models", isDirectory: true))
+        modelStore = ModelStore(root: dir.appendingPathComponent("Models", isDirectory: true),
+                                bundleResourceDirectory: Bundle.main.resourceURL)
+        studyAnalyzer = AppStudyAnalyzer(modelStore: modelStore)
     }
 
     // MARK: Arranque
@@ -125,8 +172,9 @@ final class AppModel {
         listenToModels()
 
         #if DEBUG
-        if let zip = options.installModelFrom {
-            do { _ = try await modelStore.install(Self.modelID, fromArchive: zip) } catch { notify("No se pudo instalar el modelo", error) }
+        for zip in options.installModelFrom {
+            let id = zip.lastPathComponent.contains("BeatThis") ? ModelCatalog.beatsBeatThis.id : Self.modelID
+            do { _ = try await modelStore.install(id, fromArchive: zip) } catch { notify("No se pudo instalar el modelo", error) }
         }
         if let f = options.projectsFolder {
             profile.projectsFolder = f
@@ -164,7 +212,8 @@ final class AppModel {
             let index = try LibraryIndex.make(storeURL: supportDir.appendingPathComponent("Library.store"))
             let helper = Bundle.main.url(forAuxiliaryExecutable: "tf-separate")
             let lib = Library(root: root, profile: profileStore, index: index, importer: AppAudioImporter(),
-                              separator: AppStemSeparator(modelStore: modelStore, helperURL: helper))
+                              separator: AppStemSeparator(modelStore: modelStore, helperURL: helper),
+                              levelMeter: AppStemLevelMeter(), analyzer: studyAnalyzer)
             library = lib
             eventTask = Task { [weak self] in
                 for await e in lib.events { self?.handle(e) }
@@ -181,6 +230,10 @@ final class AppModel {
         case "settings-library": section = .settings; settingsTab = .library
         case "settings": section = .settings
         case "detail-first": if let first = entries.first { await open(first.id) }
+        case "backing":
+            let match = entries.first { e in options.project.map { e.folderName == $0 || e.title == $0 } ?? true }
+            backingTarget = match?.id
+            section = .backing
         default: break
         }
         #endif
@@ -206,6 +259,10 @@ final class AppModel {
         case .separationProgress(let id, let p): separationProgress[id] = p
         case .separationFailed(let id, let msg): separationProgress[id] = nil; failures[id] = msg
         case .separationFinished(let id), .separationCancelled(let id): separationProgress[id] = nil; failures[id] = nil
+        case .analysisQueued(let id), .analysisStarted(let id): if !analysisPinned, study?.projectID == id { study?.setAnalysisState(.analyzing) }
+        case .analysisFinished(let id): if !analysisPinned, study?.projectID == id { study?.reload(); study?.setAnalysisState(.ready) }
+        case .analysisFailed(let id, let msg): if !analysisPinned, study?.projectID == id { study?.setAnalysisState(.failed(msg)) }
+        case .stemsMeasured(let id): if study?.projectID == id { study?.reload() }
         case .relocated: if let p = try? profileStore.load() { profile = p }
         default: break
         }
@@ -275,16 +332,123 @@ final class AppModel {
             let project = try await library.open(id: id)
             let folder = await library.root.appendingPathComponent(entry.folderName, isDirectory: true)
             let layout = ProjectLayout(folder: folder)
-            let stems = project.stems.map { s -> (kind: StemKind, bytes: Int64) in
+            let stems = project.stems.map { s -> (kind: StemKind, bytes: Int64, isEmpty: Bool) in
                 let size = (try? FileManager.default.attributesOfItem(atPath: layout.stemURL(s.kind).path)[.size] as? Int64) ?? 0
-                return (s.kind, size)
+                return (s.kind, size, s.isEmpty)
             }
+            backingTarget = id
             section = .library
             detail = ProjectDetail(project: project, folder: folder, stems: stems)
         } catch {
             notify("No se pudo abrir el tema", error)
         }
     }
+
+    // MARK: Estudio (Backing)
+
+    /// Abre el tema para estudiar: carga su estado de estudio y pide el análisis si falta o está desfasado.
+    func openStudy(_ id: UUID) async {
+        guard let library, let entry = entries.first(where: { $0.id == id }) else { return }
+        await closeStudy()
+        do {
+            let project = try await library.open(id: id)
+            let folder = await library.root.appendingPathComponent(entry.folderName, isDirectory: true)
+            var state = AnalysisState.missing
+            if !analysisPinned { state = try await library.ensureAnalysis(id: id) }
+            // Si el usuario ya salió de Backing mientras se abría, no se deja nada abierto.
+            guard section == .backing else { return }
+            let session = StudySession(project: project, folder: folder, library: library, analysisState: state)
+            study = session
+            let controller = BackingController(session: session, masterGainDB: profile.masterGainDB)
+            controller.onMasterChange = { [weak self] dB in self?.setMasterGain(dB) }
+            backing = controller
+            #if DEBUG
+            applyLaunchOptions(to: session)
+            #endif
+        } catch {
+            notify("No se pudo abrir el tema", error)
+        }
+    }
+
+    /// Guarda el volumen global en el perfil con rebote (el fader emite muchos valores por segundo).
+    func setMasterGain(_ dB: Double) {
+        profile.masterGainDB = dB
+        masterSaveTask?.cancel()
+        masterSaveTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(500))
+            guard !Task.isCancelled else { return }
+            self?.saveProfile()
+        }
+    }
+
+    func closeStudy() async {
+        backing?.stop()
+        backing = nil
+        await study?.flush()
+        study = nil
+    }
+
+    /// Al salir de la app: guarda lo pendiente de forma síncrona (acotada a 2 s).
+    func flushForTermination() {
+        backing?.stop()
+        if let t = masterSaveTask { t.cancel(); masterSaveTask = nil; saveProfile() }
+        guard let library, let s = study else { return }
+        let (id, study, sections) = (s.projectID, s.study, s.sections)
+        let done = DispatchSemaphore(value: 0)
+        Task.detached {
+            try? await library.saveStudy(id: id, study: study, sections: sections)
+            done.signal()
+        }
+        _ = done.wait(timeout: .now() + 2)
+    }
+
+    private var analysisPinned: Bool {
+        #if DEBUG
+        options.analysisState != nil
+        #else
+        false
+        #endif
+    }
+
+    /// Reintenta el análisis (tras un fallo, p. ej. sin red para bajar Beat This!).
+    func retryAnalysis() {
+        guard let library, let id = study?.projectID else { return }
+        Task {
+            if let state = try? await library.ensureAnalysis(id: id) { study?.setAnalysisState(state) }
+        }
+    }
+
+    #if DEBUG
+    /// `--snapshot`: vuelca el contenido de la ventana a PNG y cierra la app.
+    func scheduleSnapshot() {
+        guard let url = options.snapshot else { return }
+        let delay = options.snapshotDelay
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(delay))
+            if let window = NSApp.windows.first(where: { $0.contentView != nil }), let view = window.contentView {
+                window.setContentSize(CGSize(width: 1440, height: 900))
+                view.layoutSubtreeIfNeeded()
+                if let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
+                    view.cacheDisplay(in: view.bounds, to: rep)
+                    try? rep.representation(using: .png, properties: [:])?.write(to: url)
+                }
+            }
+            NSApp.terminate(nil)
+        }
+    }
+
+    /// Estado inicial de Backing para capturas (sin reproducir).
+    private func applyLaunchOptions(to session: StudySession) {
+        switch options.analysisState {
+        case "analyzing"?: session.setAnalysisState(.analyzing)
+        case "failed"?: session.setAnalysisState(.failed("Sin red para descargar Beat This!"))
+        case "missing"?: session.setAnalysisState(.missing)
+        default: break
+        }
+        backing?.apply(rate: options.rate, transpose: options.transpose, capo: options.capo,
+                       muted: options.mute, loop: options.loop, seek: options.seek)
+    }
+    #endif
 
     func separate(_ id: UUID) {
         guard let library else { return }

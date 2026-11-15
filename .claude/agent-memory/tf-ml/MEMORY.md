@@ -1,6 +1,6 @@
 - [Trampas de entorno Core ML/ONNX](coreml-env-traps.md) — torch 2.7.0 + coremltools 9.0 + numpy 2.3.5; rango ≤ 5; guard.py de 10 GB obligatorio; el ANE colgó el Mac
 - [demucs / HTDemucs en el venv](htdemucs-env.md) — instalar con -c sin espacios en la ruta; TORCH_HOME; MPS va; semilla para shifts
 - [BTC acordes: trampas y contrato](btc-contract.md) — HParams/yaml, np.float, weights_only, máscaras -inf→-1e4; ANE seguro con ventana 108
-- [Beat This!: pesos, Core ML publicado y contrato](beat-this-contract.md) — servidor JKU caído→espejos; schism-audio no existe; supracut FP32 vale; tempo a 50 fps
+- [Beat This!: pesos, Core ML publicado y contrato](beat-this-contract.md) — servidor JKU caído→espejos; schism-audio no existe; supracut FP32 vale; tempo a 50 fps; log-mel /sqrt(n_fft), no Σw²
 - [BS-RoFormer SW: pesos y contrato](bs-roformer-contract.md) — espejo HF, orden de stems, STFT, troceado, conversiones publicadas y sus contratos, ANE
 - [ADTOF batería: GRU en Core ML y contrato](adtof-contract.md) — gru nativa iOS18 (salida reverse invertida), GPU la calcula mal→CPU; 84 bandas; pistas con puerta

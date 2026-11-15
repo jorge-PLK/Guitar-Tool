@@ -177,7 +177,7 @@ struct ProjectDetailView: View {
                         HStack {
                             Text(s.kind.rawValue)
                             Spacer()
-                            Text(Fmt.bytes(s.bytes)).foregroundStyle(TF.muted)
+                            Text(s.isEmpty ? "vacío" : Fmt.bytes(s.bytes)).foregroundStyle(TF.muted)
                         }
                         .padding(.horizontal, 12).padding(.vertical, 10)
                         .background(TF.field, in: RoundedRectangle(cornerRadius: 10))
@@ -185,7 +185,13 @@ struct ProjectDetailView: View {
                 }
                 .padding(.horizontal, 20).padding(.vertical, 18)
             }
-            Button("Mostrar en Finder") { model.showInFinder(detail.folder) }.buttonStyle(SecondaryButton())
+            HStack(spacing: 10) {
+                if detail.project.separation.state == .done {
+                    Button("Abrir en Backing track") { model.backingTarget = detail.id; model.section = .backing }
+                        .buttonStyle(PrimaryButton())
+                }
+                Button("Mostrar en Finder") { model.showInFinder(detail.folder) }.buttonStyle(SecondaryButton())
+            }
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 40).padding(.vertical, 32)

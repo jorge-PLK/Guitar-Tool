@@ -5,7 +5,13 @@ public enum ModelRole: String, Sendable, Equatable, Codable, CaseIterable {
 }
 
 public enum ModelArchiveKind: String, Sendable, Equatable, Codable {
+    /// Zip descargado con un `.mlpackage`: se verifica, se descomprime y se compila.
     case zippedMLPackage
+    /// Zip descargado con un `.mlmodelc` ya compilado: se verifica y se descomprime, sin compilar.
+    case zippedCompiledModel
+    /// Zip con un `.mlpackage` dentro del bundle de la app (el recurso se busca por `url.lastPathComponent`
+    /// en el directorio inyectado en `ModelStore`): se copia, se verifica y se compila.
+    case bundledZippedMLPackage
 }
 
 public struct ModelDescriptor: Sendable, Equatable, Identifiable {
@@ -56,5 +62,35 @@ public enum ModelCatalog {
         packageName: "BSRoformerSW.mlpackage",
         license: "Pesos de licencia desconocida: uso personal, no redistribuir")
 
-    public static let all: [ModelDescriptor] = [separatorBSRoformerSW]
+    /// Pulso y downbeats (mini-spec Fase 2, §1 ModelKit). Se descarga en el primer análisis.
+    public static let beatsBeatThis = ModelDescriptor(
+        id: "beat-this",
+        version: "supracut-33fe1a5",
+        displayName: "Pulso y compás",
+        role: .beats,
+        url: URL(string: "https://huggingface.co/jessengatai/supracut-beat-this/resolve/33fe1a5a3edb44f6063d71e549d8ea774a41eaa1/BeatThis.mlmodelc.zip")!,
+        sha256: "0464b7497165e82cf68e94bfd3aecf989cb88be3c6ba0ca4ae3f3657cafcd4b5",
+        archiveBytes: 81_000_000,
+        archiveKind: .zippedCompiledModel,
+        packageName: "BeatThis.mlmodelc",
+        license: "MIT")
+
+    /// SHA-256 y tamaño de `App/Resources/Models/BTC_large_voca_fp16.mlpackage.zip`.
+    static let chordsBTCSHA256 = "32a981d4d157d4bf0e0133f220e43c280bf642ee90e73e6a76b54c8c390cd0bf"
+    static let chordsBTCBytes: Int64 = 5_435_958
+
+    /// Acordes (mini-spec Fase 2, §1 ModelKit). Embebido en la app: no se redistribuye.
+    public static let chordsBTC = ModelDescriptor(
+        id: "btc-chords",
+        version: "large-voca-fp16",
+        displayName: "Acordes",
+        role: .chords,
+        url: URL(string: "bundle:///BTC_large_voca_fp16.mlpackage.zip")!,
+        sha256: chordsBTCSHA256,
+        archiveBytes: chordsBTCBytes,
+        archiveKind: .bundledZippedMLPackage,
+        packageName: "BTC_large_voca_fp16.mlpackage",
+        license: "Pesos no comerciales, uso personal")
+
+    public static let all: [ModelDescriptor] = [separatorBSRoformerSW, chordsBTC, beatsBeatThis]
 }
