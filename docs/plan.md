@@ -8,7 +8,7 @@ Once fases (0 a 10) en dos etapas: primero la herramienta de estudio y la grabac
 ## Forma de trabajo
 
 - Spec primero: cada fase empieza con una mini-spec de sus módulos (entradas, salidas, casos de prueba) antes de escribir código.
-- Un paquete Swift por módulo, con sus tests: AudioKit propio (E/S y reproducción), StemKit (separación), StudyKit (acordes, pulso, bucles), AnalysisKit (huella y distancia), MatchKit (optimizador), HeadRushKit, Tone3000Kit, TabKit, VideoKit y Store (archivo de proyecto e índice en SwiftData).
+- Un paquete Swift por módulo, con sus tests: AudioKit propio (E/S y reproducción), StemKit (separación), ModelKit (descarga y compilación de modelos), StudyKit (acordes, pulso, bucles), AnalysisKit (huella y distancia), MatchKit (optimizador), HeadRushKit, Tone3000Kit, TabKit, VideoKit y Store (archivo de proyecto e índice en SwiftData).
 - Audios de prueba fijos en el repositorio: 3 temas cortos, 3 DI propios y sus resultados esperados, para probar análisis y distancia sin hardware.
 - Lo que depende de la pedalera va detrás de una interfaz con una versión simulada, así el resto avanza aunque la Flex Prime no esté conectada.
 - Una rama por fase; la fase se cierra cuando cumple su condición de paso y la spec queda actualizada con lo aprendido.
@@ -34,15 +34,15 @@ Si falla: P1 → el igualado termina en una guía visual y el rig se carga a man
 
 ### Fase 1 · Base y biblioteca
 
-- [ ] Proyecto Xcode (macOS 15+), paquetes vacíos, permisos de cámara, micrófono y red local
-- [ ] Modelo de datos: tema, stem, guitarra, sección, rig, toma, vídeo, perfil de equipo; guardado en un archivo por proyecto dentro de su carpeta, con SwiftData solo como índice de la biblioteca
-- [ ] Carpeta por proyecto en disco y limpieza de lo que se puede regenerar
-- [ ] Importar WAV, FLAC o MP3 y convertir a la frecuencia de trabajo
-- [ ] Descarga de modelos la primera vez y separación en 6 stems con progreso
-- [ ] Pantalla de biblioteca
-- [ ] Sección de Ajustes en la barra lateral (icono de engranaje), con el apartado Biblioteca y equipo: carpeta de proyectos, modelos descargados, espacio en disco, limpieza y perfil de equipo
+- [x] Proyecto Xcode (macOS 15+), paquetes vacíos, permisos de cámara, micrófono y red local *`Tools/test.sh` verde.*
+- [x] Modelo de datos: tema, stem, guitarra, sección, rig, toma, vídeo, perfil de equipo; guardado en un archivo por proyecto dentro de su carpeta, con SwiftData solo como índice de la biblioteca *`StoreTests`.*
+- [x] Carpeta por proyecto en disco y limpieza de lo que se puede regenerar *`ProjectCleaner` en `StoreTests`.*
+- [x] Importar WAV, FLAC o MP3 y convertir a la frecuencia de trabajo *`AudioImporterTests`.*
+- [x] Descarga de modelos la primera vez y separación en 6 stems con progreso *`ModelStoreTests`, `HeavyModelTests` y la prueba en la app (ADR-007).*
+- [x] Pantalla de biblioteca *Capturas revisadas por el orquestador.*
+- [x] Sección de Ajustes en la barra lateral (icono de engranaje), con el apartado Biblioteca y equipo: carpeta de proyectos, modelos descargados, espacio en disco, limpieza y perfil de equipo *Capturas revisadas por el orquestador.*
 
-Condición de paso: un tema importado y separado, con sus stems en disco.
+Condición de paso: un tema importado y separado, con sus stems en disco. *Cumplida el 15/11/2026: T1 importado en la app y separado con un directorio de soporte vacío, 6 stems a 44,1 kHz en `Temp/p7/projects/mix/stems/` (ADR-007).*
 
 ### Fase 2 · Herramienta de estudio (RF7, RF10)
 
@@ -196,7 +196,7 @@ Cada fase la lleva una sesión orquestadora que escribe la mini-spec, reparte el
 | Fase | Orquestador inicial | Agentes | Por qué |
 |---|---|---|---|
 | 0. Pruebas P2, P4 y P6 | Opus | Opus para la conversión a Core ML (P4); Sonnet para los scripts de P2 y P6 | Scripts cortos e independientes; lo difícil es solo la conversión |
-| 1. Base y biblioteca | Opus | Sonnet para paquetes, modelo de datos, importación y pantallas | APIs de Apple documentadas y trabajo guiado por la spec |
+| 1. Base y biblioteca | Opus | Sonnet para paquetes, modelo de datos, importación y pantallas; Opus para la integración del separador | APIs de Apple documentadas y trabajo guiado por la spec; el separador pide integrar el modelo |
 | 2. Herramienta de estudio | Opus | Opus para pulso y acordes; Sonnet para reproductor y pantalla | Integrar modelos es lo delicado; el resto es interfaz |
 | 3. Audio con la pedalera | Opus | Opus para latencia y alineado; Sonnet para selector y Ajustes de audio | La precisión de 1 ms pide cuidado, no un modelo mayor |
 | 4. Guitarras y secciones | Opus | Opus para la separación A/B y la clasificación; Sonnet para la interfaz | Procesado de señal acotado |

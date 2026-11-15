@@ -1,0 +1,83 @@
+name: ToneForge
+options:
+  bundleIdPrefix: local.toneforge
+  deploymentTarget:
+    macOS: "15.0"
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MACOSX_DEPLOYMENT_TARGET: "15.0"
+    ARCHS: arm64
+    ONLY_ACTIVE_ARCH: NO
+    CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: PAC5B4GH83
+    ENABLE_APP_SANDBOX: NO
+    ENABLE_HARDENED_RUNTIME: NO
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+packages:
+  Store:
+    path: ../Packages/Store
+  AudioKit:
+    path: ../Packages/AudioKit
+  ModelKit:
+    path: ../Packages/ModelKit
+  StemKit:
+    path: ../Packages/StemKit
+targets:
+  ToneForge:
+    type: application
+    platform: macOS
+    sources:
+      - Sources
+    dependencies:
+      - package: Store
+      - package: AudioKit
+      - package: ModelKit
+      - package: StemKit
+    postCompileScripts:
+      # Helper de separación embebido: Contents/MacOS/tf-separate, siempre en release (la velocidad importa)
+      # y firmado con la identidad de la app antes de que se firme el bundle.
+      - name: Embed tf-separate
+        basedOnDependencyAnalysis: true
+        inputFiles:
+          - $(SRCROOT)/../Packages/StemKit/Package.swift
+          - $(SRCROOT)/../Packages/StemKit/Sources/StemKit
+          - $(SRCROOT)/../Packages/StemKit/Sources/StemKit/MemoryGuard.swift
+          - $(SRCROOT)/../Packages/StemKit/Sources/StemKit/RoformerContract.swift
+          - $(SRCROOT)/../Packages/StemKit/Sources/StemKit/RoformerSeparator.swift
+          - $(SRCROOT)/../Packages/StemKit/Sources/StemKit/SeparationRunner.swift
+          - $(SRCROOT)/../Packages/StemKit/Sources/tf-separate
+          - $(SRCROOT)/../Packages/StemKit/Sources/tf-separate/main.swift
+        outputFiles:
+          - $(TARGET_BUILD_DIR)/$(EXECUTABLE_FOLDER_PATH)/tf-separate
+        script: |
+          set -e
+          PKG="$SRCROOT/../Packages/StemKit"
+          CLEAN=(/usr/bin/env -i HOME="$HOME" PATH="/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin" DEVELOPER_DIR="${DEVELOPER_DIR:-}")
+          [ -n "${DEVELOPER_DIR:-}" ] || CLEAN=(/usr/bin/env -i HOME="$HOME" PATH="/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin")
+          "${CLEAN[@]}" swift build -c release --package-path "$PKG" --product tf-separate
+          BIN="$("${CLEAN[@]}" swift build -c release --package-path "$PKG" --show-bin-path)/tf-separate"
+          DEST="$TARGET_BUILD_DIR/$EXECUTABLE_FOLDER_PATH/tf-separate"
+          mkdir -p "$(dirname "$DEST")"
+          cp -f "$BIN" "$DEST"
+          codesign --force --sign "${EXPANDED_CODE_SIGN_IDENTITY:--}" --timestamp=none "$DEST"
+    info:
+      path: Sources/Info.plist
+      properties:
+        CFBundleDisplayName: ToneForge
+        NSCameraUsageDescription: Para grabar tu vídeo tocando.
+        NSMicrophoneUsageDescription: Para grabar tu guitarra desde la pedalera.
+        NSLocalNetworkUsageDescription: Para conectar con el Remote Editor de la Flex Prime por Wi-Fi.
+    settings:
+      base:
+        PRODUCT_NAME: ToneForge
+        PRODUCT_BUNDLE_IDENTIFIER: local.toneforge.ToneForge
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: Sources/Info.plist
+schemes:
+  ToneForge:
+    build:
+      targets:
+        ToneForge: all
+    run:
+      config: Debug

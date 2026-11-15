@@ -1,0 +1,258 @@
+import ModelKit
+import SwiftUI
+import Store
+
+struct SettingsView: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        @Bindable var model = model
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Ajustes").font(TF.display(30))
+                    Text("Se configura una vez y lo usan todas las pantallas. Se guarda en tu perfil de equipo.")
+                        .foregroundStyle(TF.muted)
+                }
+                HStack(spacing: 4) {
+                    ForEach(SettingsTab.allCases) { tab in
+                        let on = tab == model.settingsTab
+                        Button { model.settingsTab = tab } label: {
+                            Text(tab.rawValue).font(TF.body(14, on ? .semibold : .medium))
+                                .foregroundStyle(on ? TF.accent : TF.text2)
+                                .padding(.horizontal, 18).frame(height: 44)
+                                .background(on ? TF.accentBg : .clear, in: RoundedRectangle(cornerRadius: 8))
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(3)
+                .background(TF.field, in: RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(TF.fieldLine))
+
+                switch model.settingsTab {
+                case .audio: AudioSettings()
+                case .video:
+                    SettingsGroup(title: "Cámara y vídeo", note: "Cámara, sincronía y exportación por defecto.") {
+                        phase("Llega en la Fase 6")
+                    }
+                case .device:
+                    SettingsGroup(title: "Pedalera y TONE3000", note: "Remote Editor de la Flex Prime y sesión de TONE3000.") {
+                        phase("Llega en las Fases 8–9")
+                    }
+                case .library: LibrarySettings()
+                }
+            }
+            .padding(.horizontal, 36).padding(.vertical, 28)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+private func phase(_ text: String) -> some View {
+    Text(text).foregroundStyle(TF.accent).font(TF.body(13, .semibold))
+}
+
+struct SettingsGroup<Content: View>: View {
+    let title: String
+    let note: String
+    @ViewBuilder var content: Content
+    var body: some View {
+        Card {
+            VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(title).font(TF.display(18, .medium))
+                    Text(note).font(TF.body(13)).foregroundStyle(TF.muted).fixedSize(horizontal: false, vertical: true)
+                }
+                content
+            }
+            .padding(.horizontal, 20).padding(.vertical, 18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+struct InfoRow<Trailing: View>: View {
+    let label: String
+    @ViewBuilder var trailing: Trailing
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(label)
+            Spacer()
+            trailing
+        }
+        .padding(.horizontal, 12).padding(.vertical, 10)
+        .background(TF.field, in: RoundedRectangle(cornerRadius: 10))
+    }
+}
+
+struct AudioSettings: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            SettingsGroup(title: "Frecuencia de trabajo",
+                          note: "Los temas se convierten a esta frecuencia al importarlos. Al cambiarla, los temas existentes se reconvierten al abrirlos.") {
+                Picker("Frecuencia de trabajo", selection: Binding(
+                    get: { model.profile.workingSampleRate }, set: { model.setSampleRate($0) })) {
+                    ForEach(EquipmentProfile.allowedSampleRates, id: \.self) { Text(Fmt.rate($0)).tag($0) }
+                }
+                .pickerStyle(.segmented).labelsHidden().frame(width: 220)
+            }
+            SettingsGroup(title: "Dispositivo y canales", note: "La pedalera hace de interfaz de audio por USB.") {
+                phase("Llega en la Fase 3")
+            }
+            SettingsGroup(title: "Calibración", note: "Latencia de ida y vuelta y nivel del DI.") {
+                phase("Llega en la Fase 3")
+            }
+        }
+    }
+}
+
+struct LibrarySettings: View {
+    @Environment(AppModel.self) private var model
+    @State private var guitarDraft: GuitarDraft?
+    @State private var confirmDeleteModel = false
+
+    var body: some View {
+        @Bindable var model = model
+        HStack(alignment: .top, spacing: 20) {
+            VStack(spacing: 20) { library; models }.frame(maxWidth: .infinity)
+            guitars.frame(maxWidth: .infinity)
+        }
+        .task { await model.refresh() }
+        .sheet(item: $guitarDraft) { d in
+            GuitarEditor(draft: d) { model.upsertGuitar($0) }
+        }
+        .confirmationDialog("Carpeta de proyectos", isPresented: Binding(
+            get: { model.pendingFolder != nil }, set: { if !$0 { model.pendingFolder = nil } }),
+            titleVisibility: .visible, presenting: model.pendingFolder) { url in
+            Button("Mover los temas aquí") { model.relocate(to: url, move: true) }
+            Button("Solo apuntar a esta carpeta") { model.relocate(to: url, move: false) }
+            Button("Cancelar", role: .cancel) {}
+        } message: { url in
+            Text("«\(url.path)»: ¿mover los temas existentes a la carpeta nueva o solo apuntar a ella?")
+        }
+        .confirmationDialog("Borrar el modelo", isPresented: $confirmDeleteModel, titleVisibility: .visible) {
+            Button("Borrar", role: .destructive) { model.deleteModel() }
+            Button("Cancelar", role: .cancel) {}
+        } message: {
+            Text("Se volverá a descargar la próxima vez que separes un tema.")
+        }
+    }
+
+    private var library: some View {
+        SettingsGroup(title: "Biblioteca", note: "Una carpeta por tema, con sus stems, tomas, rigs y vídeo.") {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Carpeta de proyectos").font(TF.body(13)).foregroundStyle(TF.muted)
+                Text(model.profile.projectsFolder?.path ?? "—")
+                    .lineLimit(1).truncationMode(.middle)
+                    .padding(.horizontal, 12).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .background(TF.field, in: RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(TF.fieldLine))
+            }
+            InfoRow(label: "Espacio usado") {
+                Text(model.usage.map { Fmt.bytes($0.totalBytes) } ?? "—").fontWeight(.semibold).foregroundStyle(TF.text2)
+            }
+            if let p = model.relocationProgress {
+                HStack(spacing: 12) {
+                    ProgressView(value: p).tint(TF.accent)
+                    Text("Moviendo \(Fmt.percent(p))").font(TF.body(13)).foregroundStyle(TF.muted)
+                }
+            }
+            HStack(spacing: 8) {
+                Button("Cambiar carpeta") { model.pickNewFolder() }.buttonStyle(SecondaryButton())
+                    .disabled(model.relocationProgress != nil)
+                Button("Limpiar tomas descartadas y stems") {
+                    model.requestCleanup(id: nil, title: "Limpiar toda la biblioteca")
+                }.buttonStyle(SecondaryButton())
+            }
+        }
+    }
+
+    private var models: some View {
+        let d = ModelCatalog.separatorBSRoformerSW
+        return SettingsGroup(title: "Modelos", note: "Se descargan la primera vez que se usan.") {
+            InfoRow(label: d.displayName) { modelStatus(d) }
+            if case .downloading(let p) = model.modelState {
+                ProgressView(value: p).tint(TF.accent)
+            }
+            HStack(spacing: 8) {
+                switch model.modelState {
+                case .installed:
+                    Button("Borrar") { confirmDeleteModel = true }.buttonStyle(SecondaryButton())
+                case .notInstalled, .failed:
+                    Button("Descargar") { model.downloadModel() }.buttonStyle(PrimaryButton())
+                default: EmptyView()
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private func modelStatus(_ d: ModelDescriptor) -> some View {
+        switch model.modelState {
+        case .notInstalled:
+            Text("Pendiente · \(Fmt.bytes(d.archiveBytes))").foregroundStyle(TF.accent).fontWeight(.semibold)
+        case .downloading(let p): Text("Descargando \(Fmt.percent(p))").foregroundStyle(TF.accent).fontWeight(.semibold)
+        case .verifying: Text("Verificando…").foregroundStyle(TF.accent).fontWeight(.semibold)
+        case .installing: Text("Instalando…").foregroundStyle(TF.accent).fontWeight(.semibold)
+        case .installed(_, let bytes): Text("Descargado · \(Fmt.bytes(bytes))").foregroundStyle(TF.ok).fontWeight(.semibold)
+        case .failed(let m): Text("Error").foregroundStyle(TF.danger).fontWeight(.semibold).help(m)
+        }
+    }
+
+    private var guitars: some View {
+        SettingsGroup(title: "Tus guitarras", note: "La guitarra de cada toma se guarda con ella.") {
+            if model.profile.guitars.isEmpty { Text("Aún no has añadido ninguna.").foregroundStyle(TF.muted) }
+            ForEach(model.profile.guitars, id: \.id) { g in
+                InfoRow(label: g.name) {
+                    Text(g.pickups == .active ? "Activas" : "Pasivas").font(TF.body(12)).foregroundStyle(TF.muted)
+                    if g.isDefault { Chip(text: "Por defecto", kind: .ok) }
+                    Button { guitarDraft = GuitarDraft(guitar: g) } label: { Image(systemName: "pencil") }
+                        .buttonStyle(.plain).help("Editar")
+                    Button { model.deleteGuitar(g.id) } label: { Image(systemName: "trash") }
+                        .buttonStyle(.plain).help("Borrar")
+                }
+            }
+            Button("Añadir guitarra") { guitarDraft = GuitarDraft(guitar: OwnedGuitar(name: "")) }
+                .buttonStyle(SecondaryButton())
+        }
+    }
+}
+
+struct GuitarDraft: Identifiable {
+    var guitar: OwnedGuitar
+    var id: UUID { guitar.id }
+}
+
+struct GuitarEditor: View {
+    @Environment(\.dismiss) private var dismiss
+    @State var draft: GuitarDraft
+    let onSave: (OwnedGuitar) -> Void
+
+    init(draft: GuitarDraft, onSave: @escaping (OwnedGuitar) -> Void) {
+        _draft = State(initialValue: draft)
+        self.onSave = onSave
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Guitarra").font(TF.display(22))
+            TextField("Nombre", text: $draft.guitar.name).textFieldStyle(.roundedBorder)
+            Picker("Pastillas", selection: $draft.guitar.pickups) {
+                Text("Pasivas").tag(PickupType.passive)
+                Text("Activas").tag(PickupType.active)
+            }.pickerStyle(.segmented)
+            Toggle("Guitarra por defecto", isOn: $draft.guitar.isDefault)
+            HStack {
+                Spacer()
+                Button("Cancelar") { dismiss() }.buttonStyle(SecondaryButton())
+                Button("Guardar") { onSave(draft.guitar); dismiss() }.buttonStyle(PrimaryButton())
+                    .disabled(draft.guitar.name.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+        }
+        .padding(24).frame(width: 400)
+        .background(TF.card).foregroundStyle(TF.text)
+    }
+}

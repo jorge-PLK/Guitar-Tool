@@ -63,7 +63,7 @@ El rig no cambia solo: en cada toma lo eliges tú, en la pedalera o desde la app
 - Antes de grabar: cuenta atrás de 1 compás y margen previo configurable (2 compases por defecto). Punch-in opcional para regrabar un trozo de una toma.
 - Cámara: webcam USB o iPhone mediante Continuity Camera.
 - Exportación: volumen normalizado a -14 LUFS y rótulo opcional con el título del tema.
-- Disco: de 2 a 5 GB por tema. Una carpeta por proyecto (stems, tomas, rigs y vídeo) y opción de limpiar tomas descartadas y stems que se pueden regenerar.
+- Disco: de 2 a 5 GB por tema. Una carpeta por proyecto: `project.json`, `source/original.<ext>`, `audio/song.wav` (regenerable), `stems/<stem>.wav` (regenerable, con `stems/.partial` mientras se separa), `takes/`, `video/`, `rigs/` y `cache/` (regenerable). Opción de limpiar tomas descartadas y stems que se pueden regenerar.
 
 
 ## Ajustes
@@ -72,10 +72,10 @@ La app tiene una sección de Ajustes en la barra lateral, con icono de engranaje
 
 | Apartado | Qué se gestiona |
 |---|---|
-| Audio | Dispositivo, canales (DI seco, salida de reamp, retorno procesado y salida del backing), frecuencia de muestreo, calibración de latencia y calibración del nivel del DI |
+| Audio | Dispositivo, canales (DI seco, salida de reamp, retorno procesado y salida del backing), frecuencia de muestreo (de trabajo, global, 44,1 o 48 kHz; cada proyecto guarda la suya y se reconvierte solo al abrirlo, en segundo plano y sin avisar; los stems se remuestrean, no se vuelven a separar), calibración de latencia y calibración del nivel del DI |
 | Cámara y vídeo | Cámara por defecto (webcam o iPhone), resolución y fotogramas por segundo, calibración del retardo de la cámara y valores de exportación por defecto |
 | Pedalera y TONE3000 | Dirección del Remote Editor por Wi-Fi, firmware detectado, estado de la conexión, y cuenta y clave de TONE3000 |
-| Biblioteca y equipo | Carpeta de proyectos, modelos descargados y espacio en disco, limpieza, y perfil de equipo con tus guitarras y pastillas |
+| Biblioteca y equipo | Carpeta de proyectos (se pregunta en el primer arranque, con `~/Music/ToneForge` como propuesta; «Cambiar carpeta» pregunta cada vez: Mover, Solo apuntar o Cancelar, y Mover borra el original solo al final), modelos descargados y espacio en disco, limpieza, y perfil de equipo con tus guitarras y pastillas |
 
 Las pantallas de trabajo (tablatura, backing track, grabar) siguen mostrando el dispositivo y el canal en uso, pero se cambian desde Ajustes.
 
@@ -89,7 +89,7 @@ Decisión: app nativa de macOS en Swift y SwiftUI, sin Python en la app final. A
 | UI | Proyectos, forma de onda, espectros, A/B, vista visual de la cadena de señal con knobs | SwiftUI (macOS 15+), Swift Charts, Canvas; tablatura con alphaTab dentro de un WKWebView |
 | Datos | Perfil de equipo, proyectos, rigs generados, caché de NAM e IR | Archivo de proyecto (JSON) en la carpeta de cada tema; SwiftData como índice de la biblioteca |
 | Motor de audio | Elegir dispositivo y canales, reproducir el DI hacia la pedalera, grabar el retorno, calibrar latencia con un pulso | AVAudioEngine sobre CoreAudio |
-| Separación | Aislar guitarras del tema | BS-RoFormer SW (6 stems, pesos de uso personal) con el Core ML publicado de gridshift, unidades CPU+GPU; Neural Engine prohibido (colgó el Mac). Respaldo: BSRoformer.cpp con GGUF q8 en Metal. HTDemucs descartado (pierde en SDR y en escucha ciega). ADR-004 |
+| Separación | Aislar guitarras del tema | BS-RoFormer SW (6 stems, pesos de uso personal) con el Core ML publicado de gridshift, unidades CPU+GPU; Neural Engine prohibido (colgó el Mac). Respaldo: BSRoformer.cpp con GGUF q8 en Metal (de momento solo el protocolo `StemSeparating`, sin integrar C++). HTDemucs descartado (pierde en SDR y en escucha ciega). Se ejecuta en un proceso aparte (`tf-separate`, embebido en la app), uno por tema, vigilado por `MemoryGuard` con límite de 10 GB: 0,32× la duración del tema y unos 3,3 GB de pico. ADR-004, ADR-007 |
 | Transcripción | Audio → notas → tablatura de guitarras y bajo, y partitura de batería | Basic Pitch, con su modelo Core ML oficial, para guitarras y bajo; batería con ADTOF (puerto `xavriley/ADTOF-pytorch`; CC BY-NC-SA, uso personal, no redistribuir) en Core ML FP32 con GRU nativa, solo CPU, macOS 15. Sustituye a Omnizart. ADR-006 |
 | Acordes y pulso | Acordes sincronizados, tempo, compases y tonalidad | BTC (vocabulario grande, 170) en Core ML FP16 en Neural Engine (pesos no comerciales: válido en uso personal); preproceso CQT compatible con librosa, a portar a Swift. Pulso con Beat This! `final0` (MIT), `mlmodelc` comunitario `jessengatai/supracut-beat-this` en CPU+GPU; tempo = media de los intervalos entre pulsos, no la mediana (a 50 fps va a saltos de 20 ms). ADR-006 |
 | Reproductor de estudio | Mezcla de stems, velocidad, transposición, bucles al pulso y metrónomo | AVAudioEngine + AVAudioUnitTimePitch con overlap 8. Rubber Band no hace falta: a 50 % no se oyeron diferencias (ADR-005) |
@@ -97,10 +97,11 @@ Decisión: app nativa de macOS en Swift y SwiftUI, sin Python en la app final. A
 | Optimizador | Ajustar parámetros minimizando la distancia | CMA-ES propio en Swift sobre Accelerate |
 | Conector HeadRush | Leer y escribir rigs, subir NAM e IR | URLSession y URLSessionWebSocketTask contra el Remote Editor |
 | Conector TONE3000 | Login, búsqueda y descarga | URLSession + ASWebAuthenticationSession |
+| Modelos | Descarga la primera vez, verifica SHA-256, compila a `.mlmodelc` y guarda en `Application Support/ToneForge/Models/<id>/` | Paquete ModelKit (`ModelStore`); BS-RoFormer SW, 351 MB compilado. ADR-007 |
 | Captura de vídeo | Webcam sincronizada con el audio multipista | AVCaptureSession + AVAssetWriter |
 | Montaje de vídeo | Layouts, cambios por sección, encuadre de la guitarra, exportación | AVMutableComposition, AVVideoComposition con Core Image, Vision (pose corporal) |
 
-Python queda solo como herramienta de desarrollo: prototipar la función de distancia y convertir modelos. A cambio se gana un único binario, sin runtime de Python embebido, con uso de GPU y Neural Engine en Apple Silicon. Al ser de uso personal se compila y firma en local desde Xcode: no hace falta cuenta de pago de Apple Developer ni notarización. La app pedirá permiso de cámara, micrófono y red local (para hablar con la pedalera).
+Python queda solo como herramienta de desarrollo: prototipar la función de distancia y convertir modelos. A cambio se gana un único binario, sin runtime de Python embebido, con uso de GPU y Neural Engine en Apple Silicon. Al ser de uso personal se compila y firma en local con el Apple ID gratuito (equipo personal), sin App Sandbox ni hardened runtime, solo arm64: no hace falta cuenta de pago de Apple Developer ni notarización. Para llevarla a otros Macs se copia por USB o SSD, para evitar la cuarentena. La app pedirá permiso de cámara, micrófono y red local (para hablar con la pedalera). Si la biblioteca está en un SSD externo, macOS pide una vez el permiso de «volumen extraíble». AVFoundation no lee los Vorbis comments de FLAC: el título sale del nombre del fichero («Artista - Título.ext»). ADR-007.
 
 Los modelos de separación pesan entre 0,7 y 1,1 GB: se descarga la primera vez que se usa, no va dentro de la app. El DI se graba con la misma guitarra con la que se va a tocar, así que las pastillas (activas o pasivas) ya quedan incluidas en la medida.
 

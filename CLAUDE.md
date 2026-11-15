@@ -4,8 +4,8 @@ App de escritorio para macOS (Swift/SwiftUI) que iguala el tono de un tema reamp
 
 ## Estado actual
 
-Fase 0 · Etapa 1 cerrada el 15/11/2026 (P2, P4, P6; ADR-004 a 006).
-Siguiente: Fase 1 · Base y biblioteca, en la rama `fase-1`.
+Fase 1 · Base y biblioteca cerrada el 15/11/2026 (ADR-007).
+Siguiente: Fase 2 · Herramienta de estudio, en la rama `fase-2`.
 P1, P3 y P5 quedan para el comienzo de la Etapa 2.
 
 ## Contexto: leer solo lo que haga falta
@@ -19,10 +19,10 @@ P1, P3 y P5 quedan para el comienzo de la Etapa 2.
 - **Nunca leer** audios, modelos (`.mlpackage`, `.mlmodel`, `.onnx`, `.pt`, `.safetensors`) ni logs enteros: `tail`/`grep`.
 - **Localizar código** ("dónde está X", "quién llama a Y") → subagente `caveman:cavecrew-investigator`, no una cadena de greps en el hilo principal.
 
-## Estructura (prevista; se fija en la Fase 1)
+## Estructura
 
-- `Packages/<Kit>/`: un paquete Swift por módulo con sus tests (nombres en `docs/plan.md`, «Forma de trabajo»). Lo que depende de la pedalera va detrás de un protocolo con versión simulada.
-- `App/`: proyecto Xcode, solo UI y cableado. La lógica y sus tests viven en los paquetes.
+- `Packages/<Kit>/`: un paquete Swift por módulo con sus tests (nombres en `docs/plan.md`, «Forma de trabajo», incluido ModelKit). Lo que depende de la pedalera va detrás de un protocolo con versión simulada.
+- `App/`: proyecto Xcode generado con XcodeGen (`App/project.yml`; regenerar con `xcodegen generate --spec App/project.yml`), solo UI y cableado. Embebe el helper `tf-separate` (de StemKit). La lógica y sus tests viven en los paquetes.
 - `Probes/P<n>-<tema>/`: scripts de la Fase 0 (Python o Swift). Fuera de la puerta de tests.
 - `Tools/`: scripts de desarrollo (`test.sh`; entorno Python en `Tools/py/.venv`). `Temp/`: informes y logs, no se versiona.
 
@@ -30,6 +30,7 @@ P1, P3 y P5 quedan para el comienzo de la Etapa 2.
 
 - **`Tools/test.sh`** sin argumentos: `swift test` de cada paquete + build de la app, salida resumida (totales, fallos, errores con fichero:línea). Escribe `Temp/last-run.txt`, que es lo que lee `commit-gate.sh`. **`Tools/test.sh <Paquete> [Filtro]`** mientras se itera (no escribe `last-run.txt`). Salida 0 verde, 1 fallos, 2 compilación o nada que probar. Logs completos en `Temp/logs/`.
 - Nunca `xcodebuild` ni `swift test` a pelo: miles de líneas que se quedan en contexto.
+- Los tests pesados con modelo se activan con `TF_MODEL_TESTS=1` y se lanzan siempre bajo `Probes/P4-modelos/common/guard.py`, de uno en uno.
 - **El hardware y el oído son de Jorge.** Ningún agente toca la Flex Prime ni decide si algo suena bien: devuelve números (latencia en ms, distancia, desfase) y el comando o el WAV para que Jorge lo pruebe. Lo visual de la app lo juzga el hilo principal leyendo la captura.
 
 ## Subagentes: uno por trabajo

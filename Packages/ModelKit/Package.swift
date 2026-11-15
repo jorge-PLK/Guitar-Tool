@@ -1,0 +1,14 @@
+// swift-tools-version: 6.0
+import PackageDescription
+
+let package = Package(
+    name: "ModelKit",
+    platforms: [.macOS(.v15)],
+    products: [
+        .library(name: "ModelKit", targets: ["ModelKit"])
+    ],
+    targets: [
+        .target(name: "ModelKit"),
+        .testTarget(name: "ModelKitTests", dependencies: ["ModelKit"])
+    ]
+)

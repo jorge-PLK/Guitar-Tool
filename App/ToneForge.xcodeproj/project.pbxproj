@@ -1,0 +1,439 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		134191F8B9AC4B09EE2E60EC /* ToneForgeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75A7F55F6E6CA6C725218127 /* ToneForgeApp.swift */; };
+		41A89E8D66E34069176DF099 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6454D99769C07D228948A88A /* RootView.swift */; };
+		4FBC14B59C61E87856A72D6A /* ModelKit in Frameworks */ = {isa = PBXBuildFile; productRef = A69DFC994093C85D635994FE /* ModelKit */; };
+		6193C9D14BAEB11B56782763 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E90B1053A3471D11C92D139D /* AppModel.swift */; };
+		792E4D46568BA44D26D66655 /* Adapters.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF8F42FD35B0D453C6F9E5EA /* Adapters.swift */; };
+		81BC458247D35A333397C1ED /* Store in Frameworks */ = {isa = PBXBuildFile; productRef = 9AD0CD994C338902EF1497EC /* Store */; };
+		912BF217E571DAB8F8AAB440 /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C753425F92D8228D372C046A /* LibraryView.swift */; };
+		976B522F8C79F93AD139D6D1 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29EE870241AE799869F0237A /* SettingsView.swift */; };
+		E2387454B5475F6956E87AEF /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3EE15103E9ACEAD7E554968 /* Theme.swift */; };
+		EF26AC39FD0E22A482154B90 /* AudioKit in Frameworks */ = {isa = PBXBuildFile; productRef = B2EF94E80837CC81D491FB08 /* AudioKit */; };
+		FFD37BCED14F6D643ED7B263 /* StemKit in Frameworks */ = {isa = PBXBuildFile; productRef = BF731584D8521CF63A9BC971 /* StemKit */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		0B25179B33ED0A82BB871284 /* Store */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Store; path = ../Packages/Store; sourceTree = SOURCE_ROOT; };
+		1EB495D8D35277ACBF6C671B /* StemKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = StemKit; path = ../Packages/StemKit; sourceTree = SOURCE_ROOT; };
+		28E679F0268528B203E07B9D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		29EE870241AE799869F0237A /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		50A04723931020D3F8A07685 /* ToneForge.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ToneForge.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		6454D99769C07D228948A88A /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		6776133E7FA6353546A3F0BD /* ModelKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ModelKit; path = ../Packages/ModelKit; sourceTree = SOURCE_ROOT; };
+		75A7F55F6E6CA6C725218127 /* ToneForgeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToneForgeApp.swift; sourceTree = "<group>"; };
+		9671A99E86917B93EDEFF6AC /* AudioKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = AudioKit; path = ../Packages/AudioKit; sourceTree = SOURCE_ROOT; };
+		C753425F92D8228D372C046A /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
+		CF8F42FD35B0D453C6F9E5EA /* Adapters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Adapters.swift; sourceTree = "<group>"; };
+		D3EE15103E9ACEAD7E554968 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		E90B1053A3471D11C92D139D /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		39014CF2C0D9AFC359B3D19C /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				81BC458247D35A333397C1ED /* Store in Frameworks */,
+				EF26AC39FD0E22A482154B90 /* AudioKit in Frameworks */,
+				4FBC14B59C61E87856A72D6A /* ModelKit in Frameworks */,
+				FFD37BCED14F6D643ED7B263 /* StemKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		179B4F47ED70BDF81D81BC79 = {
+			isa = PBXGroup;
+			children = (
+				9DE596F979B79291EEE2908F /* Packages */,
+				509D064F60C6B577BAD5E721 /* Sources */,
+				45A58DFB792B6DA8CF4AFCD0 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		45A58DFB792B6DA8CF4AFCD0 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				50A04723931020D3F8A07685 /* ToneForge.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		509D064F60C6B577BAD5E721 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				CF8F42FD35B0D453C6F9E5EA /* Adapters.swift */,
+				E90B1053A3471D11C92D139D /* AppModel.swift */,
+				28E679F0268528B203E07B9D /* Info.plist */,
+				C753425F92D8228D372C046A /* LibraryView.swift */,
+				6454D99769C07D228948A88A /* RootView.swift */,
+				29EE870241AE799869F0237A /* SettingsView.swift */,
+				D3EE15103E9ACEAD7E554968 /* Theme.swift */,
+				75A7F55F6E6CA6C725218127 /* ToneForgeApp.swift */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		9DE596F979B79291EEE2908F /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				9671A99E86917B93EDEFF6AC /* AudioKit */,
+				6776133E7FA6353546A3F0BD /* ModelKit */,
+				1EB495D8D35277ACBF6C671B /* StemKit */,
+				0B25179B33ED0A82BB871284 /* Store */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		89A6D4E7C34648C83944B9E8 /* ToneForge */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A988DD9F0B4CD05FDFE5485A /* Build configuration list for PBXNativeTarget "ToneForge" */;
+			buildPhases = (
+				B2F49BA63AC132C56CE33578 /* Sources */,
+				8607D37F0B09AF9123E3BACD /* Embed tf-separate */,
+				39014CF2C0D9AFC359B3D19C /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ToneForge;
+			packageProductDependencies = (
+				9AD0CD994C338902EF1497EC /* Store */,
+				B2EF94E80837CC81D491FB08 /* AudioKit */,
+				A69DFC994093C85D635994FE /* ModelKit */,
+				BF731584D8521CF63A9BC971 /* StemKit */,
+			);
+			productName = ToneForge;
+			productReference = 50A04723931020D3F8A07685 /* ToneForge.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		9EA69883A43D4CC2A69C8AF8 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					89A6D4E7C34648C83944B9E8 = {
+						DevelopmentTeam = PAC5B4GH83;
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = CC7A97C30DC3985A7F44C8F4 /* Build configuration list for PBXProject "ToneForge" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 179B4F47ED70BDF81D81BC79;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				F8772B98128A8FB2D647BBD7 /* XCLocalSwiftPackageReference "../Packages/AudioKit" */,
+				A138270A86F0AA6EB1900CDF /* XCLocalSwiftPackageReference "../Packages/ModelKit" */,
+				1D121B800B90CA6E83BF375F /* XCLocalSwiftPackageReference "../Packages/StemKit" */,
+				B8CD7D01F4A15EA4DE8E8BF9 /* XCLocalSwiftPackageReference "../Packages/Store" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 45A58DFB792B6DA8CF4AFCD0 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				89A6D4E7C34648C83944B9E8 /* ToneForge */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		8607D37F0B09AF9123E3BACD /* Embed tf-separate */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/../Packages/StemKit/Package.swift",
+				"$(SRCROOT)/../Packages/StemKit/Sources/StemKit",
+				"$(SRCROOT)/../Packages/StemKit/Sources/StemKit/MemoryGuard.swift",
+				"$(SRCROOT)/../Packages/StemKit/Sources/StemKit/RoformerContract.swift",
+				"$(SRCROOT)/../Packages/StemKit/Sources/StemKit/RoformerSeparator.swift",
+				"$(SRCROOT)/../Packages/StemKit/Sources/StemKit/SeparationRunner.swift",
+				"$(SRCROOT)/../Packages/StemKit/Sources/tf-separate",
+				"$(SRCROOT)/../Packages/StemKit/Sources/tf-separate/main.swift",
+			);
+			name = "Embed tf-separate";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(EXECUTABLE_FOLDER_PATH)/tf-separate",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e\nPKG=\"$SRCROOT/../Packages/StemKit\"\nCLEAN=(/usr/bin/env -i HOME=\"$HOME\" PATH=\"/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin\" DEVELOPER_DIR=\"${DEVELOPER_DIR:-}\")\n[ -n \"${DEVELOPER_DIR:-}\" ] || CLEAN=(/usr/bin/env -i HOME=\"$HOME\" PATH=\"/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin\")\n\"${CLEAN[@]}\" swift build -c release --package-path \"$PKG\" --product tf-separate\nBIN=\"$(\"${CLEAN[@]}\" swift build -c release --package-path \"$PKG\" --show-bin-path)/tf-separate\"\nDEST=\"$TARGET_BUILD_DIR/$EXECUTABLE_FOLDER_PATH/tf-separate\"\nmkdir -p \"$(dirname \"$DEST\")\"\ncp -f \"$BIN\" \"$DEST\"\ncodesign --force --sign \"${EXPANDED_CODE_SIGN_IDENTITY:--}\" --timestamp=none \"$DEST\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		B2F49BA63AC132C56CE33578 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				792E4D46568BA44D26D66655 /* Adapters.swift in Sources */,
+				6193C9D14BAEB11B56782763 /* AppModel.swift in Sources */,
+				912BF217E571DAB8F8AAB440 /* LibraryView.swift in Sources */,
+				41A89E8D66E34069176DF099 /* RootView.swift in Sources */,
+				976B522F8C79F93AD139D6D1 /* SettingsView.swift in Sources */,
+				E2387454B5475F6956E87AEF /* Theme.swift in Sources */,
+				134191F8B9AC4B09EE2E60EC /* ToneForgeApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		72E2E22C6D8F2B33BCBC7C9D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Sources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = local.toneforge.ToneForge;
+				PRODUCT_NAME = ToneForge;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		E7192780B1FE881029312CBF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = PAC5B4GH83;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = NO;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		EEDEF94929D2F0B00D26A252 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = PAC5B4GH83;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = NO;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = NO;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		FAB4FF19E9021A91838D1F01 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Sources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = local.toneforge.ToneForge;
+				PRODUCT_NAME = ToneForge;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A988DD9F0B4CD05FDFE5485A /* Build configuration list for PBXNativeTarget "ToneForge" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FAB4FF19E9021A91838D1F01 /* Debug */,
+				72E2E22C6D8F2B33BCBC7C9D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		CC7A97C30DC3985A7F44C8F4 /* Build configuration list for PBXProject "ToneForge" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E7192780B1FE881029312CBF /* Debug */,
+				EEDEF94929D2F0B00D26A252 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		1D121B800B90CA6E83BF375F /* XCLocalSwiftPackageReference "../Packages/StemKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../Packages/StemKit;
+		};
+		A138270A86F0AA6EB1900CDF /* XCLocalSwiftPackageReference "../Packages/ModelKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../Packages/ModelKit;
+		};
+		B8CD7D01F4A15EA4DE8E8BF9 /* XCLocalSwiftPackageReference "../Packages/Store" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../Packages/Store;
+		};
+		F8772B98128A8FB2D647BBD7 /* XCLocalSwiftPackageReference "../Packages/AudioKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../Packages/AudioKit;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		9AD0CD994C338902EF1497EC /* Store */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Store;
+		};
+		A69DFC994093C85D635994FE /* ModelKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ModelKit;
+		};
+		B2EF94E80837CC81D491FB08 /* AudioKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AudioKit;
+		};
+		BF731584D8521CF63A9BC971 /* StemKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = StemKit;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 9EA69883A43D4CC2A69C8AF8 /* Project object */;
+}
