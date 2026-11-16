@@ -9,6 +9,7 @@ let package = Package(
     ],
     targets: [
         .target(name: "TabKit"),
-        .testTarget(name: "TabKitTests", dependencies: ["TabKit"])
+        .testTarget(name: "TabKitTests", dependencies: ["TabKit"],
+                    resources: [.copy("Fixtures")])
     ]
 )

@@ -4,8 +4,8 @@ App de escritorio para macOS (Swift/SwiftUI) que iguala el tono de un tema reamp
 
 ## Estado actual
 
-Fase 3 · Audio con el dispositivo cerrada el 15/11/2026 (ADR-012, ADR-013).
-Siguiente: Fase 4 · Guitarras y secciones, ya en marcha en el worktree `fase-4` (rebase sobre `fase-3`; ADR desde el 014).
+Fase 4 · Guitarras y secciones cerrada el 16/11/2026 (ADR-014).
+Siguiente: Fase 5 · Tablatura.
 P1, P3 y P5 quedan para el comienzo de la Etapa 2.
 
 ## Contexto: leer solo lo que haga falta

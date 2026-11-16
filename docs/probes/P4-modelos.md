@@ -279,9 +279,31 @@ Repetir: `Tools/py/.venv/bin/python Probes/P4-modelos/adtof/run_all.py --convert
 
 Entorno: `Tools/py/requirements.txt` fija ahora `soxr==1.1.0`, `mir_eval==0.8.2`, `pyloudnorm==0.1.1`, `future==1.0.0` y `mido==1.3.3` (aprobado por Jorge).
 
+## Fase 4
+
+Fecha: 2026-11-16 · Rama `fase-4` · ADR-014.
+
+### Modelos de guitarra
+
+- Qué se probó: MVSep Mega 53 guitarra (lumabeat) y `becruily/mel-band-roformer-guitar` frente a BS-RoFormer SW, en T1 y con su runtime original (falla rápido). Scripts: `Probes/P4-modelos/guitar_models/` (`run_torch.py`, `score.py`, `listen.py`).
+- Resultado (SDR en guitarra, T1): Mega 53, 7,58 dB; becruily, 5,81 dB; BS-RoFormer SW, 8,23 dB.
+- Decisión: ninguno supera la referencia, así que se descartan sin pasar a Core ML. La Fase 4 trabaja sobre `stems/guitar.wav`.
+
+### Basic Pitch
+
+- Modelo Core ML oficial (Apache-2.0), 116 293 bytes, embebido en `App/Resources/Models/BasicPitch_nmp.mlpackage.zip` y en `ModelCatalog.transcriptionBasicPitch`.
+- Resultado: paridad exacta con Python. Scripts en `Probes/P4-modelos/basic_pitch/` (`convert.py`, `compare.py`); test pesado `BasicPitchHeavyModelTests` (`TF_MODEL_TESTS=1`).
+- Desbloquea la transcripción de la Fase 5 y `PassageClassifier`. Plan B, no necesario: convertir el modelo desde Python.
+
+### Lead/rhythm
+
+- Modelo: Mel-Band RoFormer «Lead_Rhythm_Guitar», pesos anónimos de Hugging Face (openrail), convertido a Core ML FP16, `num_overlap` 2. Scripts en `Probes/P4-modelos/lead_rhythm/` (`run_torch.py`, `convert.py`, `compare.py`); fixture de paridad con torch en `Packages/StemKit/Tests/StemKitTests/Fixtures/LeadRhythm/`.
+- Veredicto de oído de Jorge (15/11/2026, en Platero y T3, con nombres de WAV únicos): lo da por bueno. El 16/11/2026, con «Guitarras en L y R» en 3 temas de Extremoduro, Robe y Uoho salen en pistas distintas.
+- Límite: marca como solista adornos fuera del solo (Platero, 78–90 s), por lo que los tramos se marcan a mano. Plan B probado y descartado: máscaras de panorama con puerta del centro (ninguna anchura sonó bien).
+- Cifras de paridad con torch: pendientes (no las tengo; ver `LeadSeparatorHeavyTests`).
+
 ## Pendiente
 
-- Fase 4: probar los modelos dedicados a guitarra (MVSep Mega 53 de lumabeat y `becruily/mel-band-roformer-guitar`) frente a BS-RoFormer SW (8,23 / 11,03 / 4,38 dB).
 - Proveedor CoreML de ONNX Runtime, sin probar (reserva).
 
 ## Cómo repetirla

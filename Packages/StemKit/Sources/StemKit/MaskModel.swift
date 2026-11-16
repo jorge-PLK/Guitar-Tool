@@ -4,38 +4,45 @@ import Foundation
 
 /// El modelo de máscaras, detrás de un protocolo para poder simularlo en los tests.
 /// Contrato (docs/probes/P4-modelos.md): entrada `spec` `[1, 2·bins, frames, 2]` float32;
-/// salida `[1, 6, 2·bins, frames, 2]`: una máscara compleja por stem con el mismo layout que `spec`.
+/// salida `[1, stems, 2·bins, frames, 2]`: una máscara compleja por stem con el mismo layout que `spec`
+/// (6 stems en BS-RoFormer SW, 1 en el modelo de solista; ver `MaskModelContract`).
 protocol MaskModel: AnyObject {
+    /// Hop, número de stems y nombres del modelo.
+    var contract: MaskModelContract { get }
     /// Tramas por trozo; el trozo en muestras es `(frames − 1) · hop`.
     var frames: Int { get }
-    /// `spec`: `2·bins·frames·2` floats. `mask`: `6 · 2·bins·frames·2` floats (Float32) a rellenar.
+    /// `spec`: `2·bins·frames·2` floats. `mask`: `stems · 2·bins·frames·2` floats (Float32) a rellenar.
     func predict(spec: UnsafeMutablePointer<Float>, mask: UnsafeMutablePointer<Float>) throws
 }
 
-/// El BS-RoFormer SW publicado en Core ML (ADR-004), siempre con `.cpuAndGPU`.
+/// Un modelo de máscaras RoFormer en Core ML (BS-RoFormer SW, ADR-004, o el de solista), siempre con `.cpuAndGPU`.
 final class CoreMLMaskModel: MaskModel {
-    let frames = RoformerContract.frames
+    let contract: MaskModelContract
+    let frames: Int
     private let model: MLModel
     private let outputName: String
 
-    init(compiledModelURL: URL) throws {
+    init(compiledModelURL: URL, contract: MaskModelContract = .bsRoformerSW) throws {
+        self.contract = contract
+        frames = contract.frames
         let config = MLModelConfiguration()
         // ADR-004: Neural Engine prohibido con este modelo (colgó el Mac). Nunca .all ni .cpuAndNeuralEngine.
+        // El de solista tampoco se ha probado en el ANE (contrato de tf-ml): misma regla.
         config.computeUnits = .cpuAndGPU
         let model = try MLModel(contentsOf: compiledModelURL, configuration: config)
         let desc = model.modelDescription
         let expectedIn: [NSNumber] = [1, NSNumber(value: 2 * RoformerContract.bins), NSNumber(value: frames), 2]
-        guard let input = desc.inputDescriptionsByName[RoformerContract.inputName]?.multiArrayConstraint,
+        guard let input = desc.inputDescriptionsByName[contract.inputName]?.multiArrayConstraint,
               input.shape == expectedIn else {
-            throw SeparationError.invalidInput("el modelo no tiene la entrada \(RoformerContract.inputName) \(expectedIn)")
+            throw SeparationError.invalidInput("el modelo no tiene la entrada \(contract.inputName) \(expectedIn)")
         }
-        // Salida del contrato: permute_97; si el modelo la llama distinto y solo hay una, se usa esa.
-        if desc.outputDescriptionsByName[RoformerContract.outputName] != nil {
-            outputName = RoformerContract.outputName
+        // Salida del contrato; si el modelo la llama distinto y solo hay una, se usa esa.
+        if desc.outputDescriptionsByName[contract.outputName] != nil {
+            outputName = contract.outputName
         } else if desc.outputDescriptionsByName.count == 1, let only = desc.outputDescriptionsByName.keys.first {
             outputName = only
         } else {
-            throw SeparationError.invalidInput("el modelo no tiene la salida \(RoformerContract.outputName)")
+            throw SeparationError.invalidInput("el modelo no tiene la salida \(contract.outputName)")
         }
         self.model = model
     }
@@ -47,22 +54,22 @@ final class CoreMLMaskModel: MaskModel {
         try autoreleasepool {
             let input = try MLMultiArray(dataPointer: spec, shape: shape, dataType: .float32,
                                          strides: strides, deallocator: nil)
-            let provider = try MLDictionaryFeatureProvider(dictionary: [RoformerContract.inputName: input])
+            let provider = try MLDictionaryFeatureProvider(dictionary: [contract.inputName: input])
             let out = try model.prediction(from: provider)
             guard let m = out.featureValue(for: outputName)?.multiArrayValue else {
                 throw SeparationError.invalidInput("el modelo no devolvió \(outputName)")
             }
-            try Self.copyMask(m, rows: rows, frames: frames, into: mask)
+            try Self.copyMask(m, stems: contract.stemCount, rows: rows, frames: frames, into: mask)
         }
     }
 
-    /// Copia la máscara `[1, 6, rows, frames, 2]` (FP16 o FP32) a Float32 contiguo.
-    /// Core ML con `.cpuAndGPU` la devuelve con el último eje rellenado: strides medidos
+    /// Copia la máscara `[1, stems, rows, frames, 2]` (FP16 o FP32) a Float32 contiguo.
+    /// Core ML con `.cpuAndGPU` la devuelve con el último eje rellenado: strides medidos en BS-RoFormer
     /// `[453033600, 75505600, 36832, 32, 1]`, es decir, cada par (re, im) ocupa 32 FP16 (64 bytes).
-    static func copyMask(_ m: MLMultiArray, rows: Int, frames: Int, into mask: UnsafeMutablePointer<Float>) throws {
+    static func copyMask(_ m: MLMultiArray, stems: Int = RoformerContract.stemCount, rows: Int, frames: Int,
+                         into mask: UnsafeMutablePointer<Float>) throws {
         let shape = m.shape.map(\.intValue)
         let st = m.strides.map(\.intValue)
-        let stems = RoformerContract.stemCount
         guard shape == [1, stems, rows, frames, 2] else {
             throw SeparationError.invalidInput("máscara con forma \(shape), se esperaba [1, \(stems), \(rows), \(frames), 2]")
         }
@@ -112,15 +119,18 @@ final class CoreMLMaskModel: MaskModel {
 /// Modelo simulado: una máscara compleja constante por stem (por defecto 1 + 0i en todos).
 /// Sirve a los tests y al modo oculto `--simulate` de tf-separate.
 final class ConstantMaskModel: MaskModel {
+    let contract: MaskModelContract
     let frames: Int
     let gains: [(re: Float, im: Float)]
     let delay: TimeInterval
     private(set) var calls = 0
 
-    init(frames: Int = RoformerContract.frames,
-         gains: [(re: Float, im: Float)] = Array(repeating: (1, 0), count: RoformerContract.stemCount),
-         delay: TimeInterval = 0) {
-        precondition(gains.count == RoformerContract.stemCount)
+    /// `gains` nil: 1 + 0i en los `contract.stemCount` stems.
+    init(frames: Int = RoformerContract.frames, contract: MaskModelContract = .bsRoformerSW,
+         gains: [(re: Float, im: Float)]? = nil, delay: TimeInterval = 0) {
+        let gains = gains ?? Array(repeating: (1, 0), count: contract.stemCount)
+        precondition(gains.count == contract.stemCount)
+        self.contract = contract
         self.frames = frames
         self.gains = gains
         self.delay = delay

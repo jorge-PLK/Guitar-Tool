@@ -17,9 +17,10 @@ func makeSong(title: String = "Song", sha: String = "abc", rate: Double = 44100)
 }
 
 func makeFullProject() -> Project {
-    let guitar = Guitar(name: "Strat", stem: .guitar, side: "left", role: "rhythm")
+    let guitar = Guitar(role: .rhythm, name: "Strat")
+    let ownedGuitarID = UUID()
     let section = Section(name: "Solo", start: 10, end: 20, kind: "solo")
-    let take = Take(guitarId: guitar.id, sectionId: section.id, diFile: "takes/a-di.wav",
+    let take = Take(guitarId: ownedGuitarID, sectionId: section.id, diFile: "takes/a-di.wav",
                     processedFile: "takes/a-proc.wav", micFile: "takes/a-mic.wav", discarded: false, createdAt: whole())
     return Project(
         song: makeSong(),
@@ -143,6 +144,36 @@ actor MockAnalyzer: StudyAnalyzing {
     }
 }
 
+/// Paso de guitarras simulado: una pista por papel según las opciones; guarda las opciones que recibió.
+actor MockGuitarSplitter: GuitarSplitting {
+    var failNext = false
+    var gated = false
+    private(set) var calls = 0
+    private(set) var optionsSeen: [GuitarOptions] = []
+    func setFailNext(_ f: Bool) { failNext = f }
+    func setGated(_ g: Bool) { gated = g }
+
+    func split(projectFolder: URL, input: URL, outputDirectory: URL, options: GuitarOptions,
+               progress: @escaping @Sendable (Double) -> Void) async throws -> GuitarSplitResult {
+        calls += 1
+        optionsSeen.append(options)
+        while gated { try await Task.sleep(for: .milliseconds(10)) }
+        if failNext { failNext = false; throw NSError(domain: "mock", code: 4, userInfo: [NSLocalizedDescriptionKey: "sin modelo"]) }
+        try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
+        var roles: [GuitarRole] = options.stereoSplit ? [.left, .right] : []
+        if !options.soloSpans.isEmpty {
+            if !options.stereoSplit { roles.append(.rhythm) }
+            roles.append(.lead)
+        }
+        var tracks: [SeparatedGuitar] = []
+        for role in roles {
+            try "wav".write(to: outputDirectory.appendingPathComponent(role.fileName), atomically: true, encoding: .utf8)
+            tracks.append(SeparatedGuitar(role: role, file: role.fileName, confidence: options.stereoSplit && role != .lead ? .high : nil))
+        }
+        return GuitarSplitResult(tracks: tracks)
+    }
+}
+
 func waitUntil(timeout: TimeInterval = 5, _ cond: @Sendable () async -> Bool) async -> Bool {
     let end = Date().addingTimeInterval(timeout)
     while Date() < end {
@@ -161,9 +192,11 @@ struct Env {
     let separator = MockSeparator()
     let meter = MockMeter()
     let analyzer = MockAnalyzer()
+    let splitter = MockGuitarSplitter()
     let library: Library
 
-    init(autoSeparate: Bool = true, rate: Double = 44100, withMeter: Bool = false, withAnalyzer: Bool = false) async throws {
+    init(autoSeparate: Bool = true, rate: Double = 44100, withMeter: Bool = false, withAnalyzer: Bool = false,
+         withGuitars: Bool = false) async throws {
         dir = try makeTempDir("lib")
         root = dir.appendingPathComponent("Projects", isDirectory: true)
         profile = ProfileStore(url: dir.appendingPathComponent("profile.json"))
@@ -171,7 +204,8 @@ struct Env {
         index = try LibraryIndex.make(storeURL: dir.appendingPathComponent("idx/Library.store"))
         library = Library(root: root, profile: profile, index: index, importer: importer, separator: separator,
                           autoSeparate: autoSeparate, levelMeter: withMeter ? meter : nil,
-                          analyzer: withAnalyzer ? analyzer : nil)
+                          analyzer: withAnalyzer ? analyzer : nil,
+                          guitarSplitter: withGuitars ? splitter : nil)
     }
 
     func makeSource(_ name: String, content: String) throws -> URL {

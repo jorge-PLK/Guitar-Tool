@@ -1,6 +1,6 @@
 # ToneForge · Mapa del código
 
-Última actualización: 2026-11-15 · Fase 3 · Audio con el dispositivo (ADR-012, ADR-013).
+Última actualización: 2026-11-16 · Fase 4 · Guitarras y secciones (ADR-014).
 
 Una sección por paquete (nombres de `docs/plan.md`, «Forma de trabajo»), más la app, las pruebas y las herramientas. Fila por fichero: `| Fichero | qué hace (ADR-NNN): APIs públicas |`. Se lee por secciones: `grep -n '^## ' docs/CODEMAP.md`.
 
@@ -67,6 +67,9 @@ Separación de stems con BS-RoFormer SW en Core ML, `.cpuAndGPU` (ADR-004, ADR-0
 | `Sources/StemKit/MemoryGuard.swift` | `MemoryGuard` (`start`, `stop`, `peakBytes`, `limitExceeded`, `footprint(pid:)`): `phys_footprint` con `proc_pid_rusage`, SIGKILL por encima de `defaultLimitBytes` (10 GB) |
 | `Sources/StemKit/SeparationRunner.swift` | `SeparationRunner.run(model:input:outputDirectory:)` lanza el helper, lee el progreso en JSON (`SeparationEvent`, `SeparationError`) y cancela con SIGTERM y luego SIGKILL |
 | `Sources/StemKit/StemLevelMeter.swift` | `StemLevelMeter.measure(url:)` (RMS y pico en dBFS por bloques, `StemLevel`), `isEmpty` (RMS < −60 y pico < −40 dBFS) (ADR-009) |
+| `Sources/StemKit/GuitarStemComposer.swift` | (ADR-014) `LeadGuitarSeparating` (protocolo del separador de solista), `GuitarStemComposer.compose(input:outputDirectory:stereo:soloSpans:…)` (pistas `guitar_rhythm`, `guitar_L`, `guitar_R`, `guitar_lead` que suman `guitar.wav`; fundidos de 100 ms), `GuitarStemTrack`, `GuitarSoloSpan.normalized` |
+| `Sources/StemKit/CoreMLLeadSeparator.swift` | (ADR-014) `CoreMLLeadSeparator`: Mel-Band RoFormer lead/rhythm en Core ML FP16 sobre `MaskModelContract.leadRhythm` (num_overlap 2); la rítmica es entrada − solista |
+| `Sources/StemKit/PanSplitter.swift`, `PanSoloSpan.swift` | (ADR-014) `PanSplitter` (máscaras de panorama por canal, puerta del centro por tramos), `GuitarSide`, `PanSoloSpan`. Sin uso en la app: descartado, ver ADR-014 |
 | `Sources/tf-separate/` | Ejecutable `tf-separate` (producto): un proceso por tema, vigilado por `MemoryGuard` |
 | `Sources/tf-memhog/` | Ejecutable `tf-memhog`, solo para tests del vigilante |
 | `Tests/StemKitTests/` | 36 tests (`StemLevelMeterTests`); 3 pesados con `TF_MODEL_TESTS=1` y 1 de referencia Python con `TF_REF_DIR` |
@@ -88,6 +91,7 @@ Pulso, acordes, tonalidad y su caché (ADR-009). No depende de ningún paquete p
 | `Sources/StudyKit/ChordShapes.swift` | `ChordShapes.shape(for:capo:)` → `ChordShape` (diagrama de 6 cuerdas) |
 | `Sources/StudyKit/ChordTimeline.swift` | `ChordSegment`, `ChordOverride`, `ChordTimeline.effective(detected:overrides:)` |
 | `Sources/StudyKit/AnalysisCache.swift` | `AnalysisFingerprint`, `AnalysisCache.load(at:expecting:)` y `save` |
+| `Sources/StudyKit/SectionEdgePicker.swift` | (ADR-014) `SectionEdgePicker`: qué borde de sección se agarra con el ratón (asas de las cajas de secciones) |
 | `Tests/StudyKitTests/` | 47 tests (`BeatTests`, `ChordTests`, `ChordRecognizerTests`; pesados `BeatHeavyModelTests` y `ChordHeavyModelTests` con `TF_MODEL_TESTS=1` bajo `guard.py`). Fixtures en `Fixtures/` con su README; las genera `Probes/P4-modelos/fixtures/make_fase2_fixtures.py` |
 
 ## Packages/SourceKit
@@ -129,7 +133,14 @@ Conector de TONE3000. Sin código (solo test de humo).
 
 ## Packages/TabKit
 
-Transcripción y tablatura. Sin código (solo test de humo).
+Transcripción y tablatura (ADR-014).
+
+| Fichero | qué hace (ADR-014): APIs públicas |
+| --- | --- |
+| `Sources/TabKit/BasicPitch/BasicPitchTranscriber.swift` | `actor BasicPitchTranscriber`: Basic Pitch oficial en Core ML, por ventanas; con `BasicPitchContract` y `BasicPitchNotes` (notas desde las salidas del modelo) |
+| `Sources/TabKit/Audio/MonoAudio.swift`, `NoteEvent.swift` | Lectura a mono y `NoteEvent` |
+| `Sources/TabKit/Passages/PassageClassifier.swift` | `PassageClassifier` (rítmica o solista por pasajes, con contexto de pista), `GuitarRole`, `GuitarPassage`. Fuera de la cola de la biblioteca: sin propuesta automática (ADR-014) |
+| `Tests/TabKitTests/` | Tests de Basic Pitch (paridad con Python en fixtures; pesado con `TF_MODEL_TESTS=1`) y del clasificador |
 
 ## Packages/VideoKit
 
@@ -149,6 +160,9 @@ Archivo de proyecto (JSON por carpeta), índice en SwiftData y orquestación de 
 | `Sources/Store/Library.swift` | `actor Library`: `importSong(from:metadata:progress:)` con `ImportMetadata` (título, artista, `SongOrigin` y carátula), `project(withVideoID:)`, `project(withSpotifyID:)`, `trashProject` (Papelera) y `deleteProject` (definitivo, con salvaguarda de ruta), `updateSongInfo`, cola FIFO de separación de uno en uno (`separate`, `cancelSeparation`), `recoverInterrupted` (ahora re-encola las separaciones interrumpidas en vez de marcarlas fallidas), `stopAllForShutdown`, `removeOrphanTemporaries(in:)`, `open` (reconversión de frecuencia en segundo plano), `cleanup`, `cleanupAll`, `diskUsage`, `relocate(to:mode:)` (`.pointOnly`/`.move`), `events`. `saveStudy`, `ensureAnalysis` (→ `AnalysisState`), `needsReseparation`; mide los stems tras separar y al abrir, y analiza tras la separación. Protocolos `AudioImporting`, `StemSeparating`, `StemLevelMeasuring` y `StudyAnalyzing`, que implementa la app |
 | `Sources/Store/EquipmentProfile.swift` (Fase 3) | `EquipmentProfile.audio: AudioSettings?` (ADR-012) |
 | `Sources/Store/Models.swift`, `Files.swift`, `Library.swift` (Fase 3) | `Take` con campos nuevos opcionales (`songStart`, `sampleRate`, `latencySamples`, `rigDelaySamples`, `rigDelayReliable`, `latencyCalibrated`, `calibrationKey`, `clock`); `ProjectLayout.processedURL(takeId:)` (`takes/<id>/processed.wav`); `Library.saveTake(id:take:)` y `saveTakes(id:_:)` |
+| `Sources/Store/Guitars.swift` (Fase 4) | (ADR-014) `GuitarOptions` (`stereoSplit`, `soloSpans`), `GuitarSettings`, `GuitarSoloSpan`, `Guitar` (`role`, `name`, `file`, `confidence`), `GuitarRole` (rhythm, left, right, lead; `fileName`), `GuitarConfidence`, `GuitarAppliedState`, `GuitarSplitState`, `SeparatedGuitar`, `GuitarSplitResult` y el protocolo `GuitarSplitting` |
+| `Sources/Store/SectionEditor.swift` | (ADR-014) `SectionEditor`: `mark`, `rename`, `setSolo`, `remove`, `setColor`, `paletteIndices`, `setEdge`, `snapEdge`, `nudgeEdge`; longitud mínima 0,5 s |
+| `Sources/Store/Library.swift` (Fase 4) | `saveGuitarNames`, `saveGuitarStereoSplit`, `guitarSplitState`; paso `splitGuitars` en la cola tras el análisis. `Section` gana `color` y `isSolo` |
 | `Tests/StoreTests/` | 78 tests (`AudioSettingsTests`: ajustes de audio y caducidad de la calibración; `StudyQueueTests`: cola, stems vacíos, v1 → v2; `OriginTests`: origen, duplicados, importación con metadatos; `TrashTests`: Papelera, borrado y edición; `RecoveryTests`: re-encolado al arrancar) |
 
 Carpeta de proyecto: `project.json`, `source/original.<ext>`, `audio/song.wav` (regenerable), `stems/<stem>.wav` (regenerable), `stems/.partial`, `takes/` (`takes/<id>/processed.wav`, ADR-013), `video/`, `rigs/`, `cache/` (regenerable; `cache/analysis.json` es el análisis automático con huella). Perfil e índice en `~/Library/Application Support/ToneForge/` (`profile.json`, `Library.store`). Límite conocido: en la reconversión la sustitución es atómica por fichero, no entre ficheros; `project.json` se actualiza al final y, si falla a mitad, se reintenta al abrir.
@@ -185,6 +199,11 @@ Proyecto Xcode generado con XcodeGen (`App/project.yml`; el `.xcodeproj` tambié
 | `App/Sources/BackingRecord.swift` | Controles de grabación y A/B en Backing: `RecordButton`, `RecordStatus`, `ComparePanel`, `TakeChannel` (canal de la toma en la mezcla) |
 | `App/Sources/AudioDemo.swift` | Solo DEBUG: `AudioDemo` y `PacedSimulatedIO` para capturas y pruebas visuales con audio simulado |
 | `App/Resources/Models/BTC_large_voca_fp16.mlpackage.zip` | Recurso: BTC embebido (5,4 MB, ADR-009) |
+| `App/Sources/GuitarBridge.swift` | (ADR-014) `makeLeadSeparator(modelStore:)` y `AppGuitarSplitter` (sobre `GuitarSplitting`: `GuitarStemComposer` + `CoreMLLeadSeparator`) |
+| `App/Sources/GuitarOptionsViews.swift` | (ADR-014) `GuitarStereoToggle` («Guitarras en L y R»), `SectionApplyButtons` («Aplicar» / «Descartar»), `GuitarStatusView` |
+| `App/Sources/SectionBoxes.swift`, `SectionGridBoxes.swift` | (ADR-014) Cajas de secciones sobre la tira de acordes, compacta y expandida: `SectionBoxes`, `SectionPopover`, `SectionMenu`, asas, ◀ ▶, Supr (`SectionKeyMonitor`), colores `TF.sectionPalette` |
+| `App/Sources/BackingMixer.swift` (Fase 4) | (ADR-014) un canal por guitarra (`guitarChannel`) con nombre editable y confianza; sin stems vacíos; plegado en columnas nombre + M/S. Sin grabación ni A/B en Backing: `BackingRecord.swift`, `loadLastTake`, `setCompare` y `AudioController.bind` quedan sin uso desde la UI hasta la Fase 6 |
+| `App/Resources/Models/BasicPitch_nmp.mlpackage.zip`, `LeadRhythmMelRoformer_fp16.mlpackage.zip` | (ADR-014) Recursos: Basic Pitch (116 KB) y lead/rhythm (156 MB) |
 | `App/Sources/Theme.swift` | `TF`: colores y medidas (ampliado en la Fase 2b) |
 | `App/Resources/AppIcon.svg`, `App/Resources/Assets.xcassets/` | Icono de la app (de Jorge): los PNG salen del SVG con `Tools/make-icon.sh`; `project.yml` fija `ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon` |
 | `App/Sources/ToneForgeApp.swift` | Punto de entrada |
@@ -206,6 +225,7 @@ Sondas de la Fase 0 (`Probes/P<n>-<tema>/`), desechables; resultados en `docs/pr
 | `Probes/P4-modelos/fixtures/make_fase2_fixtures.py` | Genera los fixtures de `Packages/StudyKit/Tests/StudyKitTests/Fixtures/` (12 s de T1 en WAV de 16 bits y referencias Python) (ADR-009) |
 | `Probes/P7-fuentes/` | Sondas de fuentes externas (enlaces de YouTube y Spotify), en scripts numerados (ADR-008); `09-list.sh` a `13-parse-listas.py` son la prueba ampliada: candidatos de cinco temas con `tf-fetch`, descarga con tiempos, restricción de edad, y embeds de lista y álbum con su resumen (ADR-011) |
 | `Probes/P6-timepitch/{run.sh,p6.py,AppleRender}` | Comparación ciega de `AVAudioUnitTimePitch` y Rubber Band: `run.sh Probes/testaudio/out/clips/*.wav` (ADR-005) |
+| `Probes/P4-modelos/{guitar_models,basic_pitch,lead_rhythm}/` | Fase 4 (ADR-014): modelos de guitarra frente a BS-RoFormer SW (`run_torch.py`, `score.py`, `listen.py`), conversión y paridad de Basic Pitch y del lead/rhythm (`convert.py`, `compare.py`) |
 | `Probes/testaudio/prepare.py` | Prepara los temas y tramos de prueba (`out/` ignorado) |
 
 Recursos: modelos y resultados en `Probes/P4-modelos/*/out/` (no versionados); entorno de Python en `Tools/py/.venv`, dependencias fijadas en `Tools/py/requirements.txt`.

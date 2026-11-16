@@ -15,3 +15,4 @@ Una línea por ADR; el texto está en `docs/adr/ADR-NNN.md`. Nuevo ADR = fichero
 - [ADR-011](adr/ADR-011.md) · 2026-11-15 · Cierre de la Fase 2b: SourceKit, helpers embebidos (yt-dlp, Deno, ffmpeg propio), listas y álbumes, repetidos, y eliminar, editar y re-encolar en la biblioteca
 - [ADR-012](adr/ADR-012.md) · 2026-11-15 · Fase 3 genérica (sin Flex Prime cableada) y el DI y el reamp salen de la Etapa 1
 - [ADR-013](adr/ADR-013.md) · 2026-11-15 · Cierre de la Fase 3: audio con el dispositivo
+- [ADR-014](adr/ADR-014.md) · 2026-11-16 · Cierre de la Fase 4: guitarras y secciones (modelo lead/rhythm, tres opciones de guitarra, solo como sección)

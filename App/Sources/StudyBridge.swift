@@ -19,6 +19,12 @@ enum StudyBridge {
         grid?.beats.min { abs($0 - t) < abs($1 - t) } ?? t
     }
 
+    /// Compás (downbeat) de la rejilla más cercano a `t` (o el pulso, o `t` si no hay rejilla).
+    static func nearestBar(_ grid: BeatGrid?, to t: Double) -> Double {
+        guard let grid, !grid.downbeats.isEmpty else { return nearestBeat(grid, to: t) }
+        return grid.downbeats.min { abs($0 - t) < abs($1 - t) } ?? t
+    }
+
     /// Ajusta un tramo al pulso (`bar` = false) o al compás (`bar` = true).
     static func snap(_ grid: BeatGrid?, _ range: ClosedRange<Double>, bar: Bool) -> ClosedRange<Double> {
         grid?.snap(range, to: bar ? .bar : .beat) ?? range

@@ -1,3 +1,4 @@
+import CoreML
 import XCTest
 @testable import ModelKit
 
@@ -61,15 +62,72 @@ final class ModelOriginsTests: XCTestCase {
         return zip
     }
 
-    func testCatalogHasThreeUniqueEntries() {
+    func testCatalogHasFiveUniqueEntries() {
         let ids = ModelCatalog.all.map(\.id)
-        XCTAssertEqual(ids.count, 3)
-        XCTAssertEqual(Set(ids).count, 3)
-        XCTAssertEqual(Set(ModelCatalog.all.map(\.role)), [.separation, .chords, .beats])
+        XCTAssertEqual(ids.count, 5)
+        XCTAssertEqual(Set(ids).count, 5)
+        XCTAssertEqual(Set(ModelCatalog.all.map(\.role)),
+                       [.separation, .chords, .beats, .guitarTranscription, .leadGuitarSeparation])
+        let lr = ModelCatalog.leadRhythmMelRoformer
+        XCTAssertEqual(lr.archiveKind, .bundledZippedMLPackage)
+        XCTAssertEqual(lr.url.lastPathComponent, "LeadRhythmMelRoformer_fp16.mlpackage.zip")
+        XCTAssertEqual(lr.compiledName, "LeadRhythmMelRoformer_fp16.mlmodelc")
+        XCTAssertTrue(lr.license.contains("openrail") && lr.license.contains("uso personal"))
+        XCTAssertEqual(ModelCatalog.leadRhythmCheckpointSHA256.count, 64)
+        let bp = ModelCatalog.transcriptionBasicPitch
+        XCTAssertEqual(bp.archiveKind, .bundledZippedMLPackage)
+        XCTAssertEqual(bp.url.lastPathComponent, "BasicPitch_nmp.mlpackage.zip")
+        XCTAssertEqual(bp.compiledName, "BasicPitch_nmp.mlmodelc")
         XCTAssertEqual(ModelCatalog.beatsBeatThis.archiveKind, .zippedCompiledModel)
         XCTAssertEqual(ModelCatalog.beatsBeatThis.compiledName, "BeatThis.mlmodelc")
         XCTAssertEqual(ModelCatalog.chordsBTC.archiveKind, .bundledZippedMLPackage)
         XCTAssertEqual(ModelCatalog.chordsBTC.url.lastPathComponent, "BTC_large_voca_fp16.mlpackage.zip")
+    }
+
+    /// `App/Resources/Models` del repo (los zips embebidos).
+    private var appModelsDirectory: URL {
+        var dir = URL(fileURLWithPath: #filePath)
+        while dir.lastPathComponent != "Packages" { dir.deleteLastPathComponent() }
+        return dir.deletingLastPathComponent().appendingPathComponent("App/Resources/Models", isDirectory: true)
+    }
+
+    /// Cada modelo embebido del catálogo existe en `App/Resources/Models` con su SHA-256 y su tamaño.
+    func testBundledResourcesMatchCatalog() throws {
+        let bundled = ModelCatalog.all.filter { $0.archiveKind == .bundledZippedMLPackage }
+        XCTAssertEqual(Set(bundled.map(\.id)), ["btc-chords", "basic-pitch", "lead-rhythm-guitar"])
+        for d in bundled {
+            let zip = appModelsDirectory.appendingPathComponent(d.url.lastPathComponent)
+            let size = try FileManager.default.attributesOfItem(atPath: zip.path)[.size] as? Int64
+            XCTAssertEqual(size, d.archiveBytes, d.id)
+            XCTAssertEqual(try sha256Hex(of: zip), d.sha256, d.id)
+        }
+    }
+
+    /// Pesado: copia, verifica y compila de verdad el zip embebido de Basic Pitch. Solo con TF_MODEL_TESTS=1.
+    func testRealBasicPitchBundledInstall() async throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["TF_MODEL_TESTS"] == "1", "TF_MODEL_TESTS=1 requerido")
+        let d = ModelCatalog.transcriptionBasicPitch
+        let s = ModelStore(root: root, catalog: [d], bundleResourceDirectory: appModelsDirectory)
+        let url = try await s.ensureInstalled(d.id) { _ in }
+        XCTAssertEqual(url.lastPathComponent, "BasicPitch_nmp.mlmodelc")
+        guard case .installed = await s.state(d.id) else { return XCTFail("estado") }
+    }
+
+    /// Pesado: copia, verifica y compila de verdad el zip embebido del modelo de solista y comprueba el contrato
+    /// de entrada y salida. Solo con TF_MODEL_TESTS=1.
+    func testRealLeadRhythmBundledInstall() async throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["TF_MODEL_TESTS"] == "1", "TF_MODEL_TESTS=1 requerido")
+        let d = ModelCatalog.leadRhythmMelRoformer
+        let s = ModelStore(root: root, catalog: [d], bundleResourceDirectory: appModelsDirectory)
+        let url = try await s.ensureInstalled(d.id) { _ in }
+        XCTAssertEqual(url.lastPathComponent, "LeadRhythmMelRoformer_fp16.mlmodelc")
+        let config = MLModelConfiguration()
+        config.computeUnits = .cpuAndGPU
+        let model = try MLModel(contentsOf: url, configuration: config)
+        let desc = model.modelDescription
+        XCTAssertEqual(desc.inputDescriptionsByName["spec"]?.multiArrayConstraint?.shape, [1, 2050, 301, 2])
+        XCTAssertEqual(desc.inputDescriptionsByName["spec"]?.multiArrayConstraint?.dataType, .float32)
+        XCTAssertEqual(desc.outputDescriptionsByName["mask"]?.multiArrayConstraint?.shape, [1, 1, 2050, 301, 2])
     }
 
     func testCompiledZipInstallsWithoutCompiling() async throws {

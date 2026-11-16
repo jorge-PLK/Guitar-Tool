@@ -24,6 +24,9 @@ enum TF {
     static let ok = Color(hex: 0x6FD99E)
     static let okBg = Color(hex: 0x16301F)
     static let neutralBg = Color(hex: 0x1F242A)
+    /// Colores de sección apagados para el tema oscuro (sin naranja: es de los solos). El orden es el de
+    /// `SectionEditor.paletteCount`: azul, verde, violeta, rosa, turquesa, lima, coral.
+    static let sectionPalette: [Color] = [0x6C9BD2, 0x6FB58A, 0x9C86C9, 0xC97F9E, 0x5DB5B5, 0xA6B85C, 0xC8706A].map { Color(hex: $0) }
     static let danger = Color(hex: 0xF07178)
     static let dangerBg = Color(hex: 0x331A1C)
 

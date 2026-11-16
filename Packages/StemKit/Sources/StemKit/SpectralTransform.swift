@@ -11,7 +11,8 @@ import Accelerate
 /// No es seguro entre hilos: cada hilo usa su propia instancia (los búferes de trabajo son suyos).
 final class SpectralTransform {
     let nFFT = RoformerContract.nFFT
-    let hop = RoformerContract.hop
+    /// 512 en BS-RoFormer SW, 441 en el modelo de solista (`MaskModelContract`).
+    let hop: Int
     let bins = RoformerContract.bins
     /// Muestras por canal de la señal en el dominio del tiempo.
     let length: Int
@@ -35,10 +36,13 @@ final class SpectralTransform {
     private let splitOutI: UnsafeMutablePointer<Float>
 
     /// - Parameter length: debe ser > n_fft / 2 (el relleno reflect lo exige, igual que en torch).
-    init(length: Int) {
+    init(length: Int, hop: Int = RoformerContract.hop) {
         precondition(length > RoformerContract.nFFT / 2, "STFT: longitud demasiado corta para el relleno reflect")
+        // hop ≤ n_fft/2: la envolvente Σ w² cubre toda la salida.
+        precondition(hop > 0 && hop <= RoformerContract.nFFT / 2, "STFT: hop fuera de rango")
         self.length = length
-        self.frames = 1 + length / RoformerContract.hop
+        self.hop = hop
+        self.frames = 1 + length / hop
         let n = RoformerContract.nFFT
         let half = n / 2
         guard let f = vDSP_DFT_zrop_CreateSetup(nil, vDSP_Length(n), .FORWARD),
@@ -72,10 +76,10 @@ final class SpectralTransform {
             synthesisWindow[k] = Float(hann[k] / Double(n))
         }
         // Envolvente Σ w² sobre la señal rellenada; la salida es [n/2, n/2 + length).
-        let total = n + RoformerContract.hop * (frames - 1)
+        let total = n + hop * (frames - 1)
         var env = [Double](repeating: 0, count: total)
         for t in 0..<frames {
-            let a = t * RoformerContract.hop
+            let a = t * hop
             for k in 0..<n { env[a + k] += hann[k] * hann[k] }
         }
         for j in 0..<length {

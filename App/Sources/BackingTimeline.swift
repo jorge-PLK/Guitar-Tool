@@ -3,10 +3,8 @@ import Store
 import StudyKit
 import SwiftUI
 
-typealias SongSection = Store.Section
-
-/// Tarjeta «Línea de tiempo» de Backing: secciones, tira de acordes, tonalidad, transposición, barra de
-/// progreso con bucle y transporte (mini-spec Fase 2 §2).
+/// Tarjeta «Línea de tiempo» de Backing: tira de acordes con las secciones y los solos como cajas encima, tonalidad,
+/// transposición, barra de progreso con bucle y transporte (mini-spec Fase 2 §2 y Fase 4).
 struct BackingTimelineCard: View {
     let session: StudySession
     let ctl: BackingController
@@ -18,7 +16,8 @@ struct BackingTimelineCard: View {
     @Environment(AppModel.self) private var model
     @State private var chordEditing: Int?
     @State private var gridEditing: Double?
-    @State private var sectionEditing: UUID?
+    @State private var selection = SectionSelection()
+    @State private var keyMonitor = SectionKeyMonitor()
     @State private var stripFrames: [Int: CGRect] = [:]
     @State private var stripDrag: ClosedRange<Int>?
 
@@ -27,18 +26,29 @@ struct BackingTimelineCard: View {
 
     var body: some View {
         Card {
-            VStack(alignment: .leading, spacing: 14) {
-                SectionsLane(session: session, ctl: ctl, duration: duration, editing: $sectionEditing)
+            VStack(alignment: .leading, spacing: 10) {
                 chordsHeader
                 chordsArea
                 infoRow
                 ProgressBarView(session: session, ctl: ctl, time: time, duration: duration)
                 transport
-                RecordStatus(session: session, ctl: ctl)
             }
-            .padding(.horizontal, 18).padding(.vertical, 16)
+            .padding(.horizontal, 18).padding(.vertical, 12)
         }
-        .onChange(of: editMode.wrappedValue) { chordEditing = nil; gridEditing = nil }
+        .onChange(of: editMode.wrappedValue) { chordEditing = nil; gridEditing = nil; selection.clear() }
+        .onChange(of: expanded.wrappedValue) { selection.popover = nil }
+        .onAppear {
+            keyMonitor.install(selection: selection, session: session)
+            #if DEBUG
+            if let n = model.options.selectSection {
+                Task { @MainActor in
+                    try? await Task.sleep(for: .seconds(2))
+                    if session.sections.indices.contains(n) { selection.select(session.sections[n].id) }
+                }
+            }
+            #endif
+        }
+        .onDisappear { keyMonitor.remove() }
     }
 
     // MARK: Acordes
@@ -65,9 +75,15 @@ struct BackingTimelineCard: View {
             .buttonStyle(.plain)
             .accessibilityAddTraits(edit ? .isSelected : [])
             Text(edit ? "Modo edición: clic en un acorde para cambiarlo o partirlo. No se marcan bucles."
-                      : "Clic: saltar al acorde · arrastrar: bucle (⌥ = a compases)")
+                      : "Clic: saltar · arrastrar: bucle (⌥ = compases)")
                 .font(TF.body(12)).foregroundStyle(edit ? TF.accent : TF.muted).lineLimit(1)
+                .truncationMode(.tail).layoutPriority(-1)
             Spacer(minLength: 0)
+            if !edit, ctl.loop != nil, !currentChordsEmpty {
+                markButton("Marcar sección", icon: "rectangle.dashed", solo: false)
+                markButton("Marcar como solo", icon: "guitars.fill", solo: true)
+            }
+            SectionApplyButtons(session: session)
             Button { withAnimation(.easeInOut(duration: 0.15)) { expanded.wrappedValue.toggle() } } label: {
                 HStack(spacing: 6) {
                     Text(expanded.wrappedValue ? "Plegar" : "Expandir")
@@ -81,6 +97,27 @@ struct BackingTimelineCard: View {
             .buttonStyle(.plain)
             .accessibilityLabel(expanded.wrappedValue ? "Plegar acordes" : "Expandir acordes")
         }
+    }
+
+    private var currentChordsEmpty: Bool { session.effectiveChords.isEmpty }
+
+    /// Marca el bucle activo como sección o como solo (los cambios son locales hasta «Aplicar»).
+    private func markButton(_ title: String, icon: String, solo: Bool) -> some View {
+        Button { markLoop(solo: solo) } label: {
+            HStack(spacing: 6) { Image(systemName: icon); Text(title) }
+                .font(TF.body(12, .medium)).foregroundStyle(solo ? TF.accent : TF.text2)
+                .padding(.horizontal, 10).frame(height: 28)
+                .background(solo ? TF.accentBg : TF.field, in: RoundedRectangle(cornerRadius: 8))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(solo ? TF.accent.opacity(0.6) : TF.fieldLine))
+        }
+        .buttonStyle(.plain).fixedSize()
+        .help(solo ? "Marca el bucle como un solo: sus guitarras se separan al aplicar" : "Marca el bucle como una sección")
+    }
+
+    /// Marca el bucle y abre al momento la ventana de la sección nueva (nombre enfocado).
+    private func markLoop(solo: Bool) {
+        guard let l = ctl.loop, let id = session.markSection(l, solo: solo) else { return }
+        selection.select(id)
     }
 
     private var currentChord: (chords: [ChordSegment], current: Int?, next: ChordSegment?) {
@@ -98,7 +135,7 @@ struct BackingTimelineCard: View {
         return VStack(alignment: .leading, spacing: 10) {
             if expanded.wrappedValue {
                 HStack(alignment: .top, spacing: 12) {
-                    ChordGridView(session: session, ctl: ctl, time: time, edit: edit, shown: shown, editing: $gridEditing)
+                    ChordGridView(session: session, ctl: ctl, time: time, edit: edit, shown: shown, editing: $gridEditing, selection: selection)
                     diagramCard(current: current.map { chords[$0] }, next: next)
                 }
             } else {
@@ -124,27 +161,36 @@ struct BackingTimelineCard: View {
         let l = (stripDrag.map { chords[$0.lowerBound].start...chords[$0.upperBound].end }) ?? ctl.loop
         return ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 6) {
-                    ForEach(Array(chords.enumerated()), id: \.offset) { i, seg in
-                        let inLoop = l.map { ($0.lowerBound...$0.upperBound).contains((seg.start + seg.end) / 2) } ?? false
-                        if edit {
-                            Button { chordEditing = i } label: { chip(i, seg, current: current, inLoop: inLoop) }
-                                .buttonStyle(.plain)
-                                .popover(isPresented: Binding(get: { chordEditing == i }, set: { if !$0 { chordEditing = nil } })) {
-                                    ChordEditor(session: session, ctl: ctl, segment: seg, time: time)
-                                }
-                                .id(i)
-                        } else {
-                            chip(i, seg, current: current, inLoop: inLoop).id(i)
+                VStack(alignment: .leading, spacing: 3) {
+                    // Hueco para el nombre de las cajas de sección, sobre los acordes.
+                    Color.clear.frame(height: SectionBoxes.headerHeight)
+                    HStack(spacing: 6) {
+                        ForEach(Array(chords.enumerated()), id: \.offset) { i, seg in
+                            let inLoop = l.map { ($0.lowerBound...$0.upperBound).contains((seg.start + seg.end) / 2) } ?? false
+                            if edit {
+                                Button { chordEditing = i } label: { chip(i, seg, current: current, inLoop: inLoop) }
+                                    .buttonStyle(.plain)
+                                    .popover(isPresented: Binding(get: { chordEditing == i }, set: { if !$0 { chordEditing = nil } })) {
+                                        ChordEditor(session: session, ctl: ctl, segment: seg, time: time)
+                                    }
+                                    .id(i)
+                            } else {
+                                chip(i, seg, current: current, inLoop: inLoop).id(i)
+                                    .contextMenu { chipMenu(seg) }
+                            }
                         }
                     }
+                    .padding(.horizontal, SectionBoxes.inset + 1).padding(.bottom, SectionBoxes.inset)
                 }
-                .coordinateSpace(name: "strip")
+                .overlay(alignment: .topLeading) {
+                    SectionBoxes(session: session, ctl: ctl, chords: chords, frames: stripFrames, selection: selection)
+                }
+                .coordinateSpace(name: SectionBoxes.space)
                 .contentShape(Rectangle())
                 .gesture(stripGesture(chords), including: edit ? .subviews : .all)
             }
             .onPreferenceChange(StripFrames.self) { stripFrames = $0 }
-            .frame(height: 40)
+            .frame(height: 40 + SectionBoxes.headerHeight + 3 + SectionBoxes.inset)
             .onChange(of: current) { _, c in
                 if let c { withAnimation { proxy.scrollTo(c, anchor: .center) } }
             }
@@ -165,6 +211,19 @@ struct BackingTimelineCard: View {
         }
     }
 
+    /// Clic derecho en un acorde: marcar el bucle activo y acciones de la sección que lo contiene.
+    @ViewBuilder private func chipMenu(_ seg: ChordSegment) -> some View {
+        let mid = (seg.start + seg.end) / 2
+        if ctl.loop != nil {
+            Button("Marcar sección") { markLoop(solo: false) }
+            Button("Marcar como solo") { markLoop(solo: true) }
+        }
+        if let s = session.sections.first(where: { $0.start <= mid && mid < $0.end }) {
+            if ctl.loop != nil { Divider() }
+            SectionMenu(section: s, session: session, selection: selection)
+        }
+    }
+
     private func chip(_ i: Int, _ seg: ChordSegment, current: Int?, inLoop: Bool) -> some View {
         let on = i == current
         return Text(shown(seg.index).name)
@@ -174,7 +233,7 @@ struct BackingTimelineCard: View {
             .background(on ? TF.accent : (inLoop ? TF.accent.opacity(0.22) : TF.field), in: RoundedRectangle(cornerRadius: 8))
             .overlay(RoundedRectangle(cornerRadius: 8).stroke(on ? .clear : (inLoop ? TF.accent : TF.fieldLine)))
             .background(GeometryReader { g in
-                Color.clear.preference(key: StripFrames.self, value: [i: g.frame(in: .named("strip"))])
+                Color.clear.preference(key: StripFrames.self, value: [i: g.frame(in: .named(SectionBoxes.space))])
             })
     }
 
@@ -185,7 +244,7 @@ struct BackingTimelineCard: View {
 
     /// Clic = saltar al inicio del acorde; arrastre = bucle con imán al pulso (⌥ = al compás).
     private func stripGesture(_ chords: [ChordSegment]) -> some Gesture {
-        DragGesture(minimumDistance: 0, coordinateSpace: .named("strip"))
+        DragGesture(minimumDistance: 0, coordinateSpace: .named(SectionBoxes.space))
             .onChanged { v in
                 guard abs(v.translation.width) >= ChordGridView.clickSlop,
                       let a = stripIndex(at: v.startLocation.x), let b = stripIndex(at: v.location.x),
@@ -194,6 +253,7 @@ struct BackingTimelineCard: View {
             }
             .onEnded { v in
                 stripDrag = nil
+                selection.clear()
                 guard let a = stripIndex(at: v.startLocation.x), let b = stripIndex(at: v.location.x),
                       a < chords.count, b < chords.count else { return }
                 if abs(v.translation.width) < ChordGridView.clickSlop {
@@ -331,7 +391,6 @@ struct BackingTimelineCard: View {
                 .toggleStyle(.checkbox).font(TF.body(13)).foregroundStyle(TF.text2)
                 .disabled(session.beats == nil)
             Spacer(minLength: 0)
-            RecordButton(ctl: ctl)
         }
     }
 }
@@ -340,115 +399,6 @@ extension Fmt {
     /// m:ss.
     static func clock(_ s: Double) -> String {
         let t = Int(max(s, 0)); return String(format: "%d:%02d", t / 60, t % 60)
-    }
-}
-
-// MARK: - Secciones
-
-struct SectionsLane: View {
-    let session: StudySession
-    let ctl: BackingController
-    let duration: Double
-    @Binding var editing: UUID?
-
-    @State private var drag: ClosedRange<Double>?
-
-    var body: some View {
-        GeometryReader { geo in
-            let w = geo.size.width
-            let t: (CGFloat) -> Double = { min(max(Double($0 / max(w, 1)) * duration, 0), duration) }
-            ZStack(alignment: .topLeading) {
-                RoundedRectangle(cornerRadius: 6).fill(TF.bg.opacity(0.5))
-                    .overlay(Text(session.sections.isEmpty && drag == nil ? "Arrastra aquí para marcar una sección" : "")
-                        .font(TF.body(12)).foregroundStyle(TF.muted))
-                ForEach(session.sections, id: \.id) { s in pill(s, width: w) }
-                if let d = drag {
-                    RoundedRectangle(cornerRadius: 6).fill(TF.accent.opacity(0.25))
-                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(TF.accent))
-                        .frame(width: CGFloat((d.upperBound - d.lowerBound) / duration) * w, height: 26)
-                        .offset(x: CGFloat(d.lowerBound / duration) * w, y: 2)
-                }
-            }
-            .contentShape(Rectangle())
-            .gesture(DragGesture(minimumDistance: 6)
-                .onChanged { v in
-                    let a = t(v.startLocation.x), b = t(v.location.x)
-                    drag = min(a, b)...max(a, b)
-                }
-                .onEnded { v in
-                    drag = nil
-                    let a = t(v.startLocation.x), b = t(v.location.x)
-                    // Un arrastre que empieza sobre una sección existente no crea otra.
-                    guard !session.sections.contains(where: { $0.start <= a && a < $0.end }) else { return }
-                    let r = StudyBridge.snap(session.beats, min(a, b)...max(a, b), bar: true)
-                    guard r.upperBound - r.lowerBound > 0.2 else { return }
-                    editing = session.addSection(name: "Sección", start: r.lowerBound, end: r.upperBound)
-                })
-        }
-        .frame(height: 30)
-    }
-
-    private func pill(_ s: SongSection, width w: CGFloat) -> some View {
-        let x0 = CGFloat(s.start / duration) * w
-        let x1 = CGFloat(s.end / duration) * w
-        let isLoop = isActiveLoop(s)
-        return Text(s.name)
-            .font(TF.body(12, .semibold)).lineLimit(1)
-            .foregroundStyle(isLoop ? TF.accent : TF.text2)
-            .padding(.horizontal, 8)
-            .frame(width: max(x1 - x0 - 2, 4), height: 26, alignment: .leading)
-            .background(isLoop ? TF.accentBg : TF.neutralBg, in: RoundedRectangle(cornerRadius: 6))
-            .overlay(RoundedRectangle(cornerRadius: 6).stroke(isLoop ? TF.accent : .clear))
-            .contentShape(Rectangle())
-            .onTapGesture {
-                if isLoop { ctl.setLoop(nil) } else { ctl.setLoop(s.start...s.end, name: s.name) }
-            }
-            .contextMenu {
-                Button("Editar nombre y tipo…") { editing = s.id }
-                Button("Borrar sección", role: .destructive) { session.removeSection(s.id) }
-            }
-            .popover(isPresented: Binding(get: { editing == s.id }, set: { if !$0 { editing = nil } })) {
-                SectionEditor(session: session, id: s.id, editing: $editing)
-            }
-            .offset(x: x0 + 1, y: 2)
-    }
-
-    private func isActiveLoop(_ s: SongSection) -> Bool {
-        guard let l = ctl.loop else { return false }
-        return abs(l.lowerBound - s.start) < 0.01 && abs(l.upperBound - s.end) < 0.01
-    }
-}
-
-struct SectionEditor: View {
-    let session: StudySession
-    let id: UUID
-    @Binding var editing: UUID?
-
-    private var section: SongSection? { session.sections.first { $0.id == id } }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Sección").font(TF.display(16))
-            TextField("Nombre", text: Binding(get: { section?.name ?? "" },
-                                               set: { n in session.updateSection(id) { $0.name = n } }))
-                .textFieldStyle(.roundedBorder).frame(width: 220)
-            Picker("Tipo", selection: Binding(get: { section?.kind ?? "" }, set: { k in
-                session.updateSection(id) { s in
-                    let old = SectionKinds.name(s.kind)
-                    s.kind = k.isEmpty ? nil : k
-                    if s.name == "Sección" || s.name == old, let n = SectionKinds.name(s.kind) { s.name = n }
-                }
-            })) {
-                Text("Sin tipo").tag("")
-                ForEach(SectionKinds.all, id: \.id) { Text($0.name).tag($0.id) }
-            }
-            HStack {
-                Button("Borrar", role: .destructive) { editing = nil; session.removeSection(id) }
-                Spacer()
-                Button("Hecho") { editing = nil }.keyboardShortcut(.defaultAction)
-            }
-        }
-        .padding(16).frame(width: 260)
     }
 }
 

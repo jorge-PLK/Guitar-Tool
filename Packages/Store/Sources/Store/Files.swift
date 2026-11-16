@@ -120,6 +120,22 @@ public struct ProjectLayout: Sendable, Equatable {
     /// Análisis automático de estudio (pulso, acordes, tonalidad); regenerable, lo limpia `ProjectCleaner` con `cache/`.
     public var analysisCache: URL { cacheDir.appendingPathComponent("analysis.json") }
 
+    /// Salida provisional del paso de guitarras.
+    public var guitarsPartialDir: URL { stemsDir.appendingPathComponent(".partial-guitars", isDirectory: true) }
+
+    public func guitarURL(_ role: GuitarRole) -> URL { url(relative: role.relativePath) }
+
+    /// Huella de un fichero (tamaño + fecha de modificación); nil si no existe.
+    static func fileFingerprint(_ url: URL) -> String? {
+        guard let a = try? FileManager.default.attributesOfItem(atPath: url.path) else { return nil }
+        let size = (a[.size] as? NSNumber)?.int64Value ?? 0
+        let mtime = (a[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
+        return "\(size)-\(String(format: "%.6f", mtime))"
+    }
+
+    /// Huella de la entrada del paso de guitarras: `stems/guitar.wav`.
+    public var guitarInputFingerprint: String? { Self.fileFingerprint(stemURL(.guitar)) }
+
     public func stemURL(_ kind: StemKind) -> URL {
         stemsDir.appendingPathComponent("\(kind.rawValue).wav")
     }
@@ -212,6 +228,9 @@ public enum ProjectCleaner {
 
         var result = project
         result.stems = []
+        // Las pistas `stems/guitar_*.wav` se borran; opciones y nombres se conservan.
+        result.guitarApplied = nil
+        result.guitars = project.guitars.map { Guitar(role: $0.role, name: $0.name) }
         result.separation = SeparationState(state: .none)
         result.takes = project.takes.filter { !$0.discarded }
         result.updatedAt = Date()

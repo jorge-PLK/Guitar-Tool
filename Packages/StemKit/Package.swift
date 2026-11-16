@@ -14,6 +14,8 @@ let package = Package(
         .executableTarget(name: "tf-separate", dependencies: ["StemKit"]),
         // Solo para tests: reserva y toca memoria para probar MemoryGuard/SeparationRunner. No es producto.
         .executableTarget(name: "tf-memhog"),
-        .testTarget(name: "StemKitTests", dependencies: ["StemKit", "tf-separate", "tf-memhog"])
+        // Fixtures/LeadRhythm: paridad del modelo de solista (entrada + salida de PyTorch, ver su reference.json).
+        .testTarget(name: "StemKitTests", dependencies: ["StemKit", "tf-separate", "tf-memhog"],
+                    resources: [.copy("Fixtures")])
     ]
 )

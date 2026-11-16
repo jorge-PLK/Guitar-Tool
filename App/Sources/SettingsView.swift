@@ -37,10 +37,6 @@ struct SettingsView: View {
                     SettingsGroup(title: "Cámara y vídeo", note: "Cámara, sincronía y exportación por defecto.") {
                         phase("Llega en la Fase 6")
                     }
-                case .device:
-                    SettingsGroup(title: "Pedalera y TONE3000", note: "Remote Editor de la Flex Prime y sesión de TONE3000.") {
-                        phase("Llega en las Fases 8–9")
-                    }
                 case .library: LibrarySettings()
                 }
             }
@@ -120,7 +116,7 @@ struct LibrarySettings: View {
     }
 
     private var library: some View {
-        SettingsGroup(title: "Biblioteca", note: "Una carpeta por tema, con sus stems, tomas, rigs y vídeo.") {
+        SettingsGroup(title: "Biblioteca", note: "Una carpeta por tema, con sus stems, tomas y vídeo.") {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Carpeta de proyectos").font(TF.body(13)).foregroundStyle(TF.muted)
                 Text(model.profile.projectsFolder?.path ?? "—")

@@ -128,35 +128,29 @@ public struct Song: Codable, Sendable, Equatable {
 
 // MARK: - Entidades de fases futuras (campos mínimos; opcionales para poder crecer)
 
-public struct Guitar: Codable, Sendable, Equatable {
-    public var id: UUID
-    public var name: String
-    public var stem: StemKind?
-    public var side: String?
-    public var role: String?
-
-    public init(id: UUID = UUID(), name: String, stem: StemKind? = nil, side: String? = nil, role: String? = nil) {
-        self.id = id
-        self.name = name
-        self.stem = stem
-        self.side = side
-        self.role = role
-    }
-}
-
 public struct Section: Codable, Sendable, Equatable {
     public var id: UUID
     public var name: String
     public var start: Double
     public var end: Double
     public var kind: String?
+    /// Marca «Solo» (mini-spec Fase 4: el solo es una sección más). Opcional y aditiva: ausente = no es solo.
+    public var solo: Bool?
+    /// Índice en la paleta de colores de sección (`SectionEditor.paletteCount`); nil = automático. Los solos van
+    /// siempre en naranja y no usan este campo (se conserva para cuando se quite la marca). Opcional y aditivo.
+    public var color: Int?
 
-    public init(id: UUID = UUID(), name: String, start: Double, end: Double, kind: String? = nil) {
+    public var isSolo: Bool { solo ?? false }
+
+    public init(id: UUID = UUID(), name: String, start: Double, end: Double, kind: String? = nil, solo: Bool? = nil,
+                color: Int? = nil) {
+        self.color = color
         self.id = id
         self.name = name
         self.start = start
         self.end = end
         self.kind = kind
+        self.solo = solo
     }
 }
 
@@ -277,8 +271,11 @@ public struct StemMix: Codable, Sendable, Equatable {
     public var gainDB: Double
     public var muted: Bool
     public var solo: Bool
+    /// Si no es nil, el canal es de esa pista de guitarra (`kind` = `.guitar`) y no del stem entero.
+    public var guitarRole: GuitarRole?
 
-    public init(kind: StemKind, gainDB: Double = 0, muted: Bool = false, solo: Bool = false) {
+    public init(kind: StemKind, gainDB: Double = 0, muted: Bool = false, solo: Bool = false, guitarRole: GuitarRole? = nil) {
+        self.guitarRole = guitarRole
         self.kind = kind
         self.gainDB = gainDB
         self.muted = muted
@@ -350,6 +347,11 @@ public struct Project: Codable, Sendable, Equatable {
     public var takes: [Take]
     public var videos: [Video]
     public var study: StudyState
+    /// Ajustes de guitarras guardados (Fase 4): solo el interruptor L/R. Los tramos de solo no se guardan aquí: salen
+    /// de las secciones con «Solo» (`guitarOptions`). Aditivo; clave JSON `guitarOptions`.
+    public var guitarSettings: GuitarSettings
+    /// Con qué opciones y qué entrada se produjeron las pistas de `guitars`; nil si no se procesó. Aditivo.
+    public var guitarApplied: GuitarAppliedState?
     public var createdAt: Date
     public var updatedAt: Date
 
@@ -357,7 +359,10 @@ public struct Project: Codable, Sendable, Equatable {
                 separation: SeparationState = SeparationState(), stems: [Stem] = [], guitars: [Guitar] = [],
                 sections: [Section] = [], rigs: [Rig] = [], takes: [Take] = [], videos: [Video] = [],
                 study: StudyState = StudyState(),
-                createdAt: Date = Date(), updatedAt: Date = Date()) {
+                createdAt: Date = Date(), updatedAt: Date = Date(), guitarSettings: GuitarSettings = GuitarSettings(),
+                guitarApplied: GuitarAppliedState? = nil) {
+        self.guitarSettings = guitarSettings
+        self.guitarApplied = guitarApplied
         self.study = study
         self.schemaVersion = schemaVersion
         self.id = id
@@ -373,16 +378,25 @@ public struct Project: Codable, Sendable, Equatable {
         self.updatedAt = updatedAt
     }
 
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion, id, song, separation, stems, guitars, sections, rigs, takes, videos, study
+        case guitarSettings = "guitarOptions"
+        case guitarApplied, createdAt, updatedAt
+    }
+
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         // Migración en memoria: un v1 se lee como v2 y sube de versión al guardar.
         schemaVersion = max(try c.decode(Int.self, forKey: .schemaVersion), Project.currentSchemaVersion)
         study = try c.decodeIfPresent(StudyState.self, forKey: .study) ?? StudyState()
+        guitarSettings = try c.decodeIfPresent(GuitarSettings.self, forKey: .guitarSettings) ?? GuitarSettings()
+        guitarApplied = try c.decodeIfPresent(GuitarAppliedState.self, forKey: .guitarApplied)
         id = try c.decode(UUID.self, forKey: .id)
         song = try c.decode(Song.self, forKey: .song)
         separation = try c.decodeIfPresent(SeparationState.self, forKey: .separation) ?? SeparationState()
         stems = try c.decodeIfPresent([Stem].self, forKey: .stems) ?? []
-        guitars = try c.decodeIfPresent([Guitar].self, forKey: .guitars) ?? []
+        // Las entradas que no sean de este formato (stub de antes de la Fase 4) se ignoran.
+        guitars = ((try? c.decodeIfPresent([LossyGuitar].self, forKey: .guitars)) ?? nil)?.compactMap(\.value) ?? []
         sections = try c.decodeIfPresent([Section].self, forKey: .sections) ?? []
         rigs = try c.decodeIfPresent([Rig].self, forKey: .rigs) ?? []
         takes = try c.decodeIfPresent([Take].self, forKey: .takes) ?? []
@@ -390,4 +404,9 @@ public struct Project: Codable, Sendable, Equatable {
         createdAt = try c.decode(Date.self, forKey: .createdAt)
         updatedAt = try c.decode(Date.self, forKey: .updatedAt)
     }
+}
+
+private struct LossyGuitar: Decodable {
+    let value: Guitar?
+    init(from decoder: Decoder) throws { value = try? Guitar(from: decoder) }
 }

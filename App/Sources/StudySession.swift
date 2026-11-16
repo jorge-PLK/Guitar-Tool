@@ -21,8 +21,15 @@ final class StudySession {
 
     /// Lo del usuario. Cualquier cambio programa el guardado.
     var study: StudyState { didSet { if study != oldValue { scheduleSave() } } }
-    var sections: [Section] { didSet { if sections != oldValue { scheduleSave() } } }
+    /// Secciones en edición (los solos son secciones con la marca «Solo»): locales hasta «Aplicar» (mini-spec Fase 4,
+    /// «Opciones de guitarras y tramos de solo»). Lo guardado está en `project.sections`.
+    var sections: [Section]
+    /// Nombres de guitarra editados y aún sin guardar (con rebote, `Library.saveGuitarNames`).
+    private var pendingNames: [GuitarRole: String] = [:] { didSet { if !pendingNames.isEmpty { scheduleSave() } } }
+    /// Error al guardar las opciones o los nombres (se muestra junto al interruptor).
+    private(set) var guitarOptionsError: String?
 
+    @ObservationIgnored private var simulated = false
     @ObservationIgnored private let library: Library
     @ObservationIgnored private var saveTask: Task<Void, Never>?
 
@@ -47,8 +54,53 @@ final class StudySession {
 
     /// Relee `project.json` y la caché tras un evento (`stemsMeasured`, `analysisFinished`).
     func reload() {
-        if let p = try? ProjectFile.load(folder: folder) { project = p }
+        if let p = try? ProjectFile.load(folder: folder) {
+            let dirty = hasUnappliedSections
+            project = p
+            if !simulated, !dirty { sections = p.sections }
+        }
         loadAnalysis()
+    }
+
+    // MARK: Guitarras (Fase 4)
+
+    /// Pistas de guitarra con fichero en disco, en el orden de `GuitarRole.allCases`.
+    var guitarTracks: [Guitar] {
+        project.guitarTracks.filter { g in
+            simulated || g.file.map { FileManager.default.fileExists(atPath: layout.url(relative: $0).path) } == true
+        }
+    }
+
+    /// Hay pistas separadas: sustituyen al canal «Guitarras» del mezclador (no se suman dos veces).
+    var usesSeparatedGuitars: Bool { !guitarTracks.isEmpty }
+
+    /// Stems con canal propio en el mezclador (sin `guitar` si se muestran las pistas separadas).
+    var mixerStems: [StemKind] { usesSeparatedGuitars ? audibleStems.filter { $0 != .guitar } : audibleStems }
+
+    var guitarOptions: GuitarOptions { project.guitarOptions }
+
+    func guitarName(_ role: GuitarRole) -> String { pendingNames[role] ?? project.guitarName(role) }
+
+    func renameGuitar(_ role: GuitarRole, to name: String) {
+        let n = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        pendingNames[role] = n.isEmpty ? role.defaultName : n
+    }
+
+    /// Interruptor «Guitarras en L y R»: se guarda ya (las secciones en edición no se tocan).
+    func setStereoSplit(_ on: Bool) {
+        guitarOptionsError = nil
+        guard !simulated else {
+            project.guitarSettings.stereoSplit = on
+            return
+        }
+        Task { [library, projectID] in
+            do {
+                try await library.saveGuitarStereoSplit(id: projectID, on)
+            } catch {
+                guitarOptionsError = "No se pudieron guardar las opciones: \(error.localizedDescription)"
+            }
+            reload()
+        }
     }
 
     private func loadAnalysis() {
@@ -88,22 +140,90 @@ final class StudySession {
 
     func setKeyOverride(_ key: String?) { study.keyOverride = key }
 
+    // MARK: Secciones (el solo es una sección más)
+
+    /// Hay secciones editadas sin aplicar.
+    var hasUnappliedSections: Bool { sections != project.sections }
+
+    func discardSections() { sections = project.sections }
+
+    /// Guarda las secciones en edición; la biblioteca rehace las pistas de guitarra en segundo plano solo si cambian
+    /// los tramos de solo (renombrar o mover secciones que no son solo no reprocesa).
+    func applySections() {
+        let applied = sections
+        guitarOptionsError = nil
+        project.sections = applied
+        guard !simulated else { return }
+        saveTask?.cancel()
+        Task { [library, projectID, study] in
+            do {
+                try await library.saveStudy(id: projectID, study: study, sections: applied)
+            } catch {
+                guitarOptionsError = "No se pudieron guardar las secciones: \(error.localizedDescription)"
+            }
+            reload()
+        }
+    }
+
+    /// Aplica una edición de `SectionEditor` (lógica y tests en Store) a las secciones en edición.
+    private func edit<R>(_ body: (inout SectionEditor) -> R) -> R {
+        var e = SectionEditor(sections: sections, duration: project.song.duration)
+        let r = body(&e)
+        if e.sections != sections { sections = e.sections }
+        return r
+    }
+
+    /// Marca una sección (o un solo) en `r`: recorta o parte las que solapa (`SectionEditor.mark`).
     @discardableResult
-    func addSection(name: String, start: Double, end: Double, kind: String? = nil) -> UUID? {
-        guard end > start else { return nil }
-        let s = Section(name: name, start: start, end: end, kind: kind)
-        sections.append(s)
-        sections.sort { $0.start < $1.start }
-        return s.id
+    func markSection(_ r: ClosedRange<Double>, solo: Bool) -> UUID? { edit { $0.mark(r, solo: solo) } }
+
+    func renameSection(_ id: UUID, to name: String) { edit { $0.rename(id, to: name) } }
+
+    /// Alterna «Solo»; un nombre por defecto sigue a la marca («Sección 2» y «Solo»).
+    func setSolo(_ id: UUID, _ on: Bool) { edit { $0.setSolo(id, on) } }
+
+    /// Tiempo al que quedaría un borde de la sección sin pasar de su vecina ni bajar del largo mínimo.
+    func clampedEdge(_ id: UUID, start moveStart: Bool, to time: Double) -> Double? {
+        SectionEditor(sections: sections, duration: project.song.duration).clampedEdge(id, start: moveStart, to: time)
     }
 
-    func updateSection(_ id: UUID, _ change: (inout Section) -> Void) {
-        guard let i = sections.firstIndex(where: { $0.id == id }) else { return }
-        change(&sections[i])
-        sections.sort { $0.start < $1.start }
+    /// Mueve un borde de la sección al límite más cercano a `time` (acorde, o compás con `bar`).
+    func snapSectionEdge(_ id: UUID, start moveStart: Bool, to time: Double, bar: Bool) {
+        let b = bar ? barBoundaries : chordBoundaries
+        edit { $0.snapEdge(id, start: moveStart, to: time, boundaries: b) }
     }
 
-    func removeSection(_ id: UUID) { sections.removeAll { $0.id == id } }
+    /// Mueve un borde exactamente a `time` (ya es un límite de acorde o compás; solo se aplican los topes).
+    func setSectionEdge(_ id: UUID, start moveStart: Bool, to time: Double) {
+        edit { $0.setEdge(id, start: moveStart, to: time) }
+    }
+
+    /// Dónde quedaría un borde soltado en `time`: con imán y dentro de los topes (vista previa del arrastre).
+    func snappedEdge(_ id: UUID, start moveStart: Bool, to time: Double, bar: Bool) -> Double? {
+        clampedEdge(id, start: moveStart, to: SectionEditor.snap(time, to: bar ? barBoundaries : chordBoundaries))
+    }
+
+    /// Mueve un borde al acorde siguiente o anterior (al compás con `bar`).
+    func nudgeSectionEdge(_ id: UUID, start moveStart: Bool, forward: Bool, bar: Bool) {
+        let b = bar ? barBoundaries : chordBoundaries
+        edit { $0.nudgeEdge(id, start: moveStart, forward: forward, boundaries: b) }
+    }
+
+    func removeSection(_ id: UUID) { edit { $0.remove(id) } }
+
+    /// Elige el color de paleta de una sección (nil = automático).
+    func setSectionColor(_ id: UUID, _ index: Int?) { edit { $0.setColor(id, index) } }
+
+    /// Color de paleta de cada sección que no es solo (`SectionEditor.paletteIndices`).
+    var sectionPalette: [UUID: Int] { SectionEditor.paletteIndices(sections) }
+
+    /// Límites de acorde (inicios y finales, ordenados): el imán de los bordes de sección.
+    var chordBoundaries: [Double] {
+        Array(Set(effectiveChords.flatMap { [$0.start, $0.end] })).sorted()
+    }
+
+    /// Inicios de compás (downbeats).
+    var barBoundaries: [Double] { beats?.downbeats ?? [] }
 
     @discardableResult
     func addLoop(name: String, start: Double, end: Double) -> UUID? {
@@ -121,12 +241,27 @@ final class StudySession {
     func removeLoop(_ id: UUID) { study.loops.removeAll { $0.id == id } }
 
     /// Mezcla guardada del stem (valores por defecto si aún no se tocó).
-    func mix(for kind: StemKind) -> StemMix { study.mixer.first { $0.kind == kind } ?? StemMix(kind: kind) }
+    func mix(for kind: StemKind) -> StemMix {
+        study.mixer.first { $0.kind == kind && $0.guitarRole == nil } ?? StemMix(kind: kind)
+    }
 
     func updateMix(_ kind: StemKind, _ change: (inout StemMix) -> Void) {
-        var m = mix(for: kind)
+        updateMix(where: { $0.kind == kind && $0.guitarRole == nil }, default: StemMix(kind: kind), change)
+    }
+
+    /// Mezcla guardada de una pista de guitarra (por papel, mini-spec Fase 4 «Datos»).
+    func mix(forGuitar role: GuitarRole) -> StemMix {
+        study.mixer.first { $0.guitarRole == role } ?? StemMix(kind: .guitar, guitarRole: role)
+    }
+
+    func updateMix(guitar role: GuitarRole, _ change: (inout StemMix) -> Void) {
+        updateMix(where: { $0.guitarRole == role }, default: StemMix(kind: .guitar, guitarRole: role), change)
+    }
+
+    private func updateMix(where match: (StemMix) -> Bool, default base: StemMix, _ change: (inout StemMix) -> Void) {
+        var m = study.mixer.first(where: match) ?? base
         change(&m)
-        if let i = study.mixer.firstIndex(where: { $0.kind == kind }) { study.mixer[i] = m } else { study.mixer.append(m) }
+        if let i = study.mixer.firstIndex(where: match) { study.mixer[i] = m } else { study.mixer.append(m) }
     }
 
     func updatePlayer(_ change: (inout PlayerSettings) -> Void) {
@@ -180,6 +315,76 @@ final class StudySession {
     func flush() async {
         saveTask?.cancel()
         saveTask = nil
-        try? await library.saveStudy(id: projectID, study: study, sections: sections)
+        try? await library.saveStudy(id: projectID, study: study, sections: project.sections)
+        if !simulated, !pendingNames.isEmpty {
+            let names = pendingNames
+            pendingNames = [:]
+            do { try await library.saveGuitarNames(id: projectID, names: names) } catch {
+                guitarOptionsError = "No se pudieron guardar los nombres: \(error.localizedDescription)"
+            }
+            reload()
+        }
     }
 }
+
+extension GuitarRole {
+    /// Id de su pista en el reproductor (`guitar_L`, igual que el nombre del fichero sin extensión).
+    var trackID: String { String(fileName.dropLast(4)) }
+}
+
+#if DEBUG
+extension StudySession {
+    /// `--guitars-demo`: pistas, secciones y solos simulados, solo en memoria (no se guardan ni hay pistas en disco).
+    /// Modos: «mono-solo», «stereo», «stereo-solo», «dirty» (secciones sin aplicar), «processing», «failed» y
+    /// «narrow» (solos estrechos). Los modos sin solo llevan solo secciones normales.
+    func installGuitarsDemo(_ demo: String) {
+        let d = max(project.song.duration, 60)
+        let downbeats = beats?.downbeats ?? []
+        let bars = downbeats.count >= 8 ? downbeats : Array(stride(from: 0.0, to: d, by: 4))
+        func at(_ f: Double) -> Double {
+            let target = d * f
+            return bars.min { abs($0 - target) < abs($1 - target) } ?? target
+        }
+        let stereo = demo.hasPrefix("stereo")
+        let solo = demo.hasSuffix("solo") || ["dirty", "processing", "failed", "narrow"].contains(demo)
+        var roles: [GuitarRole] = stereo ? [.left, .right] : [.rhythm]
+        if solo { roles.append(.lead) }
+        simulated = true
+        // Con acordes analizados, las secciones caen sobre los primeros acordes (así se ven sin desplazar la tira).
+        let chords = effectiveChords
+        var list: [Section]
+        if chords.count >= 16 {
+            func c(_ i: Int) -> Double { chords[i].start }
+            list = [Section(name: "Intro", start: c(0), end: c(3)),
+                    Section(name: "Estrofa", start: c(3), end: c(6))]
+            if solo {
+                list.append(Section(name: "Solo", start: c(6), end: c(9), solo: true))
+                list.append(Section(name: "Estribillo", start: c(9), end: c(12)))
+                list.append(Section(name: "Solo 3", start: c(13), end: c(14), solo: true))
+                list.append(Section(name: "Puente del tema", start: c(14), end: c(16)))
+            } else {
+                list.append(Section(name: "Estribillo", start: c(6), end: c(10)))
+                list.append(Section(name: "Puente", start: c(10), end: c(14)))
+            }
+        } else {
+            list = [Section(name: "Intro", start: 0, end: at(0.12)),
+                    Section(name: "Estrofa", start: at(0.12), end: at(0.30)),
+                    Section(name: "Estribillo", start: at(0.30), end: at(0.42))]
+            if solo {
+                list.append(Section(name: "Solo", start: at(0.42), end: at(0.52), solo: true))
+                list.append(Section(name: "Solo 2", start: at(0.78), end: at(0.84), solo: true))
+            } else {
+                list.append(Section(name: "Puente", start: at(0.42), end: at(0.60)))
+            }
+        }
+        project.sections = list
+        sections = list
+        project.guitarSettings = GuitarSettings(stereoSplit: stereo)
+        project.guitars = roles.map { Guitar(role: $0, name: $0 == .left ? "Robe" : ($0 == .right ? "Uoho" : nil), file: $0.relativePath) }
+        if demo == "dirty" {
+            if chords.count >= 18 { _ = markSection(chords[16].start...chords[18].start, solo: true) }
+            if let i = sections.firstIndex(where: { $0.name == "Estrofa" }) { sections[i].name = "Estrofa 1" }
+        }
+    }
+}
+#endif

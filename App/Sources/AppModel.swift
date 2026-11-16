@@ -39,6 +39,11 @@ struct LaunchOptions {
     /// Detalle de Biblioteca con la edición de título y artista activada / diálogo «¿Eliminar…?» del primer tema.
     var detailEdit = false
     var deleteDialog = false
+    /// Backing con pistas de guitarra y tramos simulados (solo en memoria): «mono-solo», «stereo», «stereo-solo»,
+    /// «dirty» (tramos sin aplicar), «processing» y «failed» (como «mono-solo» con el estado del proceso).
+    var guitarsDemo: String?
+    /// Con `--guitars-demo`: selecciona la sección N (desde 0) y abre su ventana, para capturas.
+    var selectSection: Int?
 
     init(_ args: [String] = CommandLine.arguments) {
         var i = 1
@@ -71,6 +76,8 @@ struct LaunchOptions {
             case ("--link-import-demo", let v?): linkImportDemo = v; i += 1
             case ("--detail-edit", _): detailEdit = true
             case ("--delete-dialog", _): deleteDialog = true
+            case ("--guitars-demo", let v?): guitarsDemo = v; i += 1
+            case ("--select-section", let v?): selectSection = Int(v); i += 1
             default: break
             }
             i += 1
@@ -81,7 +88,7 @@ struct LaunchOptions {
 
 enum AppSection: Hashable { case library, backing, settings }
 enum SettingsTab: String, CaseIterable, Identifiable {
-    case audio = "Audio", video = "Cámara y vídeo", device = "Pedalera y TONE3000", library = "Biblioteca y equipo"
+    case audio = "Audio", video = "Cámara y vídeo", library = "Biblioteca y equipo"
     var id: String { rawValue }
 }
 
@@ -120,6 +127,12 @@ struct CleanupRequest: Identifiable {
     let projectID: UUID?   // nil = todos
     let title: String
     let bytes: Int64
+}
+
+/// Paso de guitarras en marcha o fallido (eventos `guitarSplit*` de `Library`; no hay progreso por evento).
+enum GuitarProcess: Equatable {
+    case processing
+    case failed(String)
 }
 
 struct Notice: Identifiable {
@@ -179,6 +192,8 @@ final class AppModel {
     var entries: [LibraryEntryInfo] = []
     var separationProgress: [UUID: Double] = [:]
     var failures: [UUID: String] = [:]
+    /// Estado del paso de guitarras (L/R y tramos de solo) por tema (Fase 4); sin entrada = nada en marcha.
+    var guitarProcess: [UUID: GuitarProcess] = [:]
     var imports: [ImportItem] = []
     var modelState: ModelState = .notInstalled
     var usage: DiskUsageReport?
@@ -310,7 +325,8 @@ final class AppModel {
             let helper = Bundle.main.url(forAuxiliaryExecutable: "tf-separate")
             let lib = Library(root: root, profile: profileStore, index: index, importer: AppAudioImporter(),
                               separator: AppStemSeparator(modelStore: modelStore, helperURL: helper),
-                              levelMeter: AppStemLevelMeter(), analyzer: studyAnalyzer)
+                              levelMeter: AppStemLevelMeter(), analyzer: studyAnalyzer,
+                              guitarSplitter: AppGuitarSplitter(modelStore: modelStore))
             library = lib
             eventTask = Task { [weak self] in
                 for await e in lib.events { self?.handle(e) }
@@ -378,6 +394,9 @@ final class AppModel {
         case .analysisFinished(let id): if !analysisPinned, study?.projectID == id { study?.reload(); study?.setAnalysisState(.ready) }
         case .analysisFailed(let id, let msg): if !analysisPinned, study?.projectID == id { study?.setAnalysisState(.failed(msg)) }
         case .stemsMeasured(let id): if study?.projectID == id { study?.reload() }
+        case .guitarSplitQueued(let id), .guitarSplitStarted(let id): guitarProcess[id] = .processing
+        case .guitarSplitFinished(let id): guitarProcess[id] = nil; if study?.projectID == id { study?.reload() }
+        case .guitarSplitFailed(let id, let msg): guitarProcess[id] = .failed(msg)
         case .relocated: if let p = try? profileStore.load() { profile = p }
         default: break
         }
@@ -601,8 +620,11 @@ final class AppModel {
             controller.onMasterChange = { [weak self] dB in self?.setMasterGain(dB) }
             backing = controller
             controller.audio = audio
-            audio.onTakesChanged = { [weak controller] isNew in controller?.takesChanged(isNew: isNew) }
-            audio.bind(player: controller.player, study: session)
+            switch await library.guitarSplitState(id: id) {
+            case .processing: guitarProcess[id] = .processing
+            case .failed(let msg): guitarProcess[id] = .failed(msg)
+            case .pending, .done: break
+            }
             #if DEBUG
             applyLaunchOptions(to: session)
             #endif
@@ -624,8 +646,6 @@ final class AppModel {
 
     func closeStudy() async {
         backing?.stop()
-        audio.unbind()
-        audio.onTakesChanged = nil
         backing = nil
         await study?.flush()
         study = nil
@@ -648,10 +668,12 @@ final class AppModel {
         playlistImport?.cancelLoading()
         playlistImport?.cancel()
         if let library {
-            let saved = study.map { ($0.projectID, $0.study, $0.sections) }
+            let saved = study.map { ($0.projectID, $0.study, $0.project.sections) }
             let done = DispatchSemaphore(value: 0)
             Task.detached {
-                if let (id, study, sections) = saved { try? await library.saveStudy(id: id, study: study, sections: sections) }
+                if let (id, study, sections) = saved {
+                    try? await library.saveStudy(id: id, study: study, sections: sections)
+                }
                 await library.stopAllForShutdown()
                 done.signal()
             }
@@ -736,6 +758,12 @@ final class AppModel {
         default: break
         }
         if options.screen == "backing-ab" { runAudioDemo() }
+        if let demo = options.guitarsDemo {
+            session.installGuitarsDemo(demo)
+            backing?.loadTracks()
+            if demo == "processing" { guitarProcess[session.projectID] = .processing }
+            if demo == "failed" { guitarProcess[session.projectID] = .failed("Modelo de solista no disponible") }
+        }
         backing?.apply(rate: options.rate, transpose: options.transpose, capo: options.capo,
                        muted: options.mute, loop: options.loop, seek: options.seek)
     }

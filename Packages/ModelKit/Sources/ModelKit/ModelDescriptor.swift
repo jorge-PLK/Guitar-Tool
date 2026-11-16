@@ -2,6 +2,8 @@ import Foundation
 
 public enum ModelRole: String, Sendable, Equatable, Codable, CaseIterable {
     case separation, chords, beats, guitarTranscription, drumTranscription
+    /// Guitarra solista frente a rítmica dentro de los tramos de solo (mini-spec de la Fase 4).
+    case leadGuitarSeparation
 }
 
 public enum ModelArchiveKind: String, Sendable, Equatable, Codable {
@@ -92,5 +94,52 @@ public enum ModelCatalog {
         packageName: "BTC_large_voca_fp16.mlpackage",
         license: "Pesos no comerciales, uso personal")
 
-    public static let all: [ModelDescriptor] = [separatorBSRoformerSW, chordsBTC, beatsBeatThis]
+    /// SHA-256 y tamaño de `App/Resources/Models/BasicPitch_nmp.mlpackage.zip` (lo genera, idéntico en cada
+    /// ejecución, `Probes/P4-modelos/basic_pitch/convert.py --install`).
+    static let transcriptionBasicPitchSHA256 = "c2faf4ae9da4ad7acd726b92748c63e6707b21301e1291d420dda563006f0653"
+    static let transcriptionBasicPitchBytes: Int64 = 116_293
+
+    /// Transcripción de guitarra y bajo (mini-spec Fase 4): `nmp.mlpackage` oficial de spotify/basic-pitch
+    /// (ICASSP 2022, commit `fa5997a`), FP32, sin convertir. Embebido en la app como BTC.
+    /// Contrato: `input_2` [1, 43844, 1] a 22050 Hz → `Identity_1` note [1, 172, 88], `Identity_2` onset
+    /// [1, 172, 88], `Identity` contour [1, 172, 264].
+    public static let transcriptionBasicPitch = ModelDescriptor(
+        id: "basic-pitch",
+        version: "icassp2022-fa5997a",
+        displayName: "Transcripción de notas",
+        role: .guitarTranscription,
+        url: URL(string: "bundle:///BasicPitch_nmp.mlpackage.zip")!,
+        sha256: transcriptionBasicPitchSHA256,
+        archiveBytes: transcriptionBasicPitchBytes,
+        archiveKind: .bundledZippedMLPackage,
+        packageName: "BasicPitch_nmp.mlpackage",
+        license: "Apache-2.0")
+
+    /// SHA-256 y tamaño de `App/Resources/Models/LeadRhythmMelRoformer_fp16.mlpackage.zip` (lo genera
+    /// `Probes/P4-modelos/lead_rhythm/convert.py fp16 --install`; una nueva conversión cambia el hash).
+    static let leadRhythmSHA256 = "130f33efcdd10bc4e0d5d94deebb79049ca9c57647111c85ed125d44f0ac3401"
+    static let leadRhythmBytes: Int64 = 156_007_134
+    /// SHA-256 del checkpoint original (`model_mel_band_roformer_ep_72_sdr_3.2232.ckpt`, HF
+    /// RandomFilteredStuff/RVC_V2_Stuff, commit c3ac4e45), cargado solo con `torch.load(weights_only=True)`.
+    public static let leadRhythmCheckpointSHA256 = "b3c47bca33609ca1ba0bb2d2076410bfd1eb941b051b72afc1f3e24d12b17eef"
+
+    /// Guitarra solista frente a rítmica (mini-spec Fase 4, tramos de solo): núcleo del Mel-Band RoFormer
+    /// «Lead_Rhythm_Guitar» sin STFT, convertido a Core ML FP16 (CPU+GPU). Embebido en la app como BTC.
+    /// Contrato (como BS-RoFormer SW, 1 stem): `spec` [1, 2050, 301, 2] float32 (fila 2·f + canal, STFT
+    /// n_fft 2048, hop 441, 44,1 kHz, trozo 132300) → `mask` [1, 1, 2050, 301, 2] float32, máscara compleja
+    /// de la solista; rítmica = entrada − solista.
+    public static let leadRhythmMelRoformer = ModelDescriptor(
+        id: "lead-rhythm-guitar",
+        version: "melroformer-ep72-c3ac4e45-fp16",
+        displayName: "Guitarra solista",
+        role: .leadGuitarSeparation,
+        url: URL(string: "bundle:///LeadRhythmMelRoformer_fp16.mlpackage.zip")!,
+        sha256: leadRhythmSHA256,
+        archiveBytes: leadRhythmBytes,
+        archiveKind: .bundledZippedMLPackage,
+        packageName: "LeadRhythmMelRoformer_fp16.mlpackage",
+        license: "openrail; pesos anónimos de HF, uso personal")
+
+    public static let all: [ModelDescriptor] = [separatorBSRoformerSW, chordsBTC, beatsBeatThis,
+                                                transcriptionBasicPitch, leadRhythmMelRoformer]
 }

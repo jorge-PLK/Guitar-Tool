@@ -9,15 +9,6 @@ enum SpanishNotes {
     static let names = ["Do", "Do#", "Re", "Re#", "Mi", "Fa", "Fa#", "Sol", "Sol#", "La", "La#", "Si"]
 }
 
-/// Tipos de sección de la mini-spec Fase 2 §1 (Store): intro, estrofa, estribillo, puente, solo, outro.
-enum SectionKinds {
-    static let all: [(id: String, name: String)] = [
-        ("intro", "Intro"), ("estrofa", "Estrofa"), ("estribillo", "Estribillo"),
-        ("puente", "Puente"), ("solo", "Solo"), ("outro", "Outro"),
-    ]
-    static func name(_ id: String?) -> String? { all.first { $0.id == id }?.name }
-}
-
 /// Pantalla Backing track (boceto `docs/design/Backing.dc.html`, recortado según mini-spec Fase 2 §2).
 struct BackingView: View {
     @Environment(AppModel.self) private var model
@@ -82,7 +73,7 @@ struct BackingContent: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 14) {
                 header
                 if session.project.separation.state != .done || (session.audibleStems.isEmpty && session.emptyStems.isEmpty) {
                     notSeparated
@@ -93,11 +84,10 @@ struct BackingContent: View {
                     HStack(alignment: .top, spacing: 20) {
                         BackingMixer(session: session, ctl: ctl, meters: meters, compact: chordsExpanded)
                             .frame(maxWidth: .infinity)
-                        if ctl.hasGuitar { ComparePanel(ctl: ctl).frame(width: 300) }
                     }
                 }
             }
-            .padding(.horizontal, 36).padding(.vertical, 28)
+            .padding(.horizontal, 36).padding(.vertical, 20)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .onReceive(tick) { _ in
@@ -108,20 +98,22 @@ struct BackingContent: View {
         #if DEBUG
         .onAppear {
             if model.options.chordsExpanded { chordsExpanded = true }
+            else if model.options.selectSection != nil { chordsExpanded = false }
             if model.options.chordsEdit { chordsEdit = true }
         }
         #endif
         .onChange(of: session.beats) { ctl.refreshMetronome() }
         .onChange(of: session.audibleStems) { ctl.loadTracks() }
+        .onChange(of: session.guitarTracks.map(\.role)) { ctl.loadTracks() }
     }
 
     private var header: some View {
         HStack(alignment: .bottom) {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
                 let song = session.project.song
                 Text([song.artist, song.title].compactMap { $0 }.joined(separator: " · "))
                     .font(TF.body(13)).foregroundStyle(TF.muted)
-                Text("Backing track").font(TF.display(30))
+                Text("Backing track").font(TF.display(26))
             }
             Spacer()
             if ctl.hasGuitar {
@@ -129,7 +121,7 @@ struct BackingContent: View {
                     Text("Sin guitarras")
                         .font(TF.body(13, ctl.guitarsOff ? .semibold : .medium))
                         .foregroundStyle(ctl.guitarsOff ? TF.accent : TF.text)
-                        .padding(.horizontal, 14).frame(height: 40)
+                        .padding(.horizontal, 14).frame(height: 34)
                         .background(ctl.guitarsOff ? TF.accentBg : TF.field, in: RoundedRectangle(cornerRadius: 8))
                         .overlay(RoundedRectangle(cornerRadius: 8).stroke(ctl.guitarsOff ? TF.accent : TF.fieldLine))
                 }

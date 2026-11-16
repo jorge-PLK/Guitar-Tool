@@ -118,6 +118,12 @@ public enum LibraryEvent: Sendable, Equatable {
     case trashed(UUID)
     case indexChanged
     case relocated(URL)
+    /// Paso de guitarras (Fase 4: L/R y tramos de solo), tras medir y antes del análisis. Si falla, el tema sigue
+    /// usable con las pistas que hubiera o el canal «Guitarras» de siempre.
+    case guitarSplitQueued(UUID)
+    case guitarSplitStarted(UUID)
+    case guitarSplitFinished(UUID)
+    case guitarSplitFailed(UUID, String)
 }
 
 public enum RelocationMode: Sendable {
@@ -163,6 +169,16 @@ public actor Library {
     private let autoSeparate: Bool
     private let levelMeter: (any StemLevelMeasuring)?
     private let analyzer: (any StudyAnalyzing)?
+    private let guitarSplitter: (any GuitarSplitting)?
+    /// Pasos de guitarras que fallaron en esta sesión: no se reintentan hasta reabrir la app o cambiar las opciones
+    /// (evita bucles al abrir).
+    private var guitarSplitFailed: Set<UUID> = []
+    /// Estado observable del paso de guitarras (ausente = listo).
+    private var guitarStates: [UUID: GuitarSplitState] = [:]
+    /// Trabajos de la cola que solo rehacen guitarras (no repiten el análisis).
+    private var guitarOnlyJobs: Set<UUID> = []
+    /// Las opciones cambiaron con el proyecto en pleno trabajo: hay que repetir el paso con las últimas.
+    private var guitarRerun: Set<UUID> = []
 
     /// Trabajos posteriores (medir stems y analizar). Se sirven antes que la siguiente separación: son cortos.
     private var postQueue: [UUID] = []
@@ -193,7 +209,9 @@ public actor Library {
 
     public init(root: URL, profile: ProfileStore, index: LibraryIndex, importer: any AudioImporting,
                 separator: any StemSeparating, autoSeparate: Bool = true,
-                levelMeter: (any StemLevelMeasuring)? = nil, analyzer: (any StudyAnalyzing)? = nil) {
+                levelMeter: (any StemLevelMeasuring)? = nil, analyzer: (any StudyAnalyzing)? = nil,
+                guitarSplitter: (any GuitarSplitting)? = nil) {
+        self.guitarSplitter = guitarSplitter
         self.levelMeter = levelMeter
         self.analyzer = analyzer
         let (stream, cont) = AsyncStream.makeStream(of: LibraryEvent.self)
@@ -385,6 +403,10 @@ public actor Library {
                 currentPostID = id
                 await runPostProcessing(id)
                 currentPostID = nil
+                if guitarRerun.remove(id) != nil, !shuttingDown {
+                    guitarOnlyJobs.insert(id)
+                    postQueue.append(id)
+                }
                 continue
             }
             let id = queue.removeFirst()
@@ -437,9 +459,9 @@ public actor Library {
                     }
                     try deleteEmptyStemFiles(stems, layout: layout)
                     cont.yield(.separationFinished(id))
-                    if analyzer != nil {
+                    if analyzer != nil || guitarSplitter != nil {
                         postQueue.append(id)
-                        cont.yield(.analysisQueued(id))
+                        if analyzer != nil { cont.yield(.analysisQueued(id)) }
                     }
                 }
             }
@@ -579,11 +601,70 @@ public actor Library {
 
     /// Guarda lo del usuario en la herramienta de estudio (`project.json`): correcciones, bucles, mezcla, ajustes y secciones.
     /// Solo toca esos campos, así que es seguro mientras hay una separación o un análisis en marcha.
+    /// Si cambian los tramos de solo (secciones con «Solo»), rehace solo el paso de guitarras en segundo plano;
+    /// renombrar o mover secciones que no son solo no reprocesa.
     public func saveStudy(id: UUID, study: StudyState, sections: [Section]) async throws {
+        var before: GuitarOptions?
+        var after: GuitarOptions?
         try await mutate(id) {
+            before = $0.guitarOptions
             $0.study = study
             $0.sections = sections
+            after = $0.guitarOptions
         }
+        guard before != after else { return }
+        guitarSplitFailed.remove(id)
+        try await enqueueGuitarStep(id)
+    }
+
+    /// Guarda los nombres de las pistas de guitarra por papel (vacío = el nombre por defecto). No toca pistas ni
+    /// opciones, así que es seguro con el paso de guitarras en marcha.
+    public func saveGuitarNames(id: UUID, names: [GuitarRole: String]) async throws {
+        try await mutate(id) { p in
+            for (role, raw) in names {
+                let n = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+                let name = n.isEmpty ? role.defaultName : n
+                if let i = p.guitars.firstIndex(where: { $0.role == role }) {
+                    p.guitars[i].name = name
+                } else {
+                    p.guitars.append(Guitar(role: role, name: name))
+                }
+            }
+        }
+    }
+
+    /// Guarda el interruptor «Guitarras en L y R» y, si cambió, rehace solo el paso de guitarras en segundo
+    /// plano (sin repetir el análisis). Con el paso en marcha lo repite después con las últimas opciones.
+    /// Devuelve las opciones efectivas (interruptor + tramos de las secciones con «Solo»).
+    @discardableResult
+    public func saveGuitarStereoSplit(id: UUID, _ on: Bool) async throws -> GuitarOptions {
+        var before = false
+        let saved = try await mutate(id) { p in
+            before = p.guitarSettings.stereoSplit
+            p.guitarSettings.stereoSplit = on
+        }
+        guard before != on else { return saved.guitarOptions }
+        guitarSplitFailed.remove(id)
+        try await enqueueGuitarStep(id)
+        return saved.guitarOptions
+    }
+
+    /// Estado del paso de guitarras del proyecto (listo si no hay nada pendiente).
+    public func guitarSplitState(id: UUID) -> GuitarSplitState { guitarStates[id] ?? .done }
+
+    private func enqueueGuitarStep(_ id: UUID) async throws {
+        guard guitarSplitter != nil, !shuttingDown, let folder = await locate(id) else { return }
+        let project = try ProjectFile.load(folder: folder)
+        guard project.separation.state == .done, !queue.contains(id), currentID != id, migrations[id] == nil else { return }
+        guard guitarSplitNeeded(project, layout: ProjectLayout(folder: folder)) else { return }
+        guitarStates[id] = .pending
+        continuation.yield(.guitarSplitQueued(id))
+        if currentPostID == id { guitarRerun.insert(id); return }
+        if !postQueue.contains(id) {
+            guitarOnlyJobs.insert(id)
+            postQueue.append(id)
+        }
+        startWorkerIfNeeded()
     }
 
     /// Añade una toma grabada al proyecto (mini-spec Fase 3, «Grabación»). Solo toca `takes`. Si ya hay una con
@@ -626,9 +707,12 @@ public actor Library {
         if postQueue.contains(id) || currentPostID == id { return analyzer == nil ? .missing : .analyzing }
         // Durante la reconversión no se toca: al terminar `open` vuelve a pedirlo.
         guard migrations[id] == nil else { return .missing }
-        let needsMeasure = needsStemWork(project, layout: ProjectLayout(folder: folder))
+        let layout = ProjectLayout(folder: folder)
+        let guitarNeeded = guitarSplitNeeded(project, layout: layout)
+        if guitarNeeded, guitarStates[id] == nil { guitarStates[id] = .pending; continuation.yield(.guitarSplitQueued(id)) }
+        let needsMeasure = needsStemWork(project, layout: layout) || guitarNeeded
         var current = false
-        if let analyzer { current = await analyzer.isCurrent(project: project, layout: ProjectLayout(folder: folder)) }
+        if let analyzer { current = await analyzer.isCurrent(project: project, layout: layout) }
         if !needsMeasure && (analyzer == nil || current) { return current ? .ready : .missing }
         postQueue.append(id)
         if analyzer != nil { continuation.yield(.analysisQueued(id)) }
@@ -676,22 +760,124 @@ public actor Library {
 
     private func runPostProcessing(_ id: UUID) async {
         let cont = continuation
+        guard let folder = await locate(id) else { return }
+        let layout = ProjectLayout(folder: folder)
+        var project: Project
         do {
-            guard let folder = await locate(id) else { return }
-            var project = try ProjectFile.load(folder: folder)
+            project = try ProjectFile.load(folder: folder)
             guard project.separation.state == .done else { return }
-            if needsStemWork(project, layout: ProjectLayout(folder: folder)) {
+            if needsStemWork(project, layout: layout) {
                 project = try await measureStems(id, folder: folder)
             }
-            guard let analyzer else { return }
-            let layout = ProjectLayout(folder: folder)
-            cont.yield(.analysisStarted(id))
-            if await !analyzer.isCurrent(project: project, layout: layout) {
-                try await analyzer.analyze(project: project, layout: layout)
-            }
-            cont.yield(.analysisFinished(id))
         } catch {
             if analyzer != nil { cont.yield(.analysisFailed(id, error.localizedDescription)) }
+            return
+        }
+        // Orden: niveles → guitarras → análisis.
+        let guitarsOnly = guitarOnlyJobs.remove(id) != nil
+        if guitarSplitNeeded(project, layout: layout) {
+            project = await splitGuitars(id, folder: folder, project: project)
+        } else if case .pending? = guitarStates[id] {
+            guitarStates[id] = nil
+        }
+        if let analyzer, !guitarsOnly {
+            do {
+                cont.yield(.analysisStarted(id))
+                if await !analyzer.isCurrent(project: project, layout: layout) {
+                    try await analyzer.analyze(project: project, layout: layout)
+                }
+                cont.yield(.analysisFinished(id))
+            } catch {
+                cont.yield(.analysisFailed(id, error.localizedDescription))
+            }
+        }
+    }
+
+    // MARK: Guitarras (Fase 4)
+
+    private func guitarInputAvailable(_ project: Project, layout: ProjectLayout) -> Bool {
+        project.stems.contains { $0.kind == .guitar && !$0.isEmpty }
+            && FileManager.default.fileExists(atPath: layout.stemURL(.guitar).path)
+    }
+
+    /// Hay que rehacer las pistas: las opciones piden algo y falta, cambió `stems/guitar.wav`, cambiaron las
+    /// opciones o falta algún fichero; o ya no piden nada (o no hay entrada) y quedan pistas que retirar.
+    private func guitarSplitNeeded(_ project: Project, layout: ProjectLayout) -> Bool {
+        guard guitarSplitter != nil, !guitarSplitFailed.contains(project.id) else { return false }
+        let fm = FileManager.default
+        let options = project.guitarOptions
+        guard options.needsProcessing, guitarInputAvailable(project, layout: layout) else {
+            return project.guitarApplied != nil || project.guitars.contains(where: \.isPresent)
+        }
+        guard let st = project.guitarApplied, st.inputFingerprint == layout.guitarInputFingerprint,
+              st.options == options else { return true }
+        return project.guitars.contains { g in g.file.map { !fm.fileExists(atPath: layout.url(relative: $0).path) } ?? false }
+    }
+
+    /// Rehace las pistas con las opciones guardadas ahora. Si fallan, el proyecto queda como estaba.
+    private func splitGuitars(_ id: UUID, folder: URL, project: Project) async -> Project {
+        guard let guitarSplitter else { return project }
+        let cont = continuation
+        let layout = ProjectLayout(folder: folder)
+        let fm = FileManager.default
+        let options = ((try? ProjectFile.load(folder: folder)) ?? project).guitarOptions
+        do {
+            guard options.needsProcessing, guitarInputAvailable(project, layout: layout),
+                  let fingerprint = layout.guitarInputFingerprint else {
+                // Nada que producir: se retiran las pistas (los nombres se conservan).
+                let updated = try await mutate(id) { p in
+                    p.guitars = p.guitars.map { Guitar(role: $0.role, name: $0.name) }
+                    p.guitarApplied = nil
+                }
+                for role in GuitarRole.allCases { FileOps.removeIfExists(layout.guitarURL(role)) }
+                guitarStates[id] = nil
+                cont.yield(.guitarSplitFinished(id))
+                return updated
+            }
+            guitarStates[id] = .processing
+            cont.yield(.guitarSplitStarted(id))
+            let out = layout.guitarsPartialDir
+            FileOps.removeIfExists(out)
+            try fm.createDirectory(at: out, withIntermediateDirectories: true)
+            defer { FileOps.removeIfExists(out) }
+            let result = try await guitarSplitter.split(projectFolder: folder, input: layout.stemURL(.guitar),
+                                                        outputDirectory: out, options: options) { _ in }
+            try Task.checkCancellation()
+            // Validar antes de tocar nada: nombre simple y fichero presente.
+            for t in result.tracks {
+                guard !t.file.isEmpty, !t.file.contains("/"), t.file != "..",
+                      fm.fileExists(atPath: out.appendingPathComponent(t.file).path) else {
+                    throw LibraryError.sizeMismatch("pista de guitarra \(t.role.rawValue) sin fichero")
+                }
+            }
+            try fm.createDirectory(at: layout.stemsDir, withIntermediateDirectories: true)
+            for t in result.tracks {
+                try FileOps.atomicReplace(layout.stemsDir.appendingPathComponent(t.file), with: out.appendingPathComponent(t.file))
+            }
+            let tracks = result.tracks
+            let applied = GuitarAppliedState(inputFingerprint: fingerprint, options: options)
+            // project.json antes de borrar los WAV de los papeles que ya no salen.
+            let updated = try await mutate(id) { p in
+                var guitars = p.guitars.map { Guitar(role: $0.role, name: $0.name) }
+                for t in tracks {
+                    let name = guitars.first { $0.role == t.role }?.name
+                    guitars.removeAll { $0.role == t.role }
+                    guitars.append(Guitar(role: t.role, name: name, file: "stems/\(t.file)", confidence: t.confidence))
+                }
+                let order = GuitarRole.allCases
+                p.guitars = guitars.sorted { order.firstIndex(of: $0.role)! < order.firstIndex(of: $1.role)! }
+                p.guitarApplied = applied
+            }
+            let kept = Set(tracks.map(\.role))
+            for role in GuitarRole.allCases where !kept.contains(role) { FileOps.removeIfExists(layout.guitarURL(role)) }
+            guitarStates[id] = nil
+            cont.yield(.guitarSplitFinished(id))
+            return updated
+        } catch {
+            guitarSplitFailed.insert(id)
+            guitarStates[id] = .failed(error.localizedDescription)
+            cont.yield(.guitarSplitFailed(id, error.localizedDescription))
+            return project
         }
     }
 

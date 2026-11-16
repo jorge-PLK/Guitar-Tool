@@ -42,7 +42,7 @@ struct LibraryView: View {
         HStack(alignment: .center) {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Biblioteca").font(TF.display(32))
-                Text("Tus temas, sus guitarras separadas y los rigs igualados.").foregroundStyle(TF.muted)
+                Text("Tus temas y sus guitarras separadas.").foregroundStyle(TF.muted)
             }
             Spacer()
             if let p = model.playlistImport, let text = p.indicator {
@@ -70,7 +70,6 @@ struct LibraryView: View {
     private var stats: some View {
         HStack(spacing: 16) {
             stat("Temas", model.entries.count)
-            stat("Rigs igualados", model.matchedRigs)
             stat("Tomas grabadas", model.recordedTakes)
             stat("Vídeos exportados", model.exportedVideos)
         }
@@ -88,7 +87,7 @@ struct LibraryView: View {
     }
 
     private enum Col {
-        static let guitars: CGFloat = 150, rigs: CGFloat = 70, takes: CGFloat = 70, state: CGFloat = 150, actions: CGFloat = 134
+        static let guitars: CGFloat = 150, takes: CGFloat = 70, state: CGFloat = 150, actions: CGFloat = 134
     }
 
     private func headCell(_ t: String, _ w: CGFloat? = nil) -> some View {
@@ -102,7 +101,6 @@ struct LibraryView: View {
                 HStack(spacing: 0) {
                     headCell("Tema / Artista")
                     headCell("Guitarras", Col.guitars)
-                    headCell("Rigs", Col.rigs)
                     headCell("Tomas", Col.takes)
                     headCell("Estado", Col.state)
                     Color.clear.frame(width: Col.actions, height: 1).accessibilityHidden(true)
@@ -144,7 +142,6 @@ struct LibraryView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             Text(model.isSeparating(e) ? "Separando…" : "—").foregroundStyle(TF.text2)
                 .frame(width: Col.guitars, alignment: .leading)
-            Text(e.rigCount == 0 ? "—" : "\(e.rigCount)").foregroundStyle(TF.text2).frame(width: Col.rigs, alignment: .leading)
             Text(e.takeCount == 0 ? "—" : "\(e.takeCount)").foregroundStyle(TF.text2).frame(width: Col.takes, alignment: .leading)
             chip(e).frame(width: Col.state, alignment: .leading)
             HStack(spacing: 8) {

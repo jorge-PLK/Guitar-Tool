@@ -85,12 +85,12 @@ struct ChordGridGeometry {
     var barWidth: CGFloat { (width - ChordGridView.labelWidth) / CGFloat(perRow) }
     /// Ancho dibujado de un compás (sin el hueco de la derecha).
     var drawnBarWidth: CGFloat { barWidth - ChordGridView.barGap }
-    var rowPitch: CGFloat { ChordGridView.rowHeight + ChordGridView.rowSpacing }
+    var rowPitch: CGFloat { ChordGridView.sectionGutter + ChordGridView.rowHeight + ChordGridView.rowSpacing }
 
     func cellFrame(row: Int, col: Int, beat: Int, beatCount: Int) -> CGRect {
         let w = drawnBarWidth / CGFloat(beatCount)
         return CGRect(x: ChordGridView.labelWidth + CGFloat(col) * barWidth + CGFloat(beat) * w,
-                      y: CGFloat(row) * rowPitch, width: w, height: ChordGridView.rowHeight)
+                      y: CGFloat(row) * rowPitch + ChordGridView.sectionGutter, width: w, height: ChordGridView.rowHeight)
     }
 
     /// Punto → (fila, compás dentro de la fila, pulso dentro del compás). Fuera de la rejilla se ajusta al más cercano.
@@ -121,6 +121,7 @@ struct ChordGridView: View {
     let edit: Bool
     let shown: (Int) -> ChordLabel
     @Binding var editing: Double?
+    let selection: SectionSelection
     @Environment(AppModel.self) private var model
 
     @State private var measured: [Double: CGRect] = [:]
@@ -129,14 +130,16 @@ struct ChordGridView: View {
 
     static let labelWidth: CGFloat = 84
     static let rowHeight: CGFloat = 46
-    static let rowSpacing: CGFloat = 6
+    static let rowSpacing: CGFloat = 4
+    /// Franja sobre cada fila para el nombre de las cajas de sección (mini-spec Fase 4, «Interfaz»).
+    static let sectionGutter: CGFloat = 18
     static let barGap: CGFloat = 4
     /// Ancho mínimo de un compás para pasar de 4 a 8 por fila.
     static let minBarWidthFor8: CGFloat = 112
     static let visibleRows: CGFloat = 4
     /// Un clic es un gesto que se mueve menos de esto (puntos).
     static let clickSlop: CGFloat = 4
-    static var height: CGFloat { visibleRows * rowHeight + (visibleRows - 1) * rowSpacing }
+    static var height: CGFloat { visibleRows * (sectionGutter + rowHeight) + (visibleRows - 1) * rowSpacing }
 
     private var chords: [ChordSegment] { session.effectiveChords }
 
@@ -156,6 +159,10 @@ struct ChordGridView: View {
                             }
                         }
                         .frame(width: width)
+                        .overlay(alignment: .topLeading) {
+                            GridSectionBoxes(session: session, ctl: ctl, rows: rows,
+                                             geometry: ChordGridGeometry(width: width, perRow: perRow), selection: selection)
+                        }
                         .coordinateSpace(name: "grid")
                         .contentShape(Rectangle())
                         .gesture(dragGesture(rows: rows, geometry: ChordGridGeometry(width: width, perRow: perRow)),
@@ -192,13 +199,8 @@ struct ChordGridView: View {
 
     private func row(_ bars: [ChordGridLayout.Bar], width: CGFloat, perRow: Int) -> some View {
         let barWidth = (width - Self.labelWidth) / CGFloat(perRow)
-        let sectionName = session.sections.first { s in
-            guard let a = bars.first?.start, let b = bars.last?.end else { return false }
-            return s.start >= a - 0.05 && s.start < b
-        }?.name
         return HStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(sectionName ?? " ").font(TF.body(12, .semibold)).foregroundStyle(TF.accent).lineLimit(1)
                 Text("c. \(bars.first?.number ?? 0)").font(TF.body(11)).foregroundStyle(TF.muted)
             }
             .frame(width: Self.labelWidth - 8, alignment: .leading)
@@ -208,6 +210,7 @@ struct ChordGridView: View {
             Spacer(minLength: 0)
         }
         .frame(height: Self.rowHeight)
+        .padding(.top, Self.sectionGutter)
     }
 
     private func barView(_ bar: ChordGridLayout.Bar, width: CGFloat) -> some View {
@@ -275,6 +278,7 @@ struct ChordGridView: View {
             }
             .onEnded { v in
                 dragRange = nil
+                selection.clear()
                 guard let a = cell(g.hit(v.startLocation, rows: rows), rows: rows),
                       let b = cell(g.hit(v.location, rows: rows), rows: rows) else { return }
                 if hypot(v.translation.width, v.translation.height) < Self.clickSlop {

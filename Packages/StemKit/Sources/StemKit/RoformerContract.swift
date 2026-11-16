@@ -36,3 +36,41 @@ enum RoformerContract {
     static let outputName = "permute_97"
     static let stemCount = Stem.allCases.count
 }
+
+/// Lo que cambia entre modelos de máscara compleja de la familia RoFormer exportados sin STFT. Lo común
+/// (44,1 kHz estéreo, n_fft 2048, Hann periódica, center reflect, layout de `spec`, bin 0 a cero) está en
+/// `RoformerContract`.
+struct MaskModelContract: Equatable, Sendable {
+    let hop: Int
+    /// Tramas de la entrada `spec` `[1, 2·bins, frames, 2]`.
+    let frames: Int
+    /// `num_overlap` de MSST: paso = trozo / overlaps.
+    let overlaps: Int
+    /// Máscaras de la salida `[1, stems, 2·bins, frames, 2]`.
+    let stemCount: Int
+    let inputName: String
+    let outputName: String
+
+    /// Trozo en muestras: `(frames − 1) · hop`.
+    var chunk: Int { (frames - 1) * hop }
+
+    /// BS-RoFormer SW, 6 stems (ADR-004; docs/probes/P4-modelos.md, «Contrato del modelo elegido»).
+    static let bsRoformerSW = MaskModelContract(
+        hop: RoformerContract.hop, frames: RoformerContract.frames, overlaps: RoformerContract.overlaps,
+        stemCount: RoformerContract.stemCount, inputName: RoformerContract.inputName,
+        outputName: RoformerContract.outputName)
+
+    /// Mel-Band RoFormer «Lead_Rhythm_Guitar», 1 stem: la solista (mini-spec Fase 4, «Opciones de guitarras y tramos
+    /// de solo»; contrato de tf-ml en ModelCatalog.leadRhythmMelRoformer): hop 441, 301 tramas → trozo de 132 300
+    /// muestras (3 s), salida `mask`.
+    /// num_overlap 2, no el 1 de la config de MSST (decisión de Jorge, Fase 4): con 1 los trozos van uno tras otro y
+    /// el demix deja a 0 la muestra de cada lado de cada corte (peso 0 del fundido), con saltos medidos de 0,262 en
+    /// Platero y bordes duros cada 3 s. Con 2 cada corte cae en mitad del trozo vecino y se funde. Cuesta el doble.
+    static let leadRhythm = MaskModelContract(
+        hop: 441, frames: 301, overlaps: 2, stemCount: 1, inputName: "spec", outputName: "mask")
+
+    /// El mismo modelo con num_overlap 1, como el demix de MSST con que tf-ml generó la referencia PyTorch del
+    /// fixture. Solo para medir paridad.
+    static let leadRhythmMSST = MaskModelContract(
+        hop: 441, frames: 301, overlaps: 1, stemCount: 1, inputName: "spec", outputName: "mask")
+}

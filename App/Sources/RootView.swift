@@ -47,9 +47,7 @@ struct RootView: View {
 struct Sidebar: View {
     @Environment(AppModel.self) private var model
 
-    private let future: [(String, String)] = [
-        ("Igualar tono", "Fase 8–9"), ("Tablatura y DI", "Fase 5"),
-    ]
+    private let future: [(String, String)] = [("Tablatura", "Fase 5")]
     private let later: [(String, String)] = [("Grabar", "Fase 6"), ("Montaje", "Fase 7")]
 
     var body: some View {
@@ -118,7 +116,7 @@ struct FirstRunSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Elige tu carpeta de proyectos").font(TF.display(24))
-            Text("Cada tema vive en su propia carpeta, con sus stems, tomas, rigs y vídeo. Puedes cambiarla más tarde en Ajustes.")
+            Text("Cada tema vive en su propia carpeta, con sus stems, tomas y vídeo. Puedes cambiarla más tarde en Ajustes.")
                 .foregroundStyle(TF.muted).fixedSize(horizontal: false, vertical: true)
             Text("Propuesta: ~/Music/ToneForge").font(TF.body(13)).foregroundStyle(TF.text2)
             HStack { Spacer(); Button("Elegir carpeta…") { model.chooseFirstRunFolder() }.buttonStyle(PrimaryButton()) }

@@ -1,13 +1,15 @@
 import Accelerate
 import Foundation
 
-/// Un trozo estéreo → 6 stems estéreo en el dominio del tiempo, como `run_chunk` + la vía `coremlpub`
+/// Un trozo estéreo → `stemCount` stems estéreo en el dominio del tiempo, como `run_chunk` + la vía `coremlpub`
 /// de Probes/P4-modelos/bs_roformer_sw/compare.py:
 /// STFT → `spec` → máscara del modelo → producto complejo con el espectro → bin 0 a cero → iSTFT.
+/// Hop, tramas y número de stems salen del `MaskModelContract` del modelo (6 en BS-RoFormer SW, 1 en la solista).
 final class ChunkProcessor {
     let model: MaskModel
     let frames: Int
     let chunk: Int
+    let stemCount: Int
     private let pairsPerStem: Int        // 2·bins·frames números complejos
     private let spec: UnsafeMutablePointer<Float>
     private let mask: UnsafeMutablePointer<Float>
@@ -17,16 +19,19 @@ final class ChunkProcessor {
     init(model: MaskModel) {
         self.model = model
         let frames = model.frames
-        let chunk = (frames - 1) * RoformerContract.hop
+        let hop = model.contract.hop
+        let stems = model.contract.stemCount
+        let chunk = (frames - 1) * hop
         self.frames = frames
         self.chunk = chunk
+        stemCount = stems
         pairsPerStem = 2 * RoformerContract.bins * frames
         spec = .allocate(capacity: pairsPerStem * 2)
         spec.initialize(repeating: 0, count: pairsPerStem * 2)
-        mask = .allocate(capacity: RoformerContract.stemCount * pairsPerStem * 2)
-        mask.initialize(repeating: 0, count: RoformerContract.stemCount * pairsPerStem * 2)
-        analysis = SpectralTransform(length: chunk)
-        synthesis = (0..<RoformerContract.stemCount).map { _ in SpectralTransform(length: chunk) }
+        mask = .allocate(capacity: stems * pairsPerStem * 2)
+        mask.initialize(repeating: 0, count: stems * pairsPerStem * 2)
+        analysis = SpectralTransform(length: chunk, hop: hop)
+        synthesis = (0..<stems).map { _ in SpectralTransform(length: chunk, hop: hop) }
         precondition(analysis.frames == frames)
     }
 
@@ -37,16 +42,16 @@ final class ChunkProcessor {
 
     /// - Parameters:
     ///   - input: 2 canales de `chunk` muestras.
-    ///   - outputs: 12 búferes de `chunk` muestras, índice `2·stem + canal`.
+    ///   - outputs: `2·stemCount` búferes de `chunk` muestras, índice `2·stem + canal`.
     func process(input: [UnsafePointer<Float>], outputs: [UnsafeMutablePointer<Float>]) throws {
-        precondition(input.count == RoformerContract.channels && outputs.count == 2 * RoformerContract.stemCount)
+        precondition(input.count == RoformerContract.channels && outputs.count == 2 * stemCount)
         for c in 0..<RoformerContract.channels {
             analysis.forward(input[c], channel: c, into: spec)
         }
         try model.predict(spec: spec, mask: mask)
         let job = PostprocessJob(spec: spec, mask: mask, pairs: pairsPerStem, frames: frames,
                                  synthesis: synthesis, outputs: outputs)
-        DispatchQueue.concurrentPerform(iterations: RoformerContract.stemCount) { s in
+        DispatchQueue.concurrentPerform(iterations: stemCount) { s in
             job.run(stem: s)
         }
     }

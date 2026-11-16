@@ -1,0 +1,68 @@
+{
+ "audio": {
+  "file": "audio.wav",
+  "sampleRate": 22050,
+  "channels": 1,
+  "format": "PCM 16 bit",
+  "samples": 132300,
+  "read_as": "int16 / 32768"
+ },
+ "windowing": {
+  "windowSamples": 43844,
+  "overlapFrames": 30,
+  "overlapSamples": 7680,
+  "hopSamples": 36164,
+  "leftPadSamples": 3840,
+  "framesPerWindow": 172,
+  "trimFramesEachSide": 15,
+  "outputFrames": 516,
+  "windows": 4
+ },
+ "bins": {
+  "note": 88,
+  "onset": 88,
+  "contour": 264,
+  "midiOffset": 21,
+  "contourBinsPerSemitone": 3,
+  "baseFrequencyHz": 27.5
+ },
+ "files": {
+  "note.f32": {
+   "shape": [
+    516,
+    88
+   ],
+   "dtype": "float32 little-endian, fila mayor [trama][bin]"
+  },
+  "onset.f32": {
+   "shape": [
+    516,
+    88
+   ],
+   "dtype": "float32 little-endian, fila mayor [trama][bin]"
+  },
+  "contour.f32": {
+   "shape": [
+    516,
+    264
+   ],
+   "dtype": "float32 little-endian, fila mayor [trama][bin]"
+  }
+ },
+ "reference": "ONNX Runtime 1.32 CPU, nmp.onnx de spotify/basic-pitch@fa5997a",
+ "coremlPythonVsReference": {
+  "note": {
+   "max": 7.152557373046875e-07,
+   "mean": 5.821881998713252e-08
+  },
+  "onset": {
+   "max": 1.0728836059570312e-06,
+   "mean": 7.392340251044516e-08
+  },
+  "contour": {
+   "max": 8.642673492431641e-07,
+   "mean": 4.132533248935033e-08
+  }
+ },
+ "modelZipSha256": "c2faf4ae9da4ad7acd726b92748c63e6707b21301e1291d420dda563006f0653"
+}

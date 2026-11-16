@@ -27,6 +27,8 @@ packages:
     path: ../Packages/StudyKit
   SourceKit:
     path: ../Packages/SourceKit
+  TabKit:
+    path: ../Packages/TabKit
 targets:
   ToneForge:
     type: application
@@ -46,6 +48,7 @@ targets:
       - package: StemKit
       - package: StudyKit
       - package: SourceKit
+      - package: TabKit
     postCompileScripts:
       # Helper de separación embebido: Contents/MacOS/tf-separate, siempre en release (la velocidad importa)
       # y firmado con la identidad de la app antes de que se firme el bundle.

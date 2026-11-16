@@ -55,7 +55,10 @@ final class BackingController {
     /// Carga los stems audibles y reaplica mezcla y ajustes guardados.
     func loadTracks() {
         // Un stem sin fichero (p. ej. a medio medir) se salta en vez de impedir toda la carga.
-        let tracks = session.audibleStems.map { Track(id: $0.rawValue, url: session.layout.stemURL($0)) }
+        // Con pistas de guitarra separadas suenan ellas en lugar de `stems/guitar.wav` (no se suman dos veces).
+        let layout = session.layout
+        let guitarTracks = session.guitarTracks.map { Track(id: $0.role.trackID, url: layout.guitarURL($0.role)) }
+        let tracks = (session.mixerStems.map { Track(id: $0.rawValue, url: layout.stemURL($0)) } + guitarTracks)
             .filter { FileManager.default.fileExists(atPath: $0.url.path) }
         guard !tracks.isEmpty else { loadError = nil; return }
         do {
@@ -65,16 +68,24 @@ final class BackingController {
             loadError = "No se pudieron cargar los stems (\(error))."
             return
         }
-        for kind in session.audibleStems where tracks.contains(where: { $0.id == kind.rawValue }) {
-            let m = session.mix(for: kind)
-            player.setGain(kind.rawValue, dB: m.gainDB)
-            player.setMute(kind.rawValue, kind == .guitar ? effectiveGuitarMute : m.muted)
-            player.setSolo(kind.rawValue, m.solo)
+        for kind in session.mixerStems where tracks.contains(where: { $0.id == kind.rawValue }) {
+            apply(session.mix(for: kind), to: kind.rawValue)
+            // A/B de la Fase 3: en B el stem de guitarra suena silenciado sin tocar el mute guardado.
+            if kind == .guitar { player.setMute(kind.rawValue, effectiveGuitarMute) }
+        }
+        for g in session.guitarTracks where tracks.contains(where: { $0.id == g.role.trackID }) {
+            apply(session.mix(forGuitar: g.role), to: g.role.trackID)
         }
         player.rate = settings.rate
         applyPitch()
         player.loop = loop
         refreshMetronome()
+    }
+
+    private func apply(_ m: StemMix, to id: String) {
+        player.setGain(id, dB: m.gainDB)
+        player.setMute(id, m.muted)
+        player.setSolo(id, m.solo)
     }
 
     /// Recalcula los clics tras un análisis nuevo o un cambio del metrónomo.
@@ -159,10 +170,38 @@ final class BackingController {
         player.setSolo(kind.rawValue, s)
     }
 
-    /// Preajuste «Sin guitarras»: silencia el stem guitar; otra pulsación lo restaura.
+    // Pistas de guitarra (Fase 4): el mismo mezclador, con la mezcla guardada por papel.
+
+    func setGain(guitar role: GuitarRole, _ dB: Double) {
+        let v = min(max(dB, Self.faderRange.lowerBound), Self.faderRange.upperBound)
+        session.updateMix(guitar: role) { $0.gainDB = v }
+        player.setGain(role.trackID, dB: v)
+    }
+
+    func toggleMute(guitar role: GuitarRole) {
+        let m = !session.mix(forGuitar: role).muted
+        session.updateMix(guitar: role) { $0.muted = m }
+        player.setMute(role.trackID, m)
+    }
+
+    func toggleSolo(guitar role: GuitarRole) {
+        let s = !session.mix(forGuitar: role).solo
+        session.updateMix(guitar: role) { $0.solo = s }
+        player.setSolo(role.trackID, s)
+    }
+
+    /// Preajuste «Sin guitarras»: silencia el stem guitar (o todas las pistas separadas); otra pulsación lo restaura.
     var hasGuitar: Bool { session.audibleStems.contains(.guitar) }
-    var guitarsOff: Bool { session.mix(for: .guitar).muted }
-    func toggleWithoutGuitars() { if hasGuitar { toggleMute(.guitar) } }
+    var guitarsOff: Bool {
+        session.usesSeparatedGuitars ? session.guitarTracks.allSatisfy { session.mix(forGuitar: $0.role).muted }
+                                     : session.mix(for: .guitar).muted
+    }
+    func toggleWithoutGuitars() {
+        guard hasGuitar else { return }
+        guard session.usesSeparatedGuitars else { toggleMute(.guitar); return }
+        let off = !guitarsOff
+        for g in session.guitarTracks where session.mix(forGuitar: g.role).muted != off { toggleMute(guitar: g.role) }
+    }
 
     // MARK: A/B
 

@@ -18,6 +18,7 @@ public final class RoformerSeparator {
     }
 
     init(model: MaskModel) {
+        precondition(model.contract.stemCount == RoformerContract.stemCount, "RoformerSeparator: modelo de 6 stems")
         processor = ChunkProcessor(model: model)
     }
 

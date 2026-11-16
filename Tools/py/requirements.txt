@@ -37,3 +37,12 @@ mir_eval==0.8.2
 pyloudnorm==0.1.1
 future==1.0.0
 mido==1.3.3
+# Fase 4 (Basic Pitch): basic-pitch va APARTE y sin dependencias, porque las suyas piden tensorflow-macos < 2.15.1
+# (no existe para Python 3.12) y resampy < 0.4.3 (importa pkg_resources, que ya no está). La referencia es nmp.onnx.
+#   uv pip install --python Tools/py/.venv/bin/python --no-deps basic-pitch==0.4.0
+pretty_midi==0.2.11
+importlib_resources==6.5.2
+resampy==0.4.3
+six==1.17.0
+# Fase 4 (modelos de guitarra): pesos de lumabeat/mvsep-mega53-guitar en safetensors
+safetensors==0.8.0
