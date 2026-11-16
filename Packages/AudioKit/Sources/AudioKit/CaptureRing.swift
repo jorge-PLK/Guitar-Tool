@@ -16,6 +16,7 @@ final class CaptureRing: @unchecked Sendable {
     private let metaCapacity: Int
     private let data: [UnsafeMutablePointer<Float>]
     private let metaTime: UnsafeMutablePointer<Int64>
+    private let metaHost: UnsafeMutablePointer<Double>
     private let metaFrames: UnsafeMutablePointer<Int>
     private let metaStart: UnsafeMutablePointer<Int>
     /// Bloques publicados (lo escribe el productor) y consumidos (el consumidor).
@@ -45,6 +46,7 @@ final class CaptureRing: @unchecked Sendable {
             return p
         }
         metaTime = .allocate(capacity: metaCapacity)
+        metaHost = .allocate(capacity: metaCapacity)
         metaFrames = .allocate(capacity: metaCapacity)
         metaStart = .allocate(capacity: metaCapacity)
         outData = (0..<channels).map { _ in .allocate(capacity: maxBlock) }
@@ -56,6 +58,7 @@ final class CaptureRing: @unchecked Sendable {
         data.forEach { $0.deallocate() }
         outData.forEach { $0.deallocate() }
         metaTime.deallocate()
+        metaHost.deallocate()
         metaFrames.deallocate()
         metaStart.deallocate()
         outPointers.deallocate()
@@ -88,6 +91,7 @@ final class CaptureRing: @unchecked Sendable {
         }
         let slot = w % metaCapacity
         metaTime[slot] = buffer.sampleTime
+        metaHost[slot] = buffer.hostSeconds
         metaFrames[slot] = n
         metaStart[slot] = start
         dataWrite = start + n
@@ -111,7 +115,7 @@ final class CaptureRing: @unchecked Sendable {
                 if first < n { (outData[ch] + first).update(from: data[ch], count: n - first) }
             }
             body(AudioIOBuffer(sampleTime: metaTime[slot], frameCount: n,
-                               channels: UnsafeBufferPointer(rebasing: outPointers[0..<channels])))
+                               channels: UnsafeBufferPointer(rebasing: outPointers[0..<channels]), hostSeconds: metaHost[slot]))
             dataRead.store(start + n, ordering: .releasing)
             r += 1
             read.store(r, ordering: .releasing)

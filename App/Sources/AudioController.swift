@@ -39,6 +39,9 @@ final class AudioController {
     @ObservationIgnored var onCalibrationSaved: ((LatencyCalibration) -> Void)?
     /// Una toma nueva o corregida del proyecto abierto (Backing la recarga).
     @ObservationIgnored var onTakesChanged: ((_ newTake: Bool) -> Void)?
+    /// Fase 6: si está puesto, la toma terminada se entrega aquí (id, toma, cortada) en vez de guardarse en el
+    /// proyecto; el guardado lo hace Grabar (`RecordController`) con partes, vídeo y punches.
+    @ObservationIgnored var takeSink: ((UUID, RecordedTake, Bool) -> Void)?
 
     // Estado legible para la UI.
     private(set) var settings: AudioSettings?
@@ -370,15 +373,16 @@ final class AudioController {
     // MARK: Grabar
 
     /// Empieza a grabar desde la posición actual con el backing sonando (mini-spec Fase 3, «Grabación»).
-    func startRecording(playbackRate: Double, loopActive: Bool) {
+    /// Fase 6: `takeID` y `url` permiten elegir dónde cae la toma (p. ej. un punch-in).
+    func startRecording(playbackRate: Double, loopActive: Bool, takeID: UUID = UUID(), url target: URL? = nil) {
         takeNotices = []
         guard !isRecording, let s = session, let player, let study else { return }
         if let b = recordBlock(playbackRate: playbackRate, loopActive: loopActive) {
             takeNotices = [b.message]
             return
         }
-        let id = UUID()
-        let url = study.layout.processedURL(takeId: id)
+        let id = takeID
+        let url = target ?? study.layout.processedURL(takeId: id)
         do {
             try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
             if !player.isPlaying { try player.play() }
@@ -420,7 +424,6 @@ final class AudioController {
         guard let id = recordingTakeID, let study, let a = settings else { return }
         recordingTakeID = nil
         isRecording = false
-        study.saveTakes([AudioBridge.take(t, id: id, audio: a)])
         var notices: [String] = []
         if cut {
             cutAt = Date()
@@ -430,6 +433,11 @@ final class AudioController {
             notices.append("No se pudo medir con fiabilidad el retardo del rig en esta toma (mucho delay o reverb): se usó el último valor bueno.")
         }
         takeNotices = notices
+        if let takeSink {
+            takeSink(id, t, cut)
+            return
+        }
+        study.saveTakes([AudioBridge.take(t, id: id, audio: a)])
         onTakesChanged?(true)
     }
 

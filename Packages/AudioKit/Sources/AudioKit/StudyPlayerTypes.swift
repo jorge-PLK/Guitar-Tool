@@ -54,6 +54,8 @@ public enum StudyPlayerError: Error, Equatable {
     /// Todos los stems deben tener la misma frecuencia de muestreo.
     case sampleRateMismatch
     case engine(String)
+    /// Dos canales (stems o tomas) con el mismo id.
+    case duplicateTrackID
 }
 
 /// Números del reproductor (mini-spec Fase 2 §1 AudioKit, ADR-005).

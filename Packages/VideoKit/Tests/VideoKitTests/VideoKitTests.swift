@@ -3,6 +3,6 @@ import XCTest
 
 final class VideoKitTests: XCTestCase {
     func testVersionIsSet() {
-        XCTAssertEqual(VideoKit.version, "0.1.0")
+        XCTAssertEqual(VideoKit.version, "0.2.0")
     }
 }

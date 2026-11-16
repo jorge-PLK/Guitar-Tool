@@ -6,6 +6,7 @@ import Observation
 import SourceKit
 import UniformTypeIdentifiers
 import Store
+import VideoKit
 
 #if DEBUG
 /// Argumentos de arranque solo en DEBUG (pruebas y capturas).
@@ -29,6 +30,8 @@ struct LaunchOptions {
     /// Guarda la ventana en PNG tras `snapshotDelay` s y sale (capturas sin permiso de grabación de pantalla).
     var snapshot: URL?
     var snapshotDelay = 4.0
+    /// Tamaño de la ventana de la captura (`--window 1280x720`); por defecto 1440×900.
+    var windowSize: CGSize?
     /// Backing: rejilla de acordes expandida / modo edición de acordes activo.
     var chordsExpanded = false
     var chordsEdit = false
@@ -68,6 +71,10 @@ struct LaunchOptions {
             case ("--analysis-state", let v?): analysisState = v; i += 1
             case ("--snapshot", let v?): snapshot = path(v); i += 1
             case ("--snapshot-delay", let v?): snapshotDelay = Double(v) ?? 4; i += 1
+            case ("--window", let v?):
+                let p = v.split(separator: "x").compactMap { Double($0) }
+                if p.count == 2 { windowSize = CGSize(width: p[0], height: p[1]) }
+                i += 1
             case ("--chords-expanded", _): chordsExpanded = true
             case ("--chords-edit", _): chordsEdit = true
             case ("--grid-hit-selftest", _): gridHitSelftest = true
@@ -86,7 +93,7 @@ struct LaunchOptions {
 }
 #endif
 
-enum AppSection: Hashable { case library, backing, settings }
+enum AppSection: Hashable { case library, backing, record, settings }
 enum SettingsTab: String, CaseIterable, Identifiable {
     case audio = "Audio", video = "Cámara y vídeo", library = "Biblioteca y equipo"
     var id: String { rawValue }
@@ -161,6 +168,16 @@ final class AppModel {
     let audio: AudioController
     /// Hoja «Calibrar latencia» abierta (Ajustes · Audio).
     var showCalibrationSheet = false
+
+    /// Cámaras del sistema (Ajustes · Cámara y vídeo; simuladas con `--screen settings-video` en DEBUG).
+    @ObservationIgnored let cameraProvider: CameraProviding = AppModel.makeCameraProvider()
+
+    private static func makeCameraProvider() -> CameraProviding {
+        #if DEBUG
+        if let s = LaunchOptions().screen, s == "settings-video" || s.hasPrefix("record") { return VideoDemo.provider }
+        #endif
+        return AVCameraProvider()
+    }
 
     private static func makeDeviceProvider() -> AudioDeviceProviding {
         #if DEBUG
@@ -342,6 +359,10 @@ final class AppModel {
         switch options.screen {
         case "settings-library": section = .settings; settingsTab = .library
         case "settings": section = .settings
+        case "settings-video":
+            // Cámaras simuladas (ver `makeCameraProvider`); el perfil se toca solo en memoria, sin guardar.
+            section = .settings; settingsTab = .video
+            profile.video = VideoDemo.profile
         case "settings-audio":
             // Dispositivos y E/S simulados (ver `makeDeviceProvider`); el perfil se toca solo en memoria, sin guardar.
             section = .settings; settingsTab = .audio
@@ -358,6 +379,13 @@ final class AppModel {
             let match = entries.first { e in options.project.map { e.folderName == $0 || e.title == $0 } ?? true }
             backingTarget = match?.id
             section = .backing
+        case "record", "record-counting", "record-offset", "record-mixer-expanded":
+            // Grabar con E/S y cámara simuladas (ver `RecordController.seedDemo`); el perfil se toca solo en memoria.
+            profile.audio = AudioSettings(outputDeviceUID: "sim-flex", inputDeviceUID: "sim-flex", guitarIn: [1])
+            profile.video = VideoDemo.profile
+            let match = entries.first { e in options.project.map { e.folderName == $0 || e.title == $0 } ?? true }
+            backingTarget = match?.id
+            section = .record
         case "detail-first": if let first = entries.first { await open(first.id) }
         case "backing":
             let match = entries.first { e in options.project.map { e.folderName == $0 || e.title == $0 } ?? true }
@@ -613,7 +641,7 @@ final class AppModel {
             var state = AnalysisState.missing
             if !analysisPinned { state = try await library.ensureAnalysis(id: id) }
             // Si el usuario ya salió de Backing mientras se abría, no se deja nada abierto.
-            guard section == .backing else { return }
+            guard section == .backing || section == .record else { return }
             let session = StudySession(project: project, folder: folder, library: library, analysisState: state)
             study = session
             let controller = BackingController(session: session, masterGainDB: profile.masterGainDB, output: outputSelection)
@@ -719,7 +747,7 @@ final class AppModel {
                let view = (window.attachedSheet ?? window).contentView {
                 // Con una hoja abierta (--link-import-demo) se captura la hoja, que es otra ventana.
                 if window.attachedSheet == nil {
-                    window.setContentSize(CGSize(width: 1440, height: 900))
+                    window.setContentSize(options.windowSize ?? CGSize(width: 1440, height: 900))
                     window.orderFrontRegardless()
                     try? await Task.sleep(for: .milliseconds(600))
                 }

@@ -13,6 +13,7 @@ struct RootView: View {
                 switch model.section {
                 case .library: LibraryView()
                 case .backing: BackingView()
+                case .record: RecordView()
                 case .settings: SettingsView()
                 }
             }
@@ -48,7 +49,7 @@ struct Sidebar: View {
     @Environment(AppModel.self) private var model
 
     private let future: [(String, String)] = [("Tablatura", "Fase 5")]
-    private let later: [(String, String)] = [("Grabar", "Fase 6"), ("Montaje", "Fase 7")]
+    private let later: [(String, String)] = [("Montaje", "Fase 7")]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -57,6 +58,7 @@ struct Sidebar: View {
             navRow("Biblioteca", icon: "music.note.list", active: model.section == .library) { model.section = .library; model.detail = nil }
             ForEach(future, id: \.0, content: futureRow)
             navRow("Backing track", icon: "slider.vertical.3", active: model.section == .backing) { model.section = .backing }
+            navRow("Grabar", icon: "record.circle", active: model.section == .record) { model.section = .record }
             ForEach(later, id: \.0, content: futureRow)
             Spacer()
             navRow("Ajustes", icon: "gearshape", active: model.section == .settings) { model.section = .settings }

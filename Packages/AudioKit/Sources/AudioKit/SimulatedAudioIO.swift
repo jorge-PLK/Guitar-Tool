@@ -87,6 +87,12 @@ public final class SimulatedAudioIO: AudioIO, @unchecked Sendable {
     public let latencySamples: Double
     /// Deriva del reloj de entrada frente al de salida, en ppm (positivo: la entrada corre más rápido).
     public let driftPPM: Double
+    /// Reloj de host simulado (mini-spec Fase 6, «Cámara y sincronía»): segundos de host de la muestra de
+    /// salida `initialSampleTime`.
+    public let hostStartSeconds: Double
+    /// Deriva del reloj del dispositivo (la línea de salida) frente al de host, en ppm (positivo: el
+    /// dispositivo corre más rápido y da más muestras por segundo de host que su frecuencia nominal).
+    public let hostDriftPPM: Double
     public let automatic: Bool
 
     /// Capacidad del historial de salida: 2¹⁸ muestras (5,4 s a 48 kHz) de retardo máximo.
@@ -113,9 +119,12 @@ public final class SimulatedAudioIO: AudioIO, @unchecked Sendable {
                 declaredLatencySamples: Double, driftPPM: Double = 0, bufferFrames: Int = 512,
                 inputDeviceUID: String = "sim-in", outputDeviceUID: String = "sim-out",
                 clock: AudioIOClock = .single, initialSampleTime: Int64 = 0, seed: UInt64 = 1,
-                automatic: Bool = false) {
+                automatic: Bool = false, hostStartSeconds: Double = SimulatedAudioIO.defaultHostStartSeconds,
+                hostDriftPPM: Double = 0) {
         format = AudioIOFormat(sampleRate: sampleRate, inputChannels: inputs.count, outputChannels: outputChannels,
                                bufferFrames: bufferFrames)
+        self.hostStartSeconds = hostStartSeconds
+        self.hostDriftPPM = hostDriftPPM
         self.inputDeviceUID = inputDeviceUID
         self.outputDeviceUID = outputDeviceUID
         self.clock = clock
@@ -175,6 +184,28 @@ public final class SimulatedAudioIO: AudioIO, @unchecked Sendable {
     /// Muestra de la línea común en la que empieza el próximo ciclo.
     public var sampleTime: Int64 { lock.withLock { now } }
 
+    /// Hora de host inicial por defecto (un Mac encendido hace unos 17 min; decisión propia).
+    public static let defaultHostStartSeconds = 1_000.0
+
+    /// Muestras de salida por segundo de host (frecuencia nominal con la deriva frente al host).
+    public var hostRate: Double { format.sampleRate * (1 + hostDriftPPM * 1e-6) }
+
+    /// Ley exacta del reloj simulado: segundos de host en que sale la muestra `y` de la línea común. Es lo que
+    /// llevan los bloques de salida en `hostSeconds`; los tests la usan como verdad.
+    public func hostSeconds(atOutputSample y: Double) -> Double {
+        hostStartSeconds + (y - Double(origin)) / hostRate
+    }
+
+    /// Inversa de `hostSeconds(atOutputSample:)`.
+    public func outputSample(atHostSeconds h: Double) -> Double {
+        Double(origin) + (h - hostStartSeconds) * hostRate
+    }
+
+    /// Segundos de host de la muestra de entrada `n`: el instante de la línea de salida que oye (con `driftPPM`).
+    func hostSeconds(atInputSample n: Int64) -> Double {
+        hostSeconds(atOutputSample: Double(origin) + Double(n - origin) / (1 + driftPPM * 1e-6))
+    }
+
     public func start(render: @escaping AudioIORenderHandler, capture: @escaping AudioIOCaptureHandler) throws {
         try lock.withLock {
             guard !running else { throw AudioIOError.alreadyRunning }
@@ -216,10 +247,12 @@ public final class SimulatedAudioIO: AudioIO, @unchecked Sendable {
         let (render, capture, t0, inputs) = state
 
         for p in outData { p.update(repeating: 0, count: n) }
-        render(AudioIOBuffer(sampleTime: t0, frameCount: n, channels: UnsafeBufferPointer(outPointers)))
+        render(AudioIOBuffer(sampleTime: t0, frameCount: n, channels: UnsafeBufferPointer(outPointers),
+                             hostSeconds: hostSeconds(atOutputSample: Double(t0))))
         writeHistory(t0, n)
         for (c, input) in inputs.enumerated() { synthesize(input, channel: c, t0: t0, frames: n) }
-        capture(AudioIOBuffer(sampleTime: t0, frameCount: n, channels: UnsafeBufferPointer(inPointers)))
+        capture(AudioIOBuffer(sampleTime: t0, frameCount: n, channels: UnsafeBufferPointer(inPointers),
+                              hostSeconds: hostSeconds(atInputSample: t0)))
         lock.withLock { now = t0 + Int64(n) }
     }
 

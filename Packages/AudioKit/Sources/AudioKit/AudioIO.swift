@@ -32,14 +32,23 @@ public enum AudioIOClock: String, Sendable, Equatable, Codable {
 /// reloj maestro, en muestras). Salida y entrada se marcan en esa misma línea: si una señal sale en la
 /// muestra `y` y vuelve por la entrada en la muestra `n`, la latencia de ida y vuelta es `n − y`. Es lo
 /// que mide `LatencyCalibrator` y lo que estima `AudioIO.declaredLatencySamples`.
+///
+/// `hostSeconds` es el instante de host de esa primera muestra (mini-spec Fase 6, «Cámara y sincronía»), en
+/// segundos de `mach_absolute_time` (la escala de `CoreAudioIO.hostNowSeconds` y del reloj de host de
+/// CoreMedia): en `CoreAudioIO`, el `mHostTime` del HAL; en `SimulatedAudioIO`, el de su reloj simulado. 0 = el
+/// dispositivo no dio marca válida. El de la muestra `sampleTime + i` es `hostSeconds + i / frecuencia` salvo
+/// la deriva del reloj del dispositivo frente al de host (de ahí que `HostTimeMap` ajuste una recta).
 public struct AudioIOBuffer {
     public let sampleTime: Int64
     public let frameCount: Int
+    public let hostSeconds: Double
     private let pointers: UnsafeBufferPointer<UnsafeMutablePointer<Float>>
 
-    public init(sampleTime: Int64, frameCount: Int, channels: UnsafeBufferPointer<UnsafeMutablePointer<Float>>) {
+    public init(sampleTime: Int64, frameCount: Int, channels: UnsafeBufferPointer<UnsafeMutablePointer<Float>>,
+                hostSeconds: Double = 0) {
         self.sampleTime = sampleTime
         self.frameCount = frameCount
+        self.hostSeconds = hostSeconds
         pointers = channels
     }
 
@@ -106,4 +115,19 @@ public protocol AudioIO: AnyObject, Sendable {
 
 public extension AudioIO {
     var diagnostics: AudioIODiagnostics? { nil }
+}
+
+/// Instante de host de una muestra de salida de la línea común (mini-spec Fase 6, «Cámara y sincronía»): lo
+/// que `AudioSession.outputHostClock` publica de cada ciclo y lo que necesita `HostTimeMap` (VideoKit) para
+/// pasar del reloj de host al tiempo del tema junto con el `PlaybackAnchor`.
+public struct HostClockPoint: Sendable, Equatable {
+    /// Muestra de salida en la línea común de la sesión.
+    public var sampleTime: Int64
+    /// Segundos de host (`mach_absolute_time`) de esa muestra.
+    public var hostSeconds: Double
+
+    public init(sampleTime: Int64, hostSeconds: Double) {
+        self.sampleTime = sampleTime
+        self.hostSeconds = hostSeconds
+    }
 }

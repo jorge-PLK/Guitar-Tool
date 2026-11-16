@@ -272,6 +272,16 @@ public final class AudioSession: @unchecked Sendable {
     /// Contadores del ciclo de E/S del dispositivo abierto (`nil` cerrado o si no los da).
     public var ioDiagnostics: AudioIODiagnostics? { lock.withLock { io?.diagnostics } }
 
+    /// Instante de host de la primera muestra de cada ciclo de salida desde que se abrió la sesión, con
+    /// `sampleTime` mayor que `after` (mini-spec Fase 6, «Cámara y sincronía»). Junto con `playbackAnchor` es lo
+    /// que necesita `HostTimeMap` (VideoKit) para situar en el tema cada fotograma de la cámara. Guarda los
+    /// últimos `HostClockLog.capacity` ciclos (unos 11 min a 512 muestras y 48 kHz): quien grabe más debe
+    /// pedirlos a medida que llegan. Vacío cerrada o si el dispositivo no da marcas de host.
+    public func outputHostClock(after: Int64 = .min) -> [HostClockPoint] {
+        guard let rt = lock.withLock({ rt }) else { return [] }
+        return rt.clockLog.points(after: after)
+    }
+
     public func setEventHandler(_ handler: (@Sendable (AudioSessionEvent) -> Void)?) {
         lock.withLock { eventHandler = handler }
     }
@@ -537,6 +547,8 @@ final class SessionRT: @unchecked Sendable {
     let probe: LatencyProbe
     let player = OSAllocatedUnfairLock<HostedRenderer?>(initialState: nil)
     let calibrating = Atomic<Bool>(false)
+    /// Marcas de host de cada ciclo de salida (mini-spec Fase 6).
+    let clockLog = HostClockLog()
     /// Muestra de salida del primer barrido (`Int64.min` = aún no).
     let origin = Atomic<Int64>(Int64.min)
     private let dummy: UnsafeMutablePointer<Float>
@@ -559,6 +571,7 @@ final class SessionRT: @unchecked Sendable {
     }
 
     func render(_ b: AudioIOBuffer) {
+        if b.hostSeconds > 0 { clockLog.append(HostClockPoint(sampleTime: b.sampleTime, hostSeconds: b.hostSeconds)) }
         if calibrating.load(ordering: .sequentiallyConsistent) {
             var o = origin.load(ordering: .relaxed)
             if o == Int64.min {
@@ -579,6 +592,42 @@ final class SessionRT: @unchecked Sendable {
     /// Bloque de salida vacío en `sampleTime` (para fijar el origen del calibrador fuera del hilo de E/S).
     func withEmptyOutput(at sampleTime: Int64, _ body: (AudioIOBuffer) -> Void) {
         body(AudioIOBuffer(sampleTime: sampleTime, frameCount: 0, channels: UnsafeBufferPointer(dummyPointers)))
+    }
+}
+
+/// Registro circular de las marcas de host de cada ciclo de salida. Un escritor (el hilo de E/S, sin reservar
+/// memoria) y lectores fuera de él, como `HostTimeLog`: el lector copia solo lo que el escritor no puede estar
+/// pisando.
+final class HostClockLog: @unchecked Sendable {
+    /// 2^16 ciclos: 11,6 min a 512 muestras y 48 kHz.
+    static let capacity = 1 << 16
+    static let guardEntries = 64
+    private let buf: UnsafeMutablePointer<HostClockPoint>
+    private let written = Atomic<Int>(0)
+
+    init() {
+        buf = .allocate(capacity: Self.capacity)
+        buf.initialize(repeating: HostClockPoint(sampleTime: 0, hostSeconds: 0), count: Self.capacity)
+    }
+
+    deinit { buf.deallocate() }
+
+    /// Solo desde el hilo de E/S.
+    func append(_ p: HostClockPoint) {
+        let n = written.load(ordering: .relaxed)
+        buf[n & (Self.capacity - 1)] = p
+        written.store(n + 1, ordering: .releasing)
+    }
+
+    func points(after: Int64) -> [HostClockPoint] {
+        let n = written.load(ordering: .acquiring)
+        let keep = min(n, Self.capacity - Self.guardEntries)
+        var out: [HostClockPoint] = []
+        for i in (n - keep)..<n {
+            let p = buf[i & (Self.capacity - 1)]
+            if p.sampleTime > after { out.append(p) }
+        }
+        return out
     }
 }
 

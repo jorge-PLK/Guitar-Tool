@@ -6,7 +6,7 @@ import Store
 /// Capturas sin hardware (solo DEBUG): `--screen settings-audio | calibration-sheet | backing-ab` usan dispositivos
 /// y E/S simulados (`SimulatedDeviceProvider`, `SimulatedAudioIO`), sin tocar la tarjeta de sonido.
 enum AudioDemo {
-    static let screens: Set<String> = ["settings-audio", "calibration-sheet", "backing-ab"]
+    static let screens: Set<String> = ["settings-audio", "calibration-sheet", "backing-ab", "record", "record-counting", "record-offset", "record-mixer-expanded"]
 
     /// `SimulatedAudioIO` con el tiempo de la pared: rig con saturación y retardo en el canal 1, canal 3 de
     /// referencia interno (sin rig) y ruido en los demás para que los medidores se muevan.

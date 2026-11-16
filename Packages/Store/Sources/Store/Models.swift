@@ -194,11 +194,30 @@ public struct Take: Codable, Sendable, Equatable {
     public var calibrationKey: CalibrationKey?
     public var clock: ClockMode?
 
+    // Grabación con vídeo (mini-spec Fase 6, «Datos»). Opcionales y aditivos.
+    public var partID: UUID?
+    /// Ruta relativa (`takes/<id>/video.mov`); las marcas del fichero están en tiempo del tema.
+    public var videoFile: String?
+    /// Desfase manual (s, positivo = la imagen llega tarde).
+    public var videoOffset: Double?
+    public var videoFormat: TakeVideoFormat?
+    public var punches: [TakePunch]?
+    /// Audio original antes de aplanar un punch (`takes/<id>/base/processed.wav`).
+    public var baseProcessedFile: String?
+
     public init(id: UUID = UUID(), guitarId: UUID? = nil, sectionId: UUID? = nil, diFile: String? = nil,
                 processedFile: String? = nil, micFile: String? = nil, discarded: Bool = false, createdAt: Date = Date(),
                 songStart: Double? = nil, sampleRate: Double? = nil, latencySamples: Double? = nil,
                 rigDelaySamples: Double? = nil, rigDelayReliable: Bool? = nil, latencyCalibrated: Bool? = nil,
-                calibrationKey: CalibrationKey? = nil, clock: ClockMode? = nil) {
+                calibrationKey: CalibrationKey? = nil, clock: ClockMode? = nil,
+                partID: UUID? = nil, videoFile: String? = nil, videoOffset: Double? = nil,
+                videoFormat: TakeVideoFormat? = nil, punches: [TakePunch]? = nil, baseProcessedFile: String? = nil) {
+        self.partID = partID
+        self.videoFile = videoFile
+        self.videoOffset = videoOffset
+        self.videoFormat = videoFormat
+        self.punches = punches
+        self.baseProcessedFile = baseProcessedFile
         self.songStart = songStart
         self.sampleRate = sampleRate
         self.latencySamples = latencySamples
@@ -352,6 +371,8 @@ public struct Project: Codable, Sendable, Equatable {
     public var guitarSettings: GuitarSettings
     /// Con qué opciones y qué entrada se produjeron las pistas de `guitars`; nil si no se procesó. Aditivo.
     public var guitarApplied: GuitarAppliedState?
+    /// Grabación con vídeo por partes (Fase 6). Aditivo; nil si no se ha abierto Grabar.
+    public var recording: RecordingState?
     public var createdAt: Date
     public var updatedAt: Date
 
@@ -360,7 +381,8 @@ public struct Project: Codable, Sendable, Equatable {
                 sections: [Section] = [], rigs: [Rig] = [], takes: [Take] = [], videos: [Video] = [],
                 study: StudyState = StudyState(),
                 createdAt: Date = Date(), updatedAt: Date = Date(), guitarSettings: GuitarSettings = GuitarSettings(),
-                guitarApplied: GuitarAppliedState? = nil) {
+                guitarApplied: GuitarAppliedState? = nil, recording: RecordingState? = nil) {
+        self.recording = recording
         self.guitarSettings = guitarSettings
         self.guitarApplied = guitarApplied
         self.study = study
@@ -381,7 +403,7 @@ public struct Project: Codable, Sendable, Equatable {
     private enum CodingKeys: String, CodingKey {
         case schemaVersion, id, song, separation, stems, guitars, sections, rigs, takes, videos, study
         case guitarSettings = "guitarOptions"
-        case guitarApplied, createdAt, updatedAt
+        case guitarApplied, recording, createdAt, updatedAt
     }
 
     public init(from decoder: Decoder) throws {
@@ -391,6 +413,7 @@ public struct Project: Codable, Sendable, Equatable {
         study = try c.decodeIfPresent(StudyState.self, forKey: .study) ?? StudyState()
         guitarSettings = try c.decodeIfPresent(GuitarSettings.self, forKey: .guitarSettings) ?? GuitarSettings()
         guitarApplied = try c.decodeIfPresent(GuitarAppliedState.self, forKey: .guitarApplied)
+        recording = try c.decodeIfPresent(RecordingState.self, forKey: .recording)
         id = try c.decode(UUID.self, forKey: .id)
         song = try c.decode(Song.self, forKey: .song)
         separation = try c.decodeIfPresent(SeparationState.self, forKey: .separation) ?? SeparationState()

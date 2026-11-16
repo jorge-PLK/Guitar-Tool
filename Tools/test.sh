@@ -5,6 +5,7 @@
 #                                     → escribe Temp/last-run.txt (lo lee .claude/hooks/commit-gate.sh)
 #   Tools/test.sh <Paquete> [Filtro]  un paquete, opcionalmente con `swift test --filter <Filtro>`
 #                                     → no escribe last-run.txt
+#   Tools/test.sh App                 solo el build de la app, sin tests → no escribe last-run.txt
 #
 # Salida: 0 verde, 1 tests fallidos, 2 errores de compilación o nada que probar.
 # La app se compila (no se testea): la lógica y sus tests viven en los paquetes.
@@ -16,9 +17,13 @@ cd "$root" || exit 2
 mkdir -p Temp/logs
 
 full=1
+app_only=0
 pkgs=()
 filter=""
-if [ $# -ge 1 ]; then
+if [ "${1:-}" = "App" ]; then
+  full=0
+  app_only=1
+elif [ $# -ge 1 ]; then
   full=0
   pkgs=("$1")
   filter="${2:-}"
@@ -68,7 +73,7 @@ for pkg in ${pkgs[@]+"${pkgs[@]}"}; do   # bash 3.2 + set -u: array vacío
 done
 
 app_built=0
-if [ "$full" -eq 1 ]; then
+if [ "$full" -eq 1 ] || [ "$app_only" -eq 1 ]; then
   for proj in App/*.xcodeproj; do
     [ -d "$proj" ] || continue
     log="Temp/logs/App.log"

@@ -38,8 +38,13 @@ public struct EquipmentProfile: Codable, Sendable, Equatable {
     /// Dispositivo, canales y calibración de latencia (mini-spec Fase 3). Aditivo: un perfil antiguo no lo trae.
     public var audio: AudioSettings?
 
+    /// Cámara y vídeo (mini-spec Fase 6). Aditivo: un perfil antiguo no lo trae.
+    public var video: VideoSettings?
+
     public init(projectsFolder: URL? = nil, workingSampleRate: Double = EquipmentProfile.defaultSampleRate,
-                guitars: [OwnedGuitar] = [], masterGainDB: Double = 0, audio: AudioSettings? = nil) {
+                guitars: [OwnedGuitar] = [], masterGainDB: Double = 0, audio: AudioSettings? = nil,
+                video: VideoSettings? = nil) {
+        self.video = video
         self.masterGainDB = masterGainDB
         self.audio = audio
         self.projectsFolder = projectsFolder
@@ -55,7 +60,8 @@ public struct EquipmentProfile: Codable, Sendable, Equatable {
                   workingSampleRate: try c.decodeIfPresent(Double.self, forKey: .workingSampleRate) ?? Self.defaultSampleRate,
                   guitars: try c.decodeIfPresent([OwnedGuitar].self, forKey: .guitars) ?? [],
                   masterGainDB: try c.decodeIfPresent(Double.self, forKey: .masterGainDB) ?? 0,
-                  audio: try c.decodeIfPresent(AudioSettings.self, forKey: .audio))
+                  audio: try c.decodeIfPresent(AudioSettings.self, forKey: .audio),
+                  video: try c.decodeIfPresent(VideoSettings.self, forKey: .video))
     }
 
     /// Como mucho una por defecto: se conserva la primera marcada.

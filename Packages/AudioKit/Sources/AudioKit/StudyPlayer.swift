@@ -3,21 +3,32 @@ import Observation
 
 /// Pista de toma («Tú», mini-spec Fase 3, «A/B dentro de la mezcla»): una toma ya alineada cuya muestra 0
 /// cae en `songStart` del tema. Suena por la misma cadena que los stems (sigue velocidad, tono y bucle) y
-/// aparece en `tracks` como un canal más, con su ganancia (la de `LoudnessMatch`) y su mute.
+/// aparece en `tracks` como un canal más, con su ganancia (la de `LoudnessMatch`), su mute y su solo.
+///
+/// Fase 6: puede haber varias a la vez (`setTakes`): la mejor toma de cada una de las otras partes suena como
+/// canal «Tú · parte» (mini-spec Fase 6, «Partes y tomas»).
 public struct TakeTrack: Sendable, Equatable {
-    /// Id del canal en el mezclador (no debe coincidir con el de un stem).
+    /// Id del canal en el mezclador (no debe coincidir con el de un stem ni con el de otra toma).
     public var id: String
     public var url: URL
     public var songStart: Double
     public var gainDB: Double
     public var muted: Bool
+    public var solo: Bool
+    /// Punch-in (mini-spec Fase 6, «Punch-in»): desde este instante del tema la toma se silencia con un
+    /// fundido de `PunchFlattener.crossfadeSeconds` (el mismo que tendrá la original al aplanar el punch).
+    /// `nil` = suena entera.
+    public var silencedFrom: Double?
 
-    public init(id: String, url: URL, songStart: Double, gainDB: Double = 0, muted: Bool = false) {
+    public init(id: String, url: URL, songStart: Double, gainDB: Double = 0, muted: Bool = false, solo: Bool = false,
+                silencedFrom: Double? = nil) {
         self.id = id
         self.url = url
         self.songStart = songStart
         self.gainDB = gainDB
         self.muted = muted
+        self.solo = solo
+        self.silencedFrom = silencedFrom
     }
 }
 
@@ -57,10 +68,12 @@ public struct TakeTrack: Sendable, Equatable {
 @MainActor
 @Observable
 public final class StudyPlayer {
-    /// Stems y, al final, la pista de toma si la hay.
+    /// Stems y, al final, las pistas de toma en su orden.
     public private(set) var tracks: [Track] = []
-    /// Pista de toma en uso.
-    public private(set) var take: TakeTrack?
+    /// Pistas de toma en uso (Fase 6: varias).
+    public private(set) var takes: [TakeTrack] = []
+    /// Primera pista de toma (la única antes de la Fase 6).
+    public var take: TakeTrack? { takes.first }
     public private(set) var duration: Double = 0
     public private(set) var isPlaying = false
     /// Nombre de la salida en uso («» si no hay ninguna).
@@ -152,17 +165,25 @@ public final class StudyPlayer {
 
     /// Carga los stems de un tema (quita la pista de toma).
     public func load(tracks newTracks: [Track]) throws {
-        try rebuild(stems: newTracks, take: nil)
+        try rebuild(stems: newTracks, takes: [])
     }
 
-    /// Pone o quita la pista de toma («Tú»). Conserva la mezcla de los stems, la posición y si sonaba.
-    /// La toma debe estar a la frecuencia de los stems.
+    /// Pone o quita la pista de toma («Tú»): equivale a `setTakes` con una o ninguna.
     public func setTake(_ newTake: TakeTrack?) throws {
+        try setTakes(newTake.map { [$0] } ?? [])
+    }
+
+    /// Pone las pistas de toma (Fase 6: la de la parte y las mejores de las otras, cada una con su canal).
+    /// Conserva la mezcla de los stems, la posición y si sonaba. Las tomas deben estar a la frecuencia de los
+    /// stems y sus ids no pueden repetirse ni coincidir con los de los stems.
+    public func setTakes(_ newTakes: [TakeTrack]) throws {
         guard !stemTracks.isEmpty else { throw StudyPlayerError.noTracks }
+        let ids = stemTracks.map(\.id) + newTakes.map(\.id)
+        guard Set(ids).count == ids.count else { throw StudyPlayerError.duplicateTrackID }
         let wasPlaying = isPlaying
         let t = currentTime
         let stemMix = Array(mix.prefix(stemTracks.count))
-        try rebuild(stems: stemTracks, take: newTake)
+        try rebuild(stems: stemTracks, takes: newTakes)
         for (i, m) in stemMix.enumerated() { mix[i] = m }
         applyMix()
         pausedTime = t
@@ -177,7 +198,7 @@ public final class StudyPlayer {
         }
     }
 
-    private func rebuild(stems newTracks: [Track], take newTake: TakeTrack?) throws {
+    private func rebuild(stems newTracks: [Track], takes newTakes: [TakeTrack]) throws {
         guard !newTracks.isEmpty else { throw StudyPlayerError.noTracks }
         if isPlaying { pause() }
         scheduler.stop()
@@ -193,13 +214,14 @@ public final class StudyPlayer {
             stems.append(.init(player: AVAudioPlayerNode(), file: file, reader: reader))
         }
         let sr = rate!
-        if let newTake {
+        for newTake in newTakes {
             let (file, reader) = try Self.open(newTake.url)
             guard file.processingFormat.sampleRate == sr else { throw StudyPlayerError.sampleRateMismatch }
             var s = StemScheduler.Stem(player: AVAudioPlayerNode(), file: file, reader: reader)
             s.offset = Int64((newTake.songStart * sr).rounded())
             s.silence = StemScheduler.silence(format: file.processingFormat,
                                               frames: Int64(StudyPlayerConstants.chunkSeconds * sr))
+            s.fadeOutFrom = newTake.silencedFrom.map { Int64(($0 * sr).rounded()) }
             stems.append(s)
         }
         // Alojado a otra frecuencia ya no vale: vuelve a su propia salida.
@@ -231,9 +253,9 @@ public final class StudyPlayer {
         channels = newChannels
         stemFormats = stems.map(\.file.processingFormat)
         stemTracks = newTracks
-        take = newTake
-        tracks = newTracks + (newTake.map { [Track(id: $0.id, url: $0.url)] } ?? [])
-        mix = newTracks.map { _ in StemMix() } + (newTake.map { [StemMix(gainDB: $0.gainDB, muted: $0.muted)] } ?? [])
+        takes = newTakes
+        tracks = newTracks + newTakes.map { Track(id: $0.id, url: $0.url) }
+        mix = newTracks.map { _ in StemMix() } + newTakes.map { StemMix(gainDB: $0.gainDB, muted: $0.muted, solo: $0.solo) }
         lengthFrames = length
         duration = Double(length) / sr
         pausedTime = 0
@@ -389,14 +411,14 @@ public final class StudyPlayer {
     public func setGain(_ id: String, dB: Double) {
         guard let i = index(of: id) else { return }
         mix[i].gainDB = dB
-        if take?.id == id { take?.gainDB = dB }
+        if let k = takes.firstIndex(where: { $0.id == id }) { takes[k].gainDB = dB }
         applyMix()
     }
 
     public func setMute(_ id: String, _ muted: Bool) {
         guard let i = index(of: id) else { return }
         mix[i].muted = muted
-        if take?.id == id { take?.muted = muted }
+        if let k = takes.firstIndex(where: { $0.id == id }) { takes[k].muted = muted }
         applyMix()
     }
 
@@ -404,6 +426,7 @@ public final class StudyPlayer {
     public func setSolo(_ id: String, _ solo: Bool) {
         guard let i = index(of: id) else { return }
         mix[i].solo = solo
+        if let k = takes.firstIndex(where: { $0.id == id }) { takes[k].solo = solo }
         applyMix()
     }
 

@@ -1,6 +1,6 @@
 # ToneForge · Mapa del código
 
-Última actualización: 2026-11-16 · Fase 4 · Guitarras y secciones (ADR-014).
+Última actualización: 2026-11-16 · Fase 6 · Grabación con vídeo (ADR-015).
 
 Una sección por paquete (nombres de `docs/plan.md`, «Forma de trabajo»), más la app, las pruebas y las herramientas. Fila por fichero: `| Fichero | qué hace (ADR-NNN): APIs públicas |`. Se lee por secciones: `grep -n '^## ' docs/CODEMAP.md`.
 
@@ -36,8 +36,12 @@ E/S de audio y reproducción: importación (ADR-007), reproductor de estudio (AD
 | `Sources/AudioKit/SignalMath.swift` | Interno: correlación, interpolación sinc, FFT y ruido con semilla |
 | `Sources/AudioKit/StudyPlayer.swift` (Fase 3) | Selección de salida (`setOutput(_:)`, `OutputSelection`), `init(offlineWith:output:)`, pista de toma `setTake(_:)`/`take` (`TakeTrack`), alojamiento `attach(to:)`/`detach()`/`isHosted`, `playbackAnchor` (suma la latencia declarada del TimePitch), `hostedDiagnostics` |
 | `Sources/AudioKit/StemScheduler.swift`, `PlaybackTimeline.swift` (Fase 3) | Programan y ubican también la pista de toma (`TakeTrack`: `id`, `url`, `songStart`, `gainDB`, `muted`) y el ancla |
+| `Sources/AudioKit/AudioIO.swift`, `AudioSession.swift`, `SimulatedAudioIO.swift`, `CoreAudioIO.swift`, `CaptureRing.swift` (Fase 6) | (ADR-015) Marcas de reloj de host: `HostClockPoint` (muestra de salida ↔ segundos de host), `AudioSession.outputHostClock` y su equivalente simulado, con deriva configurable |
+| `Sources/AudioKit/StudyPlayer.swift`, `StudyPlayerTypes.swift`, `StemScheduler.swift` (Fase 6) | (ADR-015) `StudyPlayer.setTakes(_:)`: varias pistas de toma a la vez (las mejores de las otras partes); `TakeTrack.solo` y `TakeTrack.silencedFrom` (silencio con fundido de la toma vieja desde la entrada del punch). La cuenta suena en un segundo `StudyPlayer` |
+| `Sources/AudioKit/PunchFlattener.swift` | (ADR-015) `PunchFlattener`: aplana la toma base y el punch con fundidos cruzados de 10 ms; fuera del tramo conserva la base muestra a muestra |
+| `Tests/AudioKitTests/HostClockTests.swift`, `PunchAndTakesTests.swift` (Fase 6) | (ADR-015) Marcas de host, varias pistas de toma, silencio del punch y aplanado |
 | `Sources/tf-audio/` | Ejecutable de desarrollo, no embebido (`TFAudio`, `Commands`, `Options`, `Rig`): `devices`, `latency` (`--restarts`), `verify`, `record`; `--simulated`; salidas en `Temp/tf-audio/` (incluye `verify-hal.csv`) |
-| `Tests/AudioKitTests/` | 90 tests (`AudioImporterTests`, `StudyPlayerTests` en render offline; Fase 3: `AudioRoutingTests`, `AudioSessionTests`, `LatencyCalibratorTests`, `TakeAlignmentTests`, `PlayerHostingTests`, `HostTimingTests`, `FeedbackLoopTests`, `LoudnessMatchTests`, `AppLogicTests`, `TFAudioToolTests`). Fixtures en `Fixtures/` (unos 300 KB), con un README de los comandos ffmpeg |
+| `Tests/AudioKitTests/` | 97 tests, 1 omitido (`AudioImporterTests`, `StudyPlayerTests` en render offline; Fase 3: `AudioRoutingTests`, `AudioSessionTests`, `LatencyCalibratorTests`, `TakeAlignmentTests`, `PlayerHostingTests`, `HostTimingTests`, `FeedbackLoopTests`, `LoudnessMatchTests`, `AppLogicTests`, `TFAudioToolTests`; Fase 6: `HostClockTests`, `PunchAndTakesTests`). Fixtures en `Fixtures/` (unos 300 KB), con un README de los comandos ffmpeg |
 
 ## Packages/ModelKit
 
@@ -144,7 +148,18 @@ Transcripción y tablatura (ADR-014).
 
 ## Packages/VideoKit
 
-Captura y montaje de vídeo. Sin código (solo test de humo).
+Captura y montaje de vídeo (ADR-015). No depende de AudioKit: la app hace de puente.
+
+| Fichero | qué hace (ADR-015): APIs públicas |
+| --- | --- |
+| `Sources/VideoKit/HostTimeMap.swift` | `HostClock` (ticks ↔ segundos de host) y `HostTimeMap`: ancla del reproductor (`Anchor`) + puntos del reloj de salida; `songTime(atHostSeconds:)`, `hostSeconds(atSongTime:)`, `outputSample(atHostSeconds:)` |
+| `Sources/VideoKit/CameraDevice.swift` | `CameraDevice`, `CameraFormat`, `FrameRateRange`, `CameraKind`, `CameraRequest`, `VideoFormat`; `CameraProviding` con `AVCameraProvider` (real, `ensureAccess()`) y `SimulatedCameraProvider`; un solo manejador de cambios (`setChangeHandler`) |
+| `Sources/VideoKit/CameraCapture.swift` | `CameraCapture` (`start(_:onFrame:)`, `stop()`), `CameraFrame` con marca de host, `CameraError`; `AVCameraCapture` (real) y `SimulatedCameraCapture` (retardo, jitter y fotogramas perdidos) |
+| `Sources/VideoKit/VideoTakeWriter.swift` | `VideoTakeWriter`: `AVAssetWriter` HEVC con PTS = tiempo del tema, sin aplicar el desfase manual |
+| `Sources/VideoKit/VideoTakeRecorder.swift` | `VideoTakeRecorder`: une captura, `HostTimeMap` y escritor; graba fotogramas en tiempo del tema |
+| `Sources/VideoKit/TakePreview.swift` | `TakePreview.load(audioURL:songStart:videoURL:punches:)`, `pieces(videoOffset:punchOffsets:)` y `composition(videoOffset:punchOffsets:)`: vídeo + toma procesada con desfase y punches, sin recodificar; `PreviewPunch`, `PreviewPiece` |
+| `Sources/tf-video/` | Ejecutable de desarrollo, no embebido: `cameras`, `record`, `sync` (medida de fotogramas, jitter, deriva y retardo contra el host) |
+| `Tests/VideoKitTests/` | 10 tests: `SyncGateTests` (puerta: 3 tomas con cámara simulada), `HostTimeMapTests`, `VideoFileTests`, `TFVideoToolTests`, `VideoKitTests` |
 
 ## Packages/Store
 
@@ -163,7 +178,13 @@ Archivo de proyecto (JSON por carpeta), índice en SwiftData y orquestación de 
 | `Sources/Store/Guitars.swift` (Fase 4) | (ADR-014) `GuitarOptions` (`stereoSplit`, `soloSpans`), `GuitarSettings`, `GuitarSoloSpan`, `Guitar` (`role`, `name`, `file`, `confidence`), `GuitarRole` (rhythm, left, right, lead; `fileName`), `GuitarConfidence`, `GuitarAppliedState`, `GuitarSplitState`, `SeparatedGuitar`, `GuitarSplitResult` y el protocolo `GuitarSplitting` |
 | `Sources/Store/SectionEditor.swift` | (ADR-014) `SectionEditor`: `mark`, `rename`, `setSolo`, `remove`, `setColor`, `paletteIndices`, `setEdge`, `snapEdge`, `nudgeEdge`; longitud mínima 0,5 s |
 | `Sources/Store/Library.swift` (Fase 4) | `saveGuitarNames`, `saveGuitarStereoSplit`, `guitarSplitState`; paso `splitGuitars` en la cola tras el análisis. `Section` gana `color` y `isSolo` |
-| `Tests/StoreTests/` | 78 tests (`AudioSettingsTests`: ajustes de audio y caducidad de la calibración; `StudyQueueTests`: cola, stems vacíos, v1 → v2; `OriginTests`: origen, duplicados, importación con metadatos; `TrashTests`: Papelera, borrado y edición; `RecoveryTests`: re-encolado al arrancar) |
+| `Sources/Store/Recording.swift` (Fase 6) | (ADR-015) `RecordingState` (`parts`, `mix`, `startSectionID`, `countIn`, `preRollBars`), `RecordingPart` (`id`, `name`, `replaces`, `isLead`, `takeIDs`, `bestTakeID`), `TakePunch` |
+| `Sources/Store/VideoSettings.swift` (Fase 6) | (ADR-015) `VideoSettings` (`cameraUID`, `resolution`, `fps`, `offsets` por cámara, `export`), `VideoExportDefaults`; `EquipmentProfile.video` |
+| `Sources/Store/Models.swift`, `Files.swift`, `Library.swift`, `EquipmentProfile.swift` (Fase 6) | (ADR-015) `Take` gana `partID`, `videoFile`, `videoOffset`, `videoFormat`, `punches`, `baseProcessedFile`; `Project.recording`; `ProjectLayout.videoURL(takeId:)`, `baseProcessedURL(takeId:)`, `punchDirectory(takeId:n:)`; `Library.saveRecording` y `deleteTake` (la quita de su parte y reasigna la mejor) |
+| `Tests/StoreTests/RecordingTests.swift` | (ADR-015) Campos nuevos, proyectos y perfiles anteriores, borrado de tomas |
+| `Tests/StoreTests/` | 123 tests (`AudioSettingsTests`: ajustes de audio y caducidad de la calibración; `StudyQueueTests`: cola, stems vacíos, v1 → v2; `OriginTests`: origen, duplicados, importación con metadatos; `TrashTests`: Papelera, borrado y edición; `RecoveryTests`: re-encolado al arrancar; Fase 6: `RecordingTests`) |
+
+Fase 6 (ADR-015): la carpeta de proyecto añade `takes/<id>/video.mov`, `takes/<id>/base/processed.wav` (toma original antes de un punch) y `takes/<id>/punch-<n>/`.
 
 Carpeta de proyecto: `project.json`, `source/original.<ext>`, `audio/song.wav` (regenerable), `stems/<stem>.wav` (regenerable), `stems/.partial`, `takes/` (`takes/<id>/processed.wav`, ADR-013), `video/`, `rigs/`, `cache/` (regenerable; `cache/analysis.json` es el análisis automático con huella). Perfil e índice en `~/Library/Application Support/ToneForge/` (`profile.json`, `Library.store`). Límite conocido: en la reconversión la sustitución es atómica por fichero, no entre ficheros; `project.json` se actualiza al final y, si falla a mitad, se reintenta al abrir.
 
@@ -204,6 +225,12 @@ Proyecto Xcode generado con XcodeGen (`App/project.yml`; el `.xcodeproj` tambié
 | `App/Sources/SectionBoxes.swift`, `SectionGridBoxes.swift` | (ADR-014) Cajas de secciones sobre la tira de acordes, compacta y expandida: `SectionBoxes`, `SectionPopover`, `SectionMenu`, asas, ◀ ▶, Supr (`SectionKeyMonitor`), colores `TF.sectionPalette` |
 | `App/Sources/BackingMixer.swift` (Fase 4) | (ADR-014) un canal por guitarra (`guitarChannel`) con nombre editable y confianza; sin stems vacíos; plegado en columnas nombre + M/S. Sin grabación ni A/B en Backing: `BackingRecord.swift`, `loadLastTake`, `setCompare` y `AudioController.bind` quedan sin uso desde la UI hasta la Fase 6 |
 | `App/Resources/Models/BasicPitch_nmp.mlpackage.zip`, `LeadRhythmMelRoformer_fp16.mlpackage.zip` | (ADR-014) Recursos: Basic Pitch (116 KB) y lead/rhythm (156 MB) |
+| `App/Sources/VideoSettingsView.swift` (Fase 6) | (ADR-015) Ajustes · Cámara y vídeo: cámara, resolución, fps, desfase por cámara y exportación por defecto |
+| `App/Sources/RecordController.swift`, `RecordTiming.swift` (Fase 6) | (ADR-015) Flujo de grabación (cuenta, margen, audio y vídeo, punch-in, partes y tomas, re-sondeo de cámaras cada 2 s) y cálculo de tiempos en compases |
+| `App/Sources/RecordView.swift`, `RecordMixer.swift` (Fase 6) | (ADR-015) Pantalla Grabar (vídeo lo más grande, sin scroll en 16:9; panel «Partes») y mezclador compacto por defecto con los canales «Tú · parte» |
+| `App/Sources/OffsetSheet.swift`, `PunchTimeline.swift` (Fase 6) | (ADR-015) Hoja «Ajustar desfase» (±500 ms, ±1 fotograma, ±1 ms) y línea de tiempo para marcar el tramo del punch |
+| `App/Sources/RecordDemo.swift` (Fase 6) | (ADR-015) Datos simulados en DEBUG. Opciones `--screen settings-video\|record\|record-counting\|record-offset\|record-mixer-expanded` y `--window WxH` |
+| `App/Sources/AudioController.swift`, `AppModel.swift`, `RootView.swift`, `SettingsView.swift`, `App/project.yml` (Fase 6) | (ADR-015) `AudioController.takeSink`, pantalla Grabar en la barra lateral, Ajustes · Cámara y vídeo; `project.yml` enlaza VideoKit |
 | `App/Sources/Theme.swift` | `TF`: colores y medidas (ampliado en la Fase 2b) |
 | `App/Resources/AppIcon.svg`, `App/Resources/Assets.xcassets/` | Icono de la app (de Jorge): los PNG salen del SVG con `Tools/make-icon.sh`; `project.yml` fija `ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon` |
 | `App/Sources/ToneForgeApp.swift` | Punto de entrada |
@@ -235,5 +262,6 @@ Recursos: modelos y resultados en `Probes/P4-modelos/*/out/` (no versionados); e
 | Fichero | qué hace |
 | --- | --- |
 | `Tools/test.sh` | `swift test` de cada paquete + build de la app con salida resumida; escribe `Temp/last-run.txt` en la pasada completa (ADR-003) |
+| `Tools/test.sh App` (Fase 6) | Solo el build de la app, unos 5 s en incremental; no escribe `Temp/last-run.txt` (ADR-015) |
 | `Tools/helpers/` | `fetch.sh` (baja y verifica yt-dlp y Deno), `build-ffmpeg.sh` (compila el ffmpeg mínimo) y `versions.env` (versiones y sumas); la salida va a `Vendor/helpers/`, sin versionar (ADR-011) |
 | `Tools/make-icon.sh`, `Tools/make-icon.swift` | Generan los PNG del icono de la app a partir de `App/Resources/AppIcon.svg` (de Jorge) |

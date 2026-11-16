@@ -1,0 +1,36 @@
+import StudyKit
+
+/// Compases para grabar (mini-spec Fase 6, «Grabar una toma»): los del pulso de la Fase 2; sin pulso, 120 BPM y 4/4.
+/// Vive en su propio fichero porque `StudyKit` y `AudioKit` comparten nombres (`Click`).
+struct BarTiming: Equatable {
+    /// Mini-spec Fase 6, «Grabar una toma»: sin pulso, 120 BPM y 4/4.
+    static let fallbackBPM = 120.0
+    static let fallbackBeatsPerBar = 4
+
+    /// Inicios de compás; vacío si no hay pulso (entonces los compases son múltiplos de `barSeconds` desde 0).
+    var downbeats: [Double]
+    var beatSeconds: Double
+    var beatsPerBar: Int
+    var barSeconds: Double { beatSeconds * Double(beatsPerBar) }
+
+    init(_ grid: BeatGrid?) {
+        downbeats = grid?.downbeats ?? []
+        beatSeconds = 60 / (grid?.bpm ?? Self.fallbackBPM)
+        beatsPerBar = grid?.beatsPerBar ?? Self.fallbackBeatsPerBar
+    }
+
+    /// Inicio del backing: `bars` compases antes de `start` (con el pulso, en el inicio de compás); nunca antes de 0.
+    func preRollStart(for start: Double, bars: Int) -> Double {
+        guard bars > 0 else { return max(0, start) }
+        if let last = downbeats.lastIndex(where: { $0 <= start + 0.05 }), last - bars >= 0 {
+            return downbeats[last - bars]
+        }
+        return max(0, start - Double(bars) * barSeconds)
+    }
+
+    /// Compás más cercano a `t` (imán del punch-in).
+    func nearestBar(_ t: Double) -> Double {
+        if let best = downbeats.min(by: { abs($0 - t) < abs($1 - t) }) { return best }
+        return (t / barSeconds).rounded() * barSeconds
+    }
+}

@@ -148,6 +148,21 @@ public struct ProjectLayout: Sendable, Equatable {
 
     public func processedURL(takeId: UUID) -> URL { url(relative: Self.processedRelativePath(takeId: takeId)) }
 
+    /// Vídeo de una toma (mini-spec Fase 6): `takes/<id>/video.mov`.
+    public static func videoRelativePath(takeId: UUID) -> String { "takes/\(takeId.uuidString)/video.mov" }
+    public static func baseProcessedRelativePath(takeId: UUID) -> String { "takes/\(takeId.uuidString)/base/processed.wav" }
+    public static func punchRelativeDirectory(takeId: UUID, n: Int) -> String { "takes/\(takeId.uuidString)/punch-\(n)" }
+
+    public func videoURL(takeId: UUID) -> URL { url(relative: Self.videoRelativePath(takeId: takeId)) }
+    public func baseProcessedURL(takeId: UUID) -> URL { url(relative: Self.baseProcessedRelativePath(takeId: takeId)) }
+    public func punchDirectory(takeId: UUID, n: Int) -> URL {
+        folder.appendingPathComponent(Self.punchRelativeDirectory(takeId: takeId, n: n), isDirectory: true)
+    }
+    /// Carpeta de la toma: `takes/<id>/`.
+    public func takeDirectory(takeId: UUID) -> URL {
+        takesDir.appendingPathComponent(takeId.uuidString, isDirectory: true)
+    }
+
     /// Resuelve una ruta relativa (con `/`) dentro de la carpeta.
     public func url(relative: String) -> URL { folder.appendingPathComponent(relative) }
 

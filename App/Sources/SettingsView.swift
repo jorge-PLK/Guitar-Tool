@@ -33,10 +33,7 @@ struct SettingsView: View {
 
                 switch model.settingsTab {
                 case .audio: AudioSettingsView()
-                case .video:
-                    SettingsGroup(title: "Cámara y vídeo", note: "Cámara, sincronía y exportación por defecto.") {
-                        phase("Llega en la Fase 6")
-                    }
+                case .video: VideoSettingsView()
                 case .library: LibrarySettings()
                 }
             }
