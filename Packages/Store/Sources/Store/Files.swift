@@ -170,6 +170,28 @@ public struct ProjectLayout: Sendable, Equatable {
         takesDir.appendingPathComponent(takeId.uuidString, isDirectory: true)
     }
 
+    /// Análisis de encuadre de una toma (mini-spec Fase 7); regenerable, dentro de `cache/`.
+    public static func framingCacheRelativePath(takeId: UUID) -> String { "cache/framing/\(takeId.uuidString).json" }
+
+    public func framingCacheURL(takeId: UUID) -> URL { url(relative: Self.framingCacheRelativePath(takeId: takeId)) }
+
+    /// Vídeo montado: `video/<tema>-<layout>.mov`. `songName` por defecto es el nombre de la carpeta del proyecto
+    /// (`<Artista> - <Título>`); se sanea como los nombres de carpeta.
+    public func montageVideoURL(layout: MontageLayoutKind, songName: String? = nil) -> URL {
+        videoDir.appendingPathComponent("\(montageBaseName(layout: layout, songName: songName)).mov")
+    }
+
+    /// WAV por pista del montaje: `video/<tema>-<layout>-pistas/`.
+    public func montageTracksDirectory(layout: MontageLayoutKind, songName: String? = nil) -> URL {
+        videoDir.appendingPathComponent("\(montageBaseName(layout: layout, songName: songName))-pistas", isDirectory: true)
+    }
+
+    private func montageBaseName(layout: MontageLayoutKind, songName: String?) -> String {
+        var name = FolderNaming.sanitize(songName ?? folder.lastPathComponent)
+        if name.isEmpty { name = "Sin título" }
+        return "\(name)-\(layout.rawValue)"
+    }
+
     /// Resuelve una ruta relativa (con `/`) dentro de la carpeta.
     public func url(relative: String) -> URL { folder.appendingPathComponent(relative) }
 

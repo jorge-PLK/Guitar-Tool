@@ -689,6 +689,11 @@ public actor Library {
         try await mutate(id) { $0.recording = recording }
     }
 
+    /// Guarda el montaje en vídeo (Fase 7). Solo toca `montage`.
+    public func saveMontage(id: UUID, _ montage: MontageState) async throws {
+        try await mutate(id) { $0.montage = montage }
+    }
+
     /// Borra una toma: su carpeta `takes/<id>/` (con salvaguarda de ruta: tiene que ser hija directa de `takes/` del
     /// proyecto y llamarse como la toma; si no, lanza `unsafeDeletion` y no toca nada) y la quita de `takes` y de su
     /// parte, reasignando la mejor. Si la toma no existe en el proyecto, lanza `takeNotFound`.
@@ -703,7 +708,8 @@ public actor Library {
             throw LibraryError.unsafeDeletion(dir)
         }
         if FileManager.default.fileExists(atPath: dir.path) { try FileManager.default.removeItem(at: dir) }
-        try await mutate(projectID) { $0.removeTake(takeID) }
+        FileOps.removeIfExists(layout.framingCacheURL(takeId: takeID))
+        try await mutate(projectID) { $0.removeTake(takeID); $0.montage?.removeFraming(takeID) }
     }
 
     /// Corrige a mano título y artista (recortados). Título vacío → `emptyTitle` y no se guarda; artista vacío → `nil`.

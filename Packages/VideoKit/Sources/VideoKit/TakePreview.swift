@@ -2,7 +2,7 @@ import AVFoundation
 import Foundation
 
 /// Un punch de la toma visto por la vista previa (los campos de `TakePunch` de Store que importan aquí).
-public struct PreviewPunch: Sendable, Equatable {
+public struct PreviewPunch: Sendable, Equatable, Codable {
     /// Tramo en tiempo del tema (s).
     public var start: Double
     public var end: Double
@@ -94,7 +94,8 @@ public final class TakePreview: @unchecked Sendable {
                            audioRange: range, base: try await source(videoURL), punchSources: sources)
     }
 
-    private static func source(_ url: URL?) async throws -> Source? {
+    /// También la usan `MontageBuilder` y `GuitarFramer`.
+    static func source(_ url: URL?) async throws -> Source? {
         guard let url else { return nil }
         let asset = AVURLAsset(url: url)
         guard let track = try await asset.loadTracks(withMediaType: .video).first else { return nil }

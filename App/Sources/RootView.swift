@@ -14,6 +14,7 @@ struct RootView: View {
                 case .library: LibraryView()
                 case .backing: BackingView()
                 case .record: RecordView()
+                case .montage: MontageView()
                 case .tab: TabScreen()
                 case .settings: SettingsView()
                 }
@@ -49,8 +50,6 @@ struct RootView: View {
 struct Sidebar: View {
     @Environment(AppModel.self) private var model
 
-    private let later: [(String, String)] = [("Montaje", "Fase 7")]
-
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             (Text("Tone") + Text("Forge").foregroundStyle(TF.accent))
@@ -59,7 +58,7 @@ struct Sidebar: View {
             navRow("Backing track", icon: "slider.vertical.3", active: model.section == .backing) { model.section = .backing }
             navRow("Tablatura", icon: "music.quarternote.3", active: model.section == .tab) { model.section = .tab }
             navRow("Grabar", icon: "record.circle", active: model.section == .record) { model.section = .record }
-            ForEach(later, id: \.0, content: futureRow)
+            navRow("Montaje", icon: "film", active: model.section == .montage) { model.section = .montage }
             Spacer()
             navRow("Ajustes", icon: "gearshape", active: model.section == .settings) { model.section = .settings }
             deviceCard
@@ -68,18 +67,6 @@ struct Sidebar: View {
         .frame(maxHeight: .infinity)
         .background(TF.sidebar)
         .overlay(alignment: .trailing) { Rectangle().fill(TF.line).frame(width: 1) }
-    }
-
-    private func futureRow(_ item: (String, String)) -> some View {
-        HStack {
-            Text(item.0)
-            Spacer()
-            Text(item.1).font(TF.body(11, .medium)).padding(.horizontal, 7).padding(.vertical, 2)
-                .background(TF.neutralBg, in: Capsule())
-        }
-        .font(TF.body(14, .medium)).foregroundStyle(TF.muted.opacity(0.7))
-        .padding(.horizontal, 12).frame(height: 44)
-        .accessibilityHint("Disponible en la \(item.1)")
     }
 
     private var deviceCard: some View {

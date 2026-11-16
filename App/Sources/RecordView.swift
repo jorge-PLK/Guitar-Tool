@@ -20,7 +20,7 @@ struct RecordView: View {
         .task(id: model.backingTarget) {
             if let id = model.backingTarget { await model.openStudy(id) }
         }
-        .onDisappear { Task { await model.closeStudy() } }
+        .onDisappear { Task { if model.section != .montage { await model.closeStudy() } } }
     }
 
     private var chooser: some View {
@@ -149,14 +149,15 @@ private struct RecordBody: View {
                 Text("Grabar").font(TF.display(26))
             }
             Spacer()
-            Button {} label: {
-                Text("Ir al montaje").font(TF.body(14, .semibold)).foregroundStyle(TF.muted)
+            Button { model.section = .montage } label: {
+                Text("Ir al montaje").font(TF.body(14, .semibold)).foregroundStyle(TF.text2)
                     .padding(.horizontal, 18).frame(height: 44)
-                    .background(TF.neutralBg, in: RoundedRectangle(cornerRadius: 10))
+                    .background(TF.field, in: RoundedRectangle(cornerRadius: 10))
                     .overlay(RoundedRectangle(cornerRadius: 10).stroke(TF.fieldLine))
             }
-            .buttonStyle(.plain).disabled(true)
-            .help("Llega en la Fase 7")
+            .buttonStyle(.plain)
+            .disabled(ctl.isBusy)
+            .help("Monta las mejores tomas en un vídeo")
         }
     }
 

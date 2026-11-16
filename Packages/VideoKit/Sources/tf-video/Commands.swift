@@ -14,7 +14,7 @@ enum CLI {
     static let help = """
     tf-video: cámaras, grabación con vídeo y sincronía (herramienta de desarrollo de ToneForge)
 
-    Uso: tf-video <cameras|record|sync> [opciones]
+    Uso: tf-video <cameras|record|sync|frame|montage> [opciones]
 
       cameras
           Lista las cámaras con UID, tipo y formatos (resolución y fps).
@@ -30,6 +30,14 @@ enum CLI {
       sync <mismas opciones que record>
           Igual sin escribir ficheros: informe de marcas (jitter, fotogramas perdidos, deriva cámara/audio,
           retardo de entrega).
+
+      frame <video.mov> [--interval 0.25] [--png <ruta.png>]
+          Encuadre automático (Vision): caja fija y resumen de la trayectoria; con --png, el fotograma central con
+          la caja fija (rojo) y la de la trayectoria (verde).
+          Ejemplo: tf-video frame Temp/tf-video/take-x/video.mov --png Temp/tf-video/frame.png
+
+      montage <plan.json> <salida.mov> [--mix <wav>] [--codec hevc|h264] [--width W --height H] [--fps F]
+          Exporta un MontagePlan en JSON (por defecto, lienzo y fps del plan, HEVC); --mix multiplexa el WAV.
 
     Sin hardware: --simulated L (audio simulado con latencia L muestras y cámara simulada),
       --sim-drift P (deriva del audio frente al host, ppm), --sim-camera-delay MS, --sim-drop N.
@@ -48,6 +56,8 @@ enum CLI {
             switch o.command {
             case .cameras: return cameras(o, env)
             case .record, .sync: return try await take(o, env, write: o.command == .record)
+            case .frame: return try await frame(o, env)
+            case .montage: return try await montage(o, env)
             }
         } catch let e as CLIError {
             env.line("Error: \(e.description)")

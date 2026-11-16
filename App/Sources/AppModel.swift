@@ -53,6 +53,11 @@ struct LaunchOptions {
     var tabListen = false
     /// Con `--screen tab`: exporta el `.gp` a esa ruta sin diálogo, cuando la tablatura está lista.
     var tabExport: URL?
+    /// Montaje (Fase 7): `--screen montage | montage-framing` y `--montage-layout side|grid|stack|single`.
+    var montageLayout: String?
+    /// Con `--screen montage`: exporta por el camino del botón, escribe `export-<layout>[-cut].json` y sale.
+    var montageExport = false
+    var montageCutGaps = false
 
     init(_ args: [String] = CommandLine.arguments) {
         var i = 1
@@ -95,6 +100,9 @@ struct LaunchOptions {
             case ("--tab-edit", _): tabEdit = true
             case ("--tab-listen", _): tabListen = true
             case ("--tab-export", let v?): tabExport = path(v); i += 1
+            case ("--montage-layout", let v?): montageLayout = v; i += 1
+            case ("--montage-export", _): montageExport = true
+            case ("--montage-cut-gaps", _): montageCutGaps = true
             default: break
             }
             i += 1
@@ -103,7 +111,7 @@ struct LaunchOptions {
 }
 #endif
 
-enum AppSection: Hashable { case library, backing, tab, record, settings }
+enum AppSection: Hashable { case library, backing, tab, record, montage, settings }
 enum SettingsTab: String, CaseIterable, Identifiable {
     case audio = "Audio", video = "Cámara y vídeo", library = "Biblioteca y equipo"
     var id: String { rawValue }
@@ -396,6 +404,11 @@ final class AppModel {
             let match = entries.first { e in options.project.map { e.folderName == $0 || e.title == $0 } ?? true }
             backingTarget = match?.id
             section = .record
+        case "montage", "montage-framing":
+            // Montaje con tomas sintéticas (ver `MontageDemo`); no abre ni el dispositivo de audio ni la cámara.
+            let match = entries.first { e in options.project.map { e.folderName == $0 || e.title == $0 } ?? true }
+            backingTarget = match?.id
+            section = .montage
         case "detail-first": if let first = entries.first { await open(first.id) }
         case "tab":
             let match = entries.first { e in options.project.map { e.folderName == $0 || e.title == $0 } ?? true }
@@ -655,7 +668,7 @@ final class AppModel {
             var state = AnalysisState.missing
             if !analysisPinned { state = try await library.ensureAnalysis(id: id) }
             // Si el usuario ya salió de Backing mientras se abría, no se deja nada abierto.
-            guard section == .backing || section == .tab || section == .record else { return }
+            guard section == .backing || section == .tab || section == .record || section == .montage else { return }
             let session = StudySession(project: project, folder: folder, library: library, analysisState: state)
             study = session
             let controller = BackingController(session: session, masterGainDB: profile.masterGainDB, output: outputSelection)
