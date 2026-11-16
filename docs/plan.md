@@ -98,10 +98,21 @@ Notas de cierre (ADR-014): Backing va sin grabación ni A/B (el código de la Fa
 
 ### Fase 5 · Tablatura (parte de RF2, RF11)
 
-- [ ] Transcribir las guitarras con Basic Pitch y asignar cuerdas y trastes; transcribir también el bajo (4 cuerdas) y la batería (modelo aparte: bombo, caja y charles como mínimo)
-- [ ] Tablatura con alphaTab, cursor, edición y exportación a un único archivo de Guitar Pro con guitarras, bajo y batería, comprobado en Guitar Pro
+- [x] Transcribir las guitarras con Basic Pitch y asignar cuerdas y trastes; transcribir también el bajo (4 cuerdas) y la batería (modelo aparte: bombo, caja y charles como mínimo). *Hecho y probado: `TabFingeringTests`, `TabQuantizeTests`, `TabTempoDriftTests`, `TabGridTests`, `DrumTranscriberTests` (T1: 1117/1117 golpes). Calidad según Jorge: bajo muy bueno, batería buena (platos confundidos con charles), guitarras pésimas (ADR-016; Fase 5b).*
+- [x] Tablatura con alphaTab, cursor, edición y exportación a un único archivo de Guitar Pro con guitarras, bajo y batería, comprobado en Guitar Pro. *Hecho: `AlphaTabScoreTests`, `TabEditorTests`, `TabSynthTests`, `TabFingerprintTests`, `TabSourcesTests`, capturas de la pantalla y apertura en Guitar Pro 8 por Jorge. Falta que Jorge pruebe a fondo el teclado de edición y «Oír transcripción» con reproducción real.*
 
-Condición de paso: tablatura de un tema con guitarras, bajo y batería exportada y abierta en Guitar Pro.
+Condición de paso: tablatura de un tema con guitarras, bajo y batería exportada y abierta en Guitar Pro. Cumplida el 16/11/2026: «El roce de tu cuerpo» (Platero y Tú), 5 pistas y 181 compases, exportada con `--tab-export` y abierta en Guitar Pro 8 por Jorge; la batería suena con RSE.
+
+Notas de cierre (ADR-016): la calidad de las guitarras no es aceptable y pasa a la Fase 5b; los compases irregulares (3/4, 2/4) en intros vienen del `BeatGrid`.
+
+### Fase 5b · Calidad de la transcripción de guitarra
+
+- [ ] Probar Guitab y MuScriptor small frente a Basic Pitch fuera de la app (Python, `tf-ml`, fallar rápido), en los stems de guitarra de 3 temas
+- [ ] Rítmica escrita desde los acordes de BTC (`ChordShapes`) con el ritmo de los ataques
+- [ ] Limpieza de lo que da Basic Pitch: armónicos, octavas, power chords y registro
+- [ ] Platos de ADTOF confundidos con charles
+
+Condición de paso (propuesta, a confirmar con Jorge al empezar la fase): las rítmicas de 3 temas reconocibles en la app, juzgado por Jorge.
 
 El DI guiado (grabar y validar la toma) salió de esta fase el 15/11/2026: solo hace falta para el igualado y pasa a la Fase 8a, en la Etapa 2.
 
@@ -188,6 +199,7 @@ Mismo número de orden: se pueden hacer en paralelo o en cualquier orden entre s
 | 4 | Fase 3 · Audio con el dispositivo | P2, Fase 2 | Sí | Opus | Opus (latencia, alineado) · Sonnet (selector, Ajustes de audio) |
 | 4 | Fase 4 · Guitarras y secciones | Fase 2 | No | Opus | Opus (separación A/B, clasificación) · Sonnet (interfaz) |
 | 5 | Fase 5 · Tablatura | Fase 4 | No | Opus | Opus (cuerdas y trastes, batería) · Sonnet (alphaTab) |
+| 5 | Fase 5b · Calidad de la transcripción de guitarra | Fase 5 | No | Opus | Opus (`tf-ml`) |
 | 5 | Fase 6 · Grabación con vídeo | Fases 3 y 4 | Sí | Opus | Opus (reloj común) · Sonnet (multitoma, pantalla) |
 | 6 | Fase 7 · Montaje | Fase 6 | No | Fable | Opus (compositor, encuadre) · Sonnet (layouts, exportación, pantalla) |
 | 7 | P1 · Remote Editor | Etapa 1 en uso | Sí | Fable | Opus (análisis del tráfico) · Sonnet (scripts) |
@@ -237,6 +249,7 @@ Cada fase la lleva una sesión orquestadora que escribe la mini-spec, reparte el
 | 3. Audio con el dispositivo | Opus | Opus para latencia y alineado; Sonnet para selector y Ajustes de audio | La precisión de 1 ms pide cuidado, no un modelo mayor |
 | 4. Guitarras y secciones | Opus | Opus para la separación A/B y la clasificación; Sonnet para la interfaz | Procesado de señal acotado |
 | 5. Tablatura | Opus | Opus para cuerdas y trastes y para la batería; Sonnet para alphaTab | Fase larga pero de piezas conocidas |
+| 5b. Calidad de la transcripción de guitarra | Opus | Opus (`tf-ml`) para la prueba de modelos y la limpieza | Probar modelos fuera de la app y fallar rápido |
 | 6. Grabación con vídeo | Opus | Opus para el reloj común de audio y vídeo; Sonnet para multitoma y pantalla | La sincronía es el único punto fino |
 | 7. Montaje | Fable | Opus para el compositor y el encuadre; Sonnet para layouts, exportación y pantalla | Compositor propio fotograma a fotograma, poco documentado |
 | Pruebas P1, P3 y P5 | Fable | Opus para analizar el tráfico capturado; Sonnet para los scripts | Ingeniería inversa de un protocolo sin documentar |

@@ -14,6 +14,7 @@ struct RootView: View {
                 case .library: LibraryView()
                 case .backing: BackingView()
                 case .record: RecordView()
+                case .tab: TabScreen()
                 case .settings: SettingsView()
                 }
             }
@@ -48,7 +49,6 @@ struct RootView: View {
 struct Sidebar: View {
     @Environment(AppModel.self) private var model
 
-    private let future: [(String, String)] = [("Tablatura", "Fase 5")]
     private let later: [(String, String)] = [("Montaje", "Fase 7")]
 
     var body: some View {
@@ -56,8 +56,8 @@ struct Sidebar: View {
             (Text("Tone") + Text("Forge").foregroundStyle(TF.accent))
                 .font(TF.display(22)).padding(.horizontal, 12).padding(.bottom, 20)
             navRow("Biblioteca", icon: "music.note.list", active: model.section == .library) { model.section = .library; model.detail = nil }
-            ForEach(future, id: \.0, content: futureRow)
             navRow("Backing track", icon: "slider.vertical.3", active: model.section == .backing) { model.section = .backing }
+            navRow("Tablatura", icon: "music.quarternote.3", active: model.section == .tab) { model.section = .tab }
             navRow("Grabar", icon: "record.circle", active: model.section == .record) { model.section = .record }
             ForEach(later, id: \.0, content: futureRow)
             Spacer()

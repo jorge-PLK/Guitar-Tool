@@ -120,6 +120,13 @@ public struct ProjectLayout: Sendable, Equatable {
     /// Análisis automático de estudio (pulso, acordes, tonalidad); regenerable, lo limpia `ProjectCleaner` con `cache/`.
     public var analysisCache: URL { cacheDir.appendingPathComponent("analysis.json") }
 
+    /// Tablatura (mini-spec Fase 5, «Datos»): `tab/score.json` lleva las ediciones y NO es caché (`ProjectCleaner` no
+    /// lo toca); `cache/tab/` (WAV sintetizados) sí es regenerable y se limpia con `cache/`.
+    public var tabDir: URL { folder.appendingPathComponent("tab", isDirectory: true) }
+    public var tabScoreFile: URL { tabDir.appendingPathComponent("score.json") }
+    public var tabCacheDir: URL { cacheDir.appendingPathComponent("tab", isDirectory: true) }
+    public func tabSynthURL(trackID: String) -> URL { tabCacheDir.appendingPathComponent("synth_\(trackID).wav") }
+
     /// Salida provisional del paso de guitarras.
     public var guitarsPartialDir: URL { stemsDir.appendingPathComponent(".partial-guitars", isDirectory: true) }
 

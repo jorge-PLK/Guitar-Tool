@@ -1,0 +1,88 @@
+{
+ "source": {
+  "song": "T1",
+  "stem": "drums.wav (BS-RoFormer SW, Core ML publicado)",
+  "start_s": 108.0,
+  "seconds": 10.0,
+  "mono": "media de canales",
+  "quantized": "PCM 16, x = int16 / 32768"
+ },
+ "audio": {
+  "file": "audio.wav",
+  "sample_rate": 44100,
+  "samples": 441000,
+  "channels": 1,
+  "subtype": "PCM_16"
+ },
+ "preprocess": {
+  "n_fft": 2048,
+  "hop": 441,
+  "window": "np.hanning(2048): 0.5 - 0.5 cos(2 pi i / 2047)",
+  "center": true,
+  "pad": "1024 ceros a cada lado",
+  "magnitude_bins": "|X|[0:1024]",
+  "filterbank": "filterbank.json [84, 1024]",
+  "log": "log10(1 + fb @ |X|)",
+  "frames": "T = 1 + floor(samples / 441)"
+ },
+ "arrays": {
+  "spec.f32": {
+   "shape": [
+    1001,
+    84
+   ],
+   "dtype": "float32 little-endian, fila mayor"
+  },
+  "act.f32": {
+   "shape": [
+    1001,
+    5
+   ],
+   "dtype": "float32 little-endian, fila mayor",
+   "columns": {
+    "kick": 35,
+    "snare": 38,
+    "tom": 47,
+    "hihat": 42,
+    "cymbal": 49
+   }
+  }
+ },
+ "model": {
+  "zip": "ADTOF_FrameRNN_fp32.mlpackage.zip",
+  "zip_sha256": "5135e35e277b60d0f7e61a411442b25f706adafaac35c13859ee6c2d26683206",
+  "zip_bytes": 1676155,
+  "input": "spec [1, T, 84, 1] float32",
+  "output": "act [1, T, 5] float32",
+  "compute_units": "cpuOnly",
+  "reference": "PyTorch 2.7.0 CPU FP32, puerto xavriley/ADTOF-pytorch 85c192e"
+ },
+ "peaks": {
+  "fps": 100,
+  "thresholds": {
+   "kick": 0.22,
+   "snare": 0.24,
+   "tom": 0.32,
+   "hihat": 0.22,
+   "cymbal": 0.3
+  },
+  "pre_avg_frames": 10,
+  "post_avg_frames": 1,
+  "pre_max_frames": 2,
+  "post_max_frames": 1,
+  "combine_frames": 2
+ },
+ "parity": {
+  "coreml_cpu_only_max_abs_diff": 2.682209014892578e-07,
+  "coreml_cpu_only_mean_abs_diff": 6.371683181072285e-09,
+  "coreml_hits_identical": true,
+  "spec_vs_process_audio_file_max_abs_diff": 0.0
+ },
+ "timing_s": {
+  "torch_fixture": 0.0653,
+  "coreml_load": 0.095,
+  "coreml_fixture_median": 0.0166,
+  "coreml_full_T1": 0.311,
+  "full_T1_frames": 18502
+ }
+}

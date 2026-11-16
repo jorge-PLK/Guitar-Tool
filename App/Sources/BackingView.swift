@@ -26,7 +26,7 @@ struct BackingView: View {
         .task(id: model.backingTarget) {
             if let id = model.backingTarget { await model.openStudy(id) }
         }
-        .onDisappear { Task { await model.closeStudy() } }
+        .onDisappear { Task { if model.section != .tab { await model.closeStudy() } } }
     }
 
     /// Sin tema elegido: lista de los ya separados.

@@ -17,6 +17,11 @@ final class BackingController {
     /// Bucle activo (no se guarda: cada sesión empieza sin bucle).
     private(set) var loop: ClosedRange<Double>?
     private(set) var loopName: String?
+    /// Pistas extra del reproductor (Fase 5: transcripción sintetizada de Tablatura, `cache/tab/synth_*.wav`).
+    /// Entran con ganancia 0 dB y sin tocar la mezcla guardada; al cambiarlas hay que llamar a `loadTracks()`.
+    var extraTracks: [Track] = []
+    /// Stems silenciados por la app sin tocar el mute guardado (Fase 5: «Oír transcripción» silencia el stem).
+    private(set) var substitutedStems: Set<String> = []
     /// Audio con el dispositivo (grabar y A/B); lo asigna la app al abrir el tema.
     @ObservationIgnored weak var audio: AudioController?
 
@@ -58,7 +63,7 @@ final class BackingController {
         // Con pistas de guitarra separadas suenan ellas en lugar de `stems/guitar.wav` (no se suman dos veces).
         let layout = session.layout
         let guitarTracks = session.guitarTracks.map { Track(id: $0.role.trackID, url: layout.guitarURL($0.role)) }
-        let tracks = (session.mixerStems.map { Track(id: $0.rawValue, url: layout.stemURL($0)) } + guitarTracks)
+        let tracks = (session.mixerStems.map { Track(id: $0.rawValue, url: layout.stemURL($0)) } + guitarTracks + extraTracks)
             .filter { FileManager.default.fileExists(atPath: $0.url.path) }
         guard !tracks.isEmpty else { loadError = nil; return }
         do {
@@ -76,11 +81,26 @@ final class BackingController {
         for g in session.guitarTracks where tracks.contains(where: { $0.id == g.role.trackID }) {
             apply(session.mix(forGuitar: g.role), to: g.role.trackID)
         }
+        for id in substitutedStems where tracks.contains(where: { $0.id == id }) { player.setMute(id, true) }
         player.rate = settings.rate
         applyPitch()
         player.loop = loop
         refreshMetronome()
     }
+
+    /// Fase 5: silencia (o restaura) un stem del reproductor sin tocar la mezcla guardada del proyecto.
+    func setSubstituted(_ id: String, _ on: Bool) {
+        if on { substitutedStems.insert(id) } else { substitutedStems.remove(id) }
+        if on { player.setMute(id, true); return }
+        if let kind = StemKind(rawValue: id) {
+            player.setMute(id, kind == .guitar ? effectiveGuitarMute : session.mix(for: kind).muted)
+        } else if let g = session.guitarTracks.first(where: { $0.role.trackID == id }) {
+            player.setMute(id, session.mix(forGuitar: g.role).muted)
+        }
+    }
+
+    /// Fase 5: mute de una pista extra (la sintetizada suena solo con «Oír transcripción»).
+    func setExtraMuted(_ id: String, _ muted: Bool) { player.setMute(id, muted) }
 
     private func apply(_ m: StemMix, to id: String) {
         player.setGain(id, dB: m.gainDB)

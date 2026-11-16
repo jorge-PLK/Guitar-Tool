@@ -17,3 +17,4 @@ Una línea por ADR; el texto está en `docs/adr/ADR-NNN.md`. Nuevo ADR = fichero
 - [ADR-013](adr/ADR-013.md) · 2026-11-15 · Cierre de la Fase 3: audio con el dispositivo
 - [ADR-014](adr/ADR-014.md) · 2026-11-16 · Cierre de la Fase 4: guitarras y secciones (modelo lead/rhythm, tres opciones de guitarra, solo como sección)
 - [ADR-015](adr/ADR-015.md) · 2026-11-16 · Cierre de la Fase 6: grabación con vídeo, reloj de host, desfase manual y multitoma
+- [ADR-016](adr/ADR-016.md) · 2026-11-16 · Cierre de la Fase 5: tablatura (alphaTab embebido, ADTOF para batería, Guitar Pro 8 comprobado; guitarra insuficiente, pasa a la Fase 5b)

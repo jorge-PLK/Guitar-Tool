@@ -1,0 +1,798 @@
+import AppKit
+import AudioKit
+import Foundation
+import ModelKit
+import Observation
+import Store
+import TabKit
+import UniformTypeIdentifiers
+
+/// Orquestación de la pantalla Tablatura (mini-spec Fase 5): pistas del proyecto, transcripción por pista con huella,
+/// `tab/score.json`, edición con deshacer, sintetizado («Oír transcripción») y exportación a Guitar Pro.
+@MainActor @Observable
+final class TabController {
+    /// Rebote del guardado de `tab/score.json` tras editar (como `StudySession`).
+    static let saveDebounce = 0.5
+    /// Rebote del re-sintetizado tras editar una pista que se está oyendo (mini-spec: «con rebote»).
+    static let synthDebounce = 1.0
+    /// Dos dígitos seguidos en menos de esto forman un traste de dos cifras («1» y «2» → 12).
+    static let digitChain = 0.8
+    /// Cuerda inicial (1 = la más aguda) al añadir una nota sin cuerda elegida: la central.
+    static func defaultString(of tuning: Tuning) -> Int { max(1, tuning.strings.count / 2) }
+
+    enum Phase: Equatable {
+        /// Aún no hay rejilla de compases (análisis del tema en curso, ausente o fallido).
+        case waitingAnalysis
+        /// Ningún stem de guitarra, bajo o batería con audio.
+        case empty
+        case working
+        case ready
+        case failed(String)
+    }
+
+    enum SynthState: Equatable { case rendering, ready, failed(String) }
+
+    struct Selection: Equatable {
+        var trackID: String
+        var point: GridPoint
+        /// Cuerda de `TabScore` (1 = la más aguda); nil en batería.
+        var string: Int?
+    }
+
+    struct Entry: Identifiable, Equatable {
+        var id: String
+        var name: String
+        var kind: TabTrackKind
+    }
+
+    let session: StudySession
+    let ctl: BackingController
+    let host = AlphaTabHost()
+
+    private(set) var phase: Phase = .working
+    /// Pistas que se están transcribiendo ahora o esperan turno, en orden, con su progreso 0…1.
+    private(set) var progress: [String: Double] = [:]
+    private(set) var queued: [String] = []
+    /// Avisos de la apertura (pistas rehechas, notas fuera de registro). Se descartan con `dismissNotices()`.
+    private(set) var notices: [String] = []
+    private(set) var editor: TabEditor?
+    private(set) var entries: [Entry] = []
+    var selectedTrackID: String? { didSet { if selectedTrackID != oldValue { trackChanged() } } }
+    var editMode = false { didSet { if !editMode { selection = nil } } }
+    private(set) var selection: Selection? { didSet { updateSelectionMarker() } }
+    private(set) var listening: Set<String> = []
+    private(set) var synth: [String: SynthState] = [:]
+    /// Mensaje breve del último error de edición o exportación.
+    private(set) var flash: String?
+    private(set) var webError: String?
+    private(set) var rendered = false
+
+    @ObservationIgnored private let modelStore: ModelStore
+    @ObservationIgnored private var sources: [TabSource] = []
+    @ObservationIgnored private var alpha: AlphaTabScore?
+    @ObservationIgnored private var started = false
+    @ObservationIgnored private var work: Task<Void, Never>?
+    @ObservationIgnored private var saveTask: Task<Void, Never>?
+    @ObservationIgnored private var flashTask: Task<Void, Never>?
+    @ObservationIgnored private var dirty = false
+    @ObservationIgnored private var revision: [String: Int] = [:]
+    @ObservationIgnored private var synthRevision: [String: Int] = [:]
+    @ObservationIgnored private var synthTasks: [String: Task<Void, Never>] = [:]
+    @ObservationIgnored private var lastDigit: (value: Int, at: Date)?
+    @ObservationIgnored private var lastCursorTime = -1.0
+    @ObservationIgnored private var keyToken: Any?
+    @ObservationIgnored private var terminateToken: NSObjectProtocol?
+
+    init(session: StudySession, ctl: BackingController, modelStore: ModelStore) {
+        self.session = session
+        self.ctl = ctl
+        self.modelStore = modelStore
+        host.onEvent = { [weak self] in self?.handle($0) }
+        terminateToken = NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification,
+                                                                object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.saveNow() }
+        }
+    }
+
+    var score: TabScore? { editor?.score }
+    var layout: ProjectLayout { session.layout }
+    var selectedTrack: TabTrack? {
+        guard let id = selectedTrackID else { return nil }
+        return score?.tracks.first { $0.id == id }
+    }
+
+    /// Compás más frecuente de la partitura («4/4») y tempo del tema (`BeatGrid.bpm` del análisis, entero) para la cabecera.
+    var headerSummary: String? {
+        guard let score, !score.bars.isEmpty else { return nil }
+        var counts: [String: Int] = [:]
+        for b in score.bars { counts["\(b.beatCount)/\(b.beatUnit)", default: 0] += 1 }
+        let meter = counts.max { ($0.value, $1.key) < ($1.value, $0.key) }?.key ?? "4/4"
+        guard let bpm = session.beats?.bpm else { return meter }
+        return "\(meter) · \(Int(bpm.rounded())) BPM"
+    }
+
+    func source(of id: String) -> TabSource? { sources.first { $0.id == id } }
+
+    // MARK: Apertura y transcripción
+
+    /// Idempotente: se llama al aparecer la pantalla y cuando llega el análisis.
+    func start() {
+        guard !started else { return }
+        guard session.beats != nil else { phase = .waitingAnalysis; return }
+        started = true
+        phase = .working
+        work = Task { [weak self] in await self?.open() }
+    }
+
+    private func open() async {
+        guard let g = session.beats else { phase = .waitingAnalysis; started = false; return }
+        let times = BeatTimes(beats: g.beats, downbeats: g.downbeats, beatsPerBar: g.beatsPerBar)
+        let folder = layout.folder
+        sources = session.project.tabSources { FileManager.default.fileExists(atPath: folder.appendingPathComponent($0).path) }
+        guard !sources.isEmpty else { phase = .empty; return }
+        do {
+            var score = try TabScore(beatTimes: times, duration: session.project.song.duration)
+            var redone: [String] = []
+            if let saved = Self.loadSaved(layout.tabScoreFile), saved.formatVersion == score.formatVersion {
+                if saved.bars == score.bars && saved.beats == score.beats {
+                    score.tracks = saved.tracks
+                } else if !saved.tracks.isEmpty {
+                    // La rejilla cambió (otro análisis): las posiciones ya no valen, se rehacen todas.
+                    redone = saved.tracks.filter { t in sources.contains { $0.id == t.id } }.map(\.name)
+                }
+            }
+            var fingerprints: [(id: String, fingerprint: TrackSourceFingerprint)] = []
+            for s in sources {
+                let fp = try TrackSourceFingerprint.of(fileAt: folder.appendingPathComponent(s.relativePath), path: s.relativePath,
+                                                       modelVersion: Self.modelVersion(of: s.kind))
+                fingerprints.append((s.id, fp))
+            }
+            let stale = score.staleness(current: fingerprints)
+            score.tracks.removeAll { stale.obsolete.contains($0.id) }
+            let hadBefore = Set(score.tracks.map(\.id))
+            for id in stale.needsTranscription where hadBefore.contains(id) {
+                if let t = score.tracks.first(where: { $0.id == id }) { redone.append(t.name) }
+            }
+            // Una pista desfasada pierde sus ediciones; conserva solo la afinación elegida.
+            var keptTuning: [String: Tuning] = [:]
+            for id in stale.needsTranscription {
+                if let t = score.tracks.first(where: { $0.id == id }), let tu = t.tuning { keptTuning[id] = tu }
+            }
+            score.tracks.removeAll { stale.needsTranscription.contains($0.id) }
+            // Los nombres editados de las guitarras se aplican sin transcribir.
+            for i in score.tracks.indices {
+                if let s = source(of: score.tracks[i].id) { score.tracks[i].name = s.name }
+            }
+            editor = TabEditor(score: score)
+            queued = stale.needsTranscription
+            if !redone.isEmpty {
+                notices.append("Se han rehecho: \(redone.joined(separator: ", ")). Su audio cambió, así que se perdieron las ediciones de esas pistas.")
+            }
+            refreshEntries()
+            if selectedTrackID == nil { selectedTrackID = entries.first?.id }
+            let fpByID = Dictionary(uniqueKeysWithValues: fingerprints.map { ($0.id, $0.fingerprint) })
+            if !queued.isEmpty {
+                // Lo que ya estaba al día se ve mientras tanto.
+                if !score.tracks.isEmpty { phase = .ready; pushScore() } else { phase = .working }
+                try await transcribe(ids: queued, fingerprints: fpByID, keptTuning: keptTuning)
+            }
+            phase = .ready
+            sortTracks()
+            pushScore()
+            saveNow()
+        } catch is CancellationError {
+            started = false
+        } catch {
+            phase = .failed(AppModel.describe(error))
+        }
+    }
+
+    private func transcribe(ids: [String], fingerprints: [String: TrackSourceFingerprint],
+                            keptTuning: [String: Tuning]) async throws {
+        var pitched: BasicPitchTranscriber?
+        var drums: DrumTranscriber?
+        var shifted = 0, dropped = 0
+        for id in ids {
+            try Task.checkCancellation()
+            guard let s = source(of: id), let fp = fingerprints[id] else { continue }
+            let url = layout.url(relative: s.relativePath)
+            progress[id] = 0
+            guard var current = editor else { return }
+            switch s.kind {
+            case .drums:
+                if drums == nil {
+                    let m = try await modelStore.ensureInstalled(ModelCatalog.drumsADTOF.id) { _ in }
+                    drums = DrumTranscriber(modelURL: m)
+                }
+                let hits = try await drums!.transcribe(url: url) { [weak self] p in
+                    Task { @MainActor in self?.progress[id] = p }
+                }
+                let onsets = hits.compactMap { h in DrumPiece(rawValue: h.midi).map { DrumOnset(time: h.time, piece: $0) } }
+                let track = TabTrackBuilder.drumTrack(id: id, name: s.name, source: fp, onsets: onsets, in: current.score)
+                current = replace(track, in: current)
+            case .guitar, .bass:
+                if pitched == nil {
+                    let m = try await modelStore.ensureInstalled(ModelCatalog.transcriptionBasicPitch.id) { _ in }
+                    pitched = BasicPitchTranscriber(modelURL: m)
+                }
+                let events = try await pitched!.transcribe(url: url)
+                let kind: TabTrackKind = s.kind == .bass ? .bass : .guitar
+                let tuning = keptTuning[id] ?? (kind == .bass ? Tuning.bass(.standard) : Tuning.guitar(.standard))
+                let built = TabTrackBuilder.pitchedTrack(id: id, name: s.name, kind: kind, tuning: tuning, source: fp,
+                                                         notes: events, in: current.score)
+                shifted += built.report.shiftedOctave
+                dropped += built.report.droppedNotes
+                current = replace(built.track, in: current)
+            }
+            progress[id] = nil
+            queued.removeAll { $0 == id }
+            editor = current
+            refreshEntries()
+            if selectedTrackID == nil { selectedTrackID = id }
+            // Cada pista se guarda al terminar: si se cierra la pantalla a medias, lo hecho no se repite.
+            saveNow()
+            if phase != .ready { phase = .ready }
+            pushScore()
+        }
+        if shifted + dropped > 0 {
+            var parts: [String] = []
+            if shifted > 0 { parts.append("\(shifted) notas fuera del registro de la afinación se subieron o bajaron una octava") }
+            if dropped > 0 { parts.append("\(dropped) se quitaron por no caber en las cuerdas") }
+            notices.append("Transcripción: " + parts.joined(separator: " y ") + ".")
+        }
+    }
+
+    private func replace(_ track: TabTrack, in editor: TabEditor) -> TabEditor {
+        var score = editor.score
+        score.upsert(track)
+        return TabEditor(score: score)
+    }
+
+    private func sortTracks() {
+        guard var score = editor?.score else { return }
+        let order = sources.map(\.id)
+        score.tracks.sort { (order.firstIndex(of: $0.id) ?? 99) < (order.firstIndex(of: $1.id) ?? 99) }
+        if score.tracks != editor?.score.tracks { editor = TabEditor(score: score) }
+        refreshEntries()
+    }
+
+    private func refreshEntries() {
+        entries = (editor?.score.tracks ?? []).map { Entry(id: $0.id, name: $0.name, kind: $0.kind) }
+    }
+
+    static func modelVersion(of kind: TabSource.Kind) -> String {
+        kind == .drums ? ModelCatalog.drumsADTOF.version : ModelCatalog.transcriptionBasicPitch.version
+    }
+
+    static func loadSaved(_ url: URL) -> TabScore? {
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        return try? JSONDecoder().decode(TabScore.self, from: data)
+    }
+
+    func dismissNotices() { notices = [] }
+
+    /// Cierra la pantalla: cancela lo pendiente y guarda lo editado.
+    func close() {
+        work?.cancel()
+        saveTask?.cancel()
+        synthTasks.values.forEach { $0.cancel() }
+        removeKeyMonitor()
+        if let terminateToken { NotificationCenter.default.removeObserver(terminateToken) }
+        terminateToken = nil
+        if dirty { saveNow() }
+    }
+
+    // MARK: Guardado
+
+    private func scheduleSave() {
+        dirty = true
+        saveTask?.cancel()
+        saveTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(Self.saveDebounce))
+            guard !Task.isCancelled else { return }
+            self?.saveNow()
+        }
+    }
+
+    func saveNow() {
+        guard let score = editor?.score else { return }
+        saveTask?.cancel()
+        do {
+            try FileManager.default.createDirectory(at: layout.tabDir, withIntermediateDirectories: true)
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.sortedKeys]
+            try encoder.encode(score).write(to: layout.tabScoreFile, options: .atomic)
+            dirty = false
+        } catch {
+            showFlash("No se pudo guardar la tablatura: \(error.localizedDescription)")
+        }
+    }
+
+    // MARK: alphaTab
+
+    private func handle(_ e: AlphaTabHost.Event) {
+        switch e {
+        case .ready: pushScore()
+        case .rendered:
+            rendered = true
+            lastCursorTime = -1   // tras cada pintado el cursor se vuelve a colocar (y a mostrar)
+            webError = nil
+            updateSelectionMarker()
+        case .error(let m): webError = m
+        case .beatClick(let track, let bar, let beat):
+            guard let ref = alpha?.ref(track: track, bar: bar, beat: beat), alpha?.trackIDs[track] == selectedTrackID,
+                  let id = selectedTrackID else { return }
+            if selection?.trackID == id, selection?.point == ref.start { return }
+            select(id, ref.start, string: selection?.string)
+        case .noteClick(let track, let bar, let beat, let s, _):
+            guard let ref = alpha?.ref(track: track, bar: bar, beat: beat), alpha?.trackIDs[track] == selectedTrackID,
+                  let id = selectedTrackID, let tuning = selectedTrack?.tuning else { return }
+            select(id, ref.start, string: AlphaTabExporter.scoreString(forJSONString: s, stringCount: tuning.strings.count))
+        }
+    }
+
+    /// Reconstruye el JSON de alphaTab con la partitura actual y la pinta (mantiene la pista y el desplazamiento).
+    func pushScore() {
+        guard let score = editor?.score, !score.tracks.isEmpty else { return }
+        let song = session.project.song
+        do {
+            let a = try AlphaTabExporter.make(score: score, title: song.title, artist: song.artist ?? "")
+            alpha = a
+            let index = selectedTrackID.flatMap { a.trackIDs.firstIndex(of: $0) } ?? 0
+            host.load(json: a.json, track: index)
+        } catch {
+            webError = error.localizedDescription
+        }
+    }
+
+    private func trackChanged() {
+        selection = nil
+        guard let id = selectedTrackID, let a = alpha, let i = a.trackIDs.firstIndex(of: id) else { return }
+        host.load(json: a.json, track: i)
+    }
+
+    /// Mueve el cursor de alphaTab a `time` (20 veces por segundo desde la vista; solo si cambió).
+    func updateCursor(time: Double, follow: Bool) {
+        guard rendered, abs(time - lastCursorTime) > 0.001 else { return }
+        lastCursorTime = time
+        host.setCursorTime(time, follow: follow)
+    }
+
+    private func updateSelectionMarker() {
+        guard rendered, let sel = selection, let score else { host.setSelection(bar: -1, fraction: 0); return }
+        guard score.beats.indices.contains(sel.point.beat) else { return }
+        let bar = score.beats[sel.point.beat].bar
+        let b = score.bars[bar]
+        let local = sel.point.absoluteTick - b.firstBeat * TabScore.ticksPerBeat
+        host.setSelection(bar: bar, fraction: Double(local) / Double(b.beatCount * TabScore.ticksPerBeat))
+    }
+
+    // MARK: Selección
+
+    func select(_ trackID: String, _ point: GridPoint, string: Int?) {
+        let track = score?.tracks.first { $0.id == trackID }
+        var s = string
+        if track?.kind == .drums { s = nil }
+        else if s == nil, let tu = track?.tuning { s = Self.defaultString(of: tu) }
+        // Con una nota en ese punto, la cuerda sigue a la nota si la cuerda elegida está vacía.
+        if let track, track.kind != .drums {
+            let notes = track.notes.filter { $0.start == point }
+            if !notes.isEmpty, !notes.contains(where: { $0.string == s }) { s = notes.first?.string }
+        }
+        selection = Selection(trackID: trackID, point: point, string: s)
+        if let score { ctl.seek(to: min(max(score.time(of: point), 0), ctl.duration)) }
+    }
+
+    var selectedNote: TabNote? {
+        guard let sel = selection, let track = selectedTrack, track.id == sel.trackID else { return nil }
+        return track.notes.first { $0.start == sel.point && $0.string == sel.string }
+    }
+
+    /// Texto de estado bajo la tablatura.
+    var selectionSummary: String? {
+        guard let sel = selection, let score, let track = selectedTrack, score.beats.indices.contains(sel.point.beat) else { return nil }
+        let bar = score.beats[sel.point.beat].bar + 1
+        let beat = score.beats[sel.point.beat].indexInBar + 1
+        let place = "Compás \(bar), pulso \(beat)"
+        if track.kind == .drums {
+            let pieces = track.hits.filter { $0.at == sel.point }.map { Self.pieceName($0.piece) }
+            return "\(place) · " + (pieces.isEmpty ? "sin golpes" : pieces.joined(separator: ", "))
+        }
+        if let n = selectedNote, let f = track.fret(of: n) {
+            return "\(place) · cuerda \(n.string), traste \(f)"
+        }
+        return "\(place) · cuerda \(sel.string ?? 1), sin nota"
+    }
+
+    static func pieceName(_ p: DrumPiece) -> String {
+        switch p {
+        case .kick: "bombo"
+        case .snare: "caja"
+        case .hiHat: "charles"
+        case .tom: "tom"
+        case .crash: "platos"
+        }
+    }
+
+    // MARK: Edición
+
+    private func step(at point: GridPoint, in track: TabTrack) -> Int {
+        track.subdivisions.indices.contains(point.beat) ? track.subdivisions[point.beat].tickStep : 3
+    }
+
+    /// Aplica `body` al editor; un fallo se muestra como aviso breve y no cambia nada.
+    private func edit(_ body: (inout TabEditor) throws -> Void) {
+        guard var e = editor else { return }
+        let before = e.score.tracks
+        do {
+            try body(&e)
+        } catch let err as TabEditError {
+            showFlash(Self.message(for: err)); return
+        } catch {
+            showFlash(error.localizedDescription); return
+        }
+        commit(e, before: before)
+    }
+
+    private func commit(_ e: TabEditor, before: [TabTrack]) {
+        guard e.score.tracks != before else { return }
+        editor = e
+        for (old, new) in zip(before, e.score.tracks) where old != new {
+            revision[new.id, default: 0] += 1
+            if listening.contains(new.id) { scheduleSynth(new.id) }
+        }
+        scheduleSave()
+        pushScore()
+    }
+
+    static func message(for e: TabEditError) -> String {
+        switch e {
+        case .unknownTrack, .unknownNote: "No hay nada seleccionado."
+        case .wrongTrackKind: "Esa edición no vale para esta pista."
+        case .stringOutOfRange: "No hay otra cuerda en esa dirección."
+        case .fretOutOfRange: "El traste saldría de 0–24."
+        case .stringOccupied: "Ya hay una nota en esa cuerda en ese punto."
+        case .invalidPosition: "Esa posición no está en la rejilla de la pista."
+        case .invalidDuration: "Esa duración no cabe."
+        }
+    }
+
+    func showFlash(_ text: String) {
+        flash = text
+        flashTask?.cancel()
+        flashTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(3))
+            guard !Task.isCancelled else { return }
+            self?.flash = nil
+        }
+    }
+
+    var canUndo: Bool { editor?.canUndo ?? false }
+    var canRedo: Bool { editor?.canRedo ?? false }
+
+    func undo() { stepHistory { $0.undo() } }
+    func redo() { stepHistory { $0.redo() } }
+
+    private func stepHistory(_ op: (inout TabEditor) -> Bool) {
+        guard var e = editor else { return }
+        let before = e.score.tracks
+        guard op(&e) else { return }
+        if let changed = zip(before, e.score.tracks).first(where: { $0 != $1 })?.1 {
+            // La pista afectada pasa a ser la visible y su punto, el seleccionado.
+            if selectedTrackID != changed.id { selectedTrackID = changed.id }
+        }
+        commit(e, before: before)
+    }
+
+    /// Dígito (0–9) con una nota seleccionada: cambia el traste; sin nota: la añade en el punto seleccionado.
+    func typeDigit(_ d: Int) {
+        guard let sel = selection, let track = selectedTrack, track.kind != .drums, let string = sel.string else { return }
+        var fret = d
+        if let last = lastDigit, Date().timeIntervalSince(last.at) < Self.digitChain, last.value * 10 + d <= Tuning.fretRange.upperBound {
+            fret = last.value * 10 + d
+        }
+        lastDigit = (d, Date())
+        if let n = selectedNote {
+            edit { try $0.setFret(fret, trackID: track.id, noteID: n.id) }
+        } else {
+            let dur = step(at: sel.point, in: track)
+            edit { _ = try $0.addNote(trackID: track.id, string: string, fret: fret, at: sel.point, duration: dur) }
+        }
+    }
+
+    /// ↑ / ↓: pasa la nota a la cuerda de arriba (más aguda) o de abajo conservando la altura; sin nota solo mueve la cuerda.
+    func moveString(up: Bool) {
+        guard let sel = selection, let track = selectedTrack, let tuning = track.tuning, let string = sel.string else { return }
+        let target = up ? string - 1 : string + 1
+        guard (1...tuning.strings.count).contains(target) else { showFlash(Self.message(for: .stringOutOfRange)); return }
+        if let n = selectedNote {
+            edit { try $0.moveNote(trackID: track.id, noteID: n.id, toString: target) }
+            if editor?.score.tracks.first(where: { $0.id == track.id })?.notes.contains(where: { $0.id == n.id && $0.string == target }) == true {
+                selection?.string = target
+            }
+        } else {
+            selection?.string = target
+        }
+    }
+
+    func deleteSelection() {
+        guard let sel = selection, let track = selectedTrack else { return }
+        if track.kind == .drums {
+            let pieces = track.hits.filter { $0.at == sel.point }.map(\.piece)
+            guard !pieces.isEmpty else { return }
+            edit { e in for p in pieces { try e.setHit(p, at: sel.point, present: false, trackID: track.id) } }
+        } else if let n = selectedNote {
+            edit { try $0.deleteNote(trackID: track.id, noteID: n.id) }
+        }
+    }
+
+    /// +/−: alarga o acorta la nota seleccionada un paso de la subdivisión de su pulso.
+    func changeDuration(by sign: Int) {
+        guard let track = selectedTrack, let n = selectedNote else { return }
+        let st = step(at: n.start, in: track)
+        edit { try $0.setDuration(n.duration + sign * st, trackID: track.id, noteID: n.id) }
+    }
+
+    /// Batería: pone o quita el golpe de `piece` en el punto seleccionado.
+    func toggleHit(_ piece: DrumPiece) {
+        guard let sel = selection, let track = selectedTrack, track.kind == .drums else { return }
+        let present = !track.hits.contains(TabDrumHit(piece: piece, at: sel.point))
+        edit { try $0.setHit(piece, at: sel.point, present: present, trackID: track.id) }
+    }
+
+    /// «Añadir nota»: en el punto de la rejilla más cercano al cursor de reproducción, traste 0 en la cuerda elegida.
+    func addNoteAtCursor() {
+        guard let score, let track = selectedTrack, track.kind != .drums, let tuning = track.tuning else { return }
+        let point = score.nearestPoint(to: ctl.player.currentTime, in: track)
+        let string = selection?.trackID == track.id ? selection?.string ?? Self.defaultString(of: tuning) : Self.defaultString(of: tuning)
+        let dur = step(at: point, in: track)
+        edit { _ = try $0.addNote(trackID: track.id, string: string, fret: 0, at: point, duration: dur) }
+        selection = Selection(trackID: track.id, point: point, string: string)
+    }
+
+    /// ← / →: siguiente o anterior punto de la rejilla de la pista.
+    func moveSelection(forward: Bool) {
+        guard let track = selectedTrack, let score else { return }
+        let current = selection?.point ?? score.nearestPoint(to: ctl.player.currentTime, in: track)
+        var tick = current.absoluteTick
+        if forward {
+            tick += step(at: current, in: track)
+        } else {
+            tick -= 1
+            let b = max(0, tick / TabScore.ticksPerBeat)
+            let st = track.subdivisions.indices.contains(b) ? track.subdivisions[b].tickStep : 3
+            tick -= (tick % TabScore.ticksPerBeat) % st
+        }
+        tick = min(max(0, tick), score.totalTicks - 1)
+        let p = GridPoint(absoluteTick: tick)
+        let b = p.beat
+        let st = track.subdivisions.indices.contains(b) ? track.subdivisions[b].tickStep : 3
+        let snapped = GridPoint(beat: b, tick: (p.tick / st) * st)
+        select(track.id, snapped, string: selection?.string)
+        host.setCursorTime(score.time(of: snapped), follow: true)
+    }
+
+    func setTuning(_ preset: TuningPreset, trackID: String) {
+        guard let track = score?.tracks.first(where: { $0.id == trackID }), track.kind != .drums else { return }
+        let tuning = track.kind == .bass ? Tuning.bass(preset) : Tuning.guitar(preset)
+        guard tuning != track.tuning else { return }
+        var report = TabBuildReport()
+        edit { report = try $0.setTuning(tuning, trackID: trackID) }
+        if report.shiftedOctave + report.droppedNotes > 0 {
+            showFlash("\(report.shiftedOctave) notas se movieron una octava y \(report.droppedNotes) se quitaron por no caber en la afinación.")
+        }
+        selection = nil
+    }
+
+    static func tuningName(_ p: TuningPreset) -> String {
+        switch p {
+        case .standard: "Estándar"
+        case .halfStepDown: "Medio tono abajo"
+        case .wholeStepDown: "Un tono abajo"
+        case .dropD: "Drop D"
+        }
+    }
+
+    // MARK: Teclado de edición
+
+    func installKeyMonitor() {
+        guard keyToken == nil else { return }
+        keyToken = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            let handled = MainActor.assumeIsolated { self?.handleKey(event) ?? false }
+            return handled ? nil : event
+        }
+    }
+
+    func removeKeyMonitor() {
+        if let keyToken { NSEvent.removeMonitor(keyToken) }
+        keyToken = nil
+    }
+
+    private func handleKey(_ e: NSEvent) -> Bool {
+        guard editMode, phase == .ready, !(NSApp.keyWindow?.firstResponder is NSText) else { return false }
+        let mods = e.modifierFlags.intersection([.command, .control, .option, .shift])
+        let ch = e.charactersIgnoringModifiers ?? ""
+        if mods == .command, ch == "z" { undo(); return true }
+        if mods == [.command, .shift], ch == "z" { redo(); return true }
+        guard mods.isEmpty || mods == .shift else { return false }
+        switch e.keyCode {
+        case 126: moveString(up: true); return true
+        case 125: moveString(up: false); return true
+        case 123: moveSelection(forward: false); return true
+        case 124: moveSelection(forward: true); return true
+        case 51, 117: deleteSelection(); return true
+        case 53: selection = nil; return true
+        default: break
+        }
+        if mods.isEmpty, let d = Int(ch), ch.count == 1 { typeDigit(d); return true }
+        switch ch {
+        case "+", "=": changeDuration(by: 1); return true
+        case "-": changeDuration(by: -1); return true
+        default: break
+        }
+        if mods.isEmpty, selectedTrack?.kind == .drums {
+            switch ch.lowercased() {
+            case "b": toggleHit(.kick); return true
+            case "c": toggleHit(.snare); return true
+            case "h": toggleHit(.hiHat); return true
+            case "t": toggleHit(.tom); return true
+            case "p": toggleHit(.crash); return true
+            default: break
+            }
+        }
+        return false
+    }
+
+    // MARK: Oír transcripción
+
+    func isListening(_ id: String) -> Bool { listening.contains(id) }
+
+    static func synthPlayerID(_ id: String) -> String { "tab-\(id)" }
+
+    func setListening(_ on: Bool, trackID: String) {
+        guard let src = source(of: trackID) else { return }
+        if on {
+            listening.insert(trackID)
+            if synthRevision[trackID] == revision[trackID, default: 0], synth[trackID] == .ready {
+                activateSynth(trackID, src)
+            } else {
+                renderSynth(trackID) { [weak self] in self?.activateSynth(trackID, src) }
+            }
+        } else {
+            listening.remove(trackID)
+            synthTasks[trackID]?.cancel()
+            ctl.setSubstituted(src.playerTrackID, false)
+            ctl.setExtraMuted(Self.synthPlayerID(trackID), true)
+        }
+    }
+
+    private func activateSynth(_ trackID: String, _ src: TabSource) {
+        guard listening.contains(trackID) else { return }
+        ctl.setSubstituted(src.playerTrackID, true)
+        ctl.setExtraMuted(Self.synthPlayerID(trackID), false)
+    }
+
+    private func scheduleSynth(_ trackID: String) {
+        synthTasks[trackID]?.cancel()
+        synthTasks[trackID] = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(Self.synthDebounce))
+            guard !Task.isCancelled, let self, let src = self.source(of: trackID) else { return }
+            self.renderSynth(trackID) { [weak self] in self?.activateSynth(trackID, src) }
+        }
+    }
+
+    /// Renderiza la pista al WAV de `cache/tab/`, lo carga en el reproductor como pista extra y llama a `done`.
+    private func renderSynth(_ trackID: String, done: @escaping @MainActor () -> Void) {
+        guard let score, let track = score.tracks.first(where: { $0.id == trackID }) else { return }
+        guard let sf = Bundle.main.url(forResource: "sonivox", withExtension: "sf2", subdirectory: "alphaTab/soundfont") else {
+            synth[trackID] = .failed("Falta el soundfont en la app"); showFlash("Falta el soundfont de alphaTab en la app."); return
+        }
+        synth[trackID] = .rendering
+        let rev = revision[trackID, default: 0]
+        let url = layout.tabSynthURL(trackID: trackID)
+        let rate = session.project.song.sampleRate
+        let duration = ctl.duration
+        let renderer = TabSynthRenderer(soundFontURL: sf)
+        synthTasks[trackID]?.cancel()
+        synthTasks[trackID] = Task { [weak self] in
+            do {
+                try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try await renderer.render(track: track, in: score, sampleRate: rate, duration: duration, to: url)
+                guard !Task.isCancelled, let self else { return }
+                self.synthRevision[trackID] = rev
+                self.synth[trackID] = .ready
+                self.attachSynth(trackID, url: url)
+                done()
+            } catch is CancellationError {
+            } catch {
+                self?.synth[trackID] = .failed(error.localizedDescription)
+                self?.listening.remove(trackID)
+                self?.showFlash("No se pudo sintetizar la pista: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    /// Añade (o recarga) el WAV sintetizado como pista del reproductor, conservando posición y reproducción.
+    private func attachSynth(_ trackID: String, url: URL) {
+        let id = Self.synthPlayerID(trackID)
+        if !ctl.extraTracks.contains(where: { $0.id == id }) { ctl.extraTracks.append(Track(id: id, url: url)) }
+        let t = ctl.player.currentTime
+        let playing = ctl.isPlaying
+        ctl.loadTracks()
+        ctl.seek(to: t)
+        // Las demás pistas extra que no se oyen quedan silenciadas.
+        for extra in ctl.extraTracks where !listening.contains(String(extra.id.dropFirst(4))) { ctl.setExtraMuted(extra.id, true) }
+        for tid in listening { if let s = source(of: tid) { ctl.setSubstituted(s.playerTrackID, true) } }
+        if playing { ctl.togglePlay() }
+    }
+
+    // MARK: Exportar
+
+    /// Nombre por defecto «Artista - Título.gp».
+    static func exportFileName(title: String, artist: String?) -> String {
+        let bad = CharacterSet(charactersIn: "/:\\")
+        func clean(_ s: String) -> String { s.components(separatedBy: bad).joined(separator: "-").trimmingCharacters(in: .whitespaces) }
+        let a = artist.map(clean) ?? ""
+        return (a.isEmpty ? clean(title) : "\(a) - \(clean(title))") + ".gp"
+    }
+
+    func exportGuitarPro() {
+        guard phase == .ready, alpha != nil else { return }
+        let song = session.project.song
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [UTType(filenameExtension: "gp") ?? .data]
+        panel.nameFieldStringValue = Self.exportFileName(title: song.title, artist: song.artist)
+        panel.canCreateDirectories = true
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        Task { await exportGuitarPro(to: url) }
+    }
+
+    func exportGuitarPro(to url: URL) async {
+        do {
+            // Sin parche de la batería: alphaTab 1.9.0 ya la exporta de forma que suena con RSE en Guitar Pro 8.
+            let data = try await host.exportGP()
+            try data.write(to: url, options: .atomic)
+            showFlash("Guardado \(url.lastPathComponent).")
+        } catch {
+            showFlash("No se pudo exportar: \(error.localizedDescription)")
+        }
+    }
+
+    /// Compás del punto seleccionado y su rango en segundos (para el bucle «Compás N»).
+    var selectedBarRange: (bar: Int, range: ClosedRange<Double>)? {
+        guard let sel = selection, let score, score.beats.indices.contains(sel.point.beat) else { return nil }
+        let bar = score.beats[sel.point.beat].bar
+        let start = max(0, score.bars[bar].start)
+        let end = bar + 1 < score.bars.count ? score.bars[bar + 1].start : score.endTime
+        guard end > start else { return nil }
+        return (bar, start...min(end, max(ctl.duration, start + 0.001)))
+    }
+
+    #if DEBUG
+    /// Capturas: espera a que acabe la transcripción y se pinte la partitura (máx. 10 min).
+    func waitUntilSettled() async {
+        let deadline = Date().addingTimeInterval(600)
+        while Date() < deadline {
+            switch phase {
+            case .ready where queued.isEmpty && rendered: return
+            case .failed, .empty, .waitingAnalysis: return
+            default: break
+            }
+            try? await Task.sleep(for: .milliseconds(200))
+        }
+    }
+
+    /// Capturas: abre la pista `index`, activa la edición y selecciona el primer pulso con nota.
+    func applyLaunchOptions(trackIndex: Int?, edit: Bool, listen: Bool) {
+        if let i = trackIndex, entries.indices.contains(i) { selectedTrackID = entries[i].id }
+        if listen, let id = selectedTrackID { setListening(true, trackID: id) }
+        if edit {
+            editMode = true
+            if let t = selectedTrack {
+                let p: GridPoint? = t.kind == .drums ? t.hits.first?.at : t.notes.first?.start
+                if let p { select(t.id, p, string: t.notes.first?.string) }
+            }
+        }
+    }
+    #endif
+}

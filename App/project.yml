@@ -41,6 +41,11 @@ targets:
       - path: Resources/Models
         includes: ["*.zip"]
         buildPhase: resources
+      # alphaTab (Fase 5): carpeta entera como referencia, queda en Contents/Resources/alphaTab/ (tab.html,
+      # alphaTab.min.js, tf-bridge.js, font/, soundfont/). Sin CDN.
+      - path: Resources/alphaTab
+        type: folder
+        buildPhase: resources
       # Icono de la app: los PNG salen de Resources/AppIcon.svg con Tools/make-icon.sh.
       - path: Resources/Assets.xcassets
     dependencies:
