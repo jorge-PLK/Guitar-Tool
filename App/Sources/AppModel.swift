@@ -44,6 +44,12 @@ struct LaunchOptions {
     var guitarsDemo: String?
     /// Con `--guitars-demo`: selecciona la sección N (desde 0) y abre su ventana, para capturas.
     var selectSection: Int?
+    /// Tablatura (Fase 5): `--screen tab`, pista N (desde 0) visible, edición activada y «Oír transcripción» en esa pista.
+    var tabTrack: Int?
+    var tabEdit = false
+    var tabListen = false
+    /// Con `--screen tab`: exporta el `.gp` a esa ruta sin diálogo, cuando la tablatura está lista.
+    var tabExport: URL?
 
     init(_ args: [String] = CommandLine.arguments) {
         var i = 1
@@ -78,6 +84,10 @@ struct LaunchOptions {
             case ("--delete-dialog", _): deleteDialog = true
             case ("--guitars-demo", let v?): guitarsDemo = v; i += 1
             case ("--select-section", let v?): selectSection = Int(v); i += 1
+            case ("--tab-track", let v?): tabTrack = Int(v); i += 1
+            case ("--tab-edit", _): tabEdit = true
+            case ("--tab-listen", _): tabListen = true
+            case ("--tab-export", let v?): tabExport = path(v); i += 1
             default: break
             }
             i += 1
@@ -86,7 +96,7 @@ struct LaunchOptions {
 }
 #endif
 
-enum AppSection: Hashable { case library, backing, settings }
+enum AppSection: Hashable { case library, backing, tab, settings }
 enum SettingsTab: String, CaseIterable, Identifiable {
     case audio = "Audio", video = "Cámara y vídeo", library = "Biblioteca y equipo"
     var id: String { rawValue }
@@ -359,6 +369,10 @@ final class AppModel {
             backingTarget = match?.id
             section = .backing
         case "detail-first": if let first = entries.first { await open(first.id) }
+        case "tab":
+            let match = entries.first { e in options.project.map { e.folderName == $0 || e.title == $0 } ?? true }
+            backingTarget = match?.id
+            section = .tab
         case "backing":
             let match = entries.first { e in options.project.map { e.folderName == $0 || e.title == $0 } ?? true }
             backingTarget = match?.id
@@ -613,7 +627,7 @@ final class AppModel {
             var state = AnalysisState.missing
             if !analysisPinned { state = try await library.ensureAnalysis(id: id) }
             // Si el usuario ya salió de Backing mientras se abría, no se deja nada abierto.
-            guard section == .backing else { return }
+            guard section == .backing || section == .tab else { return }
             let session = StudySession(project: project, folder: folder, library: library, analysisState: state)
             study = session
             let controller = BackingController(session: session, masterGainDB: profile.masterGainDB, output: outputSelection)

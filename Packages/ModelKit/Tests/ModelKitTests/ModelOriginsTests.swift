@@ -62,12 +62,17 @@ final class ModelOriginsTests: XCTestCase {
         return zip
     }
 
-    func testCatalogHasFiveUniqueEntries() {
+    func testCatalogHasSixUniqueEntries() {
         let ids = ModelCatalog.all.map(\.id)
-        XCTAssertEqual(ids.count, 5)
-        XCTAssertEqual(Set(ids).count, 5)
+        XCTAssertEqual(ids.count, 6)
+        XCTAssertEqual(Set(ids).count, 6)
         XCTAssertEqual(Set(ModelCatalog.all.map(\.role)),
-                       [.separation, .chords, .beats, .guitarTranscription, .leadGuitarSeparation])
+                       [.separation, .chords, .beats, .guitarTranscription, .leadGuitarSeparation, .drumTranscription])
+        let dr = ModelCatalog.drumsADTOF
+        XCTAssertEqual(dr.archiveKind, .bundledZippedMLPackage)
+        XCTAssertEqual(dr.url.lastPathComponent, "ADTOF_FrameRNN_fp32.mlpackage.zip")
+        XCTAssertEqual(dr.compiledName, "ADTOF_FrameRNN_fp32.mlmodelc")
+        XCTAssertTrue(dr.license.contains("CC BY-NC-SA") && dr.license.contains("uso personal"))
         let lr = ModelCatalog.leadRhythmMelRoformer
         XCTAssertEqual(lr.archiveKind, .bundledZippedMLPackage)
         XCTAssertEqual(lr.url.lastPathComponent, "LeadRhythmMelRoformer_fp16.mlpackage.zip")
@@ -94,7 +99,7 @@ final class ModelOriginsTests: XCTestCase {
     /// Cada modelo embebido del catálogo existe en `App/Resources/Models` con su SHA-256 y su tamaño.
     func testBundledResourcesMatchCatalog() throws {
         let bundled = ModelCatalog.all.filter { $0.archiveKind == .bundledZippedMLPackage }
-        XCTAssertEqual(Set(bundled.map(\.id)), ["btc-chords", "basic-pitch", "lead-rhythm-guitar"])
+        XCTAssertEqual(Set(bundled.map(\.id)), ["btc-chords", "basic-pitch", "lead-rhythm-guitar", "adtof-drums"])
         for d in bundled {
             let zip = appModelsDirectory.appendingPathComponent(d.url.lastPathComponent)
             let size = try FileManager.default.attributesOfItem(atPath: zip.path)[.size] as? Int64
@@ -128,6 +133,24 @@ final class ModelOriginsTests: XCTestCase {
         XCTAssertEqual(desc.inputDescriptionsByName["spec"]?.multiArrayConstraint?.shape, [1, 2050, 301, 2])
         XCTAssertEqual(desc.inputDescriptionsByName["spec"]?.multiArrayConstraint?.dataType, .float32)
         XCTAssertEqual(desc.outputDescriptionsByName["mask"]?.multiArrayConstraint?.shape, [1, 1, 2050, 301, 2])
+    }
+
+    /// Pesado: copia, verifica y compila de verdad el zip embebido de ADTOF y lo ejecuta en `.cpuOnly` con T = 100
+    /// tramas (longitud flexible). Solo con TF_MODEL_TESTS=1.
+    func testRealADTOFBundledInstall() async throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["TF_MODEL_TESTS"] == "1", "TF_MODEL_TESTS=1 requerido")
+        let d = ModelCatalog.drumsADTOF
+        let s = ModelStore(root: root, catalog: [d], bundleResourceDirectory: appModelsDirectory)
+        let url = try await s.ensureInstalled(d.id) { _ in }
+        XCTAssertEqual(url.lastPathComponent, "ADTOF_FrameRNN_fp32.mlmodelc")
+        let config = MLModelConfiguration()
+        config.computeUnits = .cpuOnly
+        let model = try MLModel(contentsOf: url, configuration: config)
+        XCTAssertEqual(model.modelDescription.inputDescriptionsByName["spec"]?.multiArrayConstraint?.dataType, .float32)
+        let spec = try MLMultiArray(shape: [1, 100, 84, 1], dataType: .float32)
+        for i in 0..<spec.count { spec[i] = 0 }
+        let out = try await model.prediction(from: MLDictionaryFeatureProvider(dictionary: ["spec": spec]))
+        XCTAssertEqual(out.featureValue(for: "act")?.multiArrayValue?.shape, [1, 100, 5])
     }
 
     func testCompiledZipInstallsWithoutCompiling() async throws {

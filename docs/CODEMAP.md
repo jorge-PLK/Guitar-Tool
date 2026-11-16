@@ -1,6 +1,6 @@
 # ToneForge · Mapa del código
 
-Última actualización: 2026-11-16 · Fase 4 · Guitarras y secciones (ADR-014).
+Última actualización: 2026-11-16 · Fase 5 · Tablatura (ADR-016).
 
 Una sección por paquete (nombres de `docs/plan.md`, «Forma de trabajo»), más la app, las pruebas y las herramientas. Fila por fichero: `| Fichero | qué hace (ADR-NNN): APIs públicas |`. Se lee por secciones: `grep -n '^## ' docs/CODEMAP.md`.
 
@@ -49,6 +49,7 @@ Descarga, verificación y compilación de modelos (paquete añadido en la Fase 1
 | `Sources/ModelKit/ModelStore.swift` | `actor ModelStore`: `ensureInstalled`, `install(_:fromArchive:)`, `delete`, `state`, `states`, `updates`, `diskUsage`; `ModelState`, `ModelError`. El inicializador admite `bundleResourceDirectory` (la app pasa el bundle, los tests un directorio). Descarga, SHA-256, `ditto`, compila y guarda solo el `.mlmodelc` (351 MB) con su `manifest.json` en `Application Support/ToneForge/Models/<id>/` |
 | `Sources/ModelKit/Downloading.swift` | Protocolos `ModelDownloading` y `ModelCompiling`; `URLSessionDownloader`; `ModelDownloadError` |
 | `Sources/ModelKit/CoreMLCompiler.swift` | `CoreMLCompiler`: `compileModel` (1,7 s; la especialización para la GPU ocurre en la primera carga) |
+| `Sources/ModelKit/ModelDescriptor.swift` (Fase 5) | (ADR-016) `ModelCatalog.drumsADTOF`: ADTOF FP32 con GRU nativa, embebido (zip de `.mlpackage`, 1,7 MB, CC BY-NC-SA), entra en `all` |
 | `Tests/ModelKitTests/` | 16 tests (`ModelOriginsTests`: orígenes y catálogo); 1 pesado con `TF_MODEL_TESTS=1` |
 
 ## Packages/StemKit
@@ -140,7 +141,16 @@ Transcripción y tablatura (ADR-014).
 | `Sources/TabKit/BasicPitch/BasicPitchTranscriber.swift` | `actor BasicPitchTranscriber`: Basic Pitch oficial en Core ML, por ventanas; con `BasicPitchContract` y `BasicPitchNotes` (notas desde las salidas del modelo) |
 | `Sources/TabKit/Audio/MonoAudio.swift`, `NoteEvent.swift` | Lectura a mono y `NoteEvent` |
 | `Sources/TabKit/Passages/PassageClassifier.swift` | `PassageClassifier` (rítmica o solista por pasajes, con contexto de pista), `GuitarRole`, `GuitarPassage`. Fuera de la cola de la biblioteca: sin propuesta automática (ADR-014) |
-| `Tests/TabKitTests/` | Tests de Basic Pitch (paridad con Python en fixtures; pesado con `TF_MODEL_TESTS=1`) y del clasificador |
+| `Sources/TabKit/Score/TabScore.swift` | (ADR-016) `TabScore` (Codable, `ticksPerBeat` 12, `trackIndex(id:)`), `TabBar`, `TabBeat`, `GridPoint`, `Subdivision`, `TabTrackKind`, `DrumPiece`, `TabNote`, `TabDrumHit`, `TabTrack` (`fret(of:)`) |
+| `Sources/TabKit/Score/TabGrid.swift` | `BeatTimes`, `TabScoreError`, `ScorePosition`; conversión tiempo ↔ posición (`time(of:)`, `timeRange(of:)`, `position(at:)`, `time(at:)`, `nearestPoint(to:in:)`); cuantización a semicorcheas o tresillos y tempos enteros con corrección de deriva (`maxWrittenDrift`) |
+| `Sources/TabKit/Score/Tuning.swift`, `Fingering.swift` | `TuningPreset`, `Tuning` (`guitar(_:)`, `bass(_:)`); Viterbi de cuerdas y trastes con coste por cuerda saltada, bajo monofónico |
+| `Sources/TabKit/Score/TabTrackBuilder.swift` | `TabTrackBuilder.pitchedTrack(...)` y `drumTrack(...)`, `DrumOnset`, `TabBuildReport` (avisos de notas fuera de registro) |
+| `Sources/TabKit/Score/TabEditor.swift` | `TabEditor` y `TabEditError`: cambiar traste, pasar de cuerda, borrar, añadir, duración, golpes de batería; deshacer y rehacer |
+| `Sources/TabKit/Score/TrackSourceFingerprint.swift` | `TrackSourceFingerprint` (`of(fileAt:path:modelVersion:…)`), `TabStaleness`, `TabScore.staleness(current:)` |
+| `Sources/TabKit/Drums/` | `DrumTranscriber` (actor; `transcribe(url:progress:)`, troceo con 30 s de contexto), `TranscribedDrumHit`; `DrumContract`, `DrumSpectrogram` (STFT y banco logarítmico con Accelerate), `DrumPeaks` |
+| `Sources/TabKit/Synth/TabSynthRenderer.swift` | `TabSynthRenderer.render(track:in:sampleRate:duration:…)`: WAV fuera de tiempo real con el soundfont (`GuitarSound`), `TabSynthError` |
+| `Sources/TabKit/Bridge/AlphaTabScore.swift` | `AlphaTabScore`, `AlphaTabBeatRef`, `AlphaTabExporter.make(score:title:artist:)`: JSON propio v1 para alphaTab |
+| `Tests/TabKitTests/` | Tests de Basic Pitch (paridad con Python en fixtures; pesado con `TF_MODEL_TESTS=1`) y del clasificador; Fase 5: `TabGridTests`, `TabQuantizeTests`, `TabTempoDriftTests`, `TabFingeringTests`, `TabEditorTests`, `TabFingerprintTests`, `TabSynthTests`, `AlphaTabScoreTests`, `DrumTranscriberTests`, `DrumHeavyModelTests` (con `Fixtures/drums/`) |
 
 ## Packages/VideoKit
 
@@ -163,9 +173,11 @@ Archivo de proyecto (JSON por carpeta), índice en SwiftData y orquestación de 
 | `Sources/Store/Guitars.swift` (Fase 4) | (ADR-014) `GuitarOptions` (`stereoSplit`, `soloSpans`), `GuitarSettings`, `GuitarSoloSpan`, `Guitar` (`role`, `name`, `file`, `confidence`), `GuitarRole` (rhythm, left, right, lead; `fileName`), `GuitarConfidence`, `GuitarAppliedState`, `GuitarSplitState`, `SeparatedGuitar`, `GuitarSplitResult` y el protocolo `GuitarSplitting` |
 | `Sources/Store/SectionEditor.swift` | (ADR-014) `SectionEditor`: `mark`, `rename`, `setSolo`, `remove`, `setColor`, `paletteIndices`, `setEdge`, `snapEdge`, `nudgeEdge`; longitud mínima 0,5 s |
 | `Sources/Store/Library.swift` (Fase 4) | `saveGuitarNames`, `saveGuitarStereoSplit`, `guitarSplitState`; paso `splitGuitars` en la cola tras el análisis. `Section` gana `color` y `isSolo` |
+| `Sources/Store/Files.swift` (Fase 5) | (ADR-016) `ProjectLayout.tabDir`, `tabScoreFile` (`tab/score.json`), `tabCacheDir` (`cache/tab/`), `tabSynthURL(trackID:)` |
+| `Sources/Store/TabSources.swift` | (ADR-016) `TabSource` (`id`, `name`, `kind` guitar/bass/drums, `relativePath`, `playerTrackID`) y extensión de `Project` que lista las pistas de la tablatura según `GuitarSettings` y stems no vacíos; probado en `TabSourcesTests` |
 | `Tests/StoreTests/` | 78 tests (`AudioSettingsTests`: ajustes de audio y caducidad de la calibración; `StudyQueueTests`: cola, stems vacíos, v1 → v2; `OriginTests`: origen, duplicados, importación con metadatos; `TrashTests`: Papelera, borrado y edición; `RecoveryTests`: re-encolado al arrancar) |
 
-Carpeta de proyecto: `project.json`, `source/original.<ext>`, `audio/song.wav` (regenerable), `stems/<stem>.wav` (regenerable), `stems/.partial`, `takes/` (`takes/<id>/processed.wav`, ADR-013), `video/`, `rigs/`, `cache/` (regenerable; `cache/analysis.json` es el análisis automático con huella). Perfil e índice en `~/Library/Application Support/ToneForge/` (`profile.json`, `Library.store`). Límite conocido: en la reconversión la sustitución es atómica por fichero, no entre ficheros; `project.json` se actualiza al final y, si falla a mitad, se reintenta al abrir.
+Carpeta de proyecto: `project.json`, `source/original.<ext>`, `audio/song.wav` (regenerable), `stems/<stem>.wav` (regenerable), `stems/.partial`, `takes/` (`takes/<id>/processed.wav`, ADR-013), `tab/score.json` (tablatura con ediciones; no es caché, ADR-016), `video/`, `rigs/`, `cache/` (regenerable; `cache/analysis.json` es el análisis automático con huella; `cache/tab/` los WAV sintetizados). Perfil e índice en `~/Library/Application Support/ToneForge/` (`profile.json`, `Library.store`). Límite conocido: en la reconversión la sustitución es atómica por fichero, no entre ficheros; `project.json` se actualiza al final y, si falla a mitad, se reintenta al abrir.
 
 ## App
 
@@ -204,6 +216,12 @@ Proyecto Xcode generado con XcodeGen (`App/project.yml`; el `.xcodeproj` tambié
 | `App/Sources/SectionBoxes.swift`, `SectionGridBoxes.swift` | (ADR-014) Cajas de secciones sobre la tira de acordes, compacta y expandida: `SectionBoxes`, `SectionPopover`, `SectionMenu`, asas, ◀ ▶, Supr (`SectionKeyMonitor`), colores `TF.sectionPalette` |
 | `App/Sources/BackingMixer.swift` (Fase 4) | (ADR-014) un canal por guitarra (`guitarChannel`) con nombre editable y confianza; sin stems vacíos; plegado en columnas nombre + M/S. Sin grabación ni A/B en Backing: `BackingRecord.swift`, `loadLastTake`, `setCompare` y `AudioController.bind` quedan sin uso desde la UI hasta la Fase 6 |
 | `App/Resources/Models/BasicPitch_nmp.mlpackage.zip`, `LeadRhythmMelRoformer_fp16.mlpackage.zip` | (ADR-014) Recursos: Basic Pitch (116 KB) y lead/rhythm (156 MB) |
+| `App/Sources/TabController.swift` | (ADR-016) Orquestación de la tablatura: transcribe por pista con progreso y huella, guarda `tab/score.json`, edición con deshacer, afinación por pista, sintetizado como pista extra del `StudyPlayer` («Oír transcripción»), cursor y exportación a `.gp` |
+| `App/Sources/TabScreen.swift` | (ADR-016) Pantalla Tablatura: pestañas de pista, transporte, «Editar notas», «Exportar a Guitar Pro» |
+| `App/Sources/TabWebHost.swift` | (ADR-016) `WKWebView` con alphaTab y puente Swift ↔ JS |
+| `App/Sources/AppModel.swift`, `RootView.swift`, `BackingView.swift`, `BackingController.swift` (Fase 5) | (ADR-016) Pestaña Tablatura, acceso desde Backing y opciones DEBUG `--screen tab`, `--tab-track N`, `--tab-edit`, `--tab-listen`, `--tab-export <ruta>`; log con `TF_TAB_LOG` |
+| `App/Resources/alphaTab/` | (ADR-016) alphaTab 1.9.0 embebido (MPL-2.0, 2,8 MB con soundfont Sonivox): `alphaTab.min.js`, `tab.html`, `tf-bridge.js` (construye el `Score` desde el JSON v1), `font/`, `soundfont/`, `VERSION`, licencia |
+| `App/Resources/Models/ADTOF_FrameRNN_fp32.mlpackage.zip` | (ADR-016) Recurso: ADTOF (1,7 MB) |
 | `App/Sources/Theme.swift` | `TF`: colores y medidas (ampliado en la Fase 2b) |
 | `App/Resources/AppIcon.svg`, `App/Resources/Assets.xcassets/` | Icono de la app (de Jorge): los PNG salen del SVG con `Tools/make-icon.sh`; `project.yml` fija `ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon` |
 | `App/Sources/ToneForgeApp.swift` | Punto de entrada |
@@ -226,6 +244,8 @@ Sondas de la Fase 0 (`Probes/P<n>-<tema>/`), desechables; resultados en `docs/pr
 | `Probes/P7-fuentes/` | Sondas de fuentes externas (enlaces de YouTube y Spotify), en scripts numerados (ADR-008); `09-list.sh` a `13-parse-listas.py` son la prueba ampliada: candidatos de cinco temas con `tf-fetch`, descarga con tiempos, restricción de edad, y embeds de lista y álbum con su resumen (ADR-011) |
 | `Probes/P6-timepitch/{run.sh,p6.py,AppleRender}` | Comparación ciega de `AVAudioUnitTimePitch` y Rubber Band: `run.sh Probes/testaudio/out/clips/*.wav` (ADR-005) |
 | `Probes/P4-modelos/{guitar_models,basic_pitch,lead_rhythm}/` | Fase 4 (ADR-014): modelos de guitarra frente a BS-RoFormer SW (`run_torch.py`, `score.py`, `listen.py`), conversión y paridad de Basic Pitch y del lead/rhythm (`convert.py`, `compare.py`) |
+| `Probes/P5-alphatab/make-spike.js` | (ADR-016) Prueba inicial de alphaTab: partitura de guitarra, bajo y batería exportada a `.gp` |
+| `Probes/P4-modelos/adtof/{package.py,make_fase5_fixture.py}` | (ADR-016) `package.py` empaqueta ADTOF para la app; `make_fase5_fixture.py` genera el fixture de `Tests/TabKitTests/Fixtures/drums/` (activaciones y golpes de Python) |
 | `Probes/testaudio/prepare.py` | Prepara los temas y tramos de prueba (`out/` ignorado) |
 
 Recursos: modelos y resultados en `Probes/P4-modelos/*/out/` (no versionados); entorno de Python en `Tools/py/.venv`, dependencias fijadas en `Tools/py/requirements.txt`.

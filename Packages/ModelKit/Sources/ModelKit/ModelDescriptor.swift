@@ -140,6 +140,28 @@ public enum ModelCatalog {
         packageName: "LeadRhythmMelRoformer_fp16.mlpackage",
         license: "openrail; pesos anónimos de HF, uso personal")
 
+    /// SHA-256 y tamaño de `App/Resources/Models/ADTOF_FrameRNN_fp32.mlpackage.zip` (lo genera, idéntico en cada
+    /// ejecución, `Probes/P4-modelos/adtof/package.py --install`; una nueva conversión cambia el hash).
+    static let drumsADTOFSHA256 = "5135e35e277b60d0f7e61a411442b25f706adafaac35c13859ee6c2d26683206"
+    static let drumsADTOFBytes: Int64 = 1_676_155
+
+    /// Transcripción de batería (mini-spec Fase 5): ADTOF Frame_RNN, puerto PyTorch xavriley/ADTOF-pytorch
+    /// (commit `85c192e`), Core ML FP32 con GRU nativa de MIL (macOS 15). Cargar **solo con `.cpuOnly`**: la GPU
+    /// calcula mal la GRU nativa. Embebido en la app como BTC.
+    /// Contrato: `spec` [1, T, 84, 1] float32 (T 100…60 000, 100 fps; log10(1 + banco log 12 b/oct de |STFT| 2048,
+    /// hop 441, Hann, 44,1 kHz mono) → `act` [1, T, 5] float32 sigmoide: bombo 35, caja 38, tom 47, charles 42, platos 49.
+    public static let drumsADTOF = ModelDescriptor(
+        id: "adtof-drums",
+        version: "framernn-85c192e-fp32-grunative",
+        displayName: "Transcripción de batería",
+        role: .drumTranscription,
+        url: URL(string: "bundle:///ADTOF_FrameRNN_fp32.mlpackage.zip")!,
+        sha256: drumsADTOFSHA256,
+        archiveBytes: drumsADTOFBytes,
+        archiveKind: .bundledZippedMLPackage,
+        packageName: "ADTOF_FrameRNN_fp32.mlpackage",
+        license: "CC BY-NC-SA 4.0 (ADTOF; puerto sin licencia): uso personal, no redistribuir")
+
     public static let all: [ModelDescriptor] = [separatorBSRoformerSW, chordsBTC, beatsBeatThis,
-                                                transcriptionBasicPitch, leadRhythmMelRoformer]
+                                                transcriptionBasicPitch, leadRhythmMelRoformer, drumsADTOF]
 }

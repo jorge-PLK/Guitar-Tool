@@ -1,0 +1,290 @@
+{
+ "labels": [
+  35,
+  38,
+  47,
+  42,
+  49
+ ],
+ "names": [
+  "kick",
+  "snare",
+  "tom",
+  "hihat",
+  "cymbal"
+ ],
+ "counts": {
+  "35": 19,
+  "38": 10,
+  "47": 7,
+  "42": 6,
+  "49": 11
+ },
+ "hits": [
+  {
+   "frame": 24,
+   "time": 0.24,
+   "note": 47
+  },
+  {
+   "frame": 47,
+   "time": 0.47,
+   "note": 35
+  },
+  {
+   "frame": 71,
+   "time": 0.71,
+   "note": 35
+  },
+  {
+   "frame": 71,
+   "time": 0.71,
+   "note": 47
+  },
+  {
+   "frame": 96,
+   "time": 0.96,
+   "note": 38
+  },
+  {
+   "frame": 119,
+   "time": 1.19,
+   "note": 47
+  },
+  {
+   "frame": 131,
+   "time": 1.31,
+   "note": 47
+  },
+  {
+   "frame": 144,
+   "time": 1.44,
+   "note": 35
+  },
+  {
+   "frame": 144,
+   "time": 1.44,
+   "note": 49
+  },
+  {
+   "frame": 167,
+   "time": 1.67,
+   "note": 35
+  },
+  {
+   "frame": 191,
+   "time": 1.91,
+   "note": 38
+  },
+  {
+   "frame": 191,
+   "time": 1.91,
+   "note": 42
+  },
+  {
+   "frame": 240,
+   "time": 2.4,
+   "note": 42
+  },
+  {
+   "frame": 263,
+   "time": 2.63,
+   "note": 35
+  },
+  {
+   "frame": 288,
+   "time": 2.88,
+   "note": 42
+  },
+  {
+   "frame": 312,
+   "time": 3.12,
+   "note": 35
+  },
+  {
+   "frame": 336,
+   "time": 3.36,
+   "note": 42
+  },
+  {
+   "frame": 383,
+   "time": 3.83,
+   "note": 38
+  },
+  {
+   "frame": 383,
+   "time": 3.83,
+   "note": 42
+  },
+  {
+   "frame": 420,
+   "time": 4.2,
+   "note": 35
+  },
+  {
+   "frame": 432,
+   "time": 4.32,
+   "note": 35
+  },
+  {
+   "frame": 432,
+   "time": 4.32,
+   "note": 42
+  },
+  {
+   "frame": 456,
+   "time": 4.56,
+   "note": 35
+  },
+  {
+   "frame": 467,
+   "time": 4.67,
+   "note": 38
+  },
+  {
+   "frame": 480,
+   "time": 4.8,
+   "note": 38
+  },
+  {
+   "frame": 492,
+   "time": 4.92,
+   "note": 47
+  },
+  {
+   "frame": 503,
+   "time": 5.03,
+   "note": 47
+  },
+  {
+   "frame": 515,
+   "time": 5.15,
+   "note": 47
+  },
+  {
+   "frame": 528,
+   "time": 5.28,
+   "note": 35
+  },
+  {
+   "frame": 528,
+   "time": 5.28,
+   "note": 49
+  },
+  {
+   "frame": 575,
+   "time": 5.75,
+   "note": 38
+  },
+  {
+   "frame": 575,
+   "time": 5.75,
+   "note": 49
+  },
+  {
+   "frame": 611,
+   "time": 6.11,
+   "note": 35
+  },
+  {
+   "frame": 623,
+   "time": 6.23,
+   "note": 35
+  },
+  {
+   "frame": 623,
+   "time": 6.23,
+   "note": 49
+  },
+  {
+   "frame": 647,
+   "time": 6.47,
+   "note": 35
+  },
+  {
+   "frame": 671,
+   "time": 6.71,
+   "note": 38
+  },
+  {
+   "frame": 671,
+   "time": 6.71,
+   "note": 49
+  },
+  {
+   "frame": 719,
+   "time": 7.19,
+   "note": 35
+  },
+  {
+   "frame": 719,
+   "time": 7.19,
+   "note": 49
+  },
+  {
+   "frame": 767,
+   "time": 7.67,
+   "note": 38
+  },
+  {
+   "frame": 767,
+   "time": 7.67,
+   "note": 49
+  },
+  {
+   "frame": 803,
+   "time": 8.03,
+   "note": 35
+  },
+  {
+   "frame": 815,
+   "time": 8.15,
+   "note": 35
+  },
+  {
+   "frame": 815,
+   "time": 8.15,
+   "note": 49
+  },
+  {
+   "frame": 839,
+   "time": 8.39,
+   "note": 35
+  },
+  {
+   "frame": 863,
+   "time": 8.63,
+   "note": 38
+  },
+  {
+   "frame": 863,
+   "time": 8.63,
+   "note": 49
+  },
+  {
+   "frame": 911,
+   "time": 9.11,
+   "note": 35
+  },
+  {
+   "frame": 911,
+   "time": 9.11,
+   "note": 49
+  },
+  {
+   "frame": 959,
+   "time": 9.59,
+   "note": 38
+  },
+  {
+   "frame": 959,
+   "time": 9.59,
+   "note": 49
+  },
+  {
+   "frame": 995,
+   "time": 9.95,
+   "note": 35
+  }
+ ]
+}

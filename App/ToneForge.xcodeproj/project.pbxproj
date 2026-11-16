@@ -14,6 +14,7 @@
 		1D7D3E31BDA14BA30D5A6915 /* CalibrationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD842C108EE8790376C50154 /* CalibrationSheet.swift */; };
 		212DF23661513325CC530C93 /* SectionGridBoxes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DB0C8591C493128500D41C1 /* SectionGridBoxes.swift */; };
 		22FB99040C9A3A5490D4AB8E /* ChordGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0287422B5C2A670824F3C9C5 /* ChordGrid.swift */; };
+		237146E8A1A54FDBAAE086BC /* ADTOF_FrameRNN_fp32.mlpackage.zip in Resources */ = {isa = PBXBuildFile; fileRef = B432A65725F572C008D34948 /* ADTOF_FrameRNN_fp32.mlpackage.zip */; };
 		2C2B9FE6AAC7B958F3E4A8F1 /* StudySession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 205EBA0C766248D3D5BA3D6D /* StudySession.swift */; };
 		367912D9D2B87FF85C3BD016 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B9A686802572ACB6B1A8CC04 /* Assets.xcassets */; };
 		3841A6F8CBB9E9D19DFD68CB /* TabKit in Frameworks */ = {isa = PBXBuildFile; productRef = D23158F59E97B35F583680BA /* TabKit */; };
@@ -32,16 +33,20 @@
 		AD36FEE8831300E05B5B6D3F /* BackingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80314A23F60B85C95E45E709 /* BackingView.swift */; };
 		ADF0053AD91B682E0C5B1EBE /* LinkImportDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B5FC3CE1DF0872CDBB3FBA9 /* LinkImportDemo.swift */; };
 		AF1B1A342114D331C7F9D61D /* ChordDiagram.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02E595FBE0F3410852A2CA67 /* ChordDiagram.swift */; };
+		B13EA78FF7BC5B1E2CE6F382 /* TabWebHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAEA335E596A6AF8C814ED10 /* TabWebHost.swift */; };
+		B5AFB53CFD185141B8EB0DF8 /* TabScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF3EE85365F4B0C248777A3B /* TabScreen.swift */; };
 		B5CFEE7DB885C39DD2CA1778 /* SourceKit in Frameworks */ = {isa = PBXBuildFile; productRef = CCAB4C8959EC7AC83B04E254 /* SourceKit */; };
 		BDAFFDDEBD44BCBB73461B60 /* GuitarBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F550F84CACA832D90C2AA5A /* GuitarBridge.swift */; };
 		C1E6534D276240792E8943B7 /* AudioDeviceMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCBB981D7D3174527E92BBED /* AudioDeviceMonitor.swift */; };
 		CD4EA14A1429A5610CC5182C /* AudioBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = E75DDB3F364F1B5378F62689 /* AudioBridge.swift */; };
 		CDD866DEEE759DF8CEB932EB /* AudioController.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC5E5FAEC08FEB5F90C75D18 /* AudioController.swift */; };
 		D8E41E9844B3FEFAEBBB7CB5 /* ExternalSources.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDE3261796229D3052B07781 /* ExternalSources.swift */; };
+		DADFE91E1AC93A87A49A4C44 /* TabController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63F5C61B6FFCA108DAA268DB /* TabController.swift */; };
 		DFE925A768E3583404549B0D /* BasicPitch_nmp.mlpackage.zip in Resources */ = {isa = PBXBuildFile; fileRef = AA0F285BE0A6F852B7BC7958 /* BasicPitch_nmp.mlpackage.zip */; };
 		E0C8FFEF3D77AB6C386C8761 /* GuitarOptionsViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8AD8ABAB86887E41E7902FE /* GuitarOptionsViews.swift */; };
 		E2387454B5475F6956E87AEF /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3EE15103E9ACEAD7E554968 /* Theme.swift */; };
 		E3E69FDF7D5B67705B5F0890 /* LeadRhythmMelRoformer_fp16.mlpackage.zip in Resources */ = {isa = PBXBuildFile; fileRef = 15C9BE95BFA0F0D8414E0600 /* LeadRhythmMelRoformer_fp16.mlpackage.zip */; };
+		E6CBA8E376A4719BA13B9E1D /* alphaTab in Resources */ = {isa = PBXBuildFile; fileRef = 79C26A34CF2A2EE92DE78434 /* alphaTab */; };
 		E80C7A8E62607DD51E4D80BA /* BTC_large_voca_fp16.mlpackage.zip in Resources */ = {isa = PBXBuildFile; fileRef = CC43CDA6D40FEAD57D19FD5F /* BTC_large_voca_fp16.mlpackage.zip */; };
 		ED68697F6C6612643F6A614B /* LinkImportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9D4AE74EA55983C1B4E52E0 /* LinkImportSheet.swift */; };
 		EF26AC39FD0E22A482154B90 /* AudioKit in Frameworks */ = {isa = PBXBuildFile; productRef = B2EF94E80837CC81D491FB08 /* AudioKit */; };
@@ -70,14 +75,17 @@
 		4214C2F048A90BD78E099B14 /* AudioDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioDemo.swift; sourceTree = "<group>"; };
 		50A04723931020D3F8A07685 /* ToneForge.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ToneForge.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		600C6F9C627112F722163FBE /* StudyKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = StudyKit; path = ../Packages/StudyKit; sourceTree = SOURCE_ROOT; };
+		63F5C61B6FFCA108DAA268DB /* TabController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabController.swift; sourceTree = "<group>"; };
 		6454D99769C07D228948A88A /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		6776133E7FA6353546A3F0BD /* ModelKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ModelKit; path = ../Packages/ModelKit; sourceTree = SOURCE_ROOT; };
 		6DB0C8591C493128500D41C1 /* SectionGridBoxes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectionGridBoxes.swift; sourceTree = "<group>"; };
 		75A7F55F6E6CA6C725218127 /* ToneForgeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToneForgeApp.swift; sourceTree = "<group>"; };
+		79C26A34CF2A2EE92DE78434 /* alphaTab */ = {isa = PBXFileReference; lastKnownFileType = folder; name = alphaTab; path = Resources/alphaTab; sourceTree = SOURCE_ROOT; };
 		80314A23F60B85C95E45E709 /* BackingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackingView.swift; sourceTree = "<group>"; };
 		9671A99E86917B93EDEFF6AC /* AudioKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = AudioKit; path = ../Packages/AudioKit; sourceTree = SOURCE_ROOT; };
 		A8AD8ABAB86887E41E7902FE /* GuitarOptionsViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuitarOptionsViews.swift; sourceTree = "<group>"; };
 		AA0F285BE0A6F852B7BC7958 /* BasicPitch_nmp.mlpackage.zip */ = {isa = PBXFileReference; lastKnownFileType = archive.zip; path = BasicPitch_nmp.mlpackage.zip; sourceTree = "<group>"; };
+		B432A65725F572C008D34948 /* ADTOF_FrameRNN_fp32.mlpackage.zip */ = {isa = PBXFileReference; lastKnownFileType = archive.zip; path = ADTOF_FrameRNN_fp32.mlpackage.zip; sourceTree = "<group>"; };
 		B9A686802572ACB6B1A8CC04 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B9D4AE74EA55983C1B4E52E0 /* LinkImportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkImportSheet.swift; sourceTree = "<group>"; };
 		BB2EA898094A818B3F3AD211 /* BackingRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackingRecord.swift; sourceTree = "<group>"; };
@@ -91,6 +99,8 @@
 		E75DDB3F364F1B5378F62689 /* AudioBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioBridge.swift; sourceTree = "<group>"; };
 		E7E70B03C10E548B408195F3 /* StudyBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudyBridge.swift; sourceTree = "<group>"; };
 		E90B1053A3471D11C92D139D /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		EAEA335E596A6AF8C814ED10 /* TabWebHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabWebHost.swift; sourceTree = "<group>"; };
+		EF3EE85365F4B0C248777A3B /* TabScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabScreen.swift; sourceTree = "<group>"; };
 		FC5E5FAEC08FEB5F90C75D18 /* AudioController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioController.swift; sourceTree = "<group>"; };
 		FD842C108EE8790376C50154 /* CalibrationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalibrationSheet.swift; sourceTree = "<group>"; };
 		FDE3261796229D3052B07781 /* ExternalSources.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalSources.swift; sourceTree = "<group>"; };
@@ -117,6 +127,7 @@
 		179B4F47ED70BDF81D81BC79 = {
 			isa = PBXGroup;
 			children = (
+				79C26A34CF2A2EE92DE78434 /* alphaTab */,
 				9E7DF7CD24EBA77EAD5E5873 /* Models */,
 				9DE596F979B79291EEE2908F /* Packages */,
 				3961451DF9C69321CC55BFD5 /* Resources */,
@@ -173,6 +184,9 @@
 				29EE870241AE799869F0237A /* SettingsView.swift */,
 				E7E70B03C10E548B408195F3 /* StudyBridge.swift */,
 				205EBA0C766248D3D5BA3D6D /* StudySession.swift */,
+				63F5C61B6FFCA108DAA268DB /* TabController.swift */,
+				EF3EE85365F4B0C248777A3B /* TabScreen.swift */,
+				EAEA335E596A6AF8C814ED10 /* TabWebHost.swift */,
 				D3EE15103E9ACEAD7E554968 /* Theme.swift */,
 				75A7F55F6E6CA6C725218127 /* ToneForgeApp.swift */,
 			);
@@ -196,6 +210,7 @@
 		9E7DF7CD24EBA77EAD5E5873 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				B432A65725F572C008D34948 /* ADTOF_FrameRNN_fp32.mlpackage.zip */,
 				AA0F285BE0A6F852B7BC7958 /* BasicPitch_nmp.mlpackage.zip */,
 				CC43CDA6D40FEAD57D19FD5F /* BTC_large_voca_fp16.mlpackage.zip */,
 				15C9BE95BFA0F0D8414E0600 /* LeadRhythmMelRoformer_fp16.mlpackage.zip */,
@@ -283,10 +298,12 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				237146E8A1A54FDBAAE086BC /* ADTOF_FrameRNN_fp32.mlpackage.zip in Resources */,
 				367912D9D2B87FF85C3BD016 /* Assets.xcassets in Resources */,
 				E80C7A8E62607DD51E4D80BA /* BTC_large_voca_fp16.mlpackage.zip in Resources */,
 				DFE925A768E3583404549B0D /* BasicPitch_nmp.mlpackage.zip in Resources */,
 				E3E69FDF7D5B67705B5F0890 /* LeadRhythmMelRoformer_fp16.mlpackage.zip in Resources */,
+				E6CBA8E376A4719BA13B9E1D /* alphaTab in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -379,6 +396,9 @@
 				976B522F8C79F93AD139D6D1 /* SettingsView.swift in Sources */,
 				987AAB0BD5B34F97B1B4E55F /* StudyBridge.swift in Sources */,
 				2C2B9FE6AAC7B958F3E4A8F1 /* StudySession.swift in Sources */,
+				DADFE91E1AC93A87A49A4C44 /* TabController.swift in Sources */,
+				B5AFB53CFD185141B8EB0DF8 /* TabScreen.swift in Sources */,
+				B13EA78FF7BC5B1E2CE6F382 /* TabWebHost.swift in Sources */,
 				E2387454B5475F6956E87AEF /* Theme.swift in Sources */,
 				134191F8B9AC4B09EE2E60EC /* ToneForgeApp.swift in Sources */,
 			);
