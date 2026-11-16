@@ -8,11 +8,16 @@
 # Bypass, only with Jorge's OK: `SKIP_TEST_GATE=1 git commit ...`
 set -u
 
-cmd=$(jq -r '.tool_input.command // empty')
+input=$(cat)
+cmd=$(jq -r '.tool_input.command // empty' <<< "$input")
 case "$cmd" in *"git commit"*) ;; *) exit 0 ;; esac
 case "$cmd" in *SKIP_TEST_GATE=1*) exit 0 ;; esac
 
-cd "${CLAUDE_PROJECT_DIR:-.}" || exit 0
+# Check the repository the commit runs in, not the project root: in a worktree
+# (.claude/worktrees/fase-N) the commit, its Swift and its Temp/last-run.txt live there.
+cwd=$(jq -r '.cwd // empty' <<< "$input")
+cd "${cwd:-${CLAUDE_PROJECT_DIR:-.}}" 2>/dev/null || cd "${CLAUDE_PROJECT_DIR:-.}" || exit 0
+top=$(git rev-parse --show-toplevel 2>/dev/null) && cd "$top"
 results="Temp/last-run.txt"
 
 block() {
