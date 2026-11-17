@@ -94,6 +94,34 @@ struct GridSectionBoxes: View {
     }
 }
 
+/// Barra espaciadora = reproducir/pausar en Backing track y Tablatura. Se atiende en el monitor de eventos (antes que
+/// el botón enfocado o la vista web, que harían su propia acción) y el evento se consume: sin doble conmutación.
+/// No actúa si se está escribiendo (el editor de campo es un `NSText`) ni con modificadores ni si hay otra ventana/hoja.
+@MainActor
+final class SpaceKeyMonitor {
+    private var token: Any?
+
+    func install(toggle: @escaping @MainActor () -> Void) {
+        guard token == nil else { return }
+        token = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            guard event.keyCode == 49,
+                  event.modifierFlags.intersection([.command, .control, .option, .shift]).isEmpty else { return event }
+            let handled = MainActor.assumeIsolated { () -> Bool in
+                guard let window = NSApp.keyWindow, window.sheetParent == nil, window.attachedSheet == nil,
+                      event.window === window, !(window.firstResponder is NSText) else { return false }
+                if !event.isARepeat { toggle() }
+                return true
+            }
+            return handled ? nil : event
+        }
+    }
+
+    func remove() {
+        if let token { NSEvent.removeMonitor(token) }
+        token = nil
+    }
+}
+
 /// Supr / Retroceso borran la sección seleccionada y Esc la deselecciona, salvo que se esté escribiendo en un campo
 /// (el nombre de la ventana de la sección). Vale para la tira y la rejilla: la selección es compartida.
 @MainActor

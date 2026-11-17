@@ -113,6 +113,8 @@ public enum DrumPiece: Int, Codable, Sendable, CaseIterable {
     case kick = 35
     case snare = 38
     case hiHat = 42
+    /// Charles abierto: ADTOF no lo da; sale de `DrumCymbalSeries` (Fase 5b, «Platos de ADTOF confundidos con charles»).
+    case openHiHat = 46
     case tom = 47
     case crash = 49
 }
@@ -128,27 +130,105 @@ public struct TabNote: Codable, Sendable, Equatable, Identifiable {
     /// Duración en ticks (> 0).
     public var duration: Int
     public var amplitude: Float
+    /// Bends, palm mute, ligados… (Fase 5b). En el JSON solo si hay alguna; sin la clave, ninguna.
+    public var techniques: TabTechniques
 
-    public init(id: Int, pitch: Int, string: Int, start: GridPoint, duration: Int, amplitude: Float) {
+    public init(id: Int, pitch: Int, string: Int, start: GridPoint, duration: Int, amplitude: Float,
+                techniques: TabTechniques = TabTechniques()) {
         self.id = id
         self.pitch = pitch
         self.string = string
         self.start = start
         self.duration = duration
         self.amplitude = amplitude
+        self.techniques = techniques
     }
 
     public var end: GridPoint { GridPoint(absoluteTick: start.absoluteTick + duration) }
+
+    private enum CodingKeys: String, CodingKey { case id, pitch, string, start, duration, amplitude, techniques }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(Int.self, forKey: .id)
+        pitch = try c.decode(Int.self, forKey: .pitch)
+        string = try c.decode(Int.self, forKey: .string)
+        start = try c.decode(GridPoint.self, forKey: .start)
+        duration = try c.decode(Int.self, forKey: .duration)
+        amplitude = try c.decode(Float.self, forKey: .amplitude)
+        techniques = try c.decodeIfPresent(TabTechniques.self, forKey: .techniques) ?? TabTechniques()
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(pitch, forKey: .pitch)
+        try c.encode(string, forKey: .string)
+        try c.encode(start, forKey: .start)
+        try c.encode(duration, forKey: .duration)
+        try c.encode(amplitude, forKey: .amplitude)
+        if !techniques.isEmpty { try c.encode(techniques, forKey: .techniques) }
+    }
 }
 
-/// Golpe de batería en un punto de la rejilla (el `DrumHit` de `Drums/` es el golpe detectado, en segundos).
+/// Golpe de batería en un punto de la rejilla (el `DrumHit` de `Drums/` es el golpe detectado, en segundos). Hay
+/// como mucho uno por pieza y punto: para buscarlo, compara `piece` y `at` (la igualdad incluye `ghost`).
 public struct TabDrumHit: Codable, Sendable, Hashable {
     public var piece: DrumPiece
     public var at: GridPoint
+    /// Golpe fantasma (`Note.isGhost` de alphaTab; Fase 5b). En el JSON solo si es true.
+    public var ghost: Bool
+    /// Nota de adorno delante del golpe (flam), sin tiempo propio: `fret` es su nota de percusión GM (la del beat de
+    /// adorno en alphaTab). En el JSON solo si la hay.
+    public var grace: TabGrace?
+    /// Golpe acentuado (`Note.accentuated` de alphaTab; Fase 5b). En el JSON solo si lo hay.
+    public var accent: TabAccent?
 
-    public init(piece: DrumPiece, at: GridPoint) {
+    public init(piece: DrumPiece, at: GridPoint, ghost: Bool = false, grace: TabGrace? = nil, accent: TabAccent? = nil) {
         self.piece = piece
         self.at = at
+        self.ghost = ghost
+        self.grace = grace
+        self.accent = accent
+    }
+
+    /// Mismo golpe (pieza y punto), sea o no fantasma.
+    public func isSameHit(as other: TabDrumHit) -> Bool { piece == other.piece && at == other.at }
+
+    private enum CodingKeys: String, CodingKey { case piece, at, ghost, grace, accent }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        piece = try c.decode(DrumPiece.self, forKey: .piece)
+        at = try c.decode(GridPoint.self, forKey: .at)
+        ghost = try c.decodeIfPresent(Bool.self, forKey: .ghost) ?? false
+        grace = try c.decodeIfPresent(TabGrace.self, forKey: .grace)
+        accent = try c.decodeIfPresent(TabAccent.self, forKey: .accent)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(piece, forKey: .piece)
+        try c.encode(at, forKey: .at)
+        if ghost { try c.encode(true, forKey: .ghost) }
+        try c.encodeIfPresent(grace, forKey: .grace)
+        try c.encodeIfPresent(accent, forKey: .accent)
+    }
+}
+
+/// De qué pista de Songsterr viene una pista importada (mini-spec Fase 5b, «Datos»).
+public struct ImportedTrackStamp: Codable, Sendable, Hashable {
+    public var songId: Int
+    public var revisionId: Int
+    /// `SongsterrTrackConverter.version` con que se convirtió.
+    public var converterVersion: Int
+    public var partId: Int?
+
+    public init(songId: Int, revisionId: Int, converterVersion: Int, partId: Int?) {
+        self.songId = songId
+        self.revisionId = revisionId
+        self.converterVersion = converterVersion
+        self.partId = partId
     }
 }
 
@@ -168,9 +248,14 @@ public struct TabTrack: Codable, Sendable, Equatable, Identifiable {
     public var notes: [TabNote]
     /// Ordenados por punto y pieza.
     public var hits: [TabDrumHit]
+    /// Huella de la importación desde Songsterr (mini-spec Fase 5b, «Datos»); nil en las pistas automáticas y en
+    /// los JSON anteriores a la Fase 5b. En las importadas `source` queda nil.
+    public var imported: ImportedTrackStamp?
 
     public init(id: String, name: String, kind: TabTrackKind, tuning: Tuning?, source: TrackSourceFingerprint?,
-                subdivisions: [Subdivision], notes: [TabNote] = [], hits: [TabDrumHit] = []) {
+                subdivisions: [Subdivision], notes: [TabNote] = [], hits: [TabDrumHit] = [],
+                imported: ImportedTrackStamp? = nil) {
+        self.imported = imported
         self.id = id
         self.name = name
         self.kind = kind

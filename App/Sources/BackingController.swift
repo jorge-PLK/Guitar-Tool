@@ -111,7 +111,7 @@ final class BackingController {
     /// Recalcula los clics tras un análisis nuevo o un cambio del metrónomo.
     func refreshMetronome() {
         var clicks: [Click] = []
-        if let grid = session.beats {
+        if let grid = session.metronomeBeats {
             clicks = StudyBridge.clicks(grid, in: 0...max(duration, 0.001)).map { Click(time: $0.time, accent: $0.accent) }
         }
         player.metronome = Metronome(clicks: clicks, isEnabled: settings.metronomeOn, gainDB: settings.metronomeGainDB)

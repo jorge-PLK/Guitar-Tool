@@ -33,6 +33,25 @@ public struct TabSynthRenderer: Sendable {
     static let bassProgram: UInt8 = 33
     /// Velocidad MIDI fija de notas y golpes (la partitura no guarda dinámica).
     static let velocity: UInt8 = 100
+    // Técnicas en la transcripción sonora (Fase 5b): el sampler no las conoce, se aproximan con velocidad, duración y
+    // rueda de inflexión del canal (rango por defecto de ±2 semitonos; con acordes la rueda mueve todas las notas
+    // que suenan en el canal, aproximación aceptada).
+    /// Factor de velocidad de una nota fantasma.
+    static let ghostVelocityFactor = 0.55
+    /// Factor de velocidad de un acento normal y de uno fuerte.
+    static let accentVelocityFactor = 1.2, heavyAccentVelocityFactor = 1.35
+    /// Fracción de la duración que suena una nota con palm mute y una staccato.
+    static let palmMuteLengthFactor = 0.45, staccatoLengthFactor = 0.5
+    /// Duración máxima, en segundos, de una nota muerta (x).
+    static let deadNoteSeconds = 0.06
+    /// Semitonos por unidad de valor de un bend (4 unidades = un tono; `TabBend.quarterTonesPerTone`).
+    static let semitonesPerBendUnit = 2.0 / Double(TabBend.quarterTonesPerTone)
+    /// Semitonos de la rueda de inflexión a fondo de escala.
+    static let pitchBendRangeSemitones = 2.0
+    /// Profundidad (semitonos), frecuencia (Hz) y retraso (s) del vibrato; separación entre eventos de rueda (s).
+    static let vibratoDepthSlight = 0.25, vibratoDepthWide = 0.5
+    static let vibratoRateHz = 5.5, vibratoDelaySeconds = 0.2
+    static let pitchBendStepSeconds = 0.012
     /// Canal MIDI de la batería (10 en notación GM).
     static let drumChannel: UInt8 = 9
     /// Frames por bloque de render: los eventos se colocan dentro del bloque con su desfase, así que el tamaño no
@@ -110,7 +129,7 @@ public struct TabSynthRenderer: Sendable {
         case .guitar, .bass:
             // Por altura, una sola voz: si una nota empieza antes de que acabe otra de la misma altura, la anterior
             // se corta ahí (si no, su note-off apagaría la nueva).
-            var spans: [(on: Int, off: Int, pitch: UInt8)] = []
+            var spans: [(on: Int, off: Int, pitch: UInt8, note: TabNote)] = []
             var openByPitch: [UInt8: Int] = [:]
             let notes = track.notes.sorted { $0.start.absoluteTick < $1.start.absoluteTick }
             for note in notes {
@@ -120,11 +139,19 @@ public struct TabSynthRenderer: Sendable {
                 guard off > on else { continue }
                 if let i = openByPitch[pitch], spans[i].off > on { spans[i].off = on }
                 openByPitch[pitch] = spans.count
-                spans.append((on, off, pitch))
+                spans.append((on, off, pitch, note))
             }
             for s in spans where s.off > s.on && s.off > 0 && s.on < totalFrames {
-                out.append(Event(frame: max(0, s.on) - delayFrames, status: 0x90, data1: s.pitch, data2: velocity))
-                out.append(Event(frame: s.off - delayFrames, status: 0x80, data1: s.pitch, data2: 0))
+                let t = s.note.techniques
+                var off = s.off
+                func shorten(_ factor: Double) { off = min(off, s.on + max(1, Int(Double(s.off - s.on) * factor))) }
+                if t.palmMute { shorten(palmMuteLengthFactor) }
+                if t.staccato { shorten(staccatoLengthFactor) }
+                if t.dead { off = min(off, s.on + max(1, frame(deadNoteSeconds))) }
+                out.append(Event(frame: max(0, s.on) - delayFrames, status: 0x90, data1: s.pitch,
+                                 data2: noteVelocity(t)))
+                out.append(Event(frame: off - delayFrames, status: 0x80, data1: s.pitch, data2: 0))
+                out += pitchBendEvents(t, on: s.on, off: s.off, sampleRate: sampleRate, delayFrames: delayFrames)
             }
         case .drums:
             // Cada golpe suena hasta el siguiente de la misma pieza (o hasta el final).
@@ -137,12 +164,77 @@ public struct TabSynthRenderer: Sendable {
                 if lastOn[hit.piece] != nil {
                     out.append(Event(frame: on - delayFrames, status: 0x80 | drumChannel, data1: key, data2: 0))
                 }
-                out.append(Event(frame: on - delayFrames, status: 0x90 | drumChannel, data1: key, data2: velocity))
+                out.append(Event(frame: on - delayFrames, status: 0x90 | drumChannel, data1: key, data2: hitVelocity(hit)))
                 lastOn[hit.piece] = on
             }
         }
         for i in out.indices where out[i].frame < 0 { out[i].frame = 0 }
         out.sort { ($0.frame, $0.isNoteOff ? 0 : 1) < ($1.frame, $1.isNoteOff ? 0 : 1) }
+        return out
+    }
+
+    static func scaled(_ factor: Double) -> UInt8 { UInt8(max(1, min(127, (Double(velocity) * factor).rounded()))) }
+
+    static func noteVelocity(_ t: TabTechniques) -> UInt8 { attackVelocity(ghost: t.ghost, accent: t.accent) }
+
+    static func hitVelocity(_ h: TabDrumHit) -> UInt8 { attackVelocity(ghost: h.ghost, accent: h.accent) }
+
+    static func attackVelocity(ghost: Bool, accent: TabAccent?) -> UInt8 {
+        if ghost { return scaled(ghostVelocityFactor) }
+        switch accent {
+        case .normal?: return scaled(accentVelocityFactor)
+        case .heavy?: return scaled(heavyAccentVelocityFactor)
+        default: return velocity
+        }
+    }
+
+    /// Valor de la rueda de inflexión (14 bits, 8192 = centro) para `semitones` de desvío.
+    static func pitchBendValue(semitones: Double) -> Int {
+        8192 + Int((max(-1, min(1, semitones / pitchBendRangeSemitones)) * 8191).rounded())
+    }
+
+    /// Curva de bend, palanca y vibrato de una nota como eventos de rueda de inflexión; vuelve al centro al terminar.
+    static func pitchBendEvents(_ t: TabTechniques, on: Int, off: Int, sampleRate: Double,
+                                delayFrames: Int) -> [Event] {
+        let curve = t.bend ?? t.whammy
+        guard curve != nil || t.vibrato != nil else { return [] }
+        let step = max(1, Int(pitchBendStepSeconds * sampleRate))
+        func semitones(at f: Int) -> Double {
+            var v = 0.0
+            if let c = curve, c.points.count >= 2 {
+                let pos = Double(f - on) / Double(max(1, off - on)) * Double(TabBend.maxPosition)
+                let pts = c.points
+                if pos <= Double(pts[0].position) {
+                    v = Double(pts[0].value)
+                } else if pos >= Double(pts[pts.count - 1].position) {
+                    v = Double(pts[pts.count - 1].value)
+                } else {
+                    for (a, b) in zip(pts, pts.dropFirst()) where pos >= Double(a.position) && pos <= Double(b.position) {
+                        let span = Double(max(1, b.position - a.position))
+                        v = Double(a.value) + (pos - Double(a.position)) / span * Double(b.value - a.value)
+                        break
+                    }
+                }
+                v *= semitonesPerBendUnit
+            }
+            if let vib = t.vibrato {
+                let secs = Double(f - on) / sampleRate
+                if secs > vibratoDelaySeconds {
+                    let depth = vib == .wide ? vibratoDepthWide : vibratoDepthSlight
+                    v += depth * sin(2 * .pi * vibratoRateHz * (secs - vibratoDelaySeconds))
+                }
+            }
+            return v
+        }
+        var out: [Event] = []
+        var f = on
+        while f < off {
+            let value = pitchBendValue(semitones: semitones(at: f))
+            out.append(Event(frame: max(0, f) - delayFrames, status: 0xE0, data1: UInt8(value & 0x7F),
+                             data2: UInt8((value >> 7) & 0x7F)))
+            f += step
+        }
+        out.append(Event(frame: max(0, off - 1) - delayFrames, status: 0xE0, data1: 0, data2: 64))
         return out
     }
 

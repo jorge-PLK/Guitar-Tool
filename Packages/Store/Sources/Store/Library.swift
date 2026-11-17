@@ -617,6 +617,11 @@ public actor Library {
         try await enqueueGuitarStep(id)
     }
 
+    /// Guarda la fuente elegida de la tablatura (nil = sin elegir). Solo toca ese campo.
+    public func saveTabSource(_ choice: TabSourceChoice?, for id: UUID) async throws {
+        try await mutate(id) { $0.tabSource = choice }
+    }
+
     /// Guarda los nombres de las pistas de guitarra por papel (vacío = el nombre por defecto). No toca pistas ni
     /// opciones, así que es seguro con el paso de guitarras en marcha.
     public func saveGuitarNames(id: UUID, names: [GuitarRole: String]) async throws {

@@ -62,6 +62,31 @@ final class StudySession {
         loadAnalysis()
     }
 
+    /// Guarda la fuente elegida de la tablatura (Fase 5b; nil = sin elegir). Solo toca ese campo de `project.json`.
+    /// `grid`: rejilla del metrónomo corregida desde Songsterr (se guarda en `tab/songsterr-grid.json`).
+    func saveTabSource(_ choice: TabSourceChoice?, grid: SongsterrGridFile? = nil) async {
+        project.tabSource = choice
+        if let grid {
+            songsterrGrid = grid
+            if !simulated { try? grid.save(to: layout.tabSongsterrGridFile) }
+        }
+        guard !simulated else { return }
+        try? await library.saveTabSource(choice, for: projectID)
+    }
+
+    /// Rejilla de Songsterr guardada (puede ser de otro tema; `metronomeBeats` lo comprueba).
+    private(set) var songsterrGrid: SongsterrGridFile?
+
+    /// Rejilla del metrónomo (Backing y Tablatura): la corregida desde Songsterr si la fuente de la tablatura es ese
+    /// mismo tema y revisión; si no (automática, sin elegir), la del análisis.
+    var metronomeBeats: BeatGrid? {
+        if case let .songsterr(songId, revisionId, _)? = project.tabSource, let g = songsterrGrid,
+           g.songId == songId, g.revisionId == revisionId, g.beats.count >= 2 {
+            return BeatGrid(beats: g.beats, downbeats: g.downbeats)
+        }
+        return beats
+    }
+
     // MARK: Guitarras (Fase 4)
 
     /// Pistas de guitarra con fichero en disco, en el orden de `GuitarRole.allCases`.
@@ -104,6 +129,7 @@ final class StudySession {
     }
 
     private func loadAnalysis() {
+        if songsterrGrid == nil { songsterrGrid = SongsterrGridFile.load(layout.tabSongsterrGridFile) }
         analysis = AppStudyAnalyzer.loadCached(project: project, layout: layout)
         if analysis != nil, analysisState != .analyzing { analysisState = .ready }
     }
@@ -388,3 +414,24 @@ extension StudySession {
     }
 }
 #endif
+
+/// Rejilla del metrónomo corregida desde Songsterr (`SongsterrBeatGrid.build`), en `tab/songsterr-grid.json`. Va con
+/// el tema y la revisión de los que salió: solo vale mientras `Project.tabSource` sea ese mismo.
+struct SongsterrGridFile: Codable, Equatable {
+    var songId: Int
+    var revisionId: Int
+    var beats: [Double]
+    var downbeats: [Double]
+    /// Tempo escrito principal de Songsterr (BPM de negra).
+    var writtenTempo: Double
+
+    func save(to url: URL) throws {
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try JSONEncoder().encode(self).write(to: url, options: .atomic)
+    }
+
+    static func load(_ url: URL) -> SongsterrGridFile? {
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        return try? JSONDecoder().decode(SongsterrGridFile.self, from: data)
+    }
+}

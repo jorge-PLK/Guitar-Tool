@@ -1,3 +1,4 @@
+import Accelerate
 import CoreML
 import Foundation
 
@@ -29,10 +30,15 @@ public actor BasicPitchTranscriber {
     }
 
     /// Cualquier formato que lea `AVAudioFile`; se pasa a mono (media de canales) y a 22 050 Hz.
-    /// Notas ordenadas por inicio y nota.
+    /// Notas ordenadas por inicio y nota, sin las que caen en silencio del audio (`SilenceGate`).
     public func transcribe(url: URL) async throws -> [NoteEvent] {
         let audio = try MonoAudio.load(url, sampleRate: BasicPitchContract.sampleRate)
         try Task.checkCancellation()
+        return SilenceGate.filter(try notes(audio: audio), audio: audio, sampleRate: BasicPitchContract.sampleRate)
+    }
+
+    /// Notas de Basic Pitch sin la puerta de silencio, ordenadas por inicio y nota.
+    func notes(audio: [Float]) throws -> [NoteEvent] {
         let post = try posteriorgram(audio: audio)
         try Task.checkCancellation()
         return BasicPitchNotes.noteEvents(post).sorted { ($0.start, $0.pitch) < ($1.start, $1.pitch) }
@@ -69,7 +75,8 @@ enum BasicPitchWindowing {
     typealias C = BasicPitchContract
 
     /// Audio con 3 840 ceros delante, ventanas de 43 844 cada 36 164 muestras (la última rellena con ceros),
-    /// 15 fotogramas fuera por cada lado, concatenadas y recortadas a floor(n · 86 / 22 050).
+    /// 15 fotogramas fuera por cada lado, concatenadas y recortadas a floor(n · 86 / 22 050). Las ventanas mudas
+    /// (pico < `silentWindowPeak`) no pasan por el modelo y dan ceros.
     static func posteriorgram(audio: [Float], with predictor: any BasicPitchWindowPredictor) throws -> Posteriorgram {
         let p = C.nPitches
         let outFrames = C.outputFrames(forSamples: audio.count)
@@ -78,6 +85,7 @@ enum BasicPitchWindowing {
         note.reserveCapacity((outFrames + C.keptFramesPerWindow) * p)
         onset.reserveCapacity((outFrames + C.keptFramesPerWindow) * p)
         var window = [Float](repeating: 0, count: C.windowSamples)
+        let silent = [Float](repeating: 0, count: C.windowFrames * p)
         var start = 0
         // `range(0, len(audio_original), hop_size)`; se para antes si ya hay fotogramas de sobra.
         while start < padded.count && note.count < outFrames * p {
@@ -87,7 +95,12 @@ enum BasicPitchWindowing {
                 padded.withUnsafeBufferPointer { src in w.baseAddress!.update(from: src.baseAddress! + start, count: n) }
                 (w.baseAddress! + n).update(repeating: 0, count: C.windowSamples - n)
             }
-            let out = try window.withUnsafeBufferPointer { try predictor.predict(window: $0) }
+            var peak: Float = 0
+            vDSP_maxmgv(window, 1, &peak, vDSP_Length(C.windowSamples))
+            // Ventana muda: el Core ML da basura (0/0 en `NormalizedLog`), la referencia ninguna nota.
+            let out = peak < C.silentWindowPeak
+                ? (note: silent, onset: silent)
+                : try window.withUnsafeBufferPointer { try predictor.predict(window: $0) }
             guard out.note.count == C.windowFrames * p, out.onset.count == C.windowFrames * p else {
                 throw TranscriptionError.model("salida de \(out.note.count)/\(out.onset.count) valores, se esperaban \(C.windowFrames * p)")
             }

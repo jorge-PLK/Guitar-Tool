@@ -15,7 +15,9 @@
 		212DF23661513325CC530C93 /* SectionGridBoxes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DB0C8591C493128500D41C1 /* SectionGridBoxes.swift */; };
 		22FB99040C9A3A5490D4AB8E /* ChordGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0287422B5C2A670824F3C9C5 /* ChordGrid.swift */; };
 		237146E8A1A54FDBAAE086BC /* ADTOF_FrameRNN_fp32.mlpackage.zip in Resources */ = {isa = PBXBuildFile; fileRef = B432A65725F572C008D34948 /* ADTOF_FrameRNN_fp32.mlpackage.zip */; };
+		265AE880404E2A99A10B671F /* TabSourceSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ED255B63A6CE55141F34E1B /* TabSourceSheet.swift */; };
 		2C2B9FE6AAC7B958F3E4A8F1 /* StudySession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 205EBA0C766248D3D5BA3D6D /* StudySession.swift */; };
+		35C0968915E0ED3A48851BF6 /* SongsterrProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF4274460A8109BE8F57B365 /* SongsterrProbe.swift */; };
 		367912D9D2B87FF85C3BD016 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B9A686802572ACB6B1A8CC04 /* Assets.xcassets */; };
 		3841A6F8CBB9E9D19DFD68CB /* TabKit in Frameworks */ = {isa = PBXBuildFile; productRef = D23158F59E97B35F583680BA /* TabKit */; };
 		41A89E8D66E34069176DF099 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6454D99769C07D228948A88A /* RootView.swift */; };
@@ -25,6 +27,7 @@
 		5B7C970A73829188FB47C9B4 /* BackingController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D4CF1DC9FDEAB554C9AD979 /* BackingController.swift */; };
 		6193C9D14BAEB11B56782763 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E90B1053A3471D11C92D139D /* AppModel.swift */; };
 		6EDCD951F3C93FFB3F0ED07D /* BackingTimeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = E27D5B253DA1C4343F39E6BA /* BackingTimeline.swift */; };
+		7350420DA384E14BC5BC3250 /* SongsterrWebLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC8960E0153E054AF7893480 /* SongsterrWebLoader.swift */; };
 		792E4D46568BA44D26D66655 /* Adapters.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF8F42FD35B0D453C6F9E5EA /* Adapters.swift */; };
 		81BC458247D35A333397C1ED /* Store in Frameworks */ = {isa = PBXBuildFile; productRef = 9AD0CD994C338902EF1497EC /* Store */; };
 		912BF217E571DAB8F8AAB440 /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C753425F92D8228D372C046A /* LibraryView.swift */; };
@@ -38,6 +41,7 @@
 		B5CFEE7DB885C39DD2CA1778 /* SourceKit in Frameworks */ = {isa = PBXBuildFile; productRef = CCAB4C8959EC7AC83B04E254 /* SourceKit */; };
 		BDAFFDDEBD44BCBB73461B60 /* GuitarBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F550F84CACA832D90C2AA5A /* GuitarBridge.swift */; };
 		C1E6534D276240792E8943B7 /* AudioDeviceMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCBB981D7D3174527E92BBED /* AudioDeviceMonitor.swift */; };
+		C54D8E50C3B9868A9288DA8C /* SongsterrPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3016A67AED03B38EE53DC2B /* SongsterrPreview.swift */; };
 		CD4EA14A1429A5610CC5182C /* AudioBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = E75DDB3F364F1B5378F62689 /* AudioBridge.swift */; };
 		CDD866DEEE759DF8CEB932EB /* AudioController.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC5E5FAEC08FEB5F90C75D18 /* AudioController.swift */; };
 		D8E41E9844B3FEFAEBBB7CB5 /* ExternalSources.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDE3261796229D3052B07781 /* ExternalSources.swift */; };
@@ -82,6 +86,7 @@
 		75A7F55F6E6CA6C725218127 /* ToneForgeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToneForgeApp.swift; sourceTree = "<group>"; };
 		79C26A34CF2A2EE92DE78434 /* alphaTab */ = {isa = PBXFileReference; lastKnownFileType = folder; name = alphaTab; path = Resources/alphaTab; sourceTree = SOURCE_ROOT; };
 		80314A23F60B85C95E45E709 /* BackingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackingView.swift; sourceTree = "<group>"; };
+		8ED255B63A6CE55141F34E1B /* TabSourceSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabSourceSheet.swift; sourceTree = "<group>"; };
 		9671A99E86917B93EDEFF6AC /* AudioKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = AudioKit; path = ../Packages/AudioKit; sourceTree = SOURCE_ROOT; };
 		A8AD8ABAB86887E41E7902FE /* GuitarOptionsViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuitarOptionsViews.swift; sourceTree = "<group>"; };
 		AA0F285BE0A6F852B7BC7958 /* BasicPitch_nmp.mlpackage.zip */ = {isa = PBXFileReference; lastKnownFileType = archive.zip; path = BasicPitch_nmp.mlpackage.zip; sourceTree = "<group>"; };
@@ -89,12 +94,15 @@
 		B9A686802572ACB6B1A8CC04 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B9D4AE74EA55983C1B4E52E0 /* LinkImportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkImportSheet.swift; sourceTree = "<group>"; };
 		BB2EA898094A818B3F3AD211 /* BackingRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackingRecord.swift; sourceTree = "<group>"; };
+		BC8960E0153E054AF7893480 /* SongsterrWebLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SongsterrWebLoader.swift; sourceTree = "<group>"; };
 		BCBB981D7D3174527E92BBED /* AudioDeviceMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioDeviceMonitor.swift; sourceTree = "<group>"; };
 		C753425F92D8228D372C046A /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
 		CC43CDA6D40FEAD57D19FD5F /* BTC_large_voca_fp16.mlpackage.zip */ = {isa = PBXFileReference; lastKnownFileType = archive.zip; path = BTC_large_voca_fp16.mlpackage.zip; sourceTree = "<group>"; };
 		CF8F42FD35B0D453C6F9E5EA /* Adapters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Adapters.swift; sourceTree = "<group>"; };
+		D3016A67AED03B38EE53DC2B /* SongsterrPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SongsterrPreview.swift; sourceTree = "<group>"; };
 		D3EE15103E9ACEAD7E554968 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		D7A71A84EB1D1CD867197AAC /* PlaylistImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaylistImport.swift; sourceTree = "<group>"; };
+		DF4274460A8109BE8F57B365 /* SongsterrProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SongsterrProbe.swift; sourceTree = "<group>"; };
 		E27D5B253DA1C4343F39E6BA /* BackingTimeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackingTimeline.swift; sourceTree = "<group>"; };
 		E75DDB3F364F1B5378F62689 /* AudioBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioBridge.swift; sourceTree = "<group>"; };
 		E7E70B03C10E548B408195F3 /* StudyBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudyBridge.swift; sourceTree = "<group>"; };
@@ -182,10 +190,14 @@
 				213A60E72DF3FE39FEB4049F /* SectionBoxes.swift */,
 				6DB0C8591C493128500D41C1 /* SectionGridBoxes.swift */,
 				29EE870241AE799869F0237A /* SettingsView.swift */,
+				D3016A67AED03B38EE53DC2B /* SongsterrPreview.swift */,
+				DF4274460A8109BE8F57B365 /* SongsterrProbe.swift */,
+				BC8960E0153E054AF7893480 /* SongsterrWebLoader.swift */,
 				E7E70B03C10E548B408195F3 /* StudyBridge.swift */,
 				205EBA0C766248D3D5BA3D6D /* StudySession.swift */,
 				63F5C61B6FFCA108DAA268DB /* TabController.swift */,
 				EF3EE85365F4B0C248777A3B /* TabScreen.swift */,
+				8ED255B63A6CE55141F34E1B /* TabSourceSheet.swift */,
 				EAEA335E596A6AF8C814ED10 /* TabWebHost.swift */,
 				D3EE15103E9ACEAD7E554968 /* Theme.swift */,
 				75A7F55F6E6CA6C725218127 /* ToneForgeApp.swift */,
@@ -394,10 +406,14 @@
 				0A291C78FBF19F1F7DC22927 /* SectionBoxes.swift in Sources */,
 				212DF23661513325CC530C93 /* SectionGridBoxes.swift in Sources */,
 				976B522F8C79F93AD139D6D1 /* SettingsView.swift in Sources */,
+				C54D8E50C3B9868A9288DA8C /* SongsterrPreview.swift in Sources */,
+				35C0968915E0ED3A48851BF6 /* SongsterrProbe.swift in Sources */,
+				7350420DA384E14BC5BC3250 /* SongsterrWebLoader.swift in Sources */,
 				987AAB0BD5B34F97B1B4E55F /* StudyBridge.swift in Sources */,
 				2C2B9FE6AAC7B958F3E4A8F1 /* StudySession.swift in Sources */,
 				DADFE91E1AC93A87A49A4C44 /* TabController.swift in Sources */,
 				B5AFB53CFD185141B8EB0DF8 /* TabScreen.swift in Sources */,
+				265AE880404E2A99A10B671F /* TabSourceSheet.swift in Sources */,
 				B13EA78FF7BC5B1E2CE6F382 /* TabWebHost.swift in Sources */,
 				E2387454B5475F6956E87AEF /* Theme.swift in Sources */,
 				134191F8B9AC4B09EE2E60EC /* ToneForgeApp.swift in Sources */,

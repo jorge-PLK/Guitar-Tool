@@ -52,6 +52,8 @@ struct TabContent: View {
     @Environment(AppModel.self) private var model
     @State private var tab: TabController?
     @State private var time = 0.0
+    @State private var spaceMonitor = SpaceKeyMonitor()
+    @State private var confirmAutomatic = false
     private let tick = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
 
     var body: some View {
@@ -73,14 +75,36 @@ struct TabContent: View {
             let t = TabController(session: session, ctl: ctl, modelStore: model.modelStore)
             tab = t
             t.installKeyMonitor()
+            #if DEBUG
+            let headless = model.options.tabSongsterr != nil
+            if headless || model.options.tabSongsterrSheet != nil { t.suppressAutoSearch = true }
+            if headless { await session.saveTabSource(nil) }
+            #endif
             t.start()
             #if DEBUG
             if let rate = model.options.rate { ctl.setRate(rate) }
+            if let id = model.options.tabSongsterr {
+                await t.runSongsterrHeadless(songId: id, summary: model.options.tabSummary)
+            } else if let id = model.options.tabSongsterrSheet {
+                await t.openPairingForCapture(songId: id)
+                return
+            }
             await t.waitUntilSettled()
             t.applyLaunchOptions(trackIndex: model.options.tabTrack, edit: model.options.tabEdit,
                                  listen: model.options.tabListen)
             if let url = model.options.tabExport { await t.exportGuitarPro(to: url) }
+            if headless, model.options.snapshot == nil { NSApp.terminate(nil) }
             #endif
+        }
+        .sheet(isPresented: Binding(get: { tab?.sourceSheetOpen ?? false },
+                                    set: { if !$0 { tab?.closeSourceSheet() } })) {
+            if let tab { TabSourceSheet(tab: tab) }
+        }
+        .confirmationDialog("¿Pasar a transcripción automática?", isPresented: $confirmAutomatic) {
+            Button("Pasar a automática", role: .destructive) { tab?.chooseAutomatic() }
+            Button("Cancelar", role: .cancel) {}
+        } message: {
+            Text("Se quitan las pistas de Songsterr y sus ediciones; las demás se transcriben del audio.")
         }
         .onChange(of: session.beats) { tab?.start() }
         .onReceive(tick) { _ in
@@ -88,7 +112,8 @@ struct TabContent: View {
             if t != time { time = t }
             tab?.updateCursor(time: t, follow: true)   // solo desplaza si el cursor sale de la vista (seek o reproducción)
         }
-        .onDisappear { tab?.close() }
+        .onAppear { spaceMonitor.install { [ctl] in ctl.togglePlay() } }
+        .onDisappear { tab?.close(); spaceMonitor.remove() }
     }
 
     // MARK: Cabecera
@@ -103,6 +128,7 @@ struct TabContent: View {
             }
             Spacer()
             if let tab {
+                sourceMenu(tab)
                 Button { tab.editMode.toggle() } label: {
                     Text("Editar notas")
                         .font(TF.body(13, tab.editMode ? .semibold : .medium))
@@ -119,6 +145,25 @@ struct TabContent: View {
                     .disabled(tab.phase != .ready || tab.score?.tracks.isEmpty != false)
             }
         }
+    }
+
+    /// Menú «Fuente» (mini-spec Fase 5b, «Recorrido» 5).
+    private func sourceMenu(_ tab: TabController) -> some View {
+        Menu {
+            Button("Buscar en Songsterr…") { tab.openSourceSheet() }
+            if tab.usesSongsterr {
+                Button("Cambiar emparejamiento…") { tab.reviewPairing() }
+            }
+            Button("Transcripción automática") {
+                if tab.usesSongsterr { confirmAutomatic = true } else { tab.chooseAutomatic() }
+            }
+            .disabled(tab.session.project.tabSource == .automatic)
+        } label: {
+            Text("Fuente: \(tab.sourceLabel)")
+        }
+        .menuStyle(.borderlessButton).fixedSize()
+        .font(TF.body(13, .medium)).foregroundStyle(TF.text2)
+        .disabled(tab.phase == .waitingAnalysis || tab.phase == .empty)
     }
 
     private func noticeBox(_ tab: TabController) -> some View {
@@ -203,7 +248,10 @@ struct TabContent: View {
                     Text("Afinación").foregroundStyle(TF.muted)
                     Picker("Afinación", selection: Binding(get: { tuning.preset },
                                                            set: { tab.setTuning($0, trackID: track.id) })) {
-                        ForEach(TuningPreset.allCases, id: \.self) { Text(TabController.tuningName($0)).tag($0) }
+                        ForEach(TuningPreset.fixed, id: \.self) { Text(TabController.tuningName($0)).tag($0) }
+                        if let custom = tab.customTuning(of: track) {
+                            Text(custom.customLabel).tag(TuningPreset.custom)
+                        }
                     }
                     .labelsHidden().frame(width: 170)
                 }
@@ -240,6 +288,18 @@ struct TabContent: View {
             }
             .padding(24).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background(TF.card.opacity(tab.entries.isEmpty ? 1 : 0))
+        case .choosingSource:
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Elige la fuente de la tablatura").font(TF.display(18))
+                Text("Songsterr trae la tablatura hecha por la comunidad; la transcripción automática sale del audio.")
+                    .foregroundStyle(TF.muted).fixedSize(horizontal: false, vertical: true)
+                HStack {
+                    Button("Buscar en Songsterr") { tab.openSourceSheet() }.buttonStyle(SecondaryButton(height: 34))
+                    Button("Transcribir automáticamente") { tab.chooseAutomatic() }.buttonStyle(SecondaryButton(height: 34))
+                }
+            }
+            .padding(24).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(TF.card)
         case .waitingAnalysis:
             message("Esperando el análisis del tema",
                     "La tablatura necesita los compases y pulsos del análisis. Puedes lanzarlo desde Backing track.",
@@ -263,7 +323,9 @@ struct TabContent: View {
 
     private func footer(_ tab: TabController) -> some View {
         HStack {
-            Text(tab.flash ?? tab.selectionSummary ?? "Transcripción automática · revisa y corrige si hace falta")
+            Text(tab.flash ?? tab.selectionSummary ?? (tab.selectedTrack?.imported != nil
+                                                     ? "Tablatura de Songsterr · revisa y corrige si hace falta"
+                                                     : "Transcripción automática · revisa y corrige si hace falta"))
                 .foregroundStyle(tab.flash == nil ? TF.muted : TF.accent)
                 .lineLimit(1)
             Spacer()
@@ -319,7 +381,6 @@ struct TabContent: View {
                     .frame(width: 52, height: 52).background(TF.accent, in: Circle())
             }
             .buttonStyle(.plain)
-            .keyboardShortcut(.space, modifiers: [])
             .accessibilityLabel(ctl.isPlaying ? "Pausar" : "Reproducir")
 
             (Text(Fmt.clock(time)).foregroundStyle(TF.text) + Text(" / \(Fmt.clock(ctl.duration))").foregroundStyle(TF.muted))
