@@ -24,3 +24,6 @@ Probes/*/*/out/
 
 # Helpers embebidos (yt-dlp, Deno, ffmpeg): se regeneran con Tools/helpers/*.sh
 Vendor/helpers/
+
+# Local secrets (Spotify Web API keys)
+.env

@@ -5,7 +5,7 @@ App de escritorio para macOS (Swift/SwiftUI) que iguala el tono de un tema reamp
 ## Estado actual
 
 Fases 5 · Tablatura (ADR-016), 5b · Tablatura de Songsterr (ADR-017) y 6 · Grabación con vídeo (ADR-015) cerradas y juntas en la rama `fase-7`.
-En curso: Fase 7 · Montaje (`fase-7`). Siguiente: Fase 5c · Interfaz de la tablatura (rama desde `fase-5b`).
+En curso: Fase 7 · Montaje (`fase-7`). Siguiente: Fase 7b · Retoques de interfaz (rama desde `fase-7`, lista en `docs/plan.md`); después, Fase 5c.
 P1, P3 y P5 quedan para el comienzo de la Etapa 2.
 
 ## Contexto: leer solo lo que haga falta
