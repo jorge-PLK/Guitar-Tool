@@ -17,6 +17,9 @@
  *            "tuplet": 3 | [3, 2],         // optional; 3 = eighth triplet (3 in the time of 2)
  *            "notes": [ { "s": 0, "f": 5 } ],   // pitched: string index (0 = lowest) and fret
  *            "hits": [ 35, 42 ] }               // drums: GM percussion numbers (35 36 38 42 47 49 ...)
+ *   Techniques (Fase 5b, all optional, alphaTab names): note "t" = { pm, lr, hp, dead, ghost, stac: true; vib: "slight"|"wide";
+ *   bend: {type, pts: [[pos 0..60, quarterTones]]}; sin: slide in; sout: slide out; harm: {type, fret}; acc: "normal"|"heavy"|"tenuto" };
+ *   beat: tap: true, trem: 8|16|32, whammy: {type, pts}, pick: "down"|"up", brush: "down"|"up", grace: "beforeBeat"|"onBeat"|"bendGrace" (the beat is a grace-note beat, no time of its own; several in a row = a rake, each with its notes on their strings), ghosts: [GM] (subset of hits), accents: {"GM": "normal"|"heavy"|"tenuto"} (subset of hits).
  *   A beat with neither "notes" nor "hits" is a rest. "tempo" is in quarter notes per minute;
  *   an automation is written only when it differs from the previous bar (the first bar always).
  *   "start" (seconds of the bar in the song) is optional and only used by setCursorTime.
@@ -38,6 +41,7 @@
     36: ['Kick Drum', 7, 36, 57508, 57507, 57506, -1, 0],
     38: ['Snare', 3, 38, 57508, 57507, 57506, -1, 0],
     42: ['Charley', -1, 42, 57513, 57513, 57513, -1, 0],
+    46: ['Charley', -1, 46, 57523, 57523, 57523, -1, 0], // open hi-hat (Fase 5b), "Hi-Hat (open)" in GP
     47: ['Tom Medium', 4, 47, 57508, 57507, 57506, -1, 0],
     49: ['Crash High', -2, 49, 57592, 57592, 57592, -1, 0],
   };
@@ -185,10 +189,13 @@
               beat.tupletNumerator = tp[0];
               beat.tupletDenominator = tp[1];
             }
+            if (bt.grace) beat.graceType = enumValue(model.GraceType, bt.grace, 'grace');
             voice.addBeat(beat);
             if (isDrums) {
               (bt.hits || []).forEach(function (gm) {
                 const note = new model.Note();
+                if ((bt.ghosts || []).indexOf(gm) >= 0) note.isGhost = true;
+                if (bt.accents && bt.accents[gm]) note.accentuated = enumValue(model.AccentuationType, bt.accents[gm], 'accent');
                 note.percussionArticulation = opts.drumsDefaultKit
                   ? gm
                   : track.getOrRegisterPercussionArticulation(makeArticulation(gm));
@@ -200,8 +207,10 @@
                 const note = new model.Note();
                 note.string = n.s + 1;
                 note.fret = n.f;
+                if (n.t) applyNoteTechniques(note, n.t);
                 beat.addNote(note);
               });
+              applyBeatTechniques(beat, bt);
             }
           });
         });
@@ -209,6 +218,64 @@
 
       score.finish(newSettings());
       return score;
+    }
+
+    function enumValue(type, name, what) {
+      const v = type[name.charAt(0).toUpperCase() + name.substr(1)];
+      if (v === undefined) throw new Error('Unknown ' + what + ': ' + name);
+      return v;
+    }
+
+    // La palanca usa WhammyType de alphaTab (Dive, Dip, Hold, Predive...) para cada tipo de curva.
+    const WHAMMY_OF_BEND = { custom: 'Custom', bend: 'Dive', release: 'Dive', bendRelease: 'Dip', hold: 'Hold',
+      prebend: 'Predive', prebendBend: 'PrediveDive', prebendRelease: 'PrediveDive' };
+
+    function applyNoteTechniques(note, t) {
+      if (t.pm) note.isPalmMute = true;
+      if (t.lr) note.isLetRing = true;
+      if (t.hp) note.isHammerPullOrigin = true; // alphaTab enlaza el destino al hacer finish()
+      if (t.dead) note.isDead = true;
+      if (t.ghost) note.isGhost = true;
+      if (t.stac) note.isStaccato = true;
+      if (t.vib) note.vibrato = enumValue(model.VibratoType, t.vib, 'vibrato');
+      if (t.sin) note.slideInType = enumValue(model.SlideInType, t.sin, 'slide in');
+      if (t.sout) note.slideOutType = enumValue(model.SlideOutType, t.sout, 'slide out');
+      if (t.acc) note.accentuated = enumValue(model.AccentuationType, t.acc, 'accent');
+      if (t.harm) {
+        note.harmonicType = enumValue(model.HarmonicType, t.harm.type, 'harmonic');
+        if (t.harm.fret != null) note.harmonicValue = t.harm.fret;
+      }
+      if (t.bend) {
+        note.bendType = enumValue(model.BendType, t.bend.type, 'bend');
+        padBendPoints(t.bend.type, t.bend.pts).forEach(function (p) { note.addBendPoint(new model.BendPoint(p[0], p[1])); });
+      }
+    }
+
+    // alphaTab 1.9.0 dibuja bendRelease con bendPoints[0], [1] (cima) y [3] (final), como lo guarda Guitar Pro con la
+    // cima duplicada; los demas tipos (salvo custom) leen [0] y [1]. Con menos puntos revienta al dibujar
+    // ("t.bendPoints[3].value"). Si faltan, se duplica la cima en su posicion (la forma no cambia).
+    function padBendPoints(type, pts) {
+      const need = type === 'bendRelease' ? 4 : type === 'custom' ? 0 : 2;
+      const out = pts.map(function (p) { return [p[0], p[1]]; });
+      if (out.length === 1) out.push([60, out[0][1]]);
+      while (out.length > 0 && out.length < need) {
+        let top = 0;
+        out.forEach(function (p, i) { if (p[1] > out[top][1]) top = i; });
+        if (top === out.length - 1) top = Math.max(0, out.length - 2);
+        out.splice(top + 1, 0, out[top].slice());
+      }
+      return out;
+    }
+
+    function applyBeatTechniques(beat, bt) {
+      if (bt.tap) beat.tap = true;
+      if (bt.trem) beat.tremoloSpeed = bt.trem;
+      if (bt.pick) beat.pickStroke = enumValue(model.PickStroke, bt.pick, 'pick stroke');
+      if (bt.brush) beat.brushType = bt.brush === 'up' ? model.BrushType.BrushUp : model.BrushType.BrushDown;
+      if (bt.whammy) {
+        beat.whammyBarType = model.WhammyType[WHAMMY_OF_BEND[bt.whammy.type]];
+        bt.whammy.pts.forEach(function (p) { beat.addWhammyBarPoint(new model.BendPoint(p[0], p[1])); });
+      }
     }
 
     function setTuning(staff, highToLow) {
@@ -364,14 +431,17 @@
       const tick = Math.max(0, Math.min(1, fraction)) * barTicks;
       // MasterBarBounds -> bars[] (una por pista dibujada) -> beats[] (BeatBounds con `beat` y `onNotesX`).
       const barBounds = mbb.bars && mbb.bars.length ? mbb.bars[0] : null;
-      const beats = barBounds && barBounds.beats ? barBounds.beats : [];
+      const beats = (barBounds && barBounds.beats ? barBounds.beats : []).filter(function (bb) {
+        return !bb.beat.graceType; // los beats de adorno no tienen tiempo propio
+      });
       let x = mbb.realBounds.x;
       let top = mbb.visualBounds.y;
       let height = mbb.visualBounds.h;
       for (let i = 0; i < beats.length; i++) {
         const b = beats[i];
-        const start = b.beat.playbackStart - mb.start;
-        const end = i + 1 < beats.length ? beats[i + 1].beat.playbackStart - mb.start : barTicks;
+        // beat.playbackStart ya es relativo al compas (0 en el primer pulso de cada compas), no al inicio de la cancion.
+        const start = b.beat.playbackStart;
+        const end = i + 1 < beats.length ? beats[i + 1].beat.playbackStart : barTicks;
         const bx = b.onNotesX;
         const nx = i + 1 < beats.length ? beats[i + 1].onNotesX : mbb.realBounds.x + mbb.realBounds.w;
         if (tick >= start || i === 0) {

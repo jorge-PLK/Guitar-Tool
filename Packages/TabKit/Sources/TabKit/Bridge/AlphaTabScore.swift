@@ -38,13 +38,41 @@ public enum AlphaTabExporter {
     // MARK: JSON (esquema v1 de tf-bridge.js)
 
     private struct JBar: Encodable { var num: Int; var den: Int; var tempo: Double; var start: Double }
-    private struct JNote: Encodable { var s: Int; var f: Int }
+    private struct JBend: Encodable { var type: String; var pts: [[Int]] }
+    private struct JHarmonic: Encodable { var type: String; var fret: Double? }
+    /// Técnicas por nota (claves cortas, ver cabecera de tf-bridge.js); solo las puestas.
+    private struct JTech: Encodable {
+        var pm: Bool?; var lr: Bool?; var hp: Bool?; var dead: Bool?; var ghost: Bool?; var stac: Bool?
+        var vib: String?; var bend: JBend?; var sin: String?; var sout: String?
+        var harm: JHarmonic?; var acc: String?
+
+        var isBlank: Bool {
+            pm == nil && lr == nil && hp == nil && dead == nil && ghost == nil && stac == nil && vib == nil
+                && bend == nil && sin == nil && sout == nil && harm == nil && acc == nil
+        }
+    }
+    /// Figura por defecto de una nota de adorno (fusa, como en Guitar Pro).
+    static let graceDefaultDuration = 32
+
+    private struct JNote: Encodable { var s: Int; var f: Int; var t: JTech? }
     private struct JBeat: Encodable {
         var d: Int
         var dots: Int?
         var tuplet: Int?
         var notes: [JNote]?
         var hits: [Int]?
+        /// Golpes de `hits` que son fantasma.
+        var ghosts: [Int]?
+        /// Golpes de `hits` acentuados: nota GM (como texto) → `AccentuationType`.
+        var accents: [String: String]?
+        // Técnicas que alphaTab guarda por beat (subidas desde las notas del acorde).
+        var tap: Bool?
+        var trem: Int?
+        var whammy: JBend?
+        var pick: String?
+        var brush: String?
+        /// Beat de adorno (`Beat.graceType`): sin tiempo en la rejilla, va antes del beat de su nota principal.
+        var grace: String?
     }
     private struct JTrack: Encodable {
         var name: String
@@ -82,6 +110,26 @@ public enum AlphaTabExporter {
         encoder.outputFormatting = [.sortedKeys]
         let data = try encoder.encode(JScore(title: title, artist: artist, bars: bars, tracks: jtracks))
         return AlphaTabScore(json: String(decoding: data, as: UTF8.self), trackIDs: score.tracks.map(\.id), beats: maps)
+    }
+
+    // MARK: Técnicas
+
+    /// Guitar Pro 7 guarda como mucho 4 puntos por curva de bend o palanca.
+    static let maxBendPoints = 4
+
+    private static func jBend(_ b: TabBend) -> JBend {
+        let s = b.simplified(maxPoints: maxBendPoints).paddedForAlphaTab()
+        return JBend(type: s.type.rawValue, pts: s.points.map { [$0.position, $0.value] })
+    }
+
+    private static func jTech(_ t: TabTechniques) -> JTech? {
+        let j = JTech(pm: t.palmMute ? true : nil, lr: t.letRing ? true : nil, hp: t.hammerPull ? true : nil,
+                     dead: t.dead ? true : nil, ghost: t.ghost ? true : nil, stac: t.staccato ? true : nil,
+                     vib: t.vibrato?.rawValue, bend: t.bend.map(jBend), sin: t.slideIn?.rawValue,
+                     sout: t.slideOut?.rawValue,
+                     harm: t.harmonic.map { JHarmonic(type: $0.type.rawValue, fret: $0.fret) },
+                     acc: t.accent?.rawValue)
+        return j.isBlank ? nil : j
     }
 
     // MARK: Compás a pulsos de alphaTab
@@ -127,17 +175,61 @@ public enum AlphaTabExporter {
     private static func convertBar(track: TabTrack, bar: TabBar, score: TabScore) -> ([JBeat], [AlphaTabBeatRef]) {
         let barStart = bar.firstBeat * TabScore.ticksPerBeat
         let barEnd = barStart + bar.beatCount * TabScore.ticksPerBeat
+        let stringCount = track.tuning?.strings.count ?? 0
         var beats: [JBeat] = []
         var refs: [AlphaTabBeatRef] = []
 
-        func emit(_ piece: Piece, at start: Int, notes: [(string: Int, fret: Int, id: Int)] = [], hits: [DrumPiece] = []) {
+        func emit(_ piece: Piece, at start: Int, notes: [(string: Int, fret: Int, id: Int, tech: TabTechniques)] = [],
+                  hits: [DrumPiece] = [], ghostHits: [DrumPiece] = [], accents: [DrumPiece: TabAccent] = [:],
+                  drumGraces: [(piece: DrumPiece, grace: TabGrace)] = []) {
+            // Notas de adorno: un beat de adorno por `step`, del más lejano al inmediatamente anterior, cada nota en su
+            // cuerda (longitud 0 en el mapa; un clic en una elige la nota principal que la lleva).
+            let graces = notes.flatMap { n in
+                n.tech.graces.map { g in
+                    (s: g.string.map { jsonString(forScoreString: $0, stringCount: stringCount) } ?? n.string, id: n.id, g: g)
+                }
+            }.filter { (0..<stringCount).contains($0.s) }
+            for step in Set(graces.map(\.g.step)).sorted(by: >) {
+                var inStep: [(s: Int, id: Int, g: TabGrace)] = []
+                for x in graces where x.g.step == step && !inStep.contains(where: { $0.s == x.s }) { inStep.append(x) }
+                inStep.sort { $0.s < $1.s }
+                let jg = JBeat(d: inStep[0].g.duration ?? AlphaTabExporter.graceDefaultDuration, notes: inStep.map { x in
+                    var t = JTech()
+                    t.dead = x.g.dead ? true : nil
+                    t.hp = x.g.hammerPull ? true : nil
+                    t.sout = x.g.slide ? TabSlideOut.legato.rawValue : nil
+                    return JNote(s: x.s, f: x.g.fret, t: t.isBlank ? nil : t)
+                }, grace: inStep[0].g.type.rawValue)
+                beats.append(jg)
+                refs.append(AlphaTabBeatRef(start: GridPoint(absoluteTick: start), length: 0,
+                                            noteIDs: Dictionary(inStep.map { ($0.s, $0.id) }, uniquingKeysWith: { a, _ in a }),
+                                            pieces: []))
+            }
+            if let first = drumGraces.first {
+                // Flam: beat de adorno con la nota de percusión del adorno (o la del propio golpe si no es una pieza conocida).
+                let gm = drumGraces.map { DrumPiece(rawValue: $0.grace.fret) ?? $0.piece }
+                beats.append(JBeat(d: first.grace.duration ?? AlphaTabExporter.graceDefaultDuration,
+                                   hits: gm.map(\.rawValue), grace: first.grace.type.rawValue))
+                refs.append(AlphaTabBeatRef(start: GridPoint(absoluteTick: start), length: 0, noteIDs: [:],
+                                            pieces: drumGraces.map(\.piece)))
+            }
             var jb = JBeat(d: piece.d, dots: piece.dots > 0 ? piece.dots : nil, tuplet: piece.tuplet)
             var ids: [Int: Int] = [:]
             if !notes.isEmpty {
-                jb.notes = notes.map { JNote(s: $0.string, f: $0.fret) }
+                jb.notes = notes.map { JNote(s: $0.string, f: $0.fret, t: jTech($0.tech)) }
                 for n in notes { ids[n.string] = n.id }
+                let techs = notes.map(\.tech)
+                jb.tap = techs.contains { $0.tapping } ? true : nil
+                jb.trem = techs.lazy.compactMap(\.tremoloPicking).first?.rawValue
+                jb.whammy = techs.lazy.compactMap(\.whammy).first.map(jBend)
+                jb.pick = techs.lazy.compactMap(\.pickStroke).first?.rawValue
+                jb.brush = techs.lazy.compactMap(\.brush).first?.rawValue
             }
             if !hits.isEmpty { jb.hits = hits.map(\.rawValue) }
+            if !ghostHits.isEmpty { jb.ghosts = ghostHits.map(\.rawValue) }
+            if !accents.isEmpty {
+                jb.accents = Dictionary(uniqueKeysWithValues: accents.map { (String($0.key.rawValue), $0.value.rawValue) })
+            }
             beats.append(jb)
             refs.append(AlphaTabBeatRef(start: GridPoint(absoluteTick: start), length: piece.length,
                                         noteIDs: ids, pieces: hits))
@@ -153,11 +245,16 @@ public enum AlphaTabExporter {
         }
 
         // Grupos de ataques del compás: (tick, notas o piezas).
-        struct Group { var tick: Int; var notes: [TabNote]; var hits: [DrumPiece] }
+        struct Group { var tick: Int; var notes: [TabNote]; var hits: [DrumPiece]; var ghosts: [DrumPiece] = []
+                      var accents: [DrumPiece: TabAccent] = [:]
+                      var graces: [(piece: DrumPiece, grace: TabGrace)] = [] }
         var groups: [Int: Group] = [:]
         if track.kind == .drums {
             for h in track.hits where (barStart..<barEnd).contains(h.at.absoluteTick) {
                 groups[h.at.absoluteTick, default: Group(tick: h.at.absoluteTick, notes: [], hits: [])].hits.append(h.piece)
+                if h.ghost { groups[h.at.absoluteTick]?.ghosts.append(h.piece) }
+                if let a = h.accent { groups[h.at.absoluteTick]?.accents[h.piece] = a }
+                if let g = h.grace { groups[h.at.absoluteTick]?.graces.append((h.piece, g)) }
             }
         } else {
             for n in track.notes where (barStart..<barEnd).contains(n.start.absoluteTick) {
@@ -181,14 +278,69 @@ public enum AlphaTabExporter {
             }
             let piece = pickPiece(at: g.tick, atMost: max(wanted, 1), track: track)
             let count = track.tuning?.strings.count ?? 0
-            let notes = g.notes.sorted { $0.string > $1.string }.compactMap { n -> (Int, Int, Int)? in
+            let notes = g.notes.sorted { $0.string > $1.string }.compactMap { n -> (string: Int, fret: Int, id: Int, tech: TabTechniques)? in
                 guard let fret = track.fret(of: n) else { return nil }
-                return (jsonString(forScoreString: n.string, stringCount: count), fret, n.id)
+                return (jsonString(forScoreString: n.string, stringCount: count), fret, n.id, n.techniques)
             }
-            emit(piece, at: g.tick, notes: notes, hits: g.hits.sorted { $0.rawValue < $1.rawValue })
+            emit(piece, at: g.tick, notes: notes, hits: g.hits.sorted { $0.rawValue < $1.rawValue },
+                 ghostHits: g.ghosts.sorted { $0.rawValue < $1.rawValue }, accents: g.accents,
+                 drumGraces: g.graces.sorted { $0.piece.rawValue < $1.piece.rawValue })
             cursor = g.tick + piece.length
         }
         if cursor < barEnd { fillRests(from: cursor, to: barEnd) }
         return (beats, refs)
+    }
+}
+
+extension TabBend {
+    /// Puntos que alphaTab 1.9.0 lee por tipo al dibujar (`BendNoteHeadGroupGlyph`/`TabBendGlyph`, `bendPoints[i]`):
+    /// bend-release lee el 0, el 1 (la cima) y el 3 (el final), como lo guarda Guitar Pro con la cima duplicada; los
+    /// demás tipos (salvo custom, que los recorre) leen el 0 y el 1.
+    static func alphaTabMinimumPoints(_ kind: Kind) -> Int {
+        switch kind {
+        case .bendRelease: 4
+        case .custom: 0
+        default: 2
+        }
+    }
+
+    /// La curva con los puntos que alphaTab espera para su tipo: si faltan, se duplica la cima (el primer punto de
+    /// valor máximo) en su misma posición, como hace Guitar Pro; la forma no cambia.
+    func paddedForAlphaTab() -> TabBend {
+        var pts = points
+        guard let first = pts.first else { return self }
+        if pts.count == 1 { pts.append(TabBendPoint(position: TabBend.maxPosition, value: first.value)) }
+        while pts.count < Self.alphaTabMinimumPoints(type) {
+            let top = pts.indices.max { pts[$0].value < pts[$1].value || (pts[$0].value == pts[$1].value && $0 > $1) }!
+            // La cima no es el último punto: el final queda en el índice 3.
+            let peak = top == pts.count - 1 ? max(0, pts.count - 2) : top
+            pts.insert(pts[peak], at: peak + 1)
+        }
+        return TabBend(type: type, points: pts)
+    }
+
+    /// Curva con como mucho `maxPoints` puntos, conservando el tipo, el primero, el último y los puntos que más
+    /// separan la curva de la recta entre los conservados (los picos primero).
+    func simplified(maxPoints: Int) -> TabBend {
+        guard points.count > maxPoints, maxPoints >= 2 else { return self }
+        var keep: Set<Int> = [0, points.count - 1]
+        while keep.count < maxPoints {
+            let sorted = keep.sorted()
+            var best: (index: Int, error: Double)?
+            for (a, b) in zip(sorted, sorted.dropFirst()) {
+                let pa = points[a], pb = points[b]
+                for i in (a + 1)..<b {
+                    let p = points[i]
+                    let span = Double(pb.position - pa.position)
+                    let t = span == 0 ? 0 : Double(p.position - pa.position) / span
+                    let line = Double(pa.value) + t * Double(pb.value - pa.value)
+                    let err = abs(Double(p.value) - line)
+                    if best == nil || err > best!.error { best = (i, err) }
+                }
+            }
+            guard let b = best else { break }
+            keep.insert(b.index)
+        }
+        return TabBend(type: type, points: keep.sorted().map { points[$0] })
     }
 }

@@ -119,9 +119,9 @@ public struct TabEditor: Sendable {
             else { throw TabEditError.invalidPosition }
             let hit = TabDrumHit(piece: piece, at: point)
             if present {
-                if !track.hits.contains(hit) { track.hits.append(hit) }
+                if !track.hits.contains(where: { $0.isSameHit(as: hit) }) { track.hits.append(hit) }
             } else {
-                track.hits.removeAll { $0 == hit }
+                track.hits.removeAll { $0.isSameHit(as: hit) }
             }
             track.sortContents()
         }

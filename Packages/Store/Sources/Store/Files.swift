@@ -125,6 +125,16 @@ public struct ProjectLayout: Sendable, Equatable {
     public var tabDir: URL { folder.appendingPathComponent("tab", isDirectory: true) }
     public var tabScoreFile: URL { tabDir.appendingPathComponent("score.json") }
     public var tabCacheDir: URL { cacheDir.appendingPathComponent("tab", isDirectory: true) }
+    /// Rejilla del metrónomo corregida desde Songsterr (pulsos y downbeats, con `songId` y `revisionId`): manda sobre la
+    /// del análisis mientras `Project.tabSource` sea ese tema de Songsterr. Va con `score.json` (no es caché: rehacerla
+    /// pide descargar y alinear otra vez).
+    public var tabSongsterrGridFile: URL { tabDir.appendingPathComponent("songsterr-grid.json") }
+    /// Pistas crudas de Songsterr (mini-spec Fase 5b, «Datos»): regenerables, entran en la limpieza con `cache/`.
+    public var songsterrCacheDir: URL { cacheDir.appendingPathComponent("songsterr", isDirectory: true) }
+    public func songsterrCacheDir(songId: Int, revisionId: Int) -> URL {
+        songsterrCacheDir.appendingPathComponent("\(songId)", isDirectory: true)
+            .appendingPathComponent("\(revisionId)", isDirectory: true)
+    }
     public func tabSynthURL(trackID: String) -> URL { tabCacheDir.appendingPathComponent("synth_\(trackID).wav") }
 
     /// Salida provisional del paso de guitarras.

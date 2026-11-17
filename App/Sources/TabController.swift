@@ -3,6 +3,7 @@ import AudioKit
 import Foundation
 import ModelKit
 import Observation
+import SourceKit
 import Store
 import TabKit
 import UniformTypeIdentifiers
@@ -28,6 +29,18 @@ final class TabController {
         case working
         case ready
         case failed(String)
+        /// `Project.tabSource == nil`: falta elegir entre Songsterr y la transcripción automática (mini-spec Fase 5b).
+        case choosingSource
+    }
+
+    /// Paso de la hoja «Tablatura de Songsterr».
+    enum ImportStage: Equatable {
+        /// Resultados de la búsqueda (estado en `lookup`).
+        case choosing
+        case working(String)
+        /// Lista de emparejamiento stem -> pista de Songsterr (estado en `plan`).
+        case pairing
+        case failed(SongsterrIssue)
     }
 
     enum SynthState: Equatable { case rendering, ready, failed(String) }
@@ -67,10 +80,25 @@ final class TabController {
     private(set) var webError: String?
     private(set) var rendered = false
 
+    // Fuente de la tablatura (mini-spec Fase 5b, «Recorrido»).
+    private(set) var sourceSheetOpen = false
+    private(set) var importStage: ImportStage = .choosing
+    private(set) var lookup: SongsterrLookup?
+    /// Emparejamiento propuesto, editable con `setPairing` mientras `importStage == .pairing`.
+    private(set) var plan: SongsterrImportPlan?
+    /// Solo DEBUG (`--tab-songsterr`): no abre la hoja ni busca sola cuando falta la fuente.
+    var suppressAutoSearch = false
+
     @ObservationIgnored private let modelStore: ModelStore
     @ObservationIgnored private var sources: [TabSource] = []
     @ObservationIgnored private var alpha: AlphaTabScore?
     @ObservationIgnored private var started = false
+    @ObservationIgnored private var importTask: Task<Void, Never>?
+    @ObservationIgnored private var pairingsToKeep: [TabStemPairing]?
+    /// Rejilla del metrónomo de la importación en curso (se guarda al aceptar) y pulsos preparados (para el resumen).
+    @ObservationIgnored private var meterGrid: SongsterrMeterGrid?
+    @ObservationIgnored private var preparedBeats: SongsterrPreparedBeats?
+    @ObservationIgnored private lazy var client = SongsterrClient(loader: SongsterrWebLoader())
     @ObservationIgnored private var work: Task<Void, Never>?
     @ObservationIgnored private var saveTask: Task<Void, Never>?
     @ObservationIgnored private var flashTask: Task<Void, Never>?
@@ -101,12 +129,20 @@ final class TabController {
         return score?.tracks.first { $0.id == id }
     }
 
-    /// Compás más frecuente de la partitura («4/4») y tempo del tema (`BeatGrid.bpm` del análisis, entero) para la cabecera.
+    /// Compás más frecuente de la partitura («4/4») y tempo del tema para la cabecera: con Songsterr, el tempo escrito
+    /// que más pulsos ocupa en la partitura; si no, `BeatGrid.bpm` del análisis (entero).
     var headerSummary: String? {
         guard let score, !score.bars.isEmpty else { return nil }
         var counts: [String: Int] = [:]
         for b in score.bars { counts["\(b.beatCount)/\(b.beatUnit)", default: 0] += 1 }
         let meter = counts.max { ($0.value, $1.key) < ($1.value, $0.key) }?.key ?? "4/4"
+        if usesSongsterr {
+            var beats: [Double: Int] = [:]
+            for b in score.bars { beats[b.tempo, default: 0] += b.beatCount }
+            if let written = beats.max(by: { ($0.value, $1.key) < ($1.value, $0.key) })?.key {
+                return "\(meter) · \(Int(written)) BPM"
+            }
+        }
         guard let bpm = session.beats?.bpm else { return meter }
         return "\(meter) · \(Int(bpm.rounded())) BPM"
     }
@@ -130,41 +166,51 @@ final class TabController {
         let folder = layout.folder
         sources = session.project.tabSources { FileManager.default.fileExists(atPath: folder.appendingPathComponent($0).path) }
         guard !sources.isEmpty else { phase = .empty; return }
+        guard let choice = session.project.tabSource else { askForSource(); return }
         do {
             var score = try TabScore(beatTimes: times, duration: session.project.song.duration)
+            let saved = Self.loadSaved(layout.tabScoreFile).flatMap { $0.formatVersion == score.formatVersion ? $0 : nil }
+            let importedSaved = saved?.tracks.filter { $0.imported != nil } ?? []
+            // Stems que transcribe la automática: todos, o solo los sin pareja si la fuente es Songsterr (decisión 4).
+            var autoIDs = sources.map(\.id)
+            var kept: [TabTrack] = []
             var redone: [String] = []
-            if let saved = Self.loadSaved(layout.tabScoreFile), saved.formatVersion == score.formatVersion {
-                if saved.bars == score.bars && saved.beats == score.beats {
-                    score.tracks = saved.tracks
-                } else if !saved.tracks.isEmpty {
-                    // La rejilla cambió (otro análisis): las posiciones ya no valen, se rehacen todas.
-                    redone = saved.tracks.filter { t in sources.contains { $0.id == t.id } }.map(\.name)
+            if case .songsterr = choice {
+                guard let saved, !importedSaved.isEmpty else { askForSource(); return }
+                autoIDs = autoIDs.filter { !choice.importsSongsterr(forStem: $0) }
+                // La rejilla es la de Songsterr, ya alineada con el audio: se conserva tal cual.
+                score = saved
+                kept = saved.tracks.filter { $0.imported == nil }
+                score.tracks = importedSaved
+            } else if let saved {
+                let current = score
+                if saved.bars == current.bars && saved.beats == current.beats {
+                    kept = saved.tracks.filter { $0.imported == nil }
+                } else {
+                    // La rejilla cambió (otro análisis) o venía de Songsterr: las posiciones ya no valen, se rehacen todas.
+                    redone = saved.tracks.filter { t in t.imported == nil && sources.contains { $0.id == t.id } }.map(\.name)
                 }
             }
+            kept.removeAll { !autoIDs.contains($0.id) }
             var fingerprints: [(id: String, fingerprint: TrackSourceFingerprint)] = []
-            for s in sources {
+            for s in sources where autoIDs.contains(s.id) {
                 let fp = try TrackSourceFingerprint.of(fileAt: folder.appendingPathComponent(s.relativePath), path: s.relativePath,
                                                        modelVersion: Self.modelVersion(of: s.kind))
                 fingerprints.append((s.id, fp))
             }
-            let stale = score.staleness(current: fingerprints)
-            score.tracks.removeAll { stale.obsolete.contains($0.id) }
-            let hadBefore = Set(score.tracks.map(\.id))
-            for id in stale.needsTranscription where hadBefore.contains(id) {
-                if let t = score.tracks.first(where: { $0.id == id }) { redone.append(t.name) }
-            }
+            let needs = fingerprints.filter { item in kept.first { $0.id == item.id }?.source != item.fingerprint }.map(\.id)
+            for id in needs { if let t = kept.first(where: { $0.id == id }) { redone.append(t.name) } }
             // Una pista desfasada pierde sus ediciones; conserva solo la afinación elegida.
             var keptTuning: [String: Tuning] = [:]
-            for id in stale.needsTranscription {
-                if let t = score.tracks.first(where: { $0.id == id }), let tu = t.tuning { keptTuning[id] = tu }
-            }
-            score.tracks.removeAll { stale.needsTranscription.contains($0.id) }
+            for id in needs { if let tu = kept.first(where: { $0.id == id })?.tuning { keptTuning[id] = tu } }
+            kept.removeAll { needs.contains($0.id) }
+            score.tracks += kept
             // Los nombres editados de las guitarras se aplican sin transcribir.
             for i in score.tracks.indices {
                 if let s = source(of: score.tracks[i].id) { score.tracks[i].name = s.name }
             }
             editor = TabEditor(score: score)
-            queued = stale.needsTranscription
+            queued = needs
             if !redone.isEmpty {
                 notices.append("Se han rehecho: \(redone.joined(separator: ", ")). Su audio cambió, así que se perdieron las ediciones de esas pistas.")
             }
@@ -207,7 +253,7 @@ final class TabController {
                 let hits = try await drums!.transcribe(url: url) { [weak self] p in
                     Task { @MainActor in self?.progress[id] = p }
                 }
-                let onsets = hits.compactMap { h in DrumPiece(rawValue: h.midi).map { DrumOnset(time: h.time, piece: $0) } }
+                let onsets = DrumCymbalSeries.refine(hits).compactMap { h in DrumPiece(rawValue: h.midi).map { DrumOnset(time: h.time, piece: $0) } }
                 let track = TabTrackBuilder.drumTrack(id: id, name: s.name, source: fp, onsets: onsets, in: current.score)
                 current = replace(track, in: current)
             case .guitar, .bass:
@@ -282,6 +328,244 @@ final class TabController {
         if dirty { saveNow() }
     }
 
+    // MARK: Fuente de la tablatura (mini-spec Fase 5b)
+
+    /// Texto del menú «Fuente».
+    var sourceLabel: String {
+        switch session.project.tabSource {
+        case .songsterr?: "Songsterr"
+        case .automatic?: "Transcripción automática"
+        case nil: "Sin elegir"
+        }
+    }
+
+    var usesSongsterr: Bool {
+        if case .songsterr? = session.project.tabSource { return true }
+        return false
+    }
+
+    private func askForSource() {
+        phase = .choosingSource
+        if !suppressAutoSearch { openSourceSheet() }
+    }
+
+    /// Abre la hoja con la búsqueda por artista y título del proyecto (la lanza si aún no se hizo).
+    func openSourceSheet() {
+        if lookup == nil { lookup = SongsterrLookup(service: client) }
+        importTask?.cancel()
+        plan = nil
+        importStage = .choosing
+        sourceSheetOpen = true
+        if lookup?.phase == .idle { search() }
+    }
+
+    func search() {
+        let song = session.project.song
+        Task { [weak self] in await self?.lookup?.search(artist: song.artist ?? "", title: song.title) }
+    }
+
+    func retrySearch() { Task { [weak self] in await self?.lookup?.retry() } }
+    func select(songId: Int) { Task { [weak self] in await self?.lookup?.select(songId) } }
+    func submitLink() { Task { [weak self] in await self?.lookup?.submitLink() } }
+
+    func closeSourceSheet() {
+        importTask?.cancel()
+        sourceSheetOpen = false
+        plan = nil
+        importStage = .choosing
+    }
+
+    /// «Usar esta»: descarga las pistas del resultado marcado, las alinea y propone el emparejamiento.
+    func useSelectedSong() {
+        guard let song = lookup?.selectedSong else { return }
+        beginImport(songId: song.songId, song: song, keeping: nil)
+    }
+
+    /// Menú «Fuente» > «Cambiar emparejamiento…»: lee otra vez el tema elegido y vuelve a proponer con lo ya elegido.
+    func reviewPairing() {
+        guard case let .songsterr(songId, _, pairings)? = session.project.tabSource else { return }
+        beginImport(songId: songId, song: nil, keeping: pairings)
+    }
+
+    func retryImport() {
+        guard let r = lastImport else { return }
+        beginImport(songId: r.songId, song: r.song, keeping: r.keeping)
+    }
+
+    func backToResults() {
+        importTask?.cancel()
+        plan = nil
+        importStage = .choosing
+    }
+
+    @ObservationIgnored private var lastImport: (songId: Int, song: SongsterrSong?, keeping: [TabStemPairing]?)?
+
+    func beginImport(songId: Int, song: SongsterrSong?, keeping: [TabStemPairing]?) {
+        importTask?.cancel()
+        lastImport = (songId, song, keeping)
+        plan = nil
+        sourceSheetOpen = true
+        importStage = .working(song == nil ? "Leyendo Songsterr…" : "Descargando pistas de Songsterr…")
+        importTask = Task { [weak self] in await self?.runImport() }
+    }
+
+    /// Roles de stem con los que el alineador mide cada fuente (`TabSource.id` -> `SongsterrStemRole`).
+    static func role(of source: TabSource) -> SongsterrStemRole {
+        switch source.id {
+        case "guitar-left": .guitarLeft
+        case "guitar-right": .guitarRight
+        case "guitar-lead": .guitarLead
+        case "bass": .bass
+        case "drums": .drums
+        default: .guitar   // «guitar» y «guitar-rhythm»
+        }
+    }
+
+    static func slotKind(_ k: TabSource.Kind) -> TabTrackKind {
+        switch k {
+        case .guitar: .guitar
+        case .bass: .bass
+        case .drums: .drums
+        }
+    }
+
+    static func issue(for error: Error) -> SongsterrIssue {
+        if error is SongsterrFormatError { return .formatChanged }
+        if let a = error as? SongsterrAlignmentError, a == .nothingToAlign {
+            return .other("Ninguna pista de guitarra o bajo de Songsterr se pudo medir con el audio del tema.")
+        }
+        return SongsterrIssue(error)
+    }
+
+    private func runImport() async {
+        guard let req = lastImport, let g = session.beats else { return }
+        do {
+            let song: SongsterrSong
+            if let s = req.song { song = s } else { song = try await client.song(songId: req.songId) }
+            importStage = .working("Descargando pistas de Songsterr…")
+            let dir = layout.songsterrCacheDir(songId: song.songId, revisionId: song.revisionId)
+            let files = try await client.downloadTracks(song.tracks, to: dir)
+            importStage = .working("Alineando con el audio…")
+            // (Sin nombrar el tipo: `SongsterrTrack` existe en SourceKit y en TabKit.)
+            let tracks = try song.tracks.map { t in
+                guard let f = files[t.partId] else { throw SongsterrError.unknownFormat("pista \(t.partId)") }
+                var c = try SongsterrTrackConverter.convert(try Data(contentsOf: f), isDrums: t.isDrums)
+                c.songId = song.songId
+                c.revisionId = song.revisionId
+                c.partId = t.partId
+                if !t.name.isEmpty { c.name = t.name }
+                return c
+            }
+            let raw = BeatTimes(beats: g.beats, downbeats: g.downbeats, beatsPerBar: g.beatsPerBar)
+            // Pulsos llevados a negras de Songsterr (pliegue de doble o mitad de tempo, pulsos perdidos o sobrantes)
+            // ANTES de alinear; la rejilla del metrónomo sale de ellos.
+            let prepared = SongsterrBeatGrid.writtenTempo(tracks).map { SongsterrBeatGrid.prepare(raw, writtenTempo: $0) }
+            let times = prepared?.beats ?? raw
+            var stems: [SongsterrStemRole: URL] = [:]
+            for s in sources { stems[Self.role(of: s)] = layout.url(relative: s.relativePath) }
+            if stems[.guitar] == nil,
+               let full = session.project.stems.first(where: { $0.kind == .guitar && !$0.isEmpty }) {
+                stems[.guitar] = layout.url(relative: full.file)
+            }
+            let stemURLs = stems
+            let spans = session.sections.filter(\.isSolo).map { $0.start...$0.end }
+            let (alignment, grid) = try await Task.detached(priority: .userInitiated) {
+                let a = try SongsterrAligner.align(tracks: tracks, beats: times, stems: stemURLs, soloSpans: spans)
+                let grid = try prepared.map {
+                    try SongsterrBeatGrid.build(prepared: $0, tracks: tracks, alignment: a, drums: stemURLs[.drums])
+                }
+                return (a, grid)
+            }.value
+            try Task.checkCancellation()
+            meterGrid = grid
+            preparedBeats = prepared
+            let slots = sources.map { SongsterrStemSlot(id: $0.id, name: $0.name, kind: Self.slotKind($0.kind), role: Self.role(of: $0)) }
+            var proposal = SongsterrImportPlan(alignment: alignment, tracks: tracks, slots: slots,
+                                               songId: song.songId, revisionId: song.revisionId)
+            for p in req.keeping ?? [] {
+                // Secciones de solo: cada una con la guardada que empiece a menos de 1 s.
+                if let saved = p.solos, let current = proposal.assignment(for: p.stemID)?.solos {
+                    for (k, s) in current.enumerated() {
+                        guard let old = saved.first(where: { abs($0.start - s.span.lowerBound) < 1 }) else { continue }
+                        let track = old.partId.flatMap { id in tracks.firstIndex { $0.partId == id } }
+                        proposal.assign(stemID: p.stemID, solo: k, track: track)
+                    }
+                    continue
+                }
+                if let id = p.partId {
+                    if let i = tracks.firstIndex(where: { $0.partId == id }) { proposal.assign(stemID: p.stemID, track: i) }
+                } else {
+                    proposal.assign(stemID: p.stemID, track: nil)
+                }
+            }
+            plan = proposal
+            importStage = .pairing
+        } catch is CancellationError {
+        } catch {
+            importStage = .failed(Self.issue(for: error))
+        }
+    }
+
+    /// Elige la pista de Songsterr de un stem (nil = transcripción automática).
+    func setPairing(stemID: String, track: Int?) { plan?.assign(stemID: stemID, track: track) }
+
+    /// Elige la pista de Songsterr de una sección de solo del stem solista (nil = sin notas de Songsterr en ella).
+    func setSoloPairing(stemID: String, solo: Int, track: Int?) { plan?.assign(stemID: stemID, solo: solo, track: track) }
+
+    func setAllAutomatic() { plan?.useAutomaticForAll() }
+
+    /// «Aceptar»: crea la tablatura con lo emparejado, guarda la fuente y transcribe lo que quede sin pareja.
+    func acceptPairing() {
+        guard let plan else { return }
+        let result = plan.build()
+        let pairings = plan.assignments.map { a in
+            TabStemPairing(stemID: a.stemID, partId: a.track.flatMap { plan.tracks[$0].partId },
+                           solos: a.solos.isEmpty ? nil : a.solos.map { s in
+                               TabSoloPairing(start: s.span.lowerBound, end: s.span.upperBound,
+                                              partId: s.track.flatMap { plan.tracks[$0].partId }, confidence: s.confidence)
+                           })
+        }
+        let choice = TabSourceChoice.songsterr(songId: plan.songId, revisionId: plan.revisionId, pairings: pairings)
+        importTask?.cancel()
+        work?.cancel()
+        notices = plan.warnings
+        editor = TabEditor(score: result.score)
+        saveNow()
+        closeSourceSheet()
+        let grid = meterGrid.map {
+            SongsterrGridFile(songId: plan.songId, revisionId: plan.revisionId, beats: $0.beats, downbeats: $0.downbeats,
+                              writtenTempo: $0.writtenTempo)
+        }
+        Task { [weak self] in
+            await self?.session.saveTabSource(choice, grid: grid)
+            self?.ctl.refreshMetronome()
+            self?.restart()
+        }
+    }
+
+    /// «Transcribir automáticamente» (hoja) o menú «Fuente» > «Transcripción automática».
+    func chooseAutomatic() {
+        closeSourceSheet()
+        work?.cancel()
+        Task { [weak self] in
+            await self?.session.saveTabSource(.automatic)
+            self?.ctl.refreshMetronome()   // vuelve la rejilla del análisis
+            self?.restart()
+        }
+    }
+
+    private func restart() {
+        work?.cancel()
+        for id in Array(listening) { setListening(false, trackID: id) }
+        started = false
+        progress = [:]
+        queued = []
+        selection = nil
+        selectedTrackID = nil
+        phase = .working
+        start()
+    }
+
     // MARK: Guardado
 
     private func scheduleSave() {
@@ -322,7 +606,11 @@ final class TabController {
         case .beatClick(let track, let bar, let beat):
             guard let ref = alpha?.ref(track: track, bar: bar, beat: beat), alpha?.trackIDs[track] == selectedTrackID,
                   let id = selectedTrackID else { return }
-            if selection?.trackID == id, selection?.point == ref.start { return }
+            // Mismo pulso ya seleccionado: no se toca la selección (ni su cuerda), pero el clic salta otra vez.
+            if selection?.trackID == id, selection?.point == ref.start {
+                if let score { ctl.seek(to: min(max(score.time(of: ref.start), 0), ctl.duration)) }
+                return
+            }
             select(id, ref.start, string: selection?.string)
         case .noteClick(let track, let bar, let beat, let s, _):
             guard let ref = alpha?.ref(track: track, bar: bar, beat: beat), alpha?.trackIDs[track] == selectedTrackID,
@@ -409,6 +697,7 @@ final class TabController {
         case .kick: "bombo"
         case .snare: "caja"
         case .hiHat: "charles"
+        case .openHiHat: "charles abierto"
         case .tom: "tom"
         case .crash: "platos"
         }
@@ -536,7 +825,7 @@ final class TabController {
     /// Batería: pone o quita el golpe de `piece` en el punto seleccionado.
     func toggleHit(_ piece: DrumPiece) {
         guard let sel = selection, let track = selectedTrack, track.kind == .drums else { return }
-        let present = !track.hits.contains(TabDrumHit(piece: piece, at: sel.point))
+        let present = !track.hits.contains { $0.piece == piece && $0.at == sel.point }   // también el golpe fantasma
         edit { try $0.setHit(piece, at: sel.point, present: present, trackID: track.id) }
     }
 
@@ -572,9 +861,25 @@ final class TabController {
         host.setCursorTime(score.time(of: snapped), follow: true)
     }
 
+    /// Última afinación personalizada de cada pista, para poder volver a ella desde el selector tras elegir un preset.
+    private var customTunings: [String: Tuning] = [:]
+
+    /// Afinación personalizada disponible para la pista: la actual si lo es, o la guardada al salir de ella.
+    func customTuning(of track: TabTrack) -> Tuning? {
+        if let t = track.tuning, t.preset == .custom { return t }
+        return customTunings[track.id]
+    }
+
     func setTuning(_ preset: TuningPreset, trackID: String) {
         guard let track = score?.tracks.first(where: { $0.id == trackID }), track.kind != .drums else { return }
-        let tuning = track.kind == .bass ? Tuning.bass(preset) : Tuning.guitar(preset)
+        if let current = track.tuning, current.preset == .custom { customTunings[trackID] = current }
+        let tuning: Tuning
+        if preset == .custom {
+            guard let saved = customTunings[trackID] else { return }
+            tuning = saved
+        } else {
+            tuning = track.kind == .bass ? Tuning.bass(preset) : Tuning.guitar(preset)
+        }
         guard tuning != track.tuning else { return }
         var report = TabBuildReport()
         edit { report = try $0.setTuning(tuning, trackID: trackID) }
@@ -590,6 +895,7 @@ final class TabController {
         case .halfStepDown: "Medio tono abajo"
         case .wholeStepDown: "Un tono abajo"
         case .dropD: "Drop D"
+        case .custom: "Personalizada"
         }
     }
 
@@ -650,7 +956,8 @@ final class TabController {
     static func synthPlayerID(_ id: String) -> String { "tab-\(id)" }
 
     func setListening(_ on: Bool, trackID: String) {
-        guard let src = source(of: trackID) else { return }
+        guard score?.tracks.contains(where: { $0.id == trackID }) == true else { return }
+        let src = source(of: trackID)   // nil en las pistas extra de Songsterr: solo suena la transcripción
         if on {
             listening.insert(trackID)
             if synthRevision[trackID] == revision[trackID, default: 0], synth[trackID] == .ready {
@@ -661,14 +968,14 @@ final class TabController {
         } else {
             listening.remove(trackID)
             synthTasks[trackID]?.cancel()
-            ctl.setSubstituted(src.playerTrackID, false)
+            if let src { ctl.setSubstituted(src.playerTrackID, false) }
             ctl.setExtraMuted(Self.synthPlayerID(trackID), true)
         }
     }
 
-    private func activateSynth(_ trackID: String, _ src: TabSource) {
+    private func activateSynth(_ trackID: String, _ src: TabSource?) {
         guard listening.contains(trackID) else { return }
-        ctl.setSubstituted(src.playerTrackID, true)
+        if let src { ctl.setSubstituted(src.playerTrackID, true) }
         ctl.setExtraMuted(Self.synthPlayerID(trackID), false)
     }
 
@@ -676,8 +983,8 @@ final class TabController {
         synthTasks[trackID]?.cancel()
         synthTasks[trackID] = Task { [weak self] in
             try? await Task.sleep(for: .seconds(Self.synthDebounce))
-            guard !Task.isCancelled, let self, let src = self.source(of: trackID) else { return }
-            self.renderSynth(trackID) { [weak self] in self?.activateSynth(trackID, src) }
+            guard !Task.isCancelled, let self else { return }
+            self.renderSynth(trackID) { [weak self] in self?.activateSynth(trackID, self?.source(of: trackID)) }
         }
     }
 
@@ -780,6 +1087,97 @@ final class TabController {
             }
             try? await Task.sleep(for: .milliseconds(200))
         }
+    }
+
+    /// `--tab-songsterr <songId>`: búsqueda, página, descarga, alineación y plan con la propuesta tal cual, partitura,
+    /// transcripción de lo que quede sin pareja y resumen en `summary`. Antes hay que vaciar `tabSource` y poner
+    /// `suppressAutoSearch` (lo hace `TabContent`).
+    func runSongsterrHeadless(songId: Int, summary: URL?) async {
+        var lines: [String] = []
+        func log(_ s: String) { lines.append(s); print("[tab-songsterr] \(s)") }
+        func finish() { if let summary { try? lines.joined(separator: "\n").write(to: summary, atomically: true, encoding: .utf8) } }
+        let t0 = Date()
+        func lap() -> String { String(format: "%.1f s", Date().timeIntervalSince(t0)) }
+        func wait(timeout: Double, until done: () -> Bool) async -> Bool {
+            let deadline = Date().addingTimeInterval(timeout)
+            while Date() < deadline {
+                if done() { return true }
+                try? await Task.sleep(for: .milliseconds(200))
+            }
+            return false
+        }
+        guard await wait(timeout: 120, until: { phase == .choosingSource || phase == .empty || phase == .waitingAnalysis }),
+              phase == .choosingSource else {
+            log("ERROR: la pantalla no llegó a pedir fuente (fase \(phase))")
+            finish(); return
+        }
+        let song = session.project.song
+        do {
+            let found = try await client.search(artist: song.artist ?? "", title: song.title)
+            log("búsqueda «\(song.artist ?? "") - \(song.title)»: \(found.count) resultados (\(lap())); primero: \(found.first.map { "\($0.artist) - \($0.title) #\($0.songId)" } ?? "-"); \(found.contains { $0.songId == songId } ? "incluye" : "NO incluye") #\(songId)")
+        } catch {
+            log("búsqueda: ERROR \(Self.issue(for: error).message)")
+        }
+        beginImport(songId: songId, song: nil, keeping: nil)
+        _ = await wait(timeout: 900) { if case .working = importStage { return false } else { return true } }
+        guard importStage == .pairing, let plan else {
+            if case .failed(let i) = importStage { log("importación: ERROR \(i.message)") } else { log("importación: sin resultado") }
+            finish(); return
+        }
+        let al = plan.alignment
+        if let p = preparedBeats {
+            log("pulsos: tempo escrito \(Int(p.writtenTempo)), detectado \(String(format: "%.2f", p.detectedTempo)), pliegue \(p.fold.rawValue), +\(p.insertedBeats) −\(p.removedBeats) pulsos")
+        } else {
+            log("pulsos: sin tempo escrito en Songsterr, pulsos del análisis tal cual")
+        }
+        if let g = meterGrid {
+            log("rejilla del metrónomo: \(g.beats.count) pulsos, \(g.downbeats.count) compases, \(g.anchoredBeats)/\(g.tabBeats) anclados a la batería")
+        }
+        log("alineación (\(lap())): desfase \(al.offsetBeats) pulsos, fino \(String(format: "%.3f", al.fineOffset)) s, bloques \(al.usesBlocks ? "sí" : "no"), \(al.structureWarnings.count) diferencias de estructura")
+        log("tema: \(plan.tracks.count) pistas")
+        for slot in plan.slots {
+            let a = plan.assignment(for: slot.id)
+            let conf = a?.confidence.map { String(format: "%.2f", $0) } ?? "-"
+            if let i = a?.track { log("  \(slot.name) [\(slot.id)] -> «\(plan.tracks[i].name)» (pista \(i), confianza \(conf))") }
+            else if let solos = a?.solos, !solos.isEmpty {
+                log("  \(slot.name) [\(slot.id)] -> solo por secciones de solo:")
+                for (k, s) in solos.enumerated() {
+                    let pair = al.soloPairs.indices.contains(k) ? al.soloPairs[k] : nil
+                    let others = (pair?.candidates ?? []).map { c in "\(plan.tracks[c.track].name) \(c.similarity.map { String(format: "%.3f", $0) } ?? "-")" }
+                    log("    Solo \(k + 1) (\(SongsterrImportPlan.clockText(s.span.lowerBound))) <- \(s.track.map { "«\(plan.tracks[$0].name)»" } ?? "nada") (confianza \(s.confidence.map { String(format: "%.3f", $0) } ?? "-"), margen \(pair?.margin.map { String(format: "%.3f", $0) } ?? "-"); \(others.joined(separator: ", ")))")
+                }
+            }
+            else { log("  \(slot.name) [\(slot.id)] -> transcripción automática") }
+        }
+        for i in plan.extraTracks { log("  extra: «\(plan.tracks[i].name)» (\(plan.tracks[i].kind))") }
+        for w in plan.warnings { log("  aviso: \(w)") }
+        acceptPairing()
+        await waitUntilSettled()
+        log("partitura (\(lap())): fase \(phase)")
+        for t in score?.tracks ?? [] {
+            log("  \(t.id) «\(t.name)» \(t.kind) \(t.notes.count) notas, \(t.hits.count) golpes, \(t.imported != nil ? "Songsterr" : "automática")")
+        }
+        for n in notices { log("  aviso: \(n)") }
+        log("OK")
+        finish()
+    }
+
+    /// `--tab-songsterr-sheet <songId>`: hoja de Songsterr en el paso de emparejamiento, para capturas.
+    func openPairingForCapture(songId: Int) async {
+        guard await waitForPhase({ $0 != .working && $0 != .waitingAnalysis }) else { return }
+        beginImport(songId: songId, song: nil, keeping: nil)
+        for _ in 0..<3000 {
+            if case .working = importStage { try? await Task.sleep(for: .milliseconds(200)) } else { break }
+        }
+    }
+
+    private func waitForPhase(_ ok: (Phase) -> Bool) async -> Bool {
+        let deadline = Date().addingTimeInterval(120)
+        while Date() < deadline {
+            if ok(phase) { return true }
+            try? await Task.sleep(for: .milliseconds(200))
+        }
+        return false
     }
 
     /// Capturas: abre la pista `index`, activa la edición y selecciona el primer pulso con nota.

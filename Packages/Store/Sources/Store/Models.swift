@@ -375,6 +375,8 @@ public struct Project: Codable, Sendable, Equatable {
     public var recording: RecordingState?
     /// Montaje en vídeo (Fase 7). Aditivo; nil si no se ha abierto Montaje.
     public var montage: MontageState?
+    /// Fuente de la tablatura elegida (Fase 5b); nil = sin elegir. Aditivo.
+    public var tabSource: TabSourceChoice?
     public var createdAt: Date
     public var updatedAt: Date
 
@@ -384,9 +386,10 @@ public struct Project: Codable, Sendable, Equatable {
                 study: StudyState = StudyState(),
                 createdAt: Date = Date(), updatedAt: Date = Date(), guitarSettings: GuitarSettings = GuitarSettings(),
                 guitarApplied: GuitarAppliedState? = nil, recording: RecordingState? = nil,
-                montage: MontageState? = nil) {
+                montage: MontageState? = nil, tabSource: TabSourceChoice? = nil) {
         self.recording = recording
         self.montage = montage
+        self.tabSource = tabSource
         self.guitarSettings = guitarSettings
         self.guitarApplied = guitarApplied
         self.study = study
@@ -407,7 +410,7 @@ public struct Project: Codable, Sendable, Equatable {
     private enum CodingKeys: String, CodingKey {
         case schemaVersion, id, song, separation, stems, guitars, sections, rigs, takes, videos, study
         case guitarSettings = "guitarOptions"
-        case guitarApplied, recording, montage, createdAt, updatedAt
+        case guitarApplied, recording, montage, tabSource, createdAt, updatedAt
     }
 
     public init(from decoder: Decoder) throws {
@@ -419,6 +422,7 @@ public struct Project: Codable, Sendable, Equatable {
         guitarApplied = try c.decodeIfPresent(GuitarAppliedState.self, forKey: .guitarApplied)
         recording = try c.decodeIfPresent(RecordingState.self, forKey: .recording)
         montage = try c.decodeIfPresent(MontageState.self, forKey: .montage)
+        tabSource = try c.decodeIfPresent(TabSourceChoice.self, forKey: .tabSource)
         id = try c.decode(UUID.self, forKey: .id)
         song = try c.decode(Song.self, forKey: .song)
         separation = try c.decodeIfPresent(SeparationState.self, forKey: .separation) ?? SeparationState()

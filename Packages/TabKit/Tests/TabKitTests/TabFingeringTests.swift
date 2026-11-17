@@ -92,13 +92,29 @@ final class TabFingeringTests: XCTestCase {
     func testTooManyNotesDropsWeakestAndOutOfRangeIsCounted() throws {
         // 7 notas: se quita la de menos amplitud (la 62).
         var events = [40, 47, 52, 56, 59, 64, 62].map { NoteEvent(start: 0, end: 1.9, pitch: $0, amplitude: $0 == 62 ? 0.1 : 0.6) }
-        // Fuera de registro: 35 (< E2) sube a 47; 90 (> E4 + 24 = 88) baja a 78.
+        // Fuera de registro: 35 (< E2) sube a 47; 90 (> techo de guitarra 86) se quita (Fase 5b).
         events += [NoteEvent(start: 2, end: 2.4, pitch: 35, amplitude: 0.6), NoteEvent(start: 4, end: 4.4, pitch: 90, amplitude: 0.6)]
         let (track, report) = try Self.build(events)
-        XCTAssertEqual(report.shiftedOctave, 2)
-        XCTAssertEqual(report.droppedNotes, 1)
+        XCTAssertEqual(report.shiftedOctave, 1)
+        XCTAssertEqual(report.droppedNotes, 2)
         XCTAssertEqual(track.notes.filter { $0.start.beat == 0 }.map(\.pitch).sorted(), [40, 47, 52, 56, 59, 64])
-        XCTAssertEqual(track.notes.filter { $0.start.beat > 0 }.map(\.pitch), [47, 78])
+        XCTAssertEqual(track.notes.filter { $0.start.beat > 0 }.map(\.pitch), [47])
+    }
+
+    /// Techo de registro (mini-spec Fase 5b, «Respaldo automático»): en guitarra, 86 (traste 22 de la 1.ª) se queda;
+    /// 87 y 88, que caben en los trastes 23 y 24, y 95, que antes bajaba una octava, se quitan y se cuentan.
+    func testGuitarPitchCeilingDropsAndCounts() throws {
+        XCTAssertEqual(TabTrackBuilder.guitarPitchCeiling, 86)
+        let (track, report) = try Self.build(Self.melody([76, 86, 87, 88, 95, 84]))
+        XCTAssertEqual(track.notes.map(\.pitch), [76, 86, 84])
+        XCTAssertEqual(report, TabBuildReport(shiftedOctave: 0, droppedNotes: 3))
+        let top = track.notes.first { $0.pitch == 86 }!
+        XCTAssertEqual(top.string, 1)
+        XCTAssertEqual(track.fret(of: top), 22)
+        // Bajo: el techo no se aplica (su registro acaba en 43 + 24 = 67; lo de encima sigue la regla de octava).
+        let bass = try Self.build(Self.melody([40, 60, 67]), kind: .bass, tuning: .bass(.standard))
+        XCTAssertEqual(bass.track.notes.map(\.pitch), [40, 60, 67])
+        XCTAssertEqual(bass.report, TabBuildReport())
     }
 
     func testTuningChangeKeepsPitches() throws {
@@ -109,7 +125,7 @@ final class TabFingeringTests: XCTestCase {
         let original = try Self.build(events).track
         var score = try Self.score()
         score.upsert(original)
-        for preset in TuningPreset.allCases {
+        for preset in TuningPreset.fixed {
             var editor = TabEditor(score: score)
             let report = try editor.setTuning(.guitar(preset), trackID: "t")
             let retuned = editor.score.tracks[0]

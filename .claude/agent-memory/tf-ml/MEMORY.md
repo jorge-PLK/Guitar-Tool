@@ -6,4 +6,6 @@
 - [Basic Pitch: instalación y contrato](basic-pitch-contract.md) — --no-deps sin TF; Identity_1=note, _2=onset, Identity=contour; fps 86 entero; zip reproducible
 - [Modelos de guitarra Mega53/becruily en MSST](guitar-models-contract.md) — safetensors de lumabeat cargan en BSRoformer; becruily mel-band; trampas del worktree
 - [ADTOF batería: GRU en Core ML y contrato](adtof-contract.md) — gru nativa iOS18 (salida reverse invertida), GPU la calcula mal→CPU; 84 bandas; pistas con puerta; package.py/fixture
+- [Guitab / MuScriptor (Fase 5b)](guitab-muscriptor-eval.md) — Guitab sin instalar (6 ficheros); registro 100 % por construcción; MuScriptor gated; BP y silencio
+- [Songsterr como referencia](songsterr-reference.md) — API de búsqueda; 103 Early Hints→curl; CDN en gzip; alinear con saliencia CQT, no con onsets/croma
 - [Lead/Rhythm Mel-Band anónimo](lead-rhythm-contract.md) — weights_only OK, casa estricto; YAML con tupla→SafeLoader; MPS falla→CPU; Core ML sin scatter (K gathers); contrato spec→mask hop 441

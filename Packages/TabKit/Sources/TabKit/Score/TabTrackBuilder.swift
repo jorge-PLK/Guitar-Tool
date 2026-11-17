@@ -2,10 +2,19 @@
 public struct DrumOnset: Sendable, Equatable {
     public var time: Double
     public var piece: DrumPiece
+    /// Golpe fantasma (solo los de Songsterr).
+    public var ghost: Bool
+    /// Flam (solo los de Songsterr), como `TabDrumHit.grace`.
+    public var grace: TabGrace?
+    /// Acento (solo los de Songsterr), como `TabDrumHit.accent`.
+    public var accent: TabAccent?
 
-    public init(time: Double, piece: DrumPiece) {
+    public init(time: Double, piece: DrumPiece, ghost: Bool = false, grace: TabGrace? = nil, accent: TabAccent? = nil) {
         self.time = time
         self.piece = piece
+        self.ghost = ghost
+        self.grace = grace
+        self.accent = accent
     }
 }
 
@@ -13,7 +22,8 @@ public struct DrumOnset: Sendable, Equatable {
 public struct TabBuildReport: Sendable, Equatable {
     /// Notas subidas o bajadas una octava por salirse del registro de la afinación.
     public var shiftedOctave: Int
-    /// Notas quitadas: más notas que cuerdas, unísonos tras el cambio de octava o acordes sin digitación posible.
+    /// Notas quitadas: por encima del techo de registro de guitarra, más notas que cuerdas, unísonos tras el cambio
+    /// de octava o acordes sin digitación posible.
     public var droppedNotes: Int
 
     public init(shiftedOctave: Int = 0, droppedNotes: Int = 0) {
@@ -24,18 +34,28 @@ public struct TabBuildReport: Sendable, Equatable {
 
 /// De notas o golpes a una pista de `TabScore` sobre su rejilla (mini-spec Fase 5, «Transcripción»).
 public enum TabTrackBuilder {
-    /// Versión de las reglas de cuantización y digitación; entra en la huella de cada pista.
-    public static let parametersVersion = 1
+    /// Versión de las reglas de transcripción, cuantización y digitación; entra en la huella de cada pista.
+    /// 2: ventanas mudas fuera del Core ML y puerta de silencio en Basic Pitch (Fase 5b).
+    /// 3: techo de registro de las guitarras (`guitarPitchCeiling`, Fase 5b).
+    public static let parametersVersion = 3
+
+    /// Altura MIDI más aguda que se acepta de la transcripción automática de guitarra: traste 22 de la primera
+    /// cuerda en afinación estándar (mini-spec Fase 5b, «Respaldo automático», techo de registro). Lo de encima son
+    /// armónicos sobreagudos de Basic Pitch; se quitan y cuentan en `droppedNotes`. No se aplica al bajo.
+    public static let guitarPitchCeiling = 86
 
     /// Pista de guitarra o bajo desde las notas de Basic Pitch.
     ///
     /// Rejilla: subdivisión por pulso con menor error, ataques al punto más cercano, duración hasta el final de la
     /// nota o el siguiente ataque de la pista (cuantizada, al menos un punto). Bajo: una nota por ataque, la de más
-    /// amplitud. Cuerdas y trastes por Viterbi (`Fingering`).
+    /// amplitud. Guitarra: fuera las notas por encima de `guitarPitchCeiling`. Cuerdas y trastes por Viterbi
+    /// (`Fingering`).
     public static func pitchedTrack(id: String, name: String, kind: TabTrackKind, tuning: Tuning,
-                                    source: TrackSourceFingerprint?, notes events: [NoteEvent],
+                                    source: TrackSourceFingerprint?, notes allEvents: [NoteEvent],
                                     in score: TabScore) -> (track: TabTrack, report: TabBuildReport) {
         precondition(kind != .drums, "pitchedTrack es para guitarra o bajo")
+        let events = kind == .guitar ? allEvents.filter { $0.pitch <= guitarPitchCeiling } : allEvents
+        let aboveCeiling = allEvents.count - events.count
         let times = score.beats.map(\.time)
         let subdivisions = score.chooseSubdivisions(onsets: events.map(\.start))
 
@@ -90,22 +110,27 @@ public enum TabTrackBuilder {
                              subdivisions: subdivisions, notes: notes)
         track.sortContents()
         for i in track.notes.indices { track.notes[i].id = i + 1 }
-        return (track, TabBuildReport(shiftedOctave: result.shiftedOctave, droppedNotes: result.dropped))
+        return (track, TabBuildReport(shiftedOctave: result.shiftedOctave, droppedNotes: result.dropped + aboveCeiling))
     }
 
     /// Pista de batería: subdivisión por pulso con los golpes, cada golpe al punto más cercano; un golpe por pieza
-    /// y punto.
+    /// y punto (fantasma solo si lo son todos los que caen ahí).
     public static func drumTrack(id: String, name: String, source: TrackSourceFingerprint?,
                                  onsets: [DrumOnset], in score: TabScore) -> TabTrack {
         let times = score.beats.map(\.time)
         let subdivisions = score.chooseSubdivisions(onsets: onsets.map(\.time))
-        var hits = Set<TabDrumHit>()
+        var hits: [[Int]: TabDrumHit] = [:]
         for o in onsets {
             let tick = score.snapTick(o.time, subdivisions: subdivisions, allowEnd: false, times: times)
-            hits.insert(TabDrumHit(piece: o.piece, at: GridPoint(absoluteTick: tick)))
+            let hit = TabDrumHit(piece: o.piece, at: GridPoint(absoluteTick: tick), ghost: o.ghost, grace: o.grace,
+                                 accent: o.accent)
+            hits[[o.piece.rawValue, tick]] = hits[[o.piece.rawValue, tick]].map {
+                TabDrumHit(piece: $0.piece, at: $0.at, ghost: $0.ghost && hit.ghost, grace: $0.grace ?? hit.grace,
+                           accent: TabAccent.stronger($0.accent, hit.accent))
+            } ?? hit
         }
         var track = TabTrack(id: id, name: name, kind: .drums, tuning: nil, source: source,
-                             subdivisions: subdivisions, hits: Array(hits))
+                             subdivisions: subdivisions, hits: Array(hits.values))
         track.sortContents()
         return track
     }

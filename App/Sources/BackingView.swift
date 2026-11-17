@@ -102,7 +102,7 @@ struct BackingContent: View {
             if model.options.chordsEdit { chordsEdit = true }
         }
         #endif
-        .onChange(of: session.beats) { ctl.refreshMetronome() }
+        .onChange(of: session.metronomeBeats) { ctl.refreshMetronome() }
         .onChange(of: session.audibleStems) { ctl.loadTracks() }
         .onChange(of: session.guitarTracks.map(\.role)) { ctl.loadTracks() }
     }

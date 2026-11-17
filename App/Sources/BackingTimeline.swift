@@ -18,6 +18,7 @@ struct BackingTimelineCard: View {
     @State private var gridEditing: Double?
     @State private var selection = SectionSelection()
     @State private var keyMonitor = SectionKeyMonitor()
+    @State private var spaceMonitor = SpaceKeyMonitor()
     @State private var stripFrames: [Int: CGRect] = [:]
     @State private var stripDrag: ClosedRange<Int>?
 
@@ -39,6 +40,7 @@ struct BackingTimelineCard: View {
         .onChange(of: expanded.wrappedValue) { selection.popover = nil }
         .onAppear {
             keyMonitor.install(selection: selection, session: session)
+            spaceMonitor.install { [ctl] in ctl.togglePlay() }
             #if DEBUG
             if let n = model.options.selectSection {
                 Task { @MainActor in
@@ -48,7 +50,7 @@ struct BackingTimelineCard: View {
             }
             #endif
         }
-        .onDisappear { keyMonitor.remove() }
+        .onDisappear { keyMonitor.remove(); spaceMonitor.remove() }
     }
 
     // MARK: Acordes
@@ -360,7 +362,6 @@ struct BackingTimelineCard: View {
                     .frame(width: 52, height: 52).background(TF.accent, in: Circle())
             }
             .buttonStyle(.plain)
-            .keyboardShortcut(.space, modifiers: [])
             .accessibilityLabel(ctl.isPlaying ? "Pausar" : "Reproducir")
 
             (Text(Fmt.clock(time)).foregroundStyle(TF.text) + Text(" / \(Fmt.clock(ctl.duration))").foregroundStyle(TF.muted))

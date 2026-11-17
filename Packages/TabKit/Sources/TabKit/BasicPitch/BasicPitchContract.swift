@@ -30,6 +30,16 @@ enum BasicPitchContract {
     static var minimumNoteFrames: Int {
         Int((minimumNoteLengthMs / 1000 * (sampleRate / Double(fftHop))).rounded(.toNearestOrEven))
     }
+    /// Pico por debajo del cual una ventana no pasa por el modelo y da posteriorgramas a cero: −120 dBFS.
+    /// `NormalizedLog` de basic-pitch normaliza cada ventana con `divide_no_nan`, pero el `nmp.mlpackage` oficial lo
+    /// convirtió en `real_div`: con una ventana muda el espectrograma es constante y queda 0/0. Medido en Fase 5b
+    /// frente a ONNX (la referencia): ventana de ceros en Core ML CPU+GPU → note 0,84 de media (máx 0,900) y onset
+    /// 0,659 en las 88 notas (las notas fantasma de amplitud 0,86–0,90 de `guitar_lead`); ONNX → note ≤ 0,161,
+    /// onset ≤ 0,169. Core ML se aparta de ONNX con picos ≤ −140 dBFS (ruido) o ≤ −130 (impulso) y coincide a ≤ 0,004
+    /// desde −130 (ruido). Con picos ≤ −120 dBFS ONNX da note ≤ 0,242 < `frameThreshold`, sin notas: los ceros dan
+    /// las mismas notas que la referencia.
+    static let silentWindowPeak: Float = 1e-6
+
     /// `output_to_notes_polyphonic(energy_tol=11)` y `get_infered_onsets(n_diff=2)`.
     static let energyTolerance = 11
     static let onsetDiffFrames = 2

@@ -61,6 +61,8 @@ final class FilesTests: XCTestCase {
         let l = ProjectLayout(folder: dir)
         try l.createSkeleton()
         XCTAssertEqual(l.analysisCache.path, dir.appendingPathComponent("cache/analysis.json").path)
+        XCTAssertEqual(l.songsterrCacheDir(songId: 7, revisionId: 9).path,
+                       dir.appendingPathComponent("cache/songsterr/7/9").path)
         try Data("{}".utf8).write(to: l.analysisCache)
         let p = makeFullProject()
         try ProjectFile.save(p, to: dir)

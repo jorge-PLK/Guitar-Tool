@@ -58,6 +58,18 @@ struct LaunchOptions {
     /// Con `--screen montage`: exporta por el camino del botón, escribe `export-<layout>[-cut].json` y sale.
     var montageExport = false
     var montageCutGaps = false
+    /// Comprobación real de Songsterr (WKWebView + CDN): `--songsterr-probe <songId> --songsterr-out <dir>`, con
+    /// `--songsterr-search "<artista>|<título>"` opcional. Escribe `<dir>/probe.txt` y sale.
+    var songsterrProbe: Int?
+    var songsterrOut: URL?
+    var songsterrSearch: String?
+    /// Tablatura de Songsterr sin clics: `--screen tab --project <tema> --tab-songsterr <songId> [--tab-summary <fichero>]
+    /// [--tab-export <.gp>]` busca, descarga, alinea, acepta la propuesta tal cual, transcribe lo que quede sin pareja,
+    /// escribe el resumen y sale.
+    var tabSongsterr: Int?
+    var tabSummary: URL?
+    /// Con `--screen tab`: abre la hoja de Songsterr ya en el paso de emparejamiento de ese `songId` (capturas con `--snapshot`).
+    var tabSongsterrSheet: Int?
 
     init(_ args: [String] = CommandLine.arguments) {
         var i = 1
@@ -103,6 +115,12 @@ struct LaunchOptions {
             case ("--montage-layout", let v?): montageLayout = v; i += 1
             case ("--montage-export", _): montageExport = true
             case ("--montage-cut-gaps", _): montageCutGaps = true
+            case ("--songsterr-probe", let v?): songsterrProbe = Int(v); i += 1
+            case ("--songsterr-out", let v?): songsterrOut = path(v); i += 1
+            case ("--songsterr-search", let v?): songsterrSearch = v; i += 1
+            case ("--tab-songsterr", let v?): tabSongsterr = Int(v); i += 1
+            case ("--tab-summary", let v?): tabSummary = path(v); i += 1
+            case ("--tab-songsterr-sheet", let v?): tabSongsterrSheet = Int(v); i += 1
             default: break
             }
             i += 1
@@ -421,6 +439,10 @@ final class AppModel {
         default: break
         }
         if let demo = options.linkImportDemo { openLinkImportDemo(demo) }
+        if let id = options.songsterrProbe, let out = options.songsterrOut {
+            let q = options.songsterrSearch?.split(separator: "|", maxSplits: 1).map(String.init)
+            SongsterrProbe.run(songId: id, out: out, artist: q?.first, title: q?.dropFirst().first)
+        }
         if options.deleteDialog, let first = entries.first { requestTrash(first) }
         #endif
     }
