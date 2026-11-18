@@ -159,16 +159,6 @@ Condición de paso: vídeo final exportado en portrait y en landscape.
 
 Cumplida el 18/11/2026 (ADR-018): Jorge probó a mano la app («todo correcto») con el vídeo exportado en portrait y en landscape, y `MontageGateTests` cubre la puerta sin hardware.
 
-### Fase 7c · Editor de layouts propio (sin rama aún)
-
-Pedida por Jorge el 18/11/2026. Mini-spec al empezar; sin estimación todavía. No consta en las tablas de orden y modelos hasta que se decida orquestador y agentes (iría después de la 7).
-
-- [ ] Elegir dónde va cada guitarra en el lienzo (layouts propios, además de los cinco fijos)
-- [ ] Modos de aparición: empujar (el resto se recoloca) o tapar (el recuadro entra encima)
-- [ ] Fundidos al cambiar una guitarra de lado
-
-Condición de paso: por definir con Jorge.
-
 ### Fase 7b · Retoques de interfaz (rama desde `fase-7`)
 
 Lista de Jorge del 17/11/2026, tras usar la app. La mini-spec se escribe al empezar; las dudas abiertas van al final.
@@ -206,6 +196,31 @@ Decidido con Jorge (17/11/2026):
 - Solo: si se empuja otra sección contra él, el arrastre se para en su borde.
 - Tema seleccionado en la barra lateral: ocupa el hueco encima del bloque del dispositivo y empuja «Ajustes» hacia arriba. Sin tema seleccionado (al abrir la app, la selección no se recuerda), «Ajustes» queda donde está ahora.
 - Perfil de equipo: las guitarras salen de la interfaz y del modelo de datos (con migración de los proyectos existentes); lo que guarda de audio (dispositivos, canales, latencia) se conserva.
+
+### Fase 7c · Port a Windows (sin rama aún; rama `fase-7c` desde `main`)
+
+Pedida por Jorge el 18/11/2026: ToneForge en Windows para su uso y para prestarla a un par de amigos. Se compila y se prueba en una máquina virtual de Windows en el Mac, sin GitHub Actions para iterar (decisión de Jorge, 18/11/2026): ciclo corto, sin push y sin gastar minutos. Mini-spec al empezar; sin estimación todavía. No consta en las tablas de orden y modelos hasta que se decida orquestador y agentes (iría después de la 7b).
+
+- [ ] Máquina virtual de compilación y pruebas, lo primero de la fase: UTM (gratis, `brew install --cask utm`) con Windows 11 ARM64 (ISO oficial de Microsoft; sin activar basta para probar), 4 núcleos, 8 GB, unos 100 GB de disco, guest tools de UTM (SPICE y agente QEMU), carpeta compartida con el repo del Mac y una instantánea de Windows recién instalado. La instalación de Windows la hace Jorge (cuenta local con `Shift+F10` → `oobe\bypassnro`); el resto, el agente.
+- [ ] Entorno de compilación dentro de la VM: Visual Studio Build Tools (MSVC y SDK de Windows, ARM64 y x64) y el toolchain de Swift para Windows; segunda instantánea con todo instalado. Los modelos grandes van en releases (`models-v1`, `Tools/models/fetch.sh`) y `.gitattributes` ya fija LF.
+- [ ] Compilar las dos arquitecturas en la VM: ARM64 nativa y x64 (los PCs de los amigos), las dos desde el mismo comando. La x64 se prueba en la VM con la emulación de Windows ARM. Script en `Tools/` que lanza la compilación en la VM, instala el resultado y lo arranca, para iterar sin tocar la VM a mano (`utmctl` y la carpeta compartida).
+- [ ] Prueba de viabilidad, que decide el resto (fallar rápido): qué paquetes compilan con Swift para Windows en ARM64 y x64 y qué depende de Apple (SwiftUI, Core ML, AVFoundation, Accelerate, Vision); con qué se hace la interfaz; cómo se sustituyen modelos (ONNX Runtime, ya previsto como respaldo en P4), audio (WASAPI o ASIO), cámara y vídeo, y helpers (yt-dlp, Deno y ffmpeg para Windows). Resultado en `docs/probes/P8-windows.md` y un ADR; decide Jorge.
+- [ ] Alcance de la versión de Windows: qué funciones de la Etapa 1 entran, decidido por Jorge con el resultado de la prueba de viabilidad.
+- [ ] Instaladores de Windows (ARM64 y x64) publicados como release en GitHub, como la v1.0 de macOS. GitHub Actions (`windows-latest`) solo si la compilación x64 desde la VM no sale limpia; en repo privado sus minutos de Windows cuentan doble.
+
+Límite conocido: la VM vale para comprobar que arranca, la interfaz y la lógica; la latencia de audio, la Flex Prime por USB y la cámara no se miden en una VM y las prueba Jorge en un PC con Windows.
+
+Condición de paso: por definir con Jorge tras la prueba de viabilidad.
+
+### Fase 7d · Editor de layouts propio (sin rama aún)
+
+Pedida por Jorge el 18/11/2026 (era la 7c hasta que el port a Windows tomó ese número). Mini-spec al empezar; sin estimación todavía. No consta en las tablas de orden y modelos hasta que se decida orquestador y agentes (iría después de la 7).
+
+- [ ] Elegir dónde va cada guitarra en el lienzo (layouts propios, además de los cinco fijos)
+- [ ] Modos de aparición: empujar (el resto se recoloca) o tapar (el recuadro entra encima)
+- [ ] Fundidos al cambiar una guitarra de lado
+
+Condición de paso: por definir con Jorge.
 
 ## Etapa 2 · Igualado de tono (fases 8a, 8 y 9)
 
