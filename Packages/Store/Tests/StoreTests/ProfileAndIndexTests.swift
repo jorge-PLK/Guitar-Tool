@@ -7,15 +7,12 @@ final class ProfileTests: XCTestCase {
         let p = try store.load()
         XCTAssertNil(p.projectsFolder)
         XCTAssertEqual(p.workingSampleRate, 44100)
-        XCTAssertTrue(p.guitars.isEmpty)
     }
 
     func testRoundTrip() throws {
         let dir = try makeTempDir()
         let store = ProfileStore(url: dir.appendingPathComponent("p/profile.json"))
-        var p = EquipmentProfile(projectsFolder: dir.appendingPathComponent("Songs"), workingSampleRate: 48000,
-                                 guitars: [OwnedGuitar(name: "Strat"), OwnedGuitar(name: "EMG", pickups: .active)])
-        p.setDefaultGuitar(p.guitars[1].id)
+        let p = EquipmentProfile(projectsFolder: dir.appendingPathComponent("Songs"), workingSampleRate: 48000)
         try store.save(p)
         XCTAssertEqual(try store.load(), p)
         XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: store.url.deletingLastPathComponent().path), ["profile.json"])
@@ -34,18 +31,58 @@ final class ProfileTests: XCTestCase {
         XCTAssertEqual(try store.load().masterGainDB, -4.5)
     }
 
-    func testOnlyOneDefaultGuitarAndValidRate() {
-        var p = EquipmentProfile(workingSampleRate: 96000, guitars: [
-            OwnedGuitar(name: "A", isDefault: true), OwnedGuitar(name: "B", isDefault: true)])
+    func testValidRate() {
+        var p = EquipmentProfile(workingSampleRate: 96000)
         XCTAssertEqual(p.workingSampleRate, 44100)
-        XCTAssertEqual(p.guitars.filter(\.isDefault).count, 1)
-        XCTAssertTrue(p.guitars[0].isDefault)
-        p.guitars.append(OwnedGuitar(name: "C", isDefault: true))
-        XCTAssertEqual(p.guitars.filter(\.isDefault).count, 1)
-        p.setDefaultGuitar(p.guitars[2].id)
-        XCTAssertEqual(p.guitars.filter(\.isDefault).map(\.name), ["C"])
         p.workingSampleRate = 22050
         XCTAssertEqual(p.workingSampleRate, 44100)
+    }
+
+    /// Fase 7b, punto 10: las guitarras del perfil se ignoran al leer y desaparecen al guardar; el resto, intacto.
+    func testProfileWithGuitarsLoadsAndIsRewrittenWithoutThem() throws {
+        let dir = try makeTempDir()
+        let store = ProfileStore(url: dir.appendingPathComponent("p/profile.json"))
+        try FileManager.default.createDirectory(at: store.url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let old = #"""
+        {"workingSampleRate":48000,"masterGainDB":-3.5,"projectsFolder":"file:///tmp/Songs/",
+         "audio":{"outputDeviceUID":"X","bufferFrames":256},
+         "guitars":[{"id":"6F1C2D3E-0000-4000-8000-000000000001","name":"Strat","pickups":"passive","isDefault":true},
+                    {"id":"6F1C2D3E-0000-4000-8000-000000000002","name":"EMG","pickups":"active","isDefault":false}]}
+        """#
+        try Data(old.utf8).write(to: store.url)
+        let p = try store.load()
+        XCTAssertEqual(p.workingSampleRate, 48000)
+        XCTAssertEqual(p.masterGainDB, -3.5)
+        XCTAssertEqual(p.projectsFolder?.path, "/tmp/Songs")
+        XCTAssertEqual(p.audio?.outputDeviceUID, "X")
+        XCTAssertEqual(p.audio?.bufferFrames, 256)
+        try store.save(p)
+        let text = try String(contentsOf: store.url, encoding: .utf8)
+        XCTAssertFalse(text.contains("guitars"))
+        XCTAssertFalse(text.contains("Strat"))
+        XCTAssertEqual(try store.load(), p)
+    }
+
+    /// Fase 7b, punto 10: un `project.json` con `guitarId` en las tomas se abre y se guarda sin él.
+    func testProjectWithTakeGuitarIdOpensAndIsSavedWithoutIt() throws {
+        let folder = try makeTempDir().appendingPathComponent("Song")
+        try ProjectLayout(folder: folder).createSkeleton()
+        var project = makeFullProject()
+        try ProjectFile.save(project, to: folder)
+        let url = ProjectLayout(folder: folder).projectFile
+        var root = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+        var takes = try XCTUnwrap(root["takes"] as? [[String: Any]])
+        XCTAssertFalse(takes.isEmpty)
+        for i in takes.indices { takes[i]["guitarId"] = "6F1C2D3E-0000-4000-8000-000000000001" }
+        root["takes"] = takes
+        try JSONSerialization.data(withJSONObject: root).write(to: url)
+
+        project = try ProjectFile.load(folder: folder)
+        XCTAssertEqual(project.takes.count, takes.count)
+        try ProjectFile.save(project, to: folder)
+        let text = try String(contentsOf: url, encoding: .utf8)
+        XCTAssertFalse(text.contains("guitarId"))
+        XCTAssertEqual(try ProjectFile.load(folder: folder).takes, project.takes)
     }
 }
 

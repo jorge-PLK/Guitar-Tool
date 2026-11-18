@@ -1,7 +1,8 @@
 import Foundation
 
 /// Lógica de edición de las secciones de una canción (mini-spec Fase 4, «El solo es una sección más» e «Interfaz»):
-/// crear, renombrar, mover un borde con imán, partir al marcar dentro de otra, borrar y alternar «Solo».
+/// crear, renombrar, mover un borde con imán, borrar y alternar «Solo». Sin secciones dentro de otras ni solapes:
+/// crear solo en hueco libre y empujar un borde encoge a la vecina (mini-spec Fase 7b, punto 8).
 /// Sin UI ni estado propio más allá de la lista: la app la envuelve en la sesión de estudio y la prueba aquí.
 public struct SectionEditor: Sendable, Equatable {
     /// Longitud mínima (s) de una sección.
@@ -40,9 +41,10 @@ public struct SectionEditor: Sendable, Equatable {
 
     // MARK: Crear
 
-    /// Marca una sección (o un solo) en `r`. Las secciones que solapa se recortan; una que contiene a `r` se parte
-    /// en dos (antes y después, cada una con al menos `minLength`). Un rango igual al de una existente solo cambia su
-    /// marca de solo. Devuelve la sección marcada, o nil si `r` es más corta que `minLength`.
+    /// Marca una sección (o un solo) en `r`, solo en hueco libre (mini-spec Fase 7b, punto 8): si `r` empieza dentro
+    /// de una sección no se crea nada; si empieza en un hueco y entra en la siguiente, se queda en su borde. Un rango
+    /// igual al de una existente solo cambia su marca de solo. Devuelve la sección marcada, o nil si no se crea
+    /// (empieza dentro, o queda más corta que `minLength`).
     @discardableResult
     public mutating func mark(_ r: ClosedRange<Double>, solo: Bool) -> UUID? {
         guard r.upperBound - r.lowerBound >= Self.minLength else { return nil }
@@ -50,18 +52,13 @@ public struct SectionEditor: Sendable, Equatable {
             if solo { setSolo(sections[i].id, true) }
             return sections[i].id
         }
-        var result: [Section] = []
-        for s in sections {
-            guard s.start < r.upperBound, s.end > r.lowerBound else { result.append(s); continue }
-            if s.start + Self.minLength <= r.lowerBound {
-                var left = s; left.end = r.lowerBound; result.append(left)
-            }
-            if s.end - Self.minLength >= r.upperBound {
-                var right = s; right.id = UUID(); right.start = r.upperBound; result.append(right)
-            }
-        }
-        var new = Section(name: "", start: r.lowerBound, end: r.upperBound, solo: solo ? true : nil)
-        sections = (result + [new]).sorted { $0.start < $1.start }
+        guard !sections.contains(where: { $0.start - Self.sameTime < r.lowerBound && r.lowerBound < $0.end - Self.sameTime }) else { return nil }
+        // Pegada a la anterior (a menos de `sameTime`): empieza justo en su fin.
+        let lo = max(r.lowerBound, sections.map(\.end).filter { $0 <= r.lowerBound + Self.sameTime }.max() ?? r.lowerBound)
+        let hi = min(r.upperBound, sections.filter { $0.start >= lo }.map(\.start).min() ?? r.upperBound)
+        guard hi - lo >= Self.minLength else { return nil }
+        var new = Section(name: "", start: lo, end: hi, solo: solo ? true : nil)
+        sections = (sections + [new]).sorted { $0.start < $1.start }
         new.name = defaultName(solo: solo, excluding: new.id)
         if let i = sections.firstIndex(where: { $0.id == new.id }) { sections[i].name = new.name }
         return new.id
@@ -120,22 +117,48 @@ public struct SectionEditor: Sendable, Equatable {
 
     // MARK: Bordes
 
-    /// Tiempo al que quedaría un borde sin pasar de su vecina ni bajar del largo mínimo.
+    /// Vecinas inmediatas (por inicio) de la sección `id`: la anterior y la siguiente.
+    private func neighbours(of id: UUID) -> (prev: Int?, index: Int, next: Int?)? {
+        let order = sections.indices.sorted { sections[$0].start < sections[$1].start }
+        guard let k = order.firstIndex(where: { sections[$0].id == id }) else { return nil }
+        return (k > 0 ? order[k - 1] : nil, order[k], k + 1 < order.count ? order[k + 1] : nil)
+    }
+
+    /// Tiempo al que quedaría un borde (mini-spec Fase 7b, punto 8): la propia sección no baja de `minLength`; al
+    /// llegar a la vecina inmediata la empuja y la encoge hasta `minLength` (sin cascada: su otro borde no se mueve).
+    /// Si la vecina es un solo, el borde se para en el suyo. Sin vecina, los topes son 0 y el fin de la canción.
     public func clampedEdge(_ id: UUID, start moveStart: Bool, to time: Double) -> Double? {
-        guard let i = sections.firstIndex(where: { $0.id == id }) else { return nil }
+        guard let nb = neighbours(of: id) else { return nil }
+        let (p, i, n) = nb
         let s = sections[i]
         if moveStart {
-            let lo = sections[..<i].map(\.end).max() ?? 0
+            var lo = 0.0
+            if let p {
+                let prev = sections[p]
+                lo = prev.isSolo ? prev.end : min(prev.end, prev.start + Self.minLength)
+            }
             return min(max(time, lo), s.end - Self.minLength)
         }
-        let hi = sections[(i + 1)...].map(\.start).min() ?? max(duration, s.end)
+        var hi = max(duration, s.end)
+        if let n {
+            let next = sections[n]
+            hi = next.isSolo ? next.start : max(next.start, next.end - Self.minLength)
+        }
         return max(min(time, hi), s.start + Self.minLength)
     }
 
-    /// Mueve un borde a `time` (con `clampedEdge`).
+    /// Mueve un borde a `time` (con `clampedEdge`); si entra en la vecina, el borde de esta que toca le sigue.
+    /// Al retirarse, la vecina no le sigue: queda un hueco.
     public mutating func setEdge(_ id: UUID, start moveStart: Bool, to time: Double) {
-        guard let i = sections.firstIndex(where: { $0.id == id }), let t = clampedEdge(id, start: moveStart, to: time) else { return }
-        if moveStart { sections[i].start = t } else { sections[i].end = t }
+        guard let nb = neighbours(of: id), let t = clampedEdge(id, start: moveStart, to: time) else { return }
+        let (p, i, n) = nb
+        if moveStart {
+            sections[i].start = t
+            if let p, sections[p].end > t { sections[p].end = t }
+        } else {
+            sections[i].end = t
+            if let n, sections[n].start < t { sections[n].start = t }
+        }
     }
 
     /// Límite de `boundaries` (ordenado) más cercano a `time`; `time` si no hay ninguno.
@@ -149,7 +172,7 @@ public struct SectionEditor: Sendable, Equatable {
     }
 
     /// Mueve un borde al límite siguiente (`forward`) o anterior de `boundaries` (ordenado), uno por pulsación.
-    /// Sin límites en esa dirección, o si el tope de la vecina lo impide, no se mueve.
+    /// Sin límites en esa dirección no se mueve; contra una vecina, las reglas de `setEdge` (empuja o se para).
     public mutating func nudgeEdge(_ id: UUID, start moveStart: Bool, forward: Bool, boundaries: [Double]) {
         guard let s = section(id) else { return }
         let now = moveStart ? s.start : s.end

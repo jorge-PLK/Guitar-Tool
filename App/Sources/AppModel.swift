@@ -39,6 +39,10 @@ struct LaunchOptions {
     var gridHitSelftest = false
     /// Abre la hoja «Desde enlace» con datos simulados (sin red): vacio, resolviendo, candidatos, descargando, error o youtube.
     var linkImportDemo: String?
+    /// Popup «Importar tema» con búsqueda de Spotify simulada, sin red: `results` o `error` (Fase 7b).
+    var spotifyDemo: String?
+    /// Biblioteca en vista Artistas con fotos simuladas, sin red (DEBUG; Fase 7b, 6c).
+    var artistsDemo = false
     /// Detalle de Biblioteca con la edición de título y artista activada / diálogo «¿Eliminar…?» del primer tema.
     var detailEdit = false
     var deleteDialog = false
@@ -115,6 +119,8 @@ struct LaunchOptions {
             case ("--import", let v?): importFiles.append(path(v)); i += 1
             case ("--screen", let v?): screen = v; i += 1
             case ("--link-import-demo", let v?): linkImportDemo = v; i += 1
+            case ("--spotify-demo", let v?): spotifyDemo = v; i += 1
+            case ("--artists-demo", _): artistsDemo = true
             case ("--detail-edit", _): detailEdit = true
             case ("--delete-dialog", _): deleteDialog = true
             case ("--guitars-demo", let v?): guitarsDemo = v; i += 1
@@ -154,7 +160,7 @@ struct LaunchOptions {
 
 enum AppSection: Hashable { case library, backing, tab, record, montage, settings }
 enum SettingsTab: String, CaseIterable, Identifiable {
-    case audio = "Audio", video = "Cámara y vídeo", library = "Biblioteca y equipo"
+    case audio = "Audio", video = "Cámara y vídeo", library = "Biblioteca"
     var id: String { rawValue }
 }
 
@@ -317,6 +323,7 @@ final class AppModel {
         if let d = LaunchOptions().supportDir { dir = d }
         #endif
         supportDir = dir
+        artistPhotoProvider = Self.liveArtistPhotos(supportDir: dir)
         let provider = Self.makeDeviceProvider()
         deviceProvider = provider
         #if DEBUG
@@ -462,6 +469,10 @@ final class AppModel {
         default: break
         }
         if let demo = options.linkImportDemo { openLinkImportDemo(demo) }
+        if let demo = options.spotifyDemo { openSpotifyDemo(demo) }
+        #if DEBUG
+        if options.artistsDemo { installArtistsDemo() }
+        #endif
         if let id = options.songsterrProbe, let out = options.songsterrOut {
             let q = options.songsterrSearch?.split(separator: "|", maxSplits: 1).map(String.init)
             SongsterrProbe.run(songId: id, out: out, artist: q?.first, title: q?.dropFirst().first)
@@ -519,9 +530,26 @@ final class AppModel {
     // MARK: Biblioteca
 
     var matchedRigs: Int { entries.reduce(0) { $0 + $1.rigCount } }
-    var recordedTakes: Int { entries.reduce(0) { $0 + $1.takeCount } }
-    /// Vídeos exportados: aún no hay dato en el índice (llega con el montaje, Fase 7).
-    var exportedVideos: Int { 0 }
+
+    /// Tema seleccionado (Fase 7b, punto 6): el de trabajo de Backing, Grabar y compañía. No se recuerda entre arranques.
+    var selectedEntry: LibraryEntryInfo? { backingTarget.flatMap { id in entries.first { $0.id == id } } }
+
+    /// «Seleccionar»: fija el tema de trabajo sin ir a su página.
+    func select(_ id: UUID) {
+        guard entries.contains(where: { $0.id == id }) else { return }
+        backingTarget = id
+    }
+
+    /// Buscador de Spotify de la app (la clave se lee al buscar; ver `SpotifyCredentials.load`).
+    @ObservationIgnored private lazy var spotifySearch: any SpotifySearching =
+        SpotifySearchClient.live(supportDir: supportDir, defaultSupportDir: Self.defaultSupportDir)
+
+    /// Foto de un artista (caché en `<support dir>/artists/` o Spotify); nil → iniciales (spec 7b, 6c).
+    @ObservationIgnored var artistPhotoProvider: @Sendable (String) async -> URL?
+    private static func liveArtistPhotos(supportDir: URL) -> @Sendable (String) async -> URL? {
+        let service = ArtistPhotoService.live(supportDir: supportDir, defaultSupportDir: AppModel.defaultSupportDir)
+        return { name in await service.photo(for: name) }
+    }
 
     func pickAndImport() {
         let panel = NSOpenPanel()
@@ -538,7 +566,7 @@ final class AppModel {
 
     func openLinkImport() {
         guard library != nil else { return }
-        linkImport = LinkImportSession(hooks: .init(
+        let session = LinkImportSession(hooks: .init(
             makeImporter: { [sources] in try await sources.makeImporter() },
             existingProject: { [weak self] videoID in await self?.library?.project(withVideoID: videoID)?.id },
             store: { [weak self] source, progress in _ = try await self?.storeImported(source, progress: progress) },
@@ -551,7 +579,13 @@ final class AppModel {
             },
             discardPlaylist: { [weak self] in self?.playlistImport = nil },
             close: { [weak self] dup in self?.closeLinkImport(duplicate: dup) }))
-        linkImport?.playlist = playlistImport
+        session.searcher = spotifySearch
+        session.pickFile = { [weak self] in
+            self?.closeLinkImport()
+            self?.pickAndImport()
+        }
+        session.playlist = playlistImport
+        linkImport = session
     }
 
     func closeLinkImport(duplicate: UUID? = nil) {
@@ -965,6 +999,9 @@ final class AppModel {
         }
         if study?.projectID == id { study?.reload() }
         await refresh()
+        // Renombrar un artista pide la foto del nombre nuevo (spec 7b, 6c).
+        let name = artist.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !name.isEmpty { let provider = artistPhotoProvider; Task { _ = await provider(name) } }
         return true
     }
 
@@ -1024,17 +1061,6 @@ final class AppModel {
             do { try await modelStore.delete(Self.modelID) } catch { notify("No se pudo borrar el modelo", error) }
             modelsBytes = await modelStore.diskUsage()
         }
-    }
-
-    func upsertGuitar(_ g: OwnedGuitar) {
-        if let i = profile.guitars.firstIndex(where: { $0.id == g.id }) { profile.guitars[i] = g } else { profile.guitars.append(g) }
-        if g.isDefault { profile.setDefaultGuitar(g.id) }
-        saveProfile()
-    }
-
-    func deleteGuitar(_ id: UUID) {
-        profile.guitars.removeAll { $0.id == id }
-        saveProfile()
     }
 
     func notify(_ title: String, _ error: Error) {

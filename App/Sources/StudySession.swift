@@ -191,15 +191,19 @@ final class StudySession {
         }
     }
 
-    /// Aplica una edición de `SectionEditor` (lógica y tests en Store) a las secciones en edición.
+    /// Las secciones en edición, en un `SectionEditor` (lógica y tests en Store).
+    var sectionEditor: SectionEditor { SectionEditor(sections: sections, duration: project.song.duration) }
+
+    /// Aplica una edición de `SectionEditor` a las secciones en edición.
     private func edit<R>(_ body: (inout SectionEditor) -> R) -> R {
-        var e = SectionEditor(sections: sections, duration: project.song.duration)
+        var e = sectionEditor
         let r = body(&e)
         if e.sections != sections { sections = e.sections }
         return r
     }
 
-    /// Marca una sección (o un solo) en `r`: recorta o parte las que solapa (`SectionEditor.mark`).
+    /// Marca una sección (o un solo) en `r`, solo en hueco libre: empezando dentro de otra no se crea; si entra en la
+    /// siguiente, se queda en su borde (`SectionEditor.mark`, mini-spec Fase 7b, punto 8).
     @discardableResult
     func markSection(_ r: ClosedRange<Double>, solo: Bool) -> UUID? { edit { $0.mark(r, solo: solo) } }
 
@@ -208,28 +212,13 @@ final class StudySession {
     /// Alterna «Solo»; un nombre por defecto sigue a la marca («Sección 2» y «Solo»).
     func setSolo(_ id: UUID, _ on: Bool) { edit { $0.setSolo(id, on) } }
 
-    /// Tiempo al que quedaría un borde de la sección sin pasar de su vecina ni bajar del largo mínimo.
-    func clampedEdge(_ id: UUID, start moveStart: Bool, to time: Double) -> Double? {
-        SectionEditor(sections: sections, duration: project.song.duration).clampedEdge(id, start: moveStart, to: time)
-    }
-
-    /// Mueve un borde de la sección al límite más cercano a `time` (acorde, o compás con `bar`).
-    func snapSectionEdge(_ id: UUID, start moveStart: Bool, to time: Double, bar: Bool) {
-        let b = bar ? barBoundaries : chordBoundaries
-        edit { $0.snapEdge(id, start: moveStart, to: time, boundaries: b) }
-    }
-
-    /// Mueve un borde exactamente a `time` (ya es un límite de acorde o compás; solo se aplican los topes).
+    /// Mueve un borde a `time` (lo da `SectionEdgeDrag` al soltar, ya con imán) con las reglas de `SectionEditor`:
+    /// empuja a la vecina hasta su mínimo, se para contra un solo.
     func setSectionEdge(_ id: UUID, start moveStart: Bool, to time: Double) {
         edit { $0.setEdge(id, start: moveStart, to: time) }
     }
 
-    /// Dónde quedaría un borde soltado en `time`: con imán y dentro de los topes (vista previa del arrastre).
-    func snappedEdge(_ id: UUID, start moveStart: Bool, to time: Double, bar: Bool) -> Double? {
-        clampedEdge(id, start: moveStart, to: SectionEditor.snap(time, to: bar ? barBoundaries : chordBoundaries))
-    }
-
-    /// Mueve un borde al acorde siguiente o anterior (al compás con `bar`).
+    /// Mueve un borde al acorde siguiente o anterior (al compás con `bar`), con las mismas reglas que el arrastre.
     func nudgeSectionEdge(_ id: UUID, start moveStart: Bool, forward: Bool, bar: Bool) {
         let b = bar ? barBoundaries : chordBoundaries
         edit { $0.nudgeEdge(id, start: moveStart, forward: forward, boundaries: b) }

@@ -770,6 +770,13 @@ final class RecordController {
         selectedTakeID = id
     }
 
+    /// Mini-spec Fase 7b, punto 9: el visor de tomas no se abre grabando y, al abrirlo, se para el transporte de Grabar.
+    func prepareToViewTake() -> Bool {
+        guard phase == .idle else { return false }
+        player.pause()
+        return true
+    }
+
     func markBest(_ takeID: UUID) {
         guard let i = state.parts.firstIndex(where: { $0.takeIDs.contains(takeID) }) else { return }
         state.parts[i].setBest(takeID)

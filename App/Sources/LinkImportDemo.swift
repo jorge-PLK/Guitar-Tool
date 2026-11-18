@@ -35,6 +35,7 @@ extension AppModel {
             switch state {
             case "vacio": break
             case "resolviendo": session.forced = .resolving(.searching)
+            case "preparando": session.forced = .preparing
             case "candidatos": await demo.resolve(session, spotify)
             case "descargando":
                 await demo.resolve(session, spotify)

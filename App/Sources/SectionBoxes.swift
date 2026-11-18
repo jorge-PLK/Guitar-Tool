@@ -29,8 +29,9 @@ final class SectionSelection {
     func clear() { selected = nil; popover = nil }
 }
 
-/// Una caja (o un trozo de caja, en la rejilla) de sección: contorno, cabecera con el nombre y, si está seleccionada,
-/// asas en los bordes reales. El interior deja pasar los gestos de los acordes.
+/// Una caja (o un trozo de caja, en la rejilla) de sección: contorno y cabecera con el nombre. El interior deja pasar
+/// los gestos de los acordes. Las asas de los bordes NO van aquí: las dibuja el anfitrión aparte (`SectionEdgeHandle`),
+/// con identidad fija, para que el arrastre no muera cuando el trozo que tenía el borde desaparece (punto 7, Fase 7b).
 struct SectionBoxPiece: View {
     let session: StudySession
     let ctl: BackingController
@@ -40,24 +41,17 @@ struct SectionBoxPiece: View {
     let headerHeight: CGFloat
     /// Primer trozo de la caja: lleva el nombre y la ventana. Los demás solo repiten el contorno.
     let isFirst: Bool
-    /// Este trozo contiene el borde de inicio / de fin de la sección (donde van las asas).
-    let hasStart: Bool
-    let hasEnd: Bool
     let selection: SectionSelection
-    /// Espacio de coordenadas del anfitrión y aviso de arrastre: (es el inicio, posición, terminado).
-    let space: String
-    let onEdgeDrag: (Bool, CGPoint, Bool) -> Void
-
-    /// Anchura de la zona que agarra una asa, centrada en el borde.
-    static let handleGrab: CGFloat = 16
 
     private var isSelected: Bool { selection.selected == section.id }
 
     /// Naranja para los solos; para el resto, su color de paleta (elegido o automático).
-    private var tint: Color {
+    static func tint(_ section: SongSection, _ session: StudySession) -> Color {
         if section.isSolo { return TF.accent }
         return TF.sectionPalette[(session.sectionPalette[section.id] ?? 0) % TF.sectionPalette.count]
     }
+
+    private var tint: Color { Self.tint(section, session) }
 
     private var isLoop: Bool {
         guard let l = ctl.loop else { return false }
@@ -74,10 +68,6 @@ struct SectionBoxPiece: View {
                 .stroke(stroke(solo: solo), lineWidth: isSelected || isLoop ? 2 : 1.2)
                 .allowsHitTesting(false)
             header(solo: solo)
-            if isSelected {
-                if hasStart { handle(isStart: true) }
-                if hasEnd { handle(isStart: false) }
-            }
         }
         .frame(width: size.width, height: size.height, alignment: .topLeading)
     }
@@ -129,21 +119,72 @@ struct SectionBoxPiece: View {
         .fixedSize()
     }
 
-    /// Asa de un borde: barra visible centrada en el borde y zona de agarre más ancha, con cursor de redimensionar.
-    private func handle(isStart: Bool) -> some View {
-        return ZStack {
-            Capsule().fill(tint).frame(width: 6, height: min(max(size.height - headerHeight - 10, 16), 30))
+}
+
+/// Asa de un borde de la sección seleccionada: barra visible centrada en `x` y zona de agarre más ancha, con cursor de
+/// redimensionar. La coloca el anfitrión fuera de los trozos de caja, con identidad fija durante todo el arrastre.
+/// Si el sistema cancela el gesto (sin `onEnded`), `onCancel` deja limpia la vista previa.
+struct SectionEdgeHandle: View {
+    let isStart: Bool
+    let tint: Color
+    /// Borde (x) y franja vertical del asa, en el espacio de coordenadas `space`.
+    let x: CGFloat
+    let top: CGFloat
+    let height: CGFloat
+    let space: String
+    let onDrag: (DragGesture.Value, _ ended: Bool) -> Void
+    let onCancel: () -> Void
+
+    /// Anchura de la zona que agarra una asa, centrada en el borde.
+    static let grab: CGFloat = 16
+
+    @GestureState private var active = false
+
+    var body: some View {
+        ZStack {
+            Capsule().fill(tint).frame(width: 6, height: min(max(height - 10, 16), 30))
                 .shadow(color: .black.opacity(0.5), radius: 2)
         }
-        .frame(width: Self.handleGrab, height: max(size.height - headerHeight, 0))
+        .frame(width: Self.grab, height: max(height, 0))
         .contentShape(Rectangle())
         .pointerStyle(.columnResize)
-        .offset(x: (isStart ? 0 : size.width) - Self.handleGrab / 2, y: headerHeight)
+        .offset(x: x - Self.grab / 2, y: top)
         .gesture(DragGesture(minimumDistance: 1, coordinateSpace: .named(space))
-            .onChanged { onEdgeDrag(isStart, $0.location, false) }
-            .onEnded { onEdgeDrag(isStart, $0.location, true) })
+            .updating($active) { _, s, _ in s = true }
+            .onChanged { onDrag($0, false) }
+            .onEnded { onDrag($0, true) })
+        .onChange(of: active) { _, on in if !on { onCancel() } }
         .accessibilityLabel(isStart ? "Borde de inicio" : "Borde de fin")
     }
+}
+
+/// Arrastre de un borde en curso, igual en la tira y en la rejilla: la cuenta la hace `Store.SectionEdgeDrag`
+/// (posición → tiempo, borde inicial, imán, reglas del punto 8) y aquí solo se guarda la vista previa y se aplica al soltar.
+struct SectionEdgeDragState {
+    private var drag: SectionEdgeDrag?
+    private var grab: CGPoint?
+    /// Secciones como quedarían al soltar (con la vecina empujada); nil sin arrastre.
+    private(set) var preview: [SongSection]?
+
+    /// Un evento del asa. El primero fija la cuenta con las secciones y el borde de ese momento; al soltar, guarda.
+    @MainActor mutating func update(_ v: DragGesture.Value, id: UUID, isStart: Bool, ended: Bool, session: StudySession,
+                                    cells: () -> [SectionEdgeDrag.Cell], bars: () -> [Double]) {
+        let bar = NSEvent.modifierFlags.contains(.option)
+        if drag?.id != id || drag?.isStart != isStart || grab != v.startLocation {
+            drag = SectionEdgeDrag(editor: session.sectionEditor, id: id, isStart: isStart, cells: cells(), bars: bars(),
+                                   grab: v.startLocation)
+            grab = v.startLocation
+        }
+        guard let d = drag else { cancel(); return }
+        if ended {
+            session.setSectionEdge(id, start: isStart, to: d.edge(at: v.location, bar: bar))
+            cancel()
+        } else {
+            preview = d.sections(at: v.location, bar: bar)
+        }
+    }
+
+    mutating func cancel() { drag = nil; grab = nil; preview = nil }
 }
 
 /// Cajas de la tira compacta, sobre los marcos de los acordes (espacio de coordenadas `SectionBoxes.space`).
@@ -161,11 +202,35 @@ struct SectionBoxes: View {
     /// Cuánto sobresale la caja de los acordes de los extremos.
     static let inset: CGFloat = 2
 
-    @State private var preview: SectionEdgePreview?
+    @State private var edge = SectionEdgeDragState()
 
     var body: some View {
+        let shown = edge.preview ?? session.sections
         ZStack(alignment: .topLeading) {
-            ForEach(session.sections, id: \.id) { s in box(preview.applied(to: s)) }
+            ForEach(shown, id: \.id) { s in box(s) }
+            if let id = selection.selected, let s = shown.first(where: { $0.id == id }), let r = rect(s) {
+                handle(s, isStart: true, x: r.minX, height: r.height)
+                handle(s, isStart: false, x: r.maxX, height: r.height)
+            }
+        }
+    }
+
+    private func handle(_ s: SongSection, isStart: Bool, x: CGFloat, height: CGFloat) -> some View {
+        SectionEdgeHandle(isStart: isStart, tint: SectionBoxPiece.tint(s, session), x: x, top: Self.headerHeight,
+                          height: height - Self.headerHeight, space: Self.space,
+                          onDrag: { v, ended in
+                              edge.update(v, id: s.id, isStart: isStart, ended: ended, session: session,
+                                          cells: { cells }, bars: { session.barBoundaries })
+                          },
+                          onCancel: { edge.cancel() })
+    }
+
+    /// Un chip por acorde, con la franja entera de la tira en vertical (`SectionEdgeDrag` en una sola fila).
+    private var cells: [SectionEdgeDrag.Cell] {
+        frames.sorted { $0.key < $1.key }.compactMap { i, f in
+            guard chords.indices.contains(i) else { return nil }
+            return .init(row: 0, frame: CGRect(x: f.minX, y: 0, width: f.width, height: max(f.maxY, 1)),
+                         time: chords[i].start, end: chords[i].end, chordStart: chords[i].start)
         }
     }
 
@@ -178,53 +243,19 @@ struct SectionBoxes: View {
         return a...b
     }
 
+    /// Caja de la sección en la tira (x desde el primer chip hasta el último, alto hasta el pie de los chips).
+    private func rect(_ s: SongSection) -> CGRect? {
+        guard let span = chordSpan(s), let f0 = frames[span.lowerBound], let f1 = frames[span.upperBound] else { return nil }
+        let x0 = f0.minX - Self.inset, x1 = f1.maxX + Self.inset
+        return CGRect(x: x0, y: 0, width: max(x1 - x0, 8), height: max(f0.maxY, f1.maxY) + Self.inset)
+    }
+
     @ViewBuilder private func box(_ s: SongSection) -> some View {
-        if let span = chordSpan(s), let f0 = frames[span.lowerBound], let f1 = frames[span.upperBound] {
-            let x0 = f0.minX - Self.inset, x1 = f1.maxX + Self.inset
-            let h = max(f0.maxY, f1.maxY) + Self.inset
-            SectionBoxPiece(session: session, ctl: ctl, section: s, size: CGSize(width: max(x1 - x0, 8), height: h),
-                            headerHeight: Self.headerHeight, isFirst: true, hasStart: true, hasEnd: true,
-                            selection: selection, space: Self.space) { isStart, p, ended in
-                drag(s.id, isStart: isStart, x: p.x, ended: ended)
-            }
-            .offset(x: x0)
+        if let r = rect(s) {
+            SectionBoxPiece(session: session, ctl: ctl, section: s, size: r.size, headerHeight: Self.headerHeight,
+                            isFirst: true, selection: selection)
+                .offset(x: r.minX)
         }
-    }
-
-    private func drag(_ id: UUID, isStart: Bool, x: CGFloat, ended: Bool) {
-        let bar = NSEvent.modifierFlags.contains(.option)
-        guard let t = edgeTime(x: x) else { preview = nil; return }
-        if ended {
-            preview = nil
-            session.snapSectionEdge(id, start: isStart, to: t, bar: bar)
-        } else if let snapped = session.snappedEdge(id, start: isStart, to: t, bar: bar) {
-            preview = SectionEdgePreview(id: id, isStart: isStart, time: snapped)
-        }
-    }
-
-    /// Límite de acorde bajo la posición `x`: el del lado más cercano del acorde sobre el que está.
-    private func edgeTime(x: CGFloat) -> Double? {
-        guard !frames.isEmpty else { return nil }
-        let i = frames.first { $0.value.minX <= x && x <= $0.value.maxX }?.key
-            ?? frames.min { abs($0.value.midX - x) < abs($1.value.midX - x) }!.key
-        guard chords.indices.contains(i), let f = frames[i] else { return nil }
-        return x < f.midX ? chords[i].start : chords[i].end
-    }
-}
-
-/// Borde en arrastre: la vista previa mueve la caja antes de soltar.
-struct SectionEdgePreview: Equatable {
-    var id: UUID
-    var isStart: Bool
-    var time: Double
-}
-
-extension Optional where Wrapped == SectionEdgePreview {
-    func applied(to s: SongSection) -> SongSection {
-        guard let e = self, e.id == s.id else { return s }
-        var r = s
-        if e.isStart { r.start = e.time } else { r.end = e.time }
-        return r
     }
 }
 

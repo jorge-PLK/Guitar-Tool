@@ -18,9 +18,8 @@ func makeSong(title: String = "Song", sha: String = "abc", rate: Double = 44100)
 
 func makeFullProject() -> Project {
     let guitar = Guitar(role: .rhythm, name: "Strat")
-    let ownedGuitarID = UUID()
     let section = Section(name: "Solo", start: 10, end: 20, kind: "solo")
-    let take = Take(guitarId: ownedGuitarID, sectionId: section.id, diFile: "takes/a-di.wav",
+    let take = Take(sectionId: section.id, diFile: "takes/a-di.wav",
                     processedFile: "takes/a-proc.wav", micFile: "takes/a-mic.wav", discarded: false, createdAt: whole())
     return Project(
         song: makeSong(),

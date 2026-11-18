@@ -94,6 +94,7 @@ private struct RecordBody: View {
     @State private var addingPart = false
     @State private var mixerExpanded = false
     @State private var deleting: UUID?
+    @State private var viewing: TakeViewRequest?
     private let tick = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
     private let slowTick = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
 
@@ -129,6 +130,7 @@ private struct RecordBody: View {
         .onReceive(slowTick) { _ in ctl.pollCamera() }
         .sheet(item: $ctl.offsetRequest) { OffsetSheet(request: $0, ctl: ctl) }
         .sheet(isPresented: $addingPart) { AddPartSheet(ctl: ctl) }
+        .sheet(item: $viewing) { req in takeViewer(req) }
         .confirmationDialog("¿Borrar la toma?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }),
                             titleVisibility: .visible) {
             Button("Borrar toma", role: .destructive) { if let id = deleting { ctl.deleteTake(id) }; deleting = nil }
@@ -216,7 +218,7 @@ private struct RecordBody: View {
             Text(part.replaces.map { "Sustituye: \(ctl.guitarName($0))" } ?? "Parte añadida")
                 .font(TF.body(12)).foregroundStyle(TF.muted)
             FlowRow {
-                ForEach(Array(ctl.takes(of: part).enumerated()), id: \.element.id) { i, t in takeButton(t, number: i + 1, best: part.bestTakeID == t.id) }
+                ForEach(Array(ctl.takes(of: part).enumerated()), id: \.element.id) { i, t in takeButton(t, number: i + 1, part: part, best: part.bestTakeID == t.id) }
             }
         }
         .padding(.horizontal, 14).padding(.vertical, 12).frame(maxWidth: .infinity, alignment: .leading)
@@ -238,7 +240,35 @@ private struct RecordBody: View {
             .padding(.horizontal, 9).padding(.vertical, 3).background(bg, in: Capsule())
     }
 
-    private func takeButton(_ t: Take, number: Int, best: Bool) -> some View {
+    /// Visor de la toma (mini-spec Fase 7b, punto 9): marcar como mejor y eliminar actúan como en la fila.
+    @ViewBuilder private func takeViewer(_ req: TakeViewRequest) -> some View {
+        TakeViewer(project: ctl.session.project, layout: ctl.session.layout, takeID: req.takeID, title: req.title,
+                   isBest: ctl.state.part(containingTake: req.takeID)?.bestTakeID == req.takeID,
+                   onMarkBest: { ctl.markBest(req.takeID) },
+                   onDelete: { viewing = nil; ctl.deleteTake(req.takeID) },
+                   onClose: { viewing = nil })
+    }
+
+    private func viewTake(_ t: Take, number: Int, part: RecordingPart) {
+        guard ctl.prepareToViewTake() else { return }
+        viewing = TakeViewRequest(takeID: t.id, title: "Toma \(number) · \(part.name)")
+    }
+
+    private func takeButton(_ t: Take, number: Int, part: RecordingPart, best: Bool) -> some View {
+        HStack(spacing: 4) {
+            takeMenu(t, number: number, best: best)
+            Button { viewTake(t, number: number, part: part) } label: {
+                Image(systemName: "play.fill").font(.system(size: 11)).foregroundStyle(TF.text2)
+                    .frame(width: 32, height: 32)
+                    .background(TF.sidebar, in: RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(TF.fieldLine))
+            }
+            .buttonStyle(.plain).disabled(ctl.isBusy || t.processedFile == nil || t.songStart == nil)
+            .help("Ver toma").accessibilityLabel("Ver toma \(number)")
+        }
+    }
+
+    private func takeMenu(_ t: Take, number: Int, best: Bool) -> some View {
         let selected = ctl.selectedTakeID == t.id
         return Menu {
             Button("Marcar como mejor") { ctl.markBest(t.id) }.disabled(best)
