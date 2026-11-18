@@ -50,6 +50,8 @@ final class LinkImportSession {
     enum Screen: Equatable {
         case empty
         case resolving(ResolvingStage)
+        /// Pasada recién lanzada: aún sin recorrido del importador («Preparando…»).
+        case preparing
         case candidates
         case working(String, Double?)
         case error
@@ -90,12 +92,33 @@ final class LinkImportSession {
     var forced: Screen?
     #endif
 
+    // MARK: Búsqueda en Spotify (Fase 7b, punto 4)
+
+    enum SearchState: Equatable {
+        case idle
+        case searching
+        case results(query: String, [SpotifyTrackResult])
+        case failed(String)
+    }
+    var searchState = SearchState.idle
+    /// Buscador de Spotify; nil = sin búsqueda (el campo solo acepta enlaces).
+    var searcher: (any SpotifySearching)?
+    /// «Importar fichero…» del popup: cierra la hoja y abre el selector.
+    var pickFile: () -> Void = {}
+    private var searchTask: Task<Void, Never>?
+
     private let hooks: Hooks
     private var lastOp: Op = .resolve
     private var manualLinks: [String] = []
-    private var task: Task<Void, Never>?
+    /// Una sola pasada viva (resolver, descargar, lista, actualizar): una cancelada no escribe estado.
+    private let gate = PassGate()
+    /// `lookup()` de la última URL resuelta: un reintento de la misma URL no vuelve a escanear la carpeta.
+    private var lookupCache: (text: String, value: LibraryLookup)?
 
     init(hooks: Hooks) { self.hooks = hooks }
+
+    /// Hay una búsqueda o una pasada en curso: «Importar», «Elegir» e «Importar fichero» quedan desactivados.
+    var isBusy: Bool { gate.isRunning || searchState == .searching }
 
     // MARK: Lo que se ve
 
@@ -110,11 +133,13 @@ final class LinkImportSession {
         if isImporting { return .working("Importando en la biblioteca…", importProgress) }
         if otherError != nil { return .error }
         if let f = failure, !(f.returnsToCandidates && importer?.resolved != nil) { return .error }
-        guard let importer else { return .empty }
+        guard let importer else { return gate.isRunning ? .preparing : .empty }
         switch importer.state {
         case .resolving(let s): return .resolving(s)
         case .downloading(let s, let p): return .working(s == .downloading ? "Descargando audio…" : "Convirtiendo a WAV…", p)
-        case .candidates, .idle, .failed, .finished: return importer.resolved != nil ? .candidates : .empty
+        case .candidates, .idle, .failed, .finished:
+            if importer.resolved != nil { return .candidates }
+            return gate.isRunning ? .preparing : .empty
         }
     }
 
@@ -129,30 +154,74 @@ final class LinkImportSession {
 
     // MARK: Acciones
 
+    /// «Importar» del popup: un enlace sigue el recorrido de siempre; lo demás se busca en Spotify.
+    func importTapped() {
+        guard !isBusy else { return }
+        switch ImportQuery.classify(text) {
+        case .empty: return
+        case .link(let link):
+            searchTask?.cancel()
+            searchState = .idle
+            text = link
+            continueTapped()
+        case .search(let q): search(q)
+        }
+    }
+
+    func search(_ query: String) {
+        guard let searcher else { searchState = .failed(SpotifySearchError.missingCredentials.localizedDescription); return }
+        searchTask?.cancel()
+        searchState = .searching
+        searchTask = Task {
+            do {
+                let r = try await searcher.search(query)
+                if Task.isCancelled { return }
+                searchState = .results(query: query, r)
+            } catch {
+                if Task.isCancelled || error is CancellationError { return }
+                searchState = .failed((error as? SpotifySearchError)?.localizedDescription ?? "Sin conexión con Spotify")
+            }
+        }
+    }
+
+    /// «Elegir»: lanza el flujo de enlace con la pista.
+    func choose(_ track: SpotifyTrackResult) {
+        guard !isBusy else { return }
+        text = track.trackURL.absoluteString
+        continueTapped()
+    }
+
+    /// ▶ «Oír en Spotify»: la app de Spotify y, si ninguna abre `spotify:`, el navegador.
+    func listen(_ track: SpotifyTrackResult) {
+        if !NSWorkspace.shared.open(track.appURL) { NSWorkspace.shared.open(track.trackURL) }
+    }
+
     func continueTapped() {
-        guard !text.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        guard !isBusy, !text.trimmingCharacters(in: .whitespaces).isEmpty else { return }
         if case .playlist? = try? SourceInput.parse(text) { startPlaylist(); return }
         lastOp = .resolve
         manualLinks = []
-        run { try await self.resolveOp() }
+        run { isCurrent in try await self.resolveOp(isCurrent) }
     }
 
     func importSelected() {
-        guard selectedCandidate != nil else { return }
+        guard selectedCandidate != nil, !isBusy else { return }
         lastOp = .download
-        run { try await self.downloadOp() }
+        run { _ in try await self.downloadOp() }
     }
 
     func addManual() {
         let t = manualText.trimmingCharacters(in: .whitespaces)
-        guard !t.isEmpty, let importer else { return }
+        guard !t.isEmpty, let importer, !isBusy else { return }
         manualError = nil
-        task?.cancel()
-        task = Task {
+        gate.start { [self] isCurrent in
             do {
                 let c = try await importer.addManualCandidate(t)
+                guard isCurrent() else { return }
+                let video = await hooks.lookup().video
+                guard isCurrent() else { return }
                 manualLinks.append(t)
-                libraryVideos = await hooks.lookup().video
+                libraryVideos = video
                 selectedID = libraryVideos[c.id] == nil ? c.id : nil
                 manualText = ""
                 failure = nil
@@ -166,60 +235,64 @@ final class LinkImportSession {
 
     func retry() {
         switch lastOp {
-        case .resolve: run { try await self.resolveOp() }
-        case .download: run { try await self.downloadOp() }
+        case .resolve: run { isCurrent in try await self.resolveOp(isCurrent) }
+        case .download: run { _ in try await self.downloadOp() }
         }
     }
 
     func updateAndRetry() {
+        guard !gate.isRunning else { return }
         let broken = failure
         failure = nil
         otherError = nil
         alreadyLatest = false
         updating = true
-        task?.cancel()
-        task = Task {
+        gate.start { [self] isCurrent in
             defer { updating = false }
             do {
                 let info = try await hooks.updateYtDlp()
+                guard isCurrent() else { return }
                 if case .extractorBroken(let v?, _)? = broken, HelperLocator.compare(info.version, v) <= 0 {
                     alreadyLatest = true
                     failure = broken
                     return
                 }
                 let (savedTitle, savedArtist, savedSel) = (title, artist, selectedID)
-                importer = try await hooks.makeImporter()
-                try await resolveOp()
+                let fresh = try await hooks.makeImporter()
+                guard isCurrent() else { return }
+                importer = fresh
+                try await resolveOp(isCurrent)
                 for link in manualLinks { _ = try? await importer?.addManualCandidate(link) }
+                guard isCurrent() else { return }
                 (title, artist, selectedID) = (savedTitle, savedArtist, savedSel)
                 if case .download = lastOp { try await downloadOp() }
-            } catch { handle(error) }
+            } catch { if isCurrent() { handle(error) } }
         }
     }
 
     /// Cancela lo que esté en curso: vuelve a los candidatos si ya había, o al campo vacío.
     func cancel() {
-        task?.cancel()
-        task = nil
+        gate.cancel()
         failure = nil
         otherError = nil
         if importer?.resolved == nil { importer?.reset() }
     }
 
     private func startPlaylist() {
-        task?.cancel()
         failure = nil
         otherError = nil
-        task = Task {
+        gate.start { [self] isCurrent in
             do {
                 let p = try await hooks.makePlaylist()
+                guard isCurrent() else { return }
                 playlist = p
                 p.start(text)
-            } catch { handle(error) }
+            } catch { if isCurrent() { handle(error) } }
         }
     }
 
     func close() {
+        searchTask?.cancel()
         // La cola de una lista sigue aunque se cierre la hoja.
         if playlist != nil { hooks.close(nil); return }
         cancel()
@@ -239,6 +312,7 @@ final class LinkImportSession {
         if playlist != nil { playlist = nil; hooks.discardPlaylist() }
         cancel()
         importer?.reset()
+        lookupCache = nil
         failure = nil
         otherError = nil
         alreadyLatest = false
@@ -251,20 +325,26 @@ final class LinkImportSession {
 
     // MARK: Operaciones
 
-    private func run(_ op: @escaping @MainActor () async throws -> Void) {
-        task?.cancel()
+    /// Lanza una pasada si no hay otra viva; el estado «Preparando…» se ve en el mismo clic (`gate.isRunning`).
+    private func run(_ op: @escaping @MainActor (@MainActor () -> Bool) async throws -> Void) {
+        guard !gate.isRunning else { return }
         failure = nil
         otherError = nil
         manualError = nil
         alreadyLatest = false
-        task = Task {
-            do { try await op() } catch { handle(error) }
+        gate.start { [self] isCurrent in
+            do { try await op(isCurrent) } catch { if isCurrent() { handle(error) } }
         }
     }
 
-    private func resolveOp() async throws {
+    private func resolveOp(_ isCurrent: @MainActor () -> Bool) async throws {
         // Tema repetido: se dice en cuanto se reconoce el enlace, antes de leer metadatos y de buscar.
-        let lookup = await hooks.lookup()
+        let lookup: LibraryLookup
+        if let c = lookupCache, c.text == text { lookup = c.value } else {
+            lookup = await hooks.lookup()
+            guard isCurrent() else { throw CancellationError() }
+            lookupCache = (text, lookup)
+        }
         libraryVideos = lookup.video
         existing = nil
         possibleDuplicate = nil
@@ -274,9 +354,14 @@ final class LinkImportSession {
         case nil: break
         }
         if existing != nil { return }
-        if importer == nil { importer = try await hooks.makeImporter() }
+        if importer == nil {
+            let made = try await hooks.makeImporter()
+            guard isCurrent() else { throw CancellationError() }
+            importer = made
+        }
         guard let importer else { return }
         let r = try await importer.resolve(text)
+        guard isCurrent() else { throw CancellationError() }
         title = r.title
         artist = r.artist
         possibleDuplicate = lookup.possible(title: r.title, artist: r.artist)
@@ -366,10 +451,11 @@ struct LinkImportSheet: View {
     var body: some View {
         let wide = session.screen == .playlist
         return VStack(alignment: .leading, spacing: 18) {
-            Text(wide ? "Importar lista" : "Importar desde enlace").font(TF.display(22))
+            Text(wide ? "Importar lista" : session.screen == .empty ? "Importar tema" : "Importar desde enlace").font(TF.display(22))
             switch session.screen {
             case .empty: emptyView
             case .resolving(let s): resolvingView(s)
+            case .preparing: preparingView
             case .candidates: candidatesView
             case .working(let label, let p): workingView(label, p)
             case .error: errorView
@@ -383,7 +469,7 @@ struct LinkImportSheet: View {
             }
         }
         // La hoja de una lista necesita más sitio que la de un tema.
-        .padding(24).frame(width: wide ? Self.playlistSize.width : 560, height: wide ? Self.playlistSize.height : nil)
+        .padding(24).frame(width: wide ? Self.playlistSize.width : session.screen == .empty ? 620 : 560, height: wide ? Self.playlistSize.height : nil)
         .background(TF.card).foregroundStyle(TF.text)
         .interactiveDismissDisabled(!session.canCancel)
     }
@@ -392,21 +478,70 @@ struct LinkImportSheet: View {
 
     private var emptyView: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Pega el enlace de un vídeo o lista de YouTube, o de una canción, lista o álbum de Spotify.").foregroundStyle(TF.muted)
-            HStack(spacing: 8) {
-                field("https://…", text: $session.text) { session.continueTapped() }
-                Button("Pegar") {
-                    if let s = NSPasteboard.general.string(forType: .string) { session.text = s }
-                }.buttonStyle(SecondaryButton())
+            ZStack(alignment: .trailing) {
+                field("Pega un enlace o busca en Spotify", text: $session.text) { session.importTapped() }
+                if session.searchState == .searching {
+                    ProgressView().controlSize(.small).padding(.trailing, 12)
+                }
             }
-            Text(SourceMessages.supportedLinks).font(TF.body(12)).foregroundStyle(TF.muted)
-                .fixedSize(horizontal: false, vertical: true)
+            searchArea
             actions {
+                Button("Importar fichero…") { session.pickFile() }.buttonStyle(SecondaryButton())
+                    .disabled(session.isBusy)
+                Spacer().frame(width: 8)
                 Button("Cancelar") { session.close() }.buttonStyle(SecondaryButton())
-                Button("Continuar") { session.continueTapped() }.buttonStyle(PrimaryButton())
-                    .disabled(session.text.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .keyboardShortcut(.cancelAction)
+                Button("Importar") { session.importTapped() }.buttonStyle(PrimaryButton())
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(session.isBusy || ImportQuery.classify(session.text) == .empty)
             }
         }
+    }
+
+    @ViewBuilder private var searchArea: some View {
+        switch session.searchState {
+        case .idle, .searching:
+            Text(SourceMessages.supportedLinks).font(TF.body(12)).foregroundStyle(TF.muted)
+                .fixedSize(horizontal: false, vertical: true)
+        case .failed(let message):
+            banner(message, error: true)
+            Text(SourceMessages.supportedLinks).font(TF.body(12)).foregroundStyle(TF.muted)
+                .fixedSize(horizontal: false, vertical: true)
+        case .results(let query, let tracks):
+            if tracks.isEmpty {
+                Text("Spotify no ha encontrado nada para «\(query)»").font(TF.body(13)).foregroundStyle(TF.muted)
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(tracks) { t in
+                        if t.id != tracks.first?.id { Divider().overlay(TF.line) }
+                        trackRow(t)
+                    }
+                }
+                .background(TF.field, in: RoundedRectangle(cornerRadius: 8))
+            }
+        }
+    }
+
+    private func trackRow(_ t: SpotifyTrackResult) -> some View {
+        HStack(spacing: 10) {
+            AsyncImage(url: t.imageURL) { image in image.resizable().scaledToFill() } placeholder: {
+                Image(systemName: "music.note").foregroundStyle(TF.muted)
+            }
+            .frame(width: 36, height: 36).background(TF.card).clipShape(RoundedRectangle(cornerRadius: 4))
+            VStack(alignment: .leading, spacing: 1) {
+                Text(t.name).font(TF.body(13, .semibold)).lineLimit(1)
+                Text(t.artistsText).font(TF.body(12)).foregroundStyle(TF.text2).lineLimit(1)
+                Text(t.year.map { "\(t.album) · \($0)" } ?? t.album).font(TF.body(11)).foregroundStyle(TF.muted).lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            Text(t.durationText).font(TF.body(12)).foregroundStyle(TF.muted).monospacedDigit()
+            Button { session.listen(t) } label: { Image(systemName: "play.fill") }
+                .buttonStyle(.plain).foregroundStyle(TF.accent)
+                .help("Oír en Spotify").accessibilityLabel("Oír en Spotify")
+            Button("Elegir") { session.choose(t) }.buttonStyle(SecondaryButton(height: 30))
+                .disabled(session.isBusy)
+        }
+        .padding(.horizontal, 10).padding(.vertical, 6)
     }
 
     // MARK: Repetido
@@ -428,6 +563,18 @@ struct LinkImportSheet: View {
                 Button("Cerrar") { session.close() }.buttonStyle(SecondaryButton())
                 Button("Abrir") { session.openExisting() }.buttonStyle(PrimaryButton())
             }
+        }
+    }
+
+    // MARK: Preparando
+
+    private var preparingView: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 12) {
+                ProgressView().controlSize(.small)
+                Text("Preparando…")
+            }
+            actions { Button("Cancelar") { session.cancel() }.buttonStyle(SecondaryButton()) }
         }
     }
 

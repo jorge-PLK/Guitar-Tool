@@ -1,23 +1,5 @@
 import Foundation
 
-public enum PickupType: String, Codable, Sendable, Equatable {
-    case passive, active
-}
-
-public struct OwnedGuitar: Codable, Sendable, Equatable {
-    public var id: UUID
-    public var name: String
-    public var pickups: PickupType
-    public var isDefault: Bool
-
-    public init(id: UUID = UUID(), name: String, pickups: PickupType = .passive, isDefault: Bool = false) {
-        self.id = id
-        self.name = name
-        self.pickups = pickups
-        self.isDefault = isDefault
-    }
-}
-
 /// Perfil de equipo global (no es de un proyecto).
 public struct EquipmentProfile: Codable, Sendable, Equatable {
     public static let allowedSampleRates: [Double] = [44100, 48000]
@@ -27,9 +9,6 @@ public struct EquipmentProfile: Codable, Sendable, Equatable {
     public var projectsFolder: URL?
     public var workingSampleRate: Double {
         didSet { if !Self.allowedSampleRates.contains(workingSampleRate) { workingSampleRate = Self.defaultSampleRate } }
-    }
-    public var guitars: [OwnedGuitar] {
-        didSet { Self.normalizeDefault(&guitars) }
     }
 
     /// Volumen global de la pantalla Backing (stems + metrónomo), en dB; igual en todos los temas.
@@ -42,39 +21,23 @@ public struct EquipmentProfile: Codable, Sendable, Equatable {
     public var video: VideoSettings?
 
     public init(projectsFolder: URL? = nil, workingSampleRate: Double = EquipmentProfile.defaultSampleRate,
-                guitars: [OwnedGuitar] = [], masterGainDB: Double = 0, audio: AudioSettings? = nil,
+                masterGainDB: Double = 0, audio: AudioSettings? = nil,
                 video: VideoSettings? = nil) {
         self.video = video
         self.masterGainDB = masterGainDB
         self.audio = audio
         self.projectsFolder = projectsFolder
         self.workingSampleRate = Self.allowedSampleRates.contains(workingSampleRate) ? workingSampleRate : Self.defaultSampleRate
-        var g = guitars
-        Self.normalizeDefault(&g)
-        self.guitars = g
     }
 
+    /// Un `profile.json` antiguo con `guitars` se lee ignorando la clave y se reescribe sin ella (Fase 7b, punto 10).
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.init(projectsFolder: try c.decodeIfPresent(URL.self, forKey: .projectsFolder),
                   workingSampleRate: try c.decodeIfPresent(Double.self, forKey: .workingSampleRate) ?? Self.defaultSampleRate,
-                  guitars: try c.decodeIfPresent([OwnedGuitar].self, forKey: .guitars) ?? [],
                   masterGainDB: try c.decodeIfPresent(Double.self, forKey: .masterGainDB) ?? 0,
                   audio: try c.decodeIfPresent(AudioSettings.self, forKey: .audio),
                   video: try c.decodeIfPresent(VideoSettings.self, forKey: .video))
-    }
-
-    /// Como mucho una por defecto: se conserva la primera marcada.
-    private static func normalizeDefault(_ g: inout [OwnedGuitar]) {
-        var seen = false
-        for i in g.indices where g[i].isDefault {
-            if seen { g[i].isDefault = false } else { seen = true }
-        }
-    }
-
-    /// Marca `id` como la guitarra por defecto (desmarca las demás).
-    public mutating func setDefaultGuitar(_ id: UUID) {
-        for i in guitars.indices { guitars[i].isDefault = (guitars[i].id == id) }
     }
 }
 

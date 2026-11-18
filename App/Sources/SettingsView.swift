@@ -82,19 +82,12 @@ struct InfoRow<Trailing: View>: View {
 
 struct LibrarySettings: View {
     @Environment(AppModel.self) private var model
-    @State private var guitarDraft: GuitarDraft?
     @State private var confirmDeleteModel = false
 
     var body: some View {
         @Bindable var model = model
-        HStack(alignment: .top, spacing: 20) {
-            VStack(spacing: 20) { library; models; externalSources }.frame(maxWidth: .infinity)
-            guitars.frame(maxWidth: .infinity)
-        }
+        VStack(spacing: 20) { library; models; externalSources }.frame(maxWidth: .infinity)
         .task { await model.refresh(); await model.loadToolsInfo() }
-        .sheet(item: $guitarDraft) { d in
-            GuitarEditor(draft: d) { model.upsertGuitar($0) }
-        }
         .confirmationDialog("Carpeta de proyectos", isPresented: Binding(
             get: { model.pendingFolder != nil }, set: { if !$0 { model.pendingFolder = nil } }),
             titleVisibility: .visible, presenting: model.pendingFolder) { url in
@@ -196,59 +189,5 @@ struct LibrarySettings: View {
         case .installed(_, let bytes): Text("Descargado · \(Fmt.bytes(bytes))").foregroundStyle(TF.ok).fontWeight(.semibold)
         case .failed(let m): Text("Error").foregroundStyle(TF.danger).fontWeight(.semibold).help(m)
         }
-    }
-
-    private var guitars: some View {
-        SettingsGroup(title: "Tus guitarras", note: "La guitarra de cada toma se guarda con ella.") {
-            if model.profile.guitars.isEmpty { Text("Aún no has añadido ninguna.").foregroundStyle(TF.muted) }
-            ForEach(model.profile.guitars, id: \.id) { g in
-                InfoRow(label: g.name) {
-                    Text(g.pickups == .active ? "Activas" : "Pasivas").font(TF.body(12)).foregroundStyle(TF.muted)
-                    if g.isDefault { Chip(text: "Por defecto", kind: .ok) }
-                    Button { guitarDraft = GuitarDraft(guitar: g) } label: { Image(systemName: "pencil") }
-                        .buttonStyle(.plain).help("Editar")
-                    Button { model.deleteGuitar(g.id) } label: { Image(systemName: "trash") }
-                        .buttonStyle(.plain).help("Borrar")
-                }
-            }
-            Button("Añadir guitarra") { guitarDraft = GuitarDraft(guitar: OwnedGuitar(name: "")) }
-                .buttonStyle(SecondaryButton())
-        }
-    }
-}
-
-struct GuitarDraft: Identifiable {
-    var guitar: OwnedGuitar
-    var id: UUID { guitar.id }
-}
-
-struct GuitarEditor: View {
-    @Environment(\.dismiss) private var dismiss
-    @State var draft: GuitarDraft
-    let onSave: (OwnedGuitar) -> Void
-
-    init(draft: GuitarDraft, onSave: @escaping (OwnedGuitar) -> Void) {
-        _draft = State(initialValue: draft)
-        self.onSave = onSave
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Guitarra").font(TF.display(22))
-            TextField("Nombre", text: $draft.guitar.name).textFieldStyle(.roundedBorder)
-            Picker("Pastillas", selection: $draft.guitar.pickups) {
-                Text("Pasivas").tag(PickupType.passive)
-                Text("Activas").tag(PickupType.active)
-            }.pickerStyle(.segmented)
-            Toggle("Guitarra por defecto", isOn: $draft.guitar.isDefault)
-            HStack {
-                Spacer()
-                Button("Cancelar") { dismiss() }.buttonStyle(SecondaryButton())
-                Button("Guardar") { onSave(draft.guitar); dismiss() }.buttonStyle(PrimaryButton())
-                    .disabled(draft.guitar.name.trimmingCharacters(in: .whitespaces).isEmpty)
-            }
-        }
-        .padding(24).frame(width: 400)
-        .background(TF.card).foregroundStyle(TF.text)
     }
 }

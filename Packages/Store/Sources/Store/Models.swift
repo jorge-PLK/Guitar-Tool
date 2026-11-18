@@ -170,7 +170,6 @@ public struct Rig: Codable, Sendable, Equatable {
 
 public struct Take: Codable, Sendable, Equatable {
     public var id: UUID
-    public var guitarId: UUID?
     public var sectionId: UUID?
     public var diFile: String?
     public var processedFile: String?
@@ -211,7 +210,7 @@ public struct Take: Codable, Sendable, Equatable {
     /// Giro normalizado (`VideoSettings.normalizedRotation`).
     public var rotationDegrees: Int { VideoSettings.normalizedRotation(videoRotation ?? 0) }
 
-    public init(id: UUID = UUID(), guitarId: UUID? = nil, sectionId: UUID? = nil, diFile: String? = nil,
+    public init(id: UUID = UUID(), sectionId: UUID? = nil, diFile: String? = nil,
                 processedFile: String? = nil, micFile: String? = nil, discarded: Bool = false, createdAt: Date = Date(),
                 songStart: Double? = nil, sampleRate: Double? = nil, latencySamples: Double? = nil,
                 rigDelaySamples: Double? = nil, rigDelayReliable: Bool? = nil, latencyCalibrated: Bool? = nil,
@@ -235,7 +234,6 @@ public struct Take: Codable, Sendable, Equatable {
         self.calibrationKey = calibrationKey
         self.clock = clock
         self.id = id
-        self.guitarId = guitarId
         self.sectionId = sectionId
         self.diFile = diFile
         self.processedFile = processedFile

@@ -182,6 +182,9 @@ Biblioteca:
 - [ ] Dos vistas: por tema (la actual) y por artista
 - [ ] «Abrir» pasa a ser «Seleccionar», con otro botón para mostrar en Finder. El tema seleccionado aparece entre Ajustes y el dispositivo (título y artista, empujándolos); si no cabe se trunca y al pasar el ratón el texto se desplaza para verse entero. Al pulsarlo lleva a su página de información, con Mostrar en Finder, Eliminar y las grabaciones guardadas del tema
 
+- [ ] Corregir título y artista desde la lista: icono de lápiz en cada fila (añadido el 18/11/2026)
+- [ ] Vista Artistas en recuadros con foto (de Spotify) y nombre; al pulsar uno, sus temas con flecha para volver; al volver de Temas, siempre la cuadrícula completa (añadido el 18/11/2026)
+
 Backing track:
 
 - [ ] Alargar o encoger una sección en el modo expandido sigue fallando

@@ -1,3 +1,4 @@
+import Store
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -61,12 +62,31 @@ struct Sidebar: View {
             navRow("Montaje", icon: "film", active: model.section == .montage) { model.section = .montage }
             Spacer()
             navRow("Ajustes", icon: "gearshape", active: model.section == .settings) { model.section = .settings }
+            if let e = model.selectedEntry { selectedCard(e) }
             deviceCard
         }
         .padding(.horizontal, 16).padding(.vertical, 24)
         .frame(maxHeight: .infinity)
         .background(TF.sidebar)
         .overlay(alignment: .trailing) { Rectangle().fill(TF.line).frame(width: 1) }
+    }
+
+    /// Tema seleccionado (Fase 7b, punto 6). Pulsarla abre la página del tema. El desplazamiento de los textos largos
+    /// al pasar el ratón lo añade `MarqueeText`.
+    private func selectedCard(_ e: LibraryEntryInfo) -> some View {
+        let active = model.section == .library && model.detail?.id == e.id
+        return Button { Task { await model.open(e.id) } } label: {
+            VStack(alignment: .leading, spacing: 2) {
+                MarqueeText(text: e.title, font: TF.body(14, .semibold), color: TF.text)
+                MarqueeText(text: e.artist ?? "", font: TF.body(12), color: TF.muted)
+            }
+            .padding(12).frame(maxWidth: .infinity, alignment: .leading)
+            .background(active ? TF.accentBg : TF.field, in: RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(active ? TF.accent : .clear))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain).padding(.top, 8)
+        .help("Abrir la página del tema").accessibilityLabel("Tema seleccionado: \(e.title)")
     }
 
     private var deviceCard: some View {
