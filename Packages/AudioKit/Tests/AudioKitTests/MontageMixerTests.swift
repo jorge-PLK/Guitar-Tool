@@ -58,12 +58,19 @@ final class MontageMixerTests: XCTestCase {
         for i in stride(from: 24_000, to: s.count, by: 48_000) { s[i] = 0.5 }
         let r = try await MontageMixer.mix(job([.init(id: "x", url: try wav("x", s, s), group: .backing)],
                                                end: 5, normalization: .standardWithoutLimiter))
+        // Techo efectivo: −1 dBTP menos la holgura del códec (−1,3), igual que con limitador.
+        let ceiling = MontageMixer.peakCeilingDB - MontageMixer.codecHeadroomDB
         XCTAssertTrue(r.limitedByPeak)
-        XCTAssertEqual(r.finalTruePeakDB, -1, accuracy: 1e-6)
+        XCTAssertEqual(r.finalTruePeakDB, ceiling, accuracy: 1e-6)
+        XCTAssertEqual(r.gainDB, ceiling - r.measuredTruePeakDB, accuracy: 1e-9)
+        XCTAssertEqual(r.finalLUFS ?? .nan, (r.measuredLUFS ?? .nan) + r.gainDB, accuracy: 1e-9)
         XCTAssertLessThan(r.finalLUFS ?? .nan, -14 - 1)
         let measured = try LoudnessMeter.measure(url: r.mixURL)
-        XCTAssertEqual(measured.truePeakDB, -1, accuracy: 0.1)
-        XCTAssertEqual(measured.integratedLUFS ?? .nan, r.finalLUFS ?? .nan, accuracy: 0.1)
+        print(String(format: "F7 sin limitador: resultado %.3f LUFS %.3f dBTP; fichero %.3f LUFS %.3f dBTP",
+                     r.finalLUFS ?? .nan, r.finalTruePeakDB, measured.integratedLUFS ?? .nan, measured.truePeakDB))
+        XCTAssertLessThanOrEqual(measured.truePeakDB, ceiling + 0.001)
+        XCTAssertEqual(measured.truePeakDB, ceiling, accuracy: 0.01)
+        XCTAssertEqual(measured.integratedLUFS ?? .nan, r.finalLUFS ?? .nan, accuracy: 0.05)
     }
 
     func testWithoutNormalizationTheGainIsZeroAndTheMixIsTheSum() async throws {
@@ -298,6 +305,59 @@ final class MontageMixerTests: XCTestCase {
         } catch let e as MontageMixError { XCTAssertEqual(e, .invalidRange) }
     }
 
+    func testInteriorCutFadesEvenWithoutGlobalFadeInAndOut() async throws {
+        try prepareOut()
+        let fs = 48_000
+        // Sin fundido global (primer tramo sin entrada, último sin salida): solo el corte interior funde.
+        let segs = [MontageSegment(start: 0, end: 2, fadeIn: false, fadeOut: true),
+                    MontageSegment(start: 4, end: 6, fadeIn: true, fadeOut: false)]
+        let r = try await MontageMixer.mix(segmentJob([.init(id: "a", url: try wav("a", dc(1, seconds: 7)), group: .backing)], segs))
+        let x = try read(r.mixURL)[0]
+        XCTAssertEqual(x[0], 1, accuracy: 1e-4)
+        XCTAssertEqual(x[x.count - 1], 1, accuracy: 1e-4)
+        XCTAssertEqual(x[2 * fs - fs / 4], 0.5, accuracy: 2e-3)          // mitad de la salida del primero
+        XCTAssertEqual(x[2 * fs + fs / 4], 0.5, accuracy: 2e-3)          // mitad de la entrada del segundo
+        XCTAssertEqual(x[2 * fs - 1], 0, accuracy: 1e-3)
+    }
+
+    func testFadeIsLimitedToHalfTheSegmentEvenWithoutTheOtherFade() async throws {
+        try prepareOut()
+        let fs = 48_000
+        // Tramo de 0,4 s con solo fundido de entrada de 0,5 s: dura 0,2 s (mitad del tramo).
+        let segs = [MontageSegment(start: 1, end: 1.4, fadeIn: true, fadeOut: false)]
+        let r = try await MontageMixer.mix(segmentJob([.init(id: "a", url: try wav("a", dc(1, seconds: 3)), group: .backing)], segs))
+        let x = try read(r.mixURL)[0]
+        XCTAssertEqual(x.count, Int(0.4 * Double(fs)))
+        XCTAssertEqual(x[Int(0.1 * Double(fs))], 0.5, accuracy: 2e-3)
+        XCTAssertEqual(x[Int(0.2 * Double(fs))], 1, accuracy: 2e-3)
+        XCTAssertEqual(x[x.count - 1], 1, accuracy: 1e-4)
+    }
+
+    func testSilenceWithLimiterStillWritesTheMix() async throws {
+        try prepareOut()
+        let z = [Float](repeating: 0, count: 2 * 48_000)
+        let r = try await MontageMixer.mix(job([.init(id: "z", url: try wav("z", z, z), group: .backing)],
+                                               end: 2, normalization: .standard))
+        XCTAssertNil(r.finalLUFS)
+        XCTAssertEqual(r.gainDB, 0)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: r.mixURL.path))
+        XCTAssertEqual(Int(try AVAudioFile(forReading: r.mixURL).length), 2 * 48_000)
+        XCTAssertFalse(r.limiterOutOfTolerance)
+    }
+
+    func testClippedSamplesAreReportedPerFile() async throws {
+        try prepareOut()
+        let loud = dc(1.5, seconds: 1)
+        let r = try await MontageMixer.mix(job([.init(id: "l", url: try wav("l", loud, loud), group: .backing)],
+                                               end: 1, tracksDir: true))
+        let names = Set(r.clippedFiles.map { $0.url.lastPathComponent })
+        XCTAssertEqual(names, ["backing.wav", "mezcla.wav"])
+        XCTAssertTrue(r.clippedFiles.allSatisfy { $0.samples == 2 * 48_000 })
+        // Sin pasarse de 0 dBFS no hay aviso.
+        let ok = try await MontageMixer.mix(job([.init(id: "l", url: try wav("o", dc(0.5, seconds: 1)), group: .backing)], end: 1))
+        XCTAssertTrue(ok.clippedFiles.isEmpty)
+    }
+
     // MARK: Limitador
 
     /// Ruido rosa flojo con transitorios cortos y altos cada medio segundo.
@@ -330,7 +390,7 @@ final class MontageMixerTests: XCTestCase {
         XCTAssertFalse(with.limitedByPeak)
         XCTAssertGreaterThan(with.limiterMaxReductionDB, 0.5)
         XCTAssertEqual(m.integratedLUFS ?? .nan, -14, accuracy: 0.2)
-        XCTAssertLessThanOrEqual(m.truePeakDB, -1.0 + 0.005)
+        XCTAssertLessThanOrEqual(m.truePeakDB, MontageMixer.peakCeilingDB - MontageMixer.codecHeadroomDB)
         XCTAssertEqual(with.finalLUFS ?? .nan, m.integratedLUFS ?? .nan, accuracy: 0.05)
     }
 
@@ -386,7 +446,7 @@ final class MontageMixerTests: XCTestCase {
                                                              group: .part("R"))], segs, normalization: .standard, tracksDir: true))
         let m = try LoudnessMeter.measure(url: r.mixURL)
         XCTAssertEqual(m.integratedLUFS ?? .nan, -14, accuracy: 0.2)
-        XCTAssertLessThanOrEqual(m.truePeakDB, -1.0 + 0.005)
+        XCTAssertLessThanOrEqual(m.truePeakDB, MontageMixer.peakCeilingDB - MontageMixer.codecHeadroomDB)
         XCTAssertEqual(Int(try AVAudioFile(forReading: r.mixURL).length), 8 * 48_000)
         // Las pistas no llevan ni ganancia ni limitador: pico alto.
         let t = try LoudnessMeter.measure(url: r.trackFiles[0].url)

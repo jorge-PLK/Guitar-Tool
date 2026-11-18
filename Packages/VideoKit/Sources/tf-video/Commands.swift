@@ -36,8 +36,9 @@ enum CLI {
           la caja fija (rojo) y la de la trayectoria (verde).
           Ejemplo: tf-video frame Temp/tf-video/take-x/video.mov --png Temp/tf-video/frame.png
 
-      montage <plan.json> <salida.mov> [--mix <wav>] [--codec hevc|h264] [--width W --height H] [--fps F]
+      montage <plan.json> <salida.mov|.mp4> [--mix <wav>] [--codec hevc|h264] [--container mov|mp4] [--width W --height H] [--fps F]
           Exporta un MontagePlan en JSON (por defecto, lienzo y fps del plan, HEVC); --mix multiplexa el WAV.
+          Contenedor: el de la extensión de la salida si no se da --container (que debe coincidir con ella).
 
     Sin hardware: --simulated L (audio simulado con latencia L muestras y cámara simulada),
       --sim-drift P (deriva del audio frente al host, ppm), --sim-camera-delay MS, --sim-drop N.

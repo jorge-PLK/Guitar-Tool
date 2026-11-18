@@ -94,9 +94,9 @@ public struct MontageMixJob: Sendable {
     /// 44100 o 48000.
     public var sampleRate: Double
     public var tracks: [MontageTrack]
-    /// Duración (s) del fundido global de entrada y de salida (un compás); `nil` = sin fundido. Se aplica a los
-    /// segmentos con `fadeIn`/`fadeOut` activos; si un segmento dura menos que los dos fundidos, cada uno se
-    /// acorta a la mitad de su duración.
+    /// Duración (s) del fundido de entrada y de salida (un compás); `nil` = sin fundido. Se aplica a los
+    /// segmentos con `fadeIn`/`fadeOut` activos (los booleanos por tramo deciden dónde, también en los cortes
+    /// interiores); cada fundido se acorta a la mitad del tramo si este es más corto.
     public var fadeIn: Double?
     public var fadeOut: Double?
     public var normalization: MontageNormalization
@@ -136,6 +136,11 @@ public struct MontageMixResult: Sendable, Equatable {
         public var url: URL
     }
 
+    public struct ClippedFile: Sendable, Equatable {
+        public var url: URL
+        public var samples: Int
+    }
+
     public var mixURL: URL
     /// `backing.wav` y uno por parte, en el orden de aparición de los grupos.
     public var trackFiles: [TrackFile]
@@ -154,6 +159,11 @@ public struct MontageMixResult: Sendable, Equatable {
     public var limiterApplied: Bool = false
     /// Reducción máxima de ganancia del limitador en dB (0 si no actuó).
     public var limiterMaxReductionDB: Double = 0
+    /// Con limitador, la última pasada no cumplió -1 dBTP o la tolerancia de sonoridad: `finalLUFS`/`finalTruePeakDB`
+    /// dicen dónde quedó realmente.
+    public var limiterOutOfTolerance: Bool = false
+    /// Ficheros con muestras recortadas al pasar a 24 bits (la mezcla sin normalizar, `backing.wav`, partes).
+    public var clippedFiles: [ClippedFile] = []
     public var frames: Int
     public var sampleRate: Double
     public var duration: Double { Double(frames) / sampleRate }
@@ -178,9 +188,19 @@ public enum MontageMixer {
     /// Pasadas máximas del limitador y tolerancia de sonoridad con la que se da por buena (ampliación de la Fase 7).
     static let limiterMaxPasses = 3
     static let limiterToleranceLU = 0.05
-    /// Margen inicial del umbral del limitador, que detecta sobre las muestras y no sobre el pico real; las
-    /// pasadas lo ajustan con el pico real medido.
-    static let limiterMarginDB = -0.3
+    /// Margen inicial del umbral del limitador. El limitador ya detecta el pico real con el interpolador de
+    /// `LoudnessMeter`; el margen solo cubre lo que varía la ganancia dentro de la ventana del interpolador y el
+    /// redondeo a 24 bits. Si aun así se pasa, las pasadas lo ajustan con el pico real medido.
+    static let limiterMarginDB = -0.05
+    /// Pendiente mínima (LU por dB de ganancia) que se admite en la corrección de sonoridad entre pasadas.
+    static let limiterMinSlope = 0.2
+    /// Holgura para el códec del vídeo, aparte del margen del interpolador: con limitador, `mezcla.wav` se deja en
+    /// `peakCeilingDB - codecHeadroomDB` (−1,3 dBTP). El AAC del `.mov` (que no se cambia) sube el pico real
+    /// respecto al WAV, y cuánto depende del contenido: en la puerta de VideoKit +0,04 dB con el WAV a −1,05 y
+    /// +0,33 dB con el WAV a −1,35; en exportaciones de la app con huecos cortados, +0,1 dB (−1,0 → −0,9 dBTP,
+    /// ffmpeg `ebur128=peak=true`, 17/11/2026). El tope de −1 dBTP de la mini-spec Fase 7 («Exportación») se exige
+    /// en el `.mov` entregado. Vale para los dos modos: sin limitador, la ganancia se frena en este mismo techo.
+    static let codecHeadroomDB = 0.3
     static let reservedNames: Set<String> = ["backing", "mezcla"]
 
     /// Mezcla y escribe los ficheros. Corre en el hilo que lo llame (con puntos de cesión): usar `Task.detached`
@@ -278,6 +298,9 @@ public enum MontageMixer {
             }
             for w in groupWriters.values { try w.finish() }
             try mixWriter?.finish()
+            var clipped: [MontageMixResult.ClippedFile] = []
+            for f in trackFiles { if let n = groupWriters[f.group]?.clippedSamples, n > 0 { clipped.append(.init(url: f.url, samples: n)) } }
+            if let n = mixWriter?.clippedSamples, n > 0 { clipped.append(.init(url: job.mixURL, samples: n)) }
             groupWriters = [:]
             mixWriter = nil
 
@@ -289,39 +312,33 @@ public enum MontageMixer {
             var finalPeak = report.truePeakDB
             var limiterReduction = 0.0
             var limiterUsed = false
-            if case .target(let lufs, let ceiling, let useLimiter) = job.normalization, let measured = report.integratedLUFS {
+            var outOfTolerance = false
+            if case .target(let lufs, let deliveredCeiling, true) = job.normalization {
+                // Techo efectivo de `mezcla.wav`: el tope del vídeo entregado menos la holgura del códec. El pico y
+                // `limiterOutOfTolerance` se comprueban contra este techo.
+                let ceiling = deliveredCeiling - codecHeadroomDB
+                created.append(job.mixURL)
+                let outcome = try limiterNormalize(scratchURL, frames: renderer.totalFrames, sampleRate: job.sampleRate,
+                                                   report: report, lufs: lufs, ceiling: ceiling, mixURL: job.mixURL,
+                                                   progress: progress)
+                let last = outcome.last
+                gainDB = outcome.gainDB
+                outOfTolerance = outcome.outOfTolerance
+                if outcome.clippedSamples > 0 { clipped.append(.init(url: job.mixURL, samples: outcome.clippedSamples)) }
+                finalLUFS = last.lufs
+                finalPeak = last.truePeakDB
+                limiterReduction = last.reductionDB
+                limiterUsed = last.reductionDB > 1e-6
+            } else if case .target(let lufs, let deliveredCeiling, false) = job.normalization, let measured = report.integratedLUFS {
+                // Mismo techo efectivo que con limitador (holgura del códec; Jorge, 17/11/2026).
+                let ceiling = deliveredCeiling - codecHeadroomDB
                 gainDB = lufs - measured
-                if useLimiter {
-                    // Pasadas sobre la mezcla sin normalizar guardada: ganancia, limitador y medida.
-                    var adjust = limiterMarginDB
-                    var last = LimiterPass(lufs: measured, truePeakDB: report.truePeakDB, reductionDB: 0)
-                    for pass in 0..<limiterMaxPasses {
-                        last = try limiterPass(scratchURL, frames: renderer.totalFrames, sampleRate: job.sampleRate,
-                                               gainDB: gainDB, thresholdDB: ceiling + adjust, writer: nil)
-                        progress(0.5 + 0.4 * Double(pass + 1) / Double(limiterMaxPasses))
-                        let peakOK = last.truePeakDB <= ceiling
-                        let loudOK = abs((last.lufs ?? lufs) - lufs) <= limiterToleranceLU
-                        if (peakOK && loudOK) || pass == limiterMaxPasses - 1 { break }
-                        if !peakOK { adjust -= (last.truePeakDB - ceiling) + 0.02 }
-                        if let l = last.lufs { gainDB += lufs - l }
-                    }
-                    created.append(job.mixURL)
-                    let writer = try makeWriter(job.mixURL, sampleRate: job.sampleRate)
-                    _ = try limiterPass(scratchURL, frames: renderer.totalFrames, sampleRate: job.sampleRate,
-                                        gainDB: gainDB, thresholdDB: ceiling + adjust, writer: writer)
-                    try writer.finish()
-                    finalLUFS = last.lufs
-                    finalPeak = last.truePeakDB
-                    limiterReduction = last.reductionDB
-                    limiterUsed = last.reductionDB > 1e-6
-                } else {
-                    if report.truePeakDB.isFinite, ceiling - report.truePeakDB < gainDB {
-                        gainDB = ceiling - report.truePeakDB
-                        limited = true
-                    }
-                    finalLUFS = measured + gainDB
-                    finalPeak = report.truePeakDB + gainDB
+                if report.truePeakDB.isFinite, ceiling - report.truePeakDB < gainDB {
+                    gainDB = ceiling - report.truePeakDB
+                    limited = true
                 }
+                finalLUFS = measured + gainDB
+                finalPeak = report.truePeakDB + gainDB
             }
             // Pase 2 sin limitador: la mezcla con la ganancia.
             if normalizes && !usesLimiter {
@@ -334,6 +351,7 @@ public enum MontageMixer {
                     try write(scaled, to: writer, sampleRate: job.sampleRate)
                 }
                 try writer.finish()
+                if writer.clippedSamples > 0 { clipped.append(.init(url: job.mixURL, samples: writer.clippedSamples)) }
             }
             progress(1)
             var result = MontageMixResult(
@@ -343,6 +361,8 @@ public enum MontageMixer {
                 limitedByPeak: limited, frames: renderer.totalFrames, sampleRate: job.sampleRate)
             result.limiterApplied = limiterUsed
             result.limiterMaxReductionDB = limiterReduction
+            result.limiterOutOfTolerance = outOfTolerance
+            result.clippedFiles = clipped
             return result
         } catch {
             for url in created { try? fm.removeItem(at: url) }
@@ -357,6 +377,71 @@ public enum MontageMixer {
         var lufs: Double?
         var truePeakDB: Double
         var reductionDB: Double
+    }
+
+    struct LimiterOutcome {
+        /// Medida de la última pasada (la que queda en `mezcla.wav`).
+        var last: LimiterPass
+        var gainDB: Double
+        var thresholdDB: Double
+        var passes: Int
+        var outOfTolerance: Bool
+        var clippedSamples: Int
+    }
+
+    /// Pasadas sobre la mezcla sin normalizar guardada (`scratch`, Float32 entrelazado): ganancia, limitador y medida,
+    /// corrigiendo ganancia y umbral hasta cumplir `lufs` y `ceiling` (máximo `limiterMaxPasses`). Sin medida
+    /// (silencio o menos de 400 ms) no hay ganancia que calcular: 0 dB, pero la mezcla se escribe.
+    ///
+    /// Cada pasada escribe `mixURL` (sobrescribe la anterior). La última pasada es siempre la entregada: el bucle solo
+    /// corrige ganancia y umbral antes de otra pasada, nunca después de la última, así que no se repite para escribir.
+    static func limiterNormalize(_ scratch: URL, frames: Int, sampleRate: Double, report: LoudnessReport, lufs: Double,
+                                 ceiling: Double, mixURL: URL, progress: (Double) -> Void) throws -> LimiterOutcome {
+        var gainDB = 0.0
+        var adjust = limiterMarginDB
+        var outOfTolerance = false
+        var passes = 0
+        var last = LimiterPass(lufs: report.integratedLUFS, truePeakDB: report.truePeakDB, reductionDB: 0)
+        var clippedSamples = 0
+        func runPass() throws -> LimiterPass {
+            let writer = try makeWriter(mixURL, sampleRate: sampleRate)
+            let result = try limiterPass(scratch, frames: frames, sampleRate: sampleRate, gainDB: gainDB,
+                                         thresholdDB: ceiling + adjust, writer: writer)
+            try writer.finish()
+            clippedSamples = writer.clippedSamples
+            passes += 1
+            return result
+        }
+        if let measured = report.integratedLUFS {
+            gainDB = lufs - measured
+            // Pasada anterior con el mismo umbral (ganancia, LUFS), para la pendiente de la corrección.
+            var previous: (gain: Double, lufs: Double)?
+            for pass in 0..<limiterMaxPasses {
+                last = try runPass()
+                progress(0.5 + 0.4 * Double(pass + 1) / Double(limiterMaxPasses))
+                let peakOK = last.truePeakDB <= ceiling
+                let loudOK = abs((last.lufs ?? lufs) - lufs) <= limiterToleranceLU
+                if peakOK && loudOK { break }
+                if pass == limiterMaxPasses - 1 { outOfTolerance = true; break }
+                if !peakOK {
+                    adjust -= (last.truePeakDB - ceiling) + 0.02
+                    previous = nil
+                }
+                if let l = last.lufs {
+                    // Con el limitador actuando, 1 dB más de ganancia sube menos de 1 LU: paso de secante.
+                    var slope = 1.0
+                    if let p = previous, abs(gainDB - p.gain) > 1e-6 {
+                        slope = min(max((l - p.lufs) / (gainDB - p.gain), limiterMinSlope), 1)
+                    }
+                    if peakOK { previous = (gainDB, l) }
+                    gainDB += (lufs - l) / slope
+                }
+            }
+        } else {
+            last = try runPass()
+        }
+        return LimiterOutcome(last: last, gainDB: gainDB, thresholdDB: ceiling + adjust, passes: passes,
+                              outOfTolerance: outOfTolerance, clippedSamples: clippedSamples)
     }
 
     /// Lee la mezcla sin normalizar, aplica la ganancia y el limitador, mide y, si hay `writer`, escribe.
@@ -448,6 +533,20 @@ public enum MontageMixer {
 
     // MARK: Render por bloques
 
+    /// Orden fijo en que se suman los grupos a la mezcla: fondo primero y luego las partes por nombre.
+    /// La suma en coma flotante no es asociativa; recorrer un diccionario (orden distinto en cada proceso)
+    /// cambiaba el último bit de `mezcla.wav` entre ejecuciones. Dentro de un grupo, las pistas se suman en
+    /// el orden de `job.tracks`, que es estable.
+    static func summationOrder<S: Sequence>(_ groups: S) -> [MontageGroup] where S.Element == MontageGroup {
+        func key(_ g: MontageGroup) -> (Int, String) {
+            switch g {
+            case .backing: return (0, "")
+            case .part(let p): return (1, p)
+            }
+        }
+        return groups.sorted { key($0) < key($1) }
+    }
+
     struct Block {
         var mix: [[Float]]
         var groups: [MontageGroup: [[Float]]]
@@ -474,12 +573,10 @@ public enum MontageMixer {
             let fs = job.sampleRate
             segs = job.segments.map { s in
                 let frames = Int(((s.end - s.start) * fs).rounded())
-                var din = s.fadeIn ? (job.fadeIn ?? 0) * fs : 0
-                var dout = s.fadeOut ? (job.fadeOut ?? 0) * fs : 0
-                if din + dout > Double(frames) {
-                    din = min(din, Double(frames) / 2)
-                    dout = min(dout, Double(frames) / 2)
-                }
+                // Cada fundido dura como mucho la mitad del tramo, exista o no el otro (misma regla que la imagen,
+                // mini-spec Fase 7, «Transiciones»).
+                let din = min(s.fadeIn ? (job.fadeIn ?? 0) * fs : 0, Double(frames) / 2)
+                let dout = min(s.fadeOut ? (job.fadeOut ?? 0) * fs : 0, Double(frames) / 2)
                 return Seg(start: s.start, frames: frames, fadeInFrames: din, fadeOutFrames: dout)
             }
             totalFrames = segs.reduce(0) { $0 + $1.frames }
@@ -520,7 +617,7 @@ public enum MontageMixer {
                     }
                     // Fundidos globales y suma.
                     let fade = globalFade(seg: seg, from: start, count: n)
-                    for g in groups.keys {
+                    for g in MontageMixer.summationOrder(groups.keys) {
                         var acc = groups[g]!
                         if let fade { for c in 0..<2 { for i in 0..<n { acc[c][i] *= fade[i] } } }
                         groups[g] = acc
@@ -613,6 +710,8 @@ final class PCM24Writer {
     private let handle: FileHandle
     private let sampleRate: Double
     private var frames = 0
+    /// Muestras que no cupieron en 24 bits y se recortaron.
+    private(set) var clippedSamples = 0
     private var finished = false
 
     init(url: URL, sampleRate: Double) throws {
@@ -642,11 +741,14 @@ final class PCM24Writer {
     func write(_ channels: [[Float]]) throws {
         let n = channels[0].count
         var data = Data(count: n * 6)
+        var clippedHere = 0
         data.withUnsafeMutableBytes { raw in
             let p = raw.bindMemory(to: UInt8.self)
             for i in 0..<n {
                 for c in 0..<2 {
-                    let v = Int32(max(-8_388_608, min(8_388_607, (channels[c][i] * 8_388_608).rounded())))
+                    let scaled = (channels[c][i] * 8_388_608).rounded()
+                    if scaled > 8_388_607 || scaled < -8_388_608 { clippedHere += 1 }
+                    let v = Int32(max(-8_388_608, min(8_388_607, scaled)))
                     let o = i * 6 + c * 3
                     p[o] = UInt8(truncatingIfNeeded: v)
                     p[o + 1] = UInt8(truncatingIfNeeded: v >> 8)
@@ -655,6 +757,7 @@ final class PCM24Writer {
             }
         }
         try handle.write(contentsOf: data)
+        clippedSamples += clippedHere
         frames += n
     }
 

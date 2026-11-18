@@ -1,4 +1,5 @@
 import CoreGraphics
+import CoreMedia
 import Foundation
 
 // Entrada del montaje (mini-spec Fase 7, «Montaje»). VideoKit no depende de Store ni de AudioKit: la app traduce
@@ -34,9 +35,45 @@ public struct MontageCanvas: Codable, Sendable, Equatable {
     public var size: CGSize { CGSize(width: width, height: height) }
 }
 
-/// Los cuatro layouts (mini-spec, tabla de «Layouts»; mismos nombres que `MontageState.layout` de Store).
+/// Los layouts (mini-spec, tabla de «Layouts»; mismos nombres que `MontageState.layout` de Store). `singleLandscape`
+/// es el plano único sobre 1920 × 1080 (petición de Jorge del 17/11/2026), con el mismo comportamiento que `single`.
 public enum MontageLayoutKind: String, Codable, Sendable, CaseIterable {
     case side, grid, stack, single
+    case singleLandscape = "single-landscape"
+
+    /// Plano único (portrait o landscape): un recuadro a pantalla completa, sin esquinas ni sombra, con fundido
+    /// cruzado entre guitarras y cortes libres (`MontagePlan.singleCuts`).
+    public var isSingle: Bool { self == .single || self == .singleLandscape }
+    /// Layouts en que actúa `MontagePlan.keepVideoAspect`: apilado y plano único.
+    public var honorsVideoAspect: Bool { self == .stack || isSingle }
+    /// Lienzo del layout: portrait en apilado y plano único portrait; landscape en el resto.
+    public var defaultCanvas: MontageCanvas { self == .stack || self == .single ? .portrait : .landscape }
+}
+
+/// Corte libre del plano único (petición de Jorge del 17/11/2026): desde `time` (s, tiempo del tema) manda la imagen
+/// de `partID` hasta el corte siguiente; `nil`, automático desde ahí (la rítmica elegida y, en los solos, la
+/// solista). Solo decide la imagen: el audio no cambia.
+public struct MontageCut: Codable, Sendable, Equatable, Hashable {
+    public var time: Double
+    public var partID: String?
+
+    public init(time: Double, partID: String?) {
+        self.time = time
+        self.partID = partID
+    }
+
+    /// Ordenados por tiempo; si dos caen en el mismo instante, manda el último de la lista. La app ya los normaliza,
+    /// pero el plan no se fía.
+    public static func normalized(_ cuts: [MontageCut]) -> [MontageCut] {
+        let sorted = cuts.enumerated().filter { $0.element.time.isFinite }
+            .sorted { $0.element.time != $1.element.time ? $0.element.time < $1.element.time : $0.offset < $1.offset }
+            .map(\.element)
+        var out: [MontageCut] = []
+        for c in sorted {
+            if let last = out.last, last.time == c.time { out[out.count - 1] = c } else { out.append(c) }
+        }
+        return out
+    }
 }
 
 /// Caja normalizada sobre el fotograma (0…1), **origen arriba a la izquierda** (como la pantalla, no como Vision).
@@ -166,12 +203,41 @@ public struct MontagePartVideo: Codable, Sendable, Equatable {
     public var punches: [PreviewPunch]
     /// Tramo del tema que cubre la toma (desde su `songStart`, margen incluido, hasta su final).
     public var take: MontageSpan
+    /// Giro de la imagen (base y punches), aplicado al leer (`VideoRotation`).
+    public var rotation: VideoRotation
 
-    public init(url: URL?, videoOffset: Double, punches: [PreviewPunch] = [], take: MontageSpan) {
+    public init(url: URL?, videoOffset: Double, punches: [PreviewPunch] = [], take: MontageSpan, rotation: VideoRotation = .none) {
         self.url = url
         self.videoOffset = videoOffset
         self.punches = punches
         self.take = take
+        self.rotation = rotation
+    }
+
+    private enum CodingKeys: String, CodingKey { case url, videoOffset, punches, take, rotation }
+
+    /// Un plan anterior sin `rotation` se lee sin giro.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(url: try c.decodeIfPresent(URL.self, forKey: .url), videoOffset: try c.decode(Double.self, forKey: .videoOffset),
+                  punches: try c.decodeIfPresent([PreviewPunch].self, forKey: .punches) ?? [], take: try c.decode(MontageSpan.self, forKey: .take),
+                  rotation: try c.decodeIfPresent(VideoRotation.self, forKey: .rotation) ?? .none)
+    }
+
+    /// Tramos del tema en que la toma tiene imagen, sin abrir los vídeos (plano único, decisión de Jorge del
+    /// 17/11/2026): con vídeo base, el tramo de la toma; sin él, los punches con vídeo dentro de la toma. No sabe si
+    /// un fichero acaba antes que su toma: eso solo lo ve `MontageBuilder` al abrirlo (`MontageTimeline.Part.images`).
+    public var coverage: [MontageSpan] {
+        guard url == nil else { return take.duration > 0 ? [take] : [] }
+        let spans = punches.filter { $0.videoURL != nil }.compactMap { p -> MontageSpan? in
+            let s = MontageSpan(start: max(p.start, take.start), end: min(p.end, take.end))
+            return s.duration > 0 ? s : nil
+        }.sorted { $0.start < $1.start }
+        var out: [MontageSpan] = []
+        for s in spans {
+            if let last = out.last, s.start <= last.end { out[out.count - 1].end = max(last.end, s.end) } else { out.append(s) }
+        }
+        return out
     }
 }
 
@@ -280,11 +346,21 @@ public struct MontageTimeMap: Sendable, Equatable {
 /// Todo lo que VideoKit necesita para la vista previa y la exportación del montaje.
 public struct MontagePlan: Codable, Sendable, Equatable {
     public var canvas: MontageCanvas
-    public var fps: Double
+    /// Cambiarlo vuelve a cuantizar `segments` a la rejilla nueva.
+    public var fps: Double {
+        didSet { if fps != oldValue { segments = Self.quantized(segments, fps: fps) } }
+    }
     public var layout: MontageLayoutKind
     /// Tramos del tema que forman el vídeo, ordenados y sin solape (`MontagePlan.segments`); el vídeo es su
-    /// concatenación. Uno solo sin «Cortar huecos sin tomas».
-    public var segments: [MontageSpan]
+    /// concatenación. Uno solo sin «Cortar huecos sin tomas». Siempre en la rejilla de fotogramas de `fps`
+    /// (`quantized`): al asignarlos se cuantizan, así que cada tramo dura un número entero de fotogramas y quien los
+    /// lea (compositor, exportador, vista previa, `MontageMixJob` de la app) obtiene la duración exacta del vídeo.
+    public var segments: [MontageSpan] {
+        didSet {
+            let q = Self.quantized(segments, fps: fps)
+            if q != segments { segments = q }
+        }
+    }
     /// Duración de un compás (`MontagePlan.barDuration`), para los fundidos.
     public var barDuration: Double
     /// Fundido de un compás al entrar el primer segmento (no empieza con el tema) y al salir el último (no acaba con
@@ -298,22 +374,36 @@ public struct MontagePlan: Codable, Sendable, Equatable {
     /// Pistas de la vista previa (la exportación usa el WAV ya mezclado).
     public var audio: [MontageAudioTrack]
     public var caption: MontageCaption?
+    /// Nombre de la parte en cada recuadro (vista previa y exportación). No afecta al rótulo de título y artista.
+    public var showPartLabels: Bool
+    /// «Mantener aspect ratio de vídeo» (apilado y plano único; en lado a lado y rejilla no cambia nada): cada toma
+    /// entera en su proporción, sin encuadre de guitarra, ajustada en su recuadro y con el resto relleno de la misma
+    /// toma ampliada, difuminada y oscurecida (`MontageStyle.fill*`).
+    public var keepVideoAspect: Bool
+    /// Cortes libres del plano único (`MontageCut`; vacía: todo automático). Se usan normalizados (`MontageCut.normalized`).
+    public var singleCuts: [MontageCut]
 
     /// Un solo segmento (`span`).
     public init(canvas: MontageCanvas, fps: Double, layout: MontageLayoutKind, span: MontageSpan, barDuration: Double,
                 fadeIn: Bool, fadeOut: Bool, parts: [MontagePart], singleRhythmPartID: String? = nil,
-                audio: [MontageAudioTrack] = [], caption: MontageCaption? = nil) {
+                audio: [MontageAudioTrack] = [], caption: MontageCaption? = nil, showPartLabels: Bool = true,
+                keepVideoAspect: Bool = false, singleCuts: [MontageCut] = []) {
         self.init(canvas: canvas, fps: fps, layout: layout, segments: [span], barDuration: barDuration, fadeIn: fadeIn, fadeOut: fadeOut,
-                  parts: parts, singleRhythmPartID: singleRhythmPartID, audio: audio, caption: caption)
+                  parts: parts, singleRhythmPartID: singleRhythmPartID, audio: audio, caption: caption, showPartLabels: showPartLabels,
+                  keepVideoAspect: keepVideoAspect, singleCuts: singleCuts)
     }
 
     public init(canvas: MontageCanvas, fps: Double, layout: MontageLayoutKind, segments: [MontageSpan], barDuration: Double,
                 fadeIn: Bool, fadeOut: Bool, parts: [MontagePart], singleRhythmPartID: String? = nil,
-                audio: [MontageAudioTrack] = [], caption: MontageCaption? = nil) {
+                audio: [MontageAudioTrack] = [], caption: MontageCaption? = nil, showPartLabels: Bool = true,
+                keepVideoAspect: Bool = false, singleCuts: [MontageCut] = []) {
+        self.showPartLabels = showPartLabels
+        self.keepVideoAspect = keepVideoAspect
+        self.singleCuts = singleCuts
         self.canvas = canvas
         self.fps = fps
         self.layout = layout
-        self.segments = segments.filter { $0.duration > 0 }.sorted { $0.start < $1.start }
+        self.segments = Self.quantized(segments, fps: fps)
         self.barDuration = barDuration
         self.fadeIn = fadeIn
         self.fadeOut = fadeOut
@@ -321,6 +411,61 @@ public struct MontagePlan: Codable, Sendable, Equatable {
         self.singleRhythmPartID = singleRhythmPartID
         self.audio = audio
         self.caption = caption
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case canvas, fps, layout, segments, barDuration, fadeIn, fadeOut, parts, singleRhythmPartID, audio, caption
+        case showPartLabels, keepVideoAspect, singleCuts
+    }
+
+    /// Un plan leído de JSON (`tf-video montage`) pasa por el mismo `init`: sus tramos quedan en la rejilla.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(canvas: try c.decode(MontageCanvas.self, forKey: .canvas), fps: try c.decode(Double.self, forKey: .fps),
+                  layout: try c.decode(MontageLayoutKind.self, forKey: .layout),
+                  segments: try c.decode([MontageSpan].self, forKey: .segments),
+                  barDuration: try c.decode(Double.self, forKey: .barDuration), fadeIn: try c.decode(Bool.self, forKey: .fadeIn),
+                  fadeOut: try c.decode(Bool.self, forKey: .fadeOut), parts: try c.decode([MontagePart].self, forKey: .parts),
+                  singleRhythmPartID: try c.decodeIfPresent(String.self, forKey: .singleRhythmPartID),
+                  audio: try c.decodeIfPresent([MontageAudioTrack].self, forKey: .audio) ?? [],
+                  caption: try c.decodeIfPresent(MontageCaption.self, forKey: .caption),
+                  showPartLabels: try c.decodeIfPresent(Bool.self, forKey: .showPartLabels) ?? true,
+                  keepVideoAspect: try c.decodeIfPresent(Bool.self, forKey: .keepVideoAspect) ?? false,
+                  singleCuts: try c.decodeIfPresent([MontageCut].self, forKey: .singleCuts) ?? [])
+    }
+
+    // MARK: Rejilla de fotogramas
+
+    /// Margen (en fotogramas) para que un borde que ya está en la rejilla, salvo el error de coma flotante, no se
+    /// mueva un fotograma entero al redondear.
+    static let gridEpsilon = 1e-6
+
+    /// Duración de un fotograma tal como la usa la composición (`AVVideoComposition.frameDuration`): `1/fps` en la
+    /// escala de `VideoTakeWriter` (90 000). A 30 fps, 3000 ticks exactos; a 29,97, 3003 (= 1001/30000 s).
+    static func frameTime(fps: Double) -> CMTime { VideoTakeWriter.time(1 / max(1, fps)) }
+
+    /// Tramos en la rejilla de fotogramas de `fps` (decisión de Jorge del 16/11/2026, tras la auditoría de la Fase 7:
+    /// la spec, «Exportación», pide que los WAV duren lo que el vídeo, y el escritor solo escribe fotogramas enteros).
+    /// Cada inicio baja al fotograma anterior y cada final sube al siguiente (en tiempo del tema; como los inicios
+    /// también caen en la rejilla, cada tramo dura un número entero de fotogramas y en el vídeo concatenado no hay
+    /// deriva entre tramos). Así nunca se pierde la primera nota ni se recorta la anticipación de 0,5 s, y la última
+    /// nota no se corta; el precio es, como mucho, un fotograma de más en cada borde. Los que se tocan o se solapan
+    /// tras redondear se funden. El fotograma es el de `frameTime(fps:)`, el mismo que usa el compositor.
+    public static func quantized(_ segments: [MontageSpan], fps: Double) -> [MontageSpan] {
+        let sorted = segments.filter { $0.duration > 0 }.sorted { $0.start < $1.start }
+        let frame = frameTime(fps: fps)
+        guard fps.isFinite, fps > 0, frame.value > 0 else { return sorted }
+        let ticks = Double(frame.value), scale = Double(frame.timescale)
+        func index(_ t: Double, _ rule: FloatingPointRoundingRule) -> Int64 {
+            let x = t * scale / ticks
+            return Int64((rule == .down ? x + gridEpsilon : x - gridEpsilon).rounded(rule))
+        }
+        var frames: [(a: Int64, b: Int64)] = []
+        for s in sorted {
+            let a = max(0, index(s.start, .down)), b = max(index(s.end, .up), a + 1)
+            if let last = frames.last, a <= last.b { frames[frames.count - 1].b = max(last.b, b) } else { frames.append((a, b)) }
+        }
+        return frames.map { MontageSpan(start: Double($0.a) * ticks / scale, end: Double($0.b) * ticks / scale) }
     }
 
     /// Envolvente de los segmentos (del inicio del primero al final del último).
@@ -390,6 +535,25 @@ public struct MontagePlan: Codable, Sendable, Equatable {
         return out
     }
 
+    /// Partes que un corte del plano único en `t` puede mandar (decisión de Jorge del 17/11/2026: una guitarra solo se
+    /// ve donde tiene toma): las que tienen vídeo y cuya toma tiene imagen en `t` (`MontagePartVideo.coverage`), en el
+    /// orden de `parts`. Un corte a otra parte se vería en automático (`MontageTimeline`, plano único).
+    public func singleCutCandidates(at t: Double) -> [String] {
+        parts.filter { p in p.video?.coverage.contains { $0.contains(t) } ?? false }.map(\.id)
+    }
+
+    /// Plano único sin abrir los vídeos (carril «Plano»): las mismas reglas que la vista previa
+    /// (`MontageTimeline.singleShots`) con la imagen de cada toma según `MontagePartVideo.coverage`.
+    public func singleShots() -> [MontageShot] {
+        var images: [String: (firstImage: Double, frameSize: CGSize)] = [:], spans: [String: [MontageSpan]] = [:]
+        for p in parts {
+            guard let c = p.video?.coverage, let first = c.first else { continue }
+            images[p.id] = (first.start, CGSize(width: 16, height: 9))
+            spans[p.id] = c
+        }
+        return MontageTimeline(plan: self, images: images, imageSpans: spans).singleShots()
+    }
+
     /// Fundidos globales: de entrada si el vídeo no empieza con el tema; de salida si no acaba con él.
     public static func globalFades(span: MontageSpan, songDuration: Double, tolerance: Double = 1e-3) -> (fadeIn: Bool, fadeOut: Bool) {
         (span.start > tolerance, span.end < songDuration - tolerance)
@@ -433,4 +597,19 @@ public enum MontageStyle {
     public static let captionTitleFont = 48.0
     public static let captionArtistFont = 32.0
     public static let captionInset = 64.0
+
+    // «Mantener aspect ratio de vídeo» (petición de Jorge del 17/11/2026; valores propios, a juicio de Jorge):
+    /// Desenfoque (sigma) del relleno, en unidades del lienzo de 1920 px: lo bastante para que no se lea como imagen.
+    public static let fillBlur = 40.0
+    /// Brillo del relleno (multiplica R, G y B): a la mitad, para que la toma nítida destaque.
+    public static let fillDim = 0.5
+    /// El relleno se dibuja a esta fracción de la resolución antes de difuminar (abarata el desenfoque sin que se note).
+    public static let fillDownsample = 0.125
+
+    // Toma que acaba antes que su recuadro (decisión de Jorge del 17/11/2026):
+    /// Fundido a negro desde la última imagen de la toma (0,5 s); después, negro hasta que el recuadro sale.
+    public static let endFade = 0.5
+    /// Si el recuadro sale a menos de esto de la última imagen no hay fundido a negro: basta su salida (decisión
+    /// propia: menos de dos fotogramas a 30 fps, el resto de redondeo de una toma que acaba con su vídeo).
+    public static let endFadeTolerance = 0.05
 }

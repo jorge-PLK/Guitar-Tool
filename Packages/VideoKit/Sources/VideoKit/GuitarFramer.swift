@@ -170,6 +170,8 @@ public enum GuitarFramer {
         }
         var text = "v\(FramingAnalysis.currentVersion)|\(file(video.url))|\(video.videoOffset)|\(video.take.start)|\(video.take.end)"
         for p in video.punches { text += "|\(file(p.videoURL)):\(p.start):\(p.end):\(p.videoOffset)" }
+        // El giro cambia las coordenadas del análisis; sin giro la huella no cambia (las cachés anteriores valen).
+        if video.rotation != .none { text += "|rot\(video.rotation.degrees)" }
         return SHA256.hash(data: Data(text.utf8)).map { String(format: "%02x", $0) }.joined()
     }
 }

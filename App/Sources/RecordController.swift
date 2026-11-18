@@ -50,7 +50,7 @@ struct TakePlan {
     var partID: UUID
     var punch: Punch?
     var playFrom: Double
-    /// Punch: se para solo en este instante del tema (salida + 0,5 s).
+    /// Se para solo en este instante del tema: en un punch, salida + 0,5 s; en una toma desde una sección, su final + margen.
     var stopAt: Double?
     var audioURL: URL
     var videoURL: URL
@@ -77,6 +77,8 @@ struct OffsetRequest: Identifiable {
     var cameraID: String
     var cameraName: String
     var initialOffset: Double
+    /// Giro de la imagen (grados en sentido horario) con que se ve la toma.
+    var rotation: Int = 0
 }
 
 private struct RecordFailure: Error { let message: String }
@@ -112,10 +114,12 @@ final class RecordController {
     var phase: Phase = .idle
     private(set) var loadError: String?
     private(set) var messages: [String] = []
+    /// true = proyecto degradado sin índice recuperable: no se guarda `recording` (ni automáticamente ni por edición).
+    @ObservationIgnored private var savesBlocked = false
     var selectedTakeID: UUID?
     private(set) var startSectionID: UUID?
     var offsetRequest: OffsetRequest?
-    /// Mezcla (en memoria) de los canales «Tú · parte».
+    /// Mezcla de los canales (solo en memoria el solo; volumen y silencio también en `state.partMix`) «Tú · parte».
     private(set) var takeMixes: [UUID: StemMix] = [:]
 
     // Punch-in.
@@ -146,10 +150,20 @@ final class RecordController {
         self.model = model
         player = StudyPlayer(devices: CoreAudioDeviceProvider(), output: model.outputSelection)
         player.masterGainDB = model.profile.masterGainDB
-        var s = session.project.recordingOrInitial()
+        // Proyecto degradado (tomas con vídeo/parte pero sin índice `recording`): nunca se fabrican partes por defecto.
+        let orphaned = session.project.hasOrphanedTakes
+        let rebuilt = orphaned ? session.project.reconstructedRecording() : nil
+        var s = rebuilt ?? session.project.recordingOrInitial()
         if s.parts.isEmpty { s.parts = [RecordingPart(name: "Guitarra", replaces: .rhythm)] }
         state = s
-        if session.project.recording == nil { scheduleSave() }
+        takeMixes = Dictionary(s.partMix.map { ($0.partID, StemMix(kind: .guitar, gainDB: $0.gainDB, muted: $0.muted)) },
+                               uniquingKeysWith: { _, b in b })
+        if orphaned && rebuilt == nil {
+            savesBlocked = true
+            messages = ["Este proyecto tiene tomas en disco sin índice; no se ha modificado. Restaura `project.json` desde la copia `.bak`."]
+        } else if orphaned || session.project.recording == nil {
+            scheduleSave()
+        }
         activePartID = s.parts.first?.id
         startSectionID = defaultStartSection(for: s.parts.first)
     }
@@ -237,6 +251,14 @@ final class RecordController {
 
     var startTime: Double { sections.first { $0.id == startSectionID }?.start ?? 0 }
 
+    /// Instante del tema (s) en que para sola una toma nueva: con una sección en «Empezar en», su final más el margen
+    /// (tope: el final del tema). nil con «Principio» (sigue hasta el final del tema o hasta que se pare) y en el
+    /// punch-in, que tiene su propia regla (salida + 0,5 s).
+    var plannedStop: Double? {
+        guard !punchEnabled, let s = sections.first(where: { $0.id == startSectionID }) else { return nil }
+        return timing.sectionStop(sectionEnd: s.end, bars: state.preRollBars, duration: duration)
+    }
+
     func setCountIn(_ on: Bool) { state.countIn = on; scheduleSave() }
     func setPreRoll(_ bars: Int) { state.preRollBars = bars; scheduleSave() }
 
@@ -313,6 +335,7 @@ final class RecordController {
             loadError = "No se pudieron cargar los stems (\(error))."
             return
         }
+        audio.refreshHosting()
         applyAllMixes()
         player.rate = 1
         player.pitchCents = 0
@@ -339,6 +362,9 @@ final class RecordController {
         change(&m)
         m.gainDB = min(max(m.gainDB, BackingController.faderRange.lowerBound), BackingController.faderRange.upperBound)
         takeMixes[partID] = m
+        let stored = PartMix(partID: partID, gainDB: m.gainDB, muted: m.muted)
+        if let i = state.partMix.firstIndex(where: { $0.partID == partID }) { state.partMix[i] = stored } else { state.partMix.append(stored) }
+        scheduleSave()
         let id = Self.takeTrackID(partID)
         player.setGain(id, dB: m.gainDB)
         player.setMute(id, m.muted)
@@ -376,6 +402,21 @@ final class RecordController {
     }
 
     @ObservationIgnored private var cameraID: String?
+
+    /// Giro de la cámara en uso (grados en sentido horario; 0 sin cámara). Observable a través de `model.profile`.
+    var cameraRotation: Int {
+        guard let id = videoFormat?.cameraID ?? cameraID else { return 0 }
+        return (model.profile.video ?? VideoSettings()).defaultRotation(for: id)
+    }
+
+    /// «Rotar» en Grabar: 90° más en sentido horario, guardado en la cámara activa (lo heredan sus tomas nuevas).
+    func rotateCamera() {
+        guard let id = videoFormat?.cameraID ?? cameraID else { return }
+        var v = model.profile.video ?? VideoSettings()
+        v.setDefaultRotation(v.defaultRotation(for: id) + 90, for: id)
+        model.profile.video = v
+        model.saveProfile()
+    }
 
     func startCamera() async {
         stopCamera()
@@ -478,7 +519,7 @@ final class RecordController {
         } else {
             let id = UUID()
             plan = TakePlan(takeID: id, partID: part.id, punch: nil,
-                            playFrom: timing.preRollStart(for: startTime, bars: state.preRollBars), stopAt: nil,
+                            playFrom: timing.preRollStart(for: startTime, bars: state.preRollBars), stopAt: plannedStop,
                             audioURL: layout.processedURL(takeId: id), videoURL: layout.videoURL(takeId: id))
         }
         stopRequested = false
@@ -649,7 +690,8 @@ final class RecordController {
         let offset = (model.profile.video ?? VideoSettings()).defaultOffset(for: format.cameraID)
         offsetRequest = OffsetRequest(takeID: plan.takeID, isNew: true, audioURL: plan.audioURL, songStart: rec.songStart,
                                       videoURL: plan.videoURL, punches: [], fps: format.fps, cameraID: format.cameraID,
-                                      cameraName: format.cameraName, initialOffset: offset)
+                                      cameraName: format.cameraName, initialOffset: offset,
+                                      rotation: (model.profile.video ?? VideoSettings()).defaultRotation(for: format.cameraID))
     }
 
     /// «Guardar toma» / «Guardar» de la hoja de desfase.
@@ -672,6 +714,9 @@ final class RecordController {
             t.videoFile = ProjectLayout.videoRelativePath(takeId: p.takeID)
             t.videoOffset = offset
             t.videoFormat = TakeVideoFormat(cameraUID: f.cameraID, cameraName: f.cameraName, width: f.width, height: f.height, fps: f.fps)
+            // La toma nueva hereda el giro de su cámara (nil = 0°: no se escribe sin giro).
+            let rotation = (model.profile.video ?? VideoSettings()).defaultRotation(for: f.cameraID)
+            t.videoRotation = rotation == 0 ? nil : rotation
             if makeDefault { setDefaultOffset(offset, camera: f.cameraID) }
         }
         session.saveTakes([t])
@@ -714,7 +759,7 @@ final class RecordController {
         }
         offsetRequest = OffsetRequest(takeID: takeID, isNew: false, audioURL: layout.url(relative: audioRel), songStart: start,
                                       videoURL: layout.url(relative: rel), punches: punches, fps: f.fps, cameraID: f.cameraUID,
-                                      cameraName: f.cameraName, initialOffset: t.videoOffset ?? 0)
+                                      cameraName: f.cameraName, initialOffset: t.videoOffset ?? 0, rotation: t.rotationDegrees)
     }
 
     // MARK: Mejor toma, borrar, seleccionar
@@ -771,10 +816,16 @@ final class RecordController {
             t.baseProcessedFile = ProjectLayout.baseProcessedRelativePath(takeId: t.id)
         }
         // Aplanado: la toma actual (con los punches anteriores ya dentro) más este; el último manda en su tramo.
+        // Se aplana a la frecuencia del punch (la de la sesión, que es la del proyecto). Una original grabada a
+        // otra frecuencia se remuestrea al leerla (su copia en `base/` queda intacta) y la toma pasa a esa
+        // frecuencia; `songStart` va en segundos y las latencias en muestras de `calibrationKey`, no cambian.
         let file = PunchFile(start: p.start, end: p.end, url: plan.audioURL, songStart: rec.songStart)
+        let rate = rec.sampleRate
         try await Task.detached {
-            try PunchFlattener.flattenFiles(base: processed, baseSongStart: start, punches: [file], to: processed)
+            try PunchFlattener.flattenFiles(base: processed, baseSongStart: start, punches: [file], to: processed,
+                                            sampleRate: rate)
         }.value
+        t.sampleRate = rate
         let rel = ProjectLayout.punchRelativeDirectory(takeId: t.id, n: p.n)
         let offset = format.map { (model.profile.video ?? VideoSettings()).defaultOffset(for: $0.cameraID) }
         var punches = t.punches ?? []
@@ -801,6 +852,7 @@ final class RecordController {
     func flush() async {
         saveTask?.cancel()
         saveTask = nil
+        guard !savesBlocked else { return }
         try? await model.library?.saveRecording(id: session.projectID, state)
     }
 }

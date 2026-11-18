@@ -60,6 +60,8 @@ public final class TakePreview: @unchecked Sendable {
     private let audioRange: CMTimeRange
     private let base: Source?
     private let punchSources: [Source?]
+    /// Giro de la imagen (`VideoRotation`), en la `preferredTransform` de la pista de vídeo de la composición.
+    public let rotation: VideoRotation
 
     /// Pista de vídeo cargada y el tramo (en PTS) en que tiene imagen.
     struct Source {
@@ -67,10 +69,12 @@ public final class TakePreview: @unchecked Sendable {
         let track: AVAssetTrack
         let available: ClosedRange<Double>
         let transform: CGAffineTransform
+        let naturalSize: CGSize
     }
 
     private init(songStart: Double, duration: Double, punches: [PreviewPunch], audioAsset: AVURLAsset, audioTrack: AVAssetTrack,
-                 audioRange: CMTimeRange, base: Source?, punchSources: [Source?]) {
+                 audioRange: CMTimeRange, base: Source?, punchSources: [Source?], rotation: VideoRotation) {
+        self.rotation = rotation
         self.audioAsset = audioAsset
         self.songStart = songStart
         self.duration = duration
@@ -81,8 +85,10 @@ public final class TakePreview: @unchecked Sendable {
         self.punchSources = punchSources
     }
 
-    /// Abre la toma: `audioURL` (`processed.wav`), su `songStart`, el vídeo de la toma (o `nil`) y sus punches en orden.
-    public static func load(audioURL: URL, songStart: Double, videoURL: URL?, punches: [PreviewPunch]) async throws -> TakePreview {
+    /// Abre la toma: `audioURL` (`processed.wav`), su `songStart`, el vídeo de la toma (o `nil`), sus punches en orden y
+    /// el giro de la imagen.
+    public static func load(audioURL: URL, songStart: Double, videoURL: URL?, punches: [PreviewPunch],
+                            rotation: VideoRotation = .none) async throws -> TakePreview {
         let audio = AVURLAsset(url: audioURL)
         guard let track = try await audio.loadTracks(withMediaType: .audio).first else {
             throw TakePreviewError.noAudio(audioURL.lastPathComponent)
@@ -91,7 +97,7 @@ public final class TakePreview: @unchecked Sendable {
         var sources: [Source?] = []
         for p in punches { sources.append(try await source(p.videoURL)) }
         return TakePreview(songStart: songStart, duration: CMTimeGetSeconds(range.duration), punches: punches, audioAsset: audio, audioTrack: track,
-                           audioRange: range, base: try await source(videoURL), punchSources: sources)
+                           audioRange: range, base: try await source(videoURL), punchSources: sources, rotation: rotation)
     }
 
     /// También la usan `MontageBuilder` y `GuitarFramer`.
@@ -99,12 +105,12 @@ public final class TakePreview: @unchecked Sendable {
         guard let url else { return nil }
         let asset = AVURLAsset(url: url)
         guard let track = try await asset.loadTracks(withMediaType: .video).first else { return nil }
-        let (segments, transform) = try await track.load(.segments, .preferredTransform)
+        let (segments, transform, size) = try await track.load(.segments, .preferredTransform, .naturalSize)
         let full = segments.filter { !$0.isEmpty }.map(\.timeMapping.target)
         guard let first = full.first, let last = full.last else { return nil }
         let lo = CMTimeGetSeconds(first.start), hi = CMTimeGetSeconds(CMTimeRangeGetEnd(last))
         guard hi > lo else { return nil }
-        return Source(asset: asset, track: track, available: lo...hi, transform: transform)
+        return Source(asset: asset, track: track, available: lo...hi, transform: transform, naturalSize: size)
     }
 
     /// Plan de tramos para un desfase (función pura; `composition` la sigue). `punchOffsets` sustituye los desfases
@@ -160,8 +166,9 @@ public final class TakePreview: @unchecked Sendable {
         guard !plan.isEmpty, let v = comp.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else {
             return comp
         }
-        if let base { v.preferredTransform = base.transform } else if let s = punchSources.compactMap({ $0 }).first {
-            v.preferredTransform = s.transform
+        if let s = base ?? punchSources.compactMap({ $0 }).first {
+            // Giro de la toma después de la transformación del fichero (las grabadas por la app traen la identidad).
+            v.preferredTransform = s.transform.concatenating(rotation.transform(naturalSize: s.naturalSize))
         }
         var cursor = CMTime.zero
         for p in plan {

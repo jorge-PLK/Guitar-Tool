@@ -37,8 +37,10 @@ public extension GuitarFramer {
             guard let pb = CMSampleBufferGetImageBuffer(sb) else { continue }
             let song = first + CMTimeGetSeconds(CMSampleBufferGetPresentationTimeStamp(sb))
             guard song + 1e-6 >= next else { continue }
-            size = (CVPixelBufferGetWidth(pb), CVPixelBufferGetHeight(pb))
-            samples.append(PoseSample(time: song, joints: (try? joints(in: pb)) ?? [:]))
+            // Coordenadas de la imagen ya girada (las del encuadre): Vision recibe la orientación y el tamaño se gira.
+            let rotated = take.rotation.rotatedSize(CGSize(width: CVPixelBufferGetWidth(pb), height: CVPixelBufferGetHeight(pb)))
+            size = (Int(rotated.width), Int(rotated.height))
+            samples.append(PoseSample(time: song, joints: (try? joints(in: pb, orientation: take.rotation.orientation)) ?? [:]))
             while next <= song + 1e-6 { next += interval }
             progress?(min(1, (song - first) / max(1e-6, last - first)))
         }
@@ -54,10 +56,10 @@ public extension GuitarFramer {
     }
 
     /// Articulaciones de la persona más grande del fotograma (las de confianza ≥ `minConfidence`), normalizadas con
-    /// origen arriba a la izquierda.
-    static func joints(in pixelBuffer: CVPixelBuffer) throws -> [PoseJoint: PosePoint] {
+    /// origen arriba a la izquierda, sobre la imagen ya orientada con `orientation` (giro de la toma).
+    static func joints(in pixelBuffer: CVPixelBuffer, orientation: CGImagePropertyOrientation = .up) throws -> [PoseJoint: PosePoint] {
         let request = VNDetectHumanBodyPoseRequest()
-        try VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .up).perform([request])
+        try VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: orientation).perform([request])
         let names: [PoseJoint: VNHumanBodyPoseObservation.JointName] = [
             .leftWrist: .leftWrist, .rightWrist: .rightWrist, .leftElbow: .leftElbow, .rightElbow: .rightElbow,
             .leftShoulder: .leftShoulder, .rightShoulder: .rightShoulder, .neck: .neck, .root: .root,

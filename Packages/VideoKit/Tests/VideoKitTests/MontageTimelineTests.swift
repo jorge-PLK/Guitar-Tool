@@ -46,16 +46,29 @@ final class MontageTimelineTests: XCTestCase {
         }
         let c = MontageCanvas.landscape.size
         let inner = CGRect(x: 48, y: 48, width: 1920 - 96, height: 1080 - 96)
-        // Tabla de la spec: rejilla 1 completo, 2 lado a lado, 3 dos arriba y uno centrado abajo, 4 en 2 × 2.
+        // Tabla de la spec: rejilla 1 completo, 3 dos arriba y uno centrado abajo, 4 en 2 × 2; 2 apilados con la celda
+        // del 2 × 2 y centrados en horizontal (Jorge, 17/11/2026).
         XCTAssertEqual(MontageLayout.rects(.grid, count: 1, canvas: c), [inner])
-        XCTAssertEqual(MontageLayout.rects(.grid, count: 2, canvas: c), MontageLayout.rects(.side, count: 2, canvas: c))
+        let g4 = MontageLayout.rects(.grid, count: 4, canvas: c)
+        XCTAssertEqual(Set(g4.map(\.minX)).count, 2)
+        XCTAssertEqual(Set(g4.map(\.minY)).count, 2)
+        let g2 = MontageLayout.rects(.grid, count: 2, canvas: c)
+        let cellW = (1824 - 24) / 2.0, cellH = (984 - 24) / 2.0
+        for (k, r) in g2.enumerated() {
+            XCTAssertEqual(r.width, cellW, accuracy: 1e-9, "rejilla 2: ancho de celda del 2 × 2")
+            XCTAssertEqual(r.height, cellH, accuracy: 1e-9, "rejilla 2: alto de celda del 2 × 2")
+            XCTAssertEqual(r.size, g4[0].size)
+            XCTAssertEqual(r.midX, c.width / 2, accuracy: 1e-9, "rejilla 2: centrado en horizontal")
+            XCTAssertEqual(r.minY, g4[2 * k].minY, accuracy: 1e-9, "rejilla 2: filas del 2 × 2")
+        }
+        XCTAssertEqual(g2[1].minY - g2[0].maxY, MontageStyle.gap, accuracy: 1e-9, "rejilla 2: uno encima del otro")
+        XCTAssertEqual(g2[0].minX, (1920 - cellW) / 2, accuracy: 1e-9, "rejilla 2: fondo a los lados")
         let g3 = MontageLayout.rects(.grid, count: 3, canvas: c)
         XCTAssertEqual(g3[0].minY, g3[1].minY)
         XCTAssertGreaterThan(g3[2].minY, g3[0].maxY)
         XCTAssertEqual(g3[2].midX, c.width / 2, accuracy: 1e-9)
-        let g4 = MontageLayout.rects(.grid, count: 4, canvas: c)
-        XCTAssertEqual(Set(g4.map(\.minX)).count, 2)
-        XCTAssertEqual(Set(g4.map(\.minY)).count, 2)
+        XCTAssertEqual(g3[2], g2[1], "rejilla 2 → 3: el de abajo no se mueve")
+        XCTAssertEqual(MontageLayout.rects(.singleLandscape, count: 1, canvas: c), [CGRect(origin: .zero, size: c)])
         // Lado a lado: una fila; apilado: una columna; plano único: lienzo entero.
         XCTAssertEqual(Set(MontageLayout.rects(.side, count: 4, canvas: c).map(\.minY)).count, 1)
         XCTAssertEqual(Set(MontageLayout.rects(.stack, count: 4, canvas: MontageCanvas.portrait.size).map(\.minX)).count, 1)
@@ -72,7 +85,7 @@ final class MontageTimelineTests: XCTestCase {
         let slope = 3 / d * step
         var report: [String] = []
         for kind in MontageLayoutKind.allCases {
-            let canvas: MontageCanvas = kind == .stack || kind == .single ? .portrait : .landscape
+            let canvas = kind.defaultCanvas
             let tl = Self.timeline(kind, canvas: canvas)
             var prev: [String: MontageBoxState] = [:]
             var worstRect = 0.0, worstOpacity = 0.0, worstScale = 0.0, worstBlur = 0.0

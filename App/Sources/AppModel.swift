@@ -55,6 +55,8 @@ struct LaunchOptions {
     var tabExport: URL?
     /// Montaje (Fase 7): `--screen montage | montage-framing` y `--montage-layout side|grid|stack|single`.
     var montageLayout: String?
+    /// `--montage-order 2,0,1`: índices de las partes (orden de Grabar) en el orden de recuadros que se quiere.
+    var montageOrder: [Int]?
     /// Con `--screen montage`: exporta por el camino del botón, escribe `export-<layout>[-cut].json` y sale.
     var montageExport = false
     var montageCutGaps = false
@@ -70,6 +72,15 @@ struct LaunchOptions {
     var tabSummary: URL?
     /// Con `--screen tab`: abre la hoja de Songsterr ya en el paso de emparejamiento de ese `songId` (capturas con `--snapshot`).
     var tabSongsterrSheet: Int?
+    /// `--montage-no-part-labels`, `--montage-keep-aspect` y `--montage-cuts "t1:idx,t2:auto"` (segundos : índice de parte en el
+    /// orden de Grabar, o `auto`).
+    var montageNoPartLabels = false
+    var montageKeepAspect = false
+    /// `--montage-neutral`: deja el montaje de la demo por defecto (nombres visibles, aspecto desactivado, sin cortes, side).
+    var montageNeutral = false
+    var montageCuts: [(time: Double, part: Int?)]?
+    /// `--montage-container mov|mp4`: contenedor de la exportación de la comprobación.
+    var montageContainer: String?
 
     init(_ args: [String] = CommandLine.arguments) {
         var i = 1
@@ -113,6 +124,7 @@ struct LaunchOptions {
             case ("--tab-listen", _): tabListen = true
             case ("--tab-export", let v?): tabExport = path(v); i += 1
             case ("--montage-layout", let v?): montageLayout = v; i += 1
+            case ("--montage-order", let v?): montageOrder = v.split(separator: ",").compactMap { Int($0) }; i += 1
             case ("--montage-export", _): montageExport = true
             case ("--montage-cut-gaps", _): montageCutGaps = true
             case ("--songsterr-probe", let v?): songsterrProbe = Int(v); i += 1
@@ -121,6 +133,17 @@ struct LaunchOptions {
             case ("--tab-songsterr", let v?): tabSongsterr = Int(v); i += 1
             case ("--tab-summary", let v?): tabSummary = path(v); i += 1
             case ("--tab-songsterr-sheet", let v?): tabSongsterrSheet = Int(v); i += 1
+            case ("--montage-no-part-labels", _): montageNoPartLabels = true
+            case ("--montage-keep-aspect", _): montageKeepAspect = true
+            case ("--montage-neutral", _): montageNeutral = true
+            case ("--montage-cuts", let v?):
+                montageCuts = v.split(separator: ",").compactMap { item in
+                    let f = item.split(separator: ":", maxSplits: 1).map(String.init)
+                    guard f.count == 2, let t = Double(f[0]) else { return nil }
+                    return (t, f[1] == "auto" ? nil : Int(f[1]))
+                }
+                i += 1
+            case ("--montage-container", let v?): montageContainer = v; i += 1
             default: break
             }
             i += 1

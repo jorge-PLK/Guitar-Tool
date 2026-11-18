@@ -28,9 +28,11 @@ final class RecordingTests: XCTestCase {
         part.addTake(take.id)
         p.takes.append(take)
         p.recording = RecordingState(parts: [part], mix: [StemMix(kind: .drums, gainDB: -3, muted: true)],
+                                     partMix: [PartMix(partID: part.id, gainDB: -4.5, muted: true)],
                                      startSectionID: section.id, countIn: false, preRollBars: 1)
         let back = try roundTripProject(p)
         XCTAssertEqual(back, p)
+        XCTAssertEqual(back.recording?.partMix(for: part.id).gainDB, -4.5)
         XCTAssertEqual(back.takes.last?.punches?.first?.end, 12.5)
         XCTAssertEqual(back.schemaVersion, p.schemaVersion)
     }
@@ -78,6 +80,14 @@ final class RecordingTests: XCTestCase {
         XCTAssertNil(p.recording)
         XCTAssertNil(p.takes[0].partID)
         XCTAssertNil(p.takes[0].punches)
+    }
+
+    func testPartMixMissingDecodesAsZeroDB() throws {
+        let old = #"{"parts":[],"mix":[],"countIn":true,"preRollBars":2}"#
+        let s = try JSONDecoder().decode(RecordingState.self, from: Data(old.utf8))
+        XCTAssertTrue(s.partMix.isEmpty)
+        let id = UUID()
+        XCTAssertEqual(s.partMix(for: id), PartMix(partID: id, gainDB: 0, muted: false))
     }
 
     func testRecordingStateDefaultsAndPreRollClamp() throws {

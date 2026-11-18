@@ -112,7 +112,8 @@ struct OffsetSheet: View {
     private func load() async {
         do {
             preview = try await TakePreview.load(audioURL: request.audioURL, songStart: request.songStart,
-                                                 videoURL: request.videoURL, punches: request.punches)
+                                                 videoURL: request.videoURL, punches: request.punches,
+                                                 rotation: VideoRotation(degrees: request.rotation))
             await rebuild()
         } catch {
             self.error = "No se pudo abrir la toma (\(error))."

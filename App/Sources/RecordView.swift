@@ -334,6 +334,7 @@ struct RecordPreview: View {
                     recPill
                     Spacer()
                     if let f = ctl.cameraLabel { pill(Text(f).foregroundStyle(TF.text2)) }
+                    if ctl.cameraLabel != nil { rotateButton }
                 }
                 Spacer()
                 if case .counting(let n) = ctl.phase {
@@ -352,7 +353,7 @@ struct RecordPreview: View {
     @ViewBuilder private var content: some View {
         switch ctl.cameraState {
         case .live(let s):
-            CameraPreviewLayerView(session: s)
+            CameraPreviewLayerView(session: s, rotation: ctl.cameraRotation)
         case .simulated:
             placeholder("Vista previa de la cámara · \(ctl.cameraName ?? "simulada") (simulada)")
         case .none, .denied, .failed:
@@ -377,6 +378,21 @@ struct RecordPreview: View {
             Circle().fill(recording ? Color(hex: 0xE5534B) : TF.muted).frame(width: 10, height: 10)
             Text("\(recording ? "REC · " : "")Toma \(ctl.nextTakeNumber) · \(part)").fontWeight(.semibold)
         })
+    }
+
+    /// «Rotar»: 90° más por clic, guardado en la cámara activa (vídeo vertical); lo heredan sus tomas nuevas.
+    private var rotateButton: some View {
+        let degrees = ctl.cameraRotation
+        return Button { ctl.rotateCamera() } label: {
+            pill(HStack(spacing: 6) {
+                Image(systemName: "rotate.right")
+                Text(degrees == 0 ? "Rotar" : "Rotar · \(degrees)°")
+            }.foregroundStyle(degrees == 0 ? TF.text2 : TF.accent))
+        }
+        .buttonStyle(.plain)
+        .disabled(ctl.phase != .idle)
+        .help("Gira la imagen de esta cámara 90° en sentido horario (no se recodifica; se aplica al ver y montar)")
+        .accessibilityLabel("Rotar cámara, ahora \(degrees) grados")
     }
 
     private func pill<C: View>(_ c: C) -> some View {
@@ -416,8 +432,9 @@ struct RecordBar: View {
             .disabled(blocked || ctl.phase == .finishing || ctl.phase == .adjusting)
             .accessibilityLabel(recording ? "Parar la grabación" : "Grabar")
 
-            (Text(Fmt.duration(time)).font(TF.display(20)) + Text(" / \(Fmt.duration(ctl.duration))").font(TF.body(16, .medium)).foregroundStyle(TF.muted))
+            (Text(Fmt.duration(time)).font(TF.display(20)) + Text(" / \(Fmt.duration(ctl.plannedStop ?? ctl.duration))").font(TF.body(16, .medium)).foregroundStyle(TF.muted))
                 .monospacedDigit()
+                .help(ctl.plannedStop == nil ? "Duración del tema" : "Para sola al acabar la sección más el margen")
 
             Spacer(minLength: 0)
             offsetLabel

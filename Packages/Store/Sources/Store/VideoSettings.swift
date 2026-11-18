@@ -62,14 +62,18 @@ public struct VideoSettings: Codable, Sendable, Equatable {
     /// Desfase por defecto (s, positivo = la imagen llega tarde) por UID de cámara.
     public var offsets: [String: Double]
     public var export: VideoExportDefaults
+    /// Giro de la imagen (grados en sentido horario: 0, 90, 180 o 270) por UID de cámara (decisión de Jorge del
+    /// 17/11/2026: vídeo vertical). Aditivo; sin entrada, 0.
+    public var rotations: [String: Int]
 
     public init(cameraUID: String? = nil, resolution: VideoResolution = .fullHD, fps: Double = VideoSettings.defaultFPS,
-                offsets: [String: Double] = [:], export: VideoExportDefaults = VideoExportDefaults()) {
+                offsets: [String: Double] = [:], export: VideoExportDefaults = VideoExportDefaults(), rotations: [String: Int] = [:]) {
         self.cameraUID = cameraUID
         self.resolution = resolution
         self.fps = fps
         self.offsets = offsets
         self.export = export
+        self.rotations = rotations
     }
 
     public init(from decoder: Decoder) throws {
@@ -79,6 +83,20 @@ public struct VideoSettings: Codable, Sendable, Equatable {
         fps = try c.decodeIfPresent(Double.self, forKey: .fps) ?? Self.defaultFPS
         offsets = try c.decodeIfPresent([String: Double].self, forKey: .offsets) ?? [:]
         export = try c.decodeIfPresent(VideoExportDefaults.self, forKey: .export) ?? VideoExportDefaults()
+        rotations = try c.decodeIfPresent([String: Int].self, forKey: .rotations) ?? [:]
+    }
+
+    /// Giro de esa cámara (0 si no hay), normalizado.
+    public func defaultRotation(for cameraUID: String) -> Int { Self.normalizedRotation(rotations[cameraUID] ?? 0) }
+
+    public mutating func setDefaultRotation(_ degrees: Int, for cameraUID: String) {
+        rotations[cameraUID] = Self.normalizedRotation(degrees)
+    }
+
+    /// Cuartos de vuelta: cualquier entero → 0, 90, 180 o 270 (se redondea al cuarto más cercano).
+    public static func normalizedRotation(_ degrees: Int) -> Int {
+        let q = Int((Double(degrees) / 90).rounded())
+        return ((q % 4) + 4) % 4 * 90
     }
 
     /// Desfase por defecto de esa cámara (0 si no hay).

@@ -100,11 +100,24 @@ public enum TakeAligner {
     ///
     /// Sin calibrar no se conoce el canal de referencia y no se grabó: se usa la latencia calibrada de
     /// `guitarIn` (que incluye el retardo del rig que había al calibrar) y la toma queda sin retardo del rig.
+    ///
+    /// Convención de unidades: las latencias (`latencySamples`, la de `calibration`) van en muestras de
+    /// `calibrationKey.sampleRate` (el dispositivo al grabar); `take.sampleRate`, `songStartFrame` y
+    /// `frameCount` van en muestras del fichero. El cambio de latencia se pasa a segundos y de ahí a muestras
+    /// del fichero (redondeo ≤ media muestra). Si las dos frecuencias coinciden (todas las tomas grabadas hasta
+    /// hoy) la cuenta es entera y da exactamente lo mismo que antes. El fichero no se remuestrea nunca.
     public static func reshift(_ take: RecordedTake, file: URL, with calibration: LatencyCalibrationResult) throws -> RecordedTake? {
         guard !take.latencyCalibrated, calibration.applies(to: take.calibrationKey) else { return nil }
         let newLatency = calibration.latencySamples
         let delta = shiftSamples(latency: newLatency, rigDelay: nil) - take.shiftSamples
-        var start = take.songStartFrame - Int64(delta)
+        let latencyRate = take.calibrationKey.sampleRate
+        let deltaFrames: Int64
+        if abs(latencyRate - take.sampleRate) < 0.5 {
+            deltaFrames = Int64(delta)
+        } else {
+            deltaFrames = Int64((Double(delta) * take.sampleRate / latencyRate).rounded())
+        }
+        var start = take.songStartFrame - deltaFrames
         var out = take
         if start < 0 {
             let drop = Int(-start)

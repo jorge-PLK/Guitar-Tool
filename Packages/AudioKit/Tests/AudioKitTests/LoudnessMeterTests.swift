@@ -166,6 +166,38 @@ final class LoudnessMeterTests: XCTestCase {
         XCTAssertThrowsError(try LoudnessMeter.measure(url: url, isCancelled: { true }))
     }
 
+    // MARK: Puertas (valores teóricos, sin ffmpeg)
+
+    /// Seno de 997 Hz estéreo a `dB` dBFS: su sonoridad es `dB` LUFS (ver el primer test).
+    private func tone(_ dB: Double, _ seconds: Double, fs: Double = 48_000) -> [Float] {
+        SynthWAV.sine(997, dB: dB, seconds: seconds, rate: fs)
+    }
+
+    func testRelativeGateExcludesASectionTwentyDecibelsLower() {
+        // Sin puerta relativa saldría ≈ −26 LUFS (media de energía de −23 y −43); con ella, −23: el umbral
+        // relativo queda en ≈ −36 LUFS (−10 LU bajo la media) y los bloques de −43 se descartan.
+        let x = tone(-23, 10) + tone(-43, 10)
+        let r = LoudnessMeter.measure([x, x], sampleRate: 48_000)
+        XCTAssertEqual(r.integratedLUFS ?? .nan, -23.0, accuracy: 0.1)
+    }
+
+    func testAbsoluteGateExcludesDigitalSilence() {
+        let silence = [Float](repeating: 0, count: 48_000 * 30)
+        let x = tone(-23, 20) + silence
+        let r = LoudnessMeter.measure([x, x], sampleRate: 48_000)
+        XCTAssertEqual(r.integratedLUFS ?? .nan, -23.0, accuracy: 0.1)
+    }
+
+    func testAbsoluteGateAt70LUFSDecidesWhatTheRelativeGateSees() {
+        // 20 s a −60 y 80 s a −75 (bajo −70 LUFS). Con la puerta absoluta los −75 no cuentan y sale −60; sin ella
+        // la media de energía daría ≈ −66,5 y el umbral relativo (−76,5) los dejaría pasar.
+        let x = tone(-60, 20) + tone(-75, 80)
+        XCTAssertEqual(LoudnessMeter.measure([x, x], sampleRate: 48_000).integratedLUFS ?? .nan, -60.0, accuracy: 0.1)
+        // Todo bajo la absoluta: sin medida.
+        let quiet = tone(-75, 6)
+        XCTAssertNil(LoudnessMeter.measure([quiet, quiet], sampleRate: 48_000).integratedLUFS)
+    }
+
     // MARK: Contra ebur128 de ffmpeg
 
     func testMatchesFFmpegEBUR128() throws {

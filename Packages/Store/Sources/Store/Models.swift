@@ -204,6 +204,12 @@ public struct Take: Codable, Sendable, Equatable {
     public var punches: [TakePunch]?
     /// Audio original antes de aplanar un punch (`takes/<id>/base/processed.wav`).
     public var baseProcessedFile: String?
+    /// Giro de la imagen en grados en sentido horario (0, 90, 180 o 270; `nil` = 0), aplicado al leer, sin recodificar
+    /// (decisión de Jorge del 17/11/2026). Aditivo: una toma nueva hereda el de su cámara (`VideoSettings.rotations`).
+    public var videoRotation: Int?
+
+    /// Giro normalizado (`VideoSettings.normalizedRotation`).
+    public var rotationDegrees: Int { VideoSettings.normalizedRotation(videoRotation ?? 0) }
 
     public init(id: UUID = UUID(), guitarId: UUID? = nil, sectionId: UUID? = nil, diFile: String? = nil,
                 processedFile: String? = nil, micFile: String? = nil, discarded: Bool = false, createdAt: Date = Date(),
@@ -211,7 +217,9 @@ public struct Take: Codable, Sendable, Equatable {
                 rigDelaySamples: Double? = nil, rigDelayReliable: Bool? = nil, latencyCalibrated: Bool? = nil,
                 calibrationKey: CalibrationKey? = nil, clock: ClockMode? = nil,
                 partID: UUID? = nil, videoFile: String? = nil, videoOffset: Double? = nil,
-                videoFormat: TakeVideoFormat? = nil, punches: [TakePunch]? = nil, baseProcessedFile: String? = nil) {
+                videoFormat: TakeVideoFormat? = nil, punches: [TakePunch]? = nil, baseProcessedFile: String? = nil,
+                videoRotation: Int? = nil) {
+        self.videoRotation = videoRotation
         self.partID = partID
         self.videoFile = videoFile
         self.videoOffset = videoOffset

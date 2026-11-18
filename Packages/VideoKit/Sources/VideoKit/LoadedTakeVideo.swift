@@ -13,18 +13,22 @@ final class LoadedTakeVideo: @unchecked Sendable {
     }
 
     let pieces: [Piece]
+    /// Tamaño del fotograma ya girado (`rotation`): el que ven el timeline y el encuadre.
     let frameSize: CGSize
     let frameRate: Double
+    /// Giro que el compositor (o Vision) aplica a cada fotograma leído de las pistas, que siguen sin girar.
+    let rotation: VideoRotation
     /// Los `AVAsset` se guardan dentro de `Source`: sus pistas no los retienen.
     private let sources: [TakePreview.Source]
 
     var firstImage: Double? { pieces.first?.start }
     var lastImage: Double? { pieces.last?.end }
 
-    private init(pieces: [Piece], frameSize: CGSize, frameRate: Double, sources: [TakePreview.Source]) {
+    private init(pieces: [Piece], frameSize: CGSize, frameRate: Double, rotation: VideoRotation, sources: [TakePreview.Source]) {
         self.pieces = pieces
         self.frameSize = frameSize
         self.frameRate = frameRate
+        self.rotation = rotation
         self.sources = sources
     }
 
@@ -47,8 +51,8 @@ final class LoadedTakeVideo: @unchecked Sendable {
         }
         guard let first = pieces.first else { return nil }
         let (size, rate) = try await first.source.track.load(.naturalSize, .nominalFrameRate)
-        return LoadedTakeVideo(pieces: pieces, frameSize: size, frameRate: rate > 0 ? Double(rate) : 30,
-                               sources: ([base] + punchSources).compactMap { $0 })
+        return LoadedTakeVideo(pieces: pieces, frameSize: video.rotation.rotatedSize(size), frameRate: rate > 0 ? Double(rate) : 30,
+                               rotation: video.rotation, sources: ([base] + punchSources).compactMap { $0 })
     }
 
     /// Inserta los tramos en `track` con el tiempo 0 de la composición en `origin` (tiempo del tema), recortados a
@@ -59,15 +63,26 @@ final class LoadedTakeVideo: @unchecked Sendable {
     }
 
     /// Igual, segmento a segmento de `map`: cada uno en su sitio del vídeo, con su congelado y su relleno.
-    func insert(into track: AVMutableCompositionTrack, map: MontageTimeMap, hold: Double) throws {
+    ///
+    /// `fillToEnd`: en el último segmento el congelado dura hasta el final del vídeo (aunque pase de `hold` o el hueco
+    /// sea de menos de un fotograma). Un tramo vacío al final de una pista no cuenta en la duración de la composición:
+    /// si ninguna pista llega con imagen al final (los tramos cuantizados acaban hasta un fotograma después que la
+    /// toma), la composición dura menos que el plan y `AVAssetReader` rechaza la lectura con -11841.
+    func insert(into track: AVMutableCompositionTrack, map: MontageTimeMap, hold: Double, fillToEnd: Bool = false) throws {
         var cursor = CMTime.zero
         for (k, seg) in map.segments.enumerated() {
-            cursor = try insert(into: track, origin: seg.start, videoStart: map.videoStarts[k], duration: seg.duration, hold: hold, cursor: cursor)
+            cursor = try insert(into: track, origin: seg.start, videoStart: map.videoStarts[k], duration: seg.duration, hold: hold,
+                                fill: fillToEnd && k == map.segments.count - 1, cursor: cursor)
         }
     }
 
+    /// Último instante del tema con imagen antes de `t` (para elegir la pista que se congela hasta el final).
+    func lastImage(before t: Double) -> Double? {
+        pieces.filter { $0.start < t }.map { min($0.end, t) }.max()
+    }
+
     private func insert(into track: AVMutableCompositionTrack, origin: Double, videoStart: Double, duration: Double, hold: Double,
-                        cursor start: CMTime) throws -> CMTime {
+                        fill: Bool = false, cursor start: CMTime) throws -> CMTime {
         func t(_ s: Double) -> CMTime { VideoTakeWriter.time(s) }
         let total = t(videoStart + duration)
         var cursor = start
@@ -85,12 +100,17 @@ final class LoadedTakeVideo: @unchecked Sendable {
             last = (p.source, from + CMTimeGetSeconds(CMTimeSubtract(end, start)))
         }
         let frame = 1 / frameRate
-        if let last, hold > 0, CMTimeGetSeconds(CMTimeSubtract(total, cursor)) > frame {
+        if fill, last == nil, let p = pieces.last(where: { $0.start < origin }) {
+            // Sin imagen en este segmento: se congela la última de los anteriores.
+            last = (p.source, p.sourceStart + (p.end - p.start))
+        }
+        let filling = fill && CMTimeCompare(total, cursor) > 0
+        if let last, filling || (hold > 0 && CMTimeGetSeconds(CMTimeSubtract(total, cursor)) > frame) {
             // Congelado: el último fotograma insertado, estirado (`scaleTimeRange`, sin recodificar).
             let src = max(last.source.available.lowerBound, last.sourceEnd - frame)
             let one = t(last.sourceEnd - src)
             try track.insertTimeRange(CMTimeRange(start: t(src), duration: one), of: last.source.track, at: cursor)
-            let stretched = CMTimeMinimum(t(hold + frame), CMTimeSubtract(total, cursor))
+            let stretched = filling ? CMTimeSubtract(total, cursor) : CMTimeMinimum(t(hold + frame), CMTimeSubtract(total, cursor))
             track.scaleTimeRange(CMTimeRange(start: cursor, duration: one), toDuration: stretched)
             cursor = CMTimeAdd(cursor, stretched)
         }

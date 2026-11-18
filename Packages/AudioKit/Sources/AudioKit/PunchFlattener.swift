@@ -35,6 +35,7 @@ public struct PunchFile: Sendable, Equatable {
 }
 
 public enum PunchFlattenerError: Error, Equatable, Sendable {
+    /// Ya no se lanza: los ficheros a otra frecuencia se remuestrean al leerlos. Se conserva por compatibilidad.
     case sampleRateMismatch(String)
     case unreadable(String)
     case write(String)
@@ -116,13 +117,22 @@ public enum PunchFlattener {
 
     /// Versión sobre ficheros: lee `base` (con su `songStart`), aplica `punches` y escribe el resultado en
     /// `output` (WAV float32 como las tomas). `output` puede ser el mismo fichero que `base`: se lee antes.
-    public static func flattenFiles(base: URL, baseSongStart: Double, punches: [PunchFile], to output: URL) throws {
-        let (baseChannels, rate) = try read(base)
+    ///
+    /// `sampleRate`: frecuencia del resultado (la del proyecto); `nil` = la de `base`. La original y los punches
+    /// que estén a otra frecuencia (tomas grabadas antes de reconvertir el proyecto) se remuestrean al leerlos
+    /// (`TakeResampling`); sus ficheros no se tocan. Todo se coloca en segundos del tema, así que la alineación
+    /// no cambia; a la misma frecuencia el camino es el de siempre.
+    public static func flattenFiles(base: URL, baseSongStart: Double, punches: [PunchFile], to output: URL,
+                                    sampleRate: Double? = nil) throws {
+        let rate: Double
+        do { rate = try sampleRate ?? TakeResampling.sampleRate(of: base) } catch {
+            throw PunchFlattenerError.unreadable(base.lastPathComponent)
+        }
+        let baseChannels = try read(base, at: rate)
         let start = Int64((baseSongStart * rate).rounded())
         var list: [PunchAudio] = []
         for p in punches {
-            let (ch, r) = try read(p.url)
-            guard r == rate else { throw PunchFlattenerError.sampleRateMismatch(p.url.lastPathComponent) }
+            let ch = try read(p.url, at: rate)
             list.append(PunchAudio(start: Int64((p.start * rate).rounded()), end: Int64((p.end * rate).rounded()),
                                    songStartFrame: Int64((p.songStart * rate).rounded()), channels: ch))
         }
@@ -132,10 +142,9 @@ public enum PunchFlattener {
         }
     }
 
-    private static func read(_ url: URL) throws -> ([[Float]], Double) {
+    private static func read(_ url: URL, at rate: Double) throws -> [[Float]] {
         do {
-            let rate = try AVAudioFile(forReading: url).processingFormat.sampleRate
-            return (try TakeFile.read(url), rate)
+            return try TakeResampling.read(url, at: rate)
         } catch {
             throw PunchFlattenerError.unreadable(url.lastPathComponent)
         }

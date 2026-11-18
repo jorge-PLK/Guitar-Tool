@@ -215,7 +215,13 @@ public final class StudyPlayer {
         }
         let sr = rate!
         for newTake in newTakes {
-            let (file, reader) = try Self.open(newTake.url)
+            // Una toma a otra frecuencia (grabada antes de reconvertir el proyecto) se remuestrea al cargar, sin
+            // tocar el original (`TakeResampling`); a la misma frecuencia se abre tal cual, como siempre.
+            let url: URL
+            do { url = try TakeResampling.readable(newTake.url, at: sr) } catch {
+                throw StudyPlayerError.unreadable(newTake.url.lastPathComponent)
+            }
+            let (file, reader) = try Self.open(url)
             guard file.processingFormat.sampleRate == sr else { throw StudyPlayerError.sampleRateMismatch }
             var s = StemScheduler.Stem(player: AVAudioPlayerNode(), file: file, reader: reader)
             s.offset = Int64((newTake.songStart * sr).rounded())

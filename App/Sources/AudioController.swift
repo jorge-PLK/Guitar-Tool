@@ -230,6 +230,9 @@ final class AudioController {
                 hostError = nil
             } catch StudyPlayerError.sampleRateMismatch {
                 hostError = "Este tema no está a la frecuencia de trabajo (\(Fmt.rate(workingRate))): no se puede grabar."
+            } catch StudyPlayerError.noTracks {
+                // Sin pistas cargadas (aún o de verdad): no es un fallo del dispositivo. Al cargar se reintenta.
+                hostError = "Este tema no tiene stems para sonar de fondo: no se puede grabar."
             } catch {
                 hostError = "No se pudo usar el dispositivo para el backing (\(error))."
             }
@@ -263,6 +266,10 @@ final class AudioController {
     }
 
     // MARK: Reproductor y proyecto abierto
+
+    /// Reintenta alojar el reproductor en el dispositivo (p. ej. tras cargar las pistas, que `bind` pudo
+    /// adelantarse a ellas).
+    func refreshHosting() { syncHosting() }
 
     func bind(player: StudyPlayer, study: StudySession) {
         self.player = player

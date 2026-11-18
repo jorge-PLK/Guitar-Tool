@@ -127,23 +127,49 @@ final class CameraPreviewModel {
     }
 }
 
-/// `AVCaptureVideoPreviewLayer` sobre la sesión de `AVCameraCapture`.
+/// `AVCaptureVideoPreviewLayer` sobre la sesión de `AVCameraCapture`, girada `rotation` grados en sentido horario
+/// (botón «Rotar» de Grabar; solo la vista: la cámara graba sin girar y el giro se aplica al leer la toma).
 struct CameraPreviewLayerView: NSViewRepresentable {
     let session: AVCaptureSession
+    var rotation: Int = 0
 
-    func makeNSView(context: Context) -> NSView {
-        let v = NSView()
-        v.wantsLayer = true
-        let layer = AVCaptureVideoPreviewLayer(session: session)
-        layer.videoGravity = .resizeAspect
-        layer.frame = v.bounds
-        layer.autoresizingMask = [.layerWidthSizable, .layerHeightSizable]
-        v.layer?.addSublayer(layer)
-        return v
+    func makeNSView(context: Context) -> RotatingPreviewView {
+        RotatingPreviewView(session: session)
     }
 
-    func updateNSView(_ v: NSView, context: Context) {
-        if let l = v.layer?.sublayers?.first as? AVCaptureVideoPreviewLayer, l.session !== session { l.session = session }
+    func updateNSView(_ v: RotatingPreviewView, context: Context) {
+        if v.preview.session !== session { v.preview.session = session }
+        if v.rotation != rotation { v.rotation = rotation }
+    }
+}
+
+/// Vista con la capa de la cámara girada: con 90° o 270° la capa toma el ancho y el alto intercambiados y se gira
+/// alrededor del centro, así `resizeAspect` encaja la imagen ya girada.
+final class RotatingPreviewView: NSView {
+    let preview: AVCaptureVideoPreviewLayer
+    var rotation = 0 { didSet { needsLayout = true } }
+
+    init(session: AVCaptureSession) {
+        preview = AVCaptureVideoPreviewLayer(session: session)
+        super.init(frame: .zero)
+        wantsLayer = true
+        preview.videoGravity = .resizeAspect
+        layer?.addSublayer(preview)
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) no se usa") }
+
+    override func layout() {
+        super.layout()
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        let b = bounds, swaps = (rotation / 90) % 2 != 0
+        preview.setAffineTransform(.identity)
+        preview.bounds = CGRect(x: 0, y: 0, width: swaps ? b.height : b.width, height: swaps ? b.width : b.height)
+        preview.position = CGPoint(x: b.midX, y: b.midY)
+        // Capa sin voltear (y hacia arriba): un ángulo positivo gira en sentido antihorario.
+        preview.setAffineTransform(CGAffineTransform(rotationAngle: -CGFloat(rotation) * .pi / 180))
+        CATransaction.commit()
     }
 }
 
@@ -258,7 +284,10 @@ struct VideoSettingsView: View {
         ZStack {
             Color.black
             switch preview.state {
-            case .live(let session): CameraPreviewLayerView(session: session)
+            case .live(let session):
+                // Con el giro guardado de esa cámara («Rotar» de Grabar).
+                CameraPreviewLayerView(session: session,
+                                       rotation: (list?.effective(video.cameraUID)?.id ?? video.cameraUID).map { video.defaultRotation(for: $0) } ?? 0)
             case .simulated: ColorBars().overlay(alignment: .bottom) { caption("Vista previa simulada") }
             case .idle: ProgressView().controlSize(.small)
             case .noCamera: message("camera.fill", "No hay ninguna cámara conectada.")

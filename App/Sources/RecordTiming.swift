@@ -28,6 +28,21 @@ struct BarTiming: Equatable {
         return max(0, start - Double(bars) * barSeconds)
     }
 
+    /// Fin de una toma que empieza en una sección (petición de Jorge, 17/11/2026; mini-spec Fase 6, «Grabar una toma»):
+    /// el final de la sección más `bars` compases de cola (el mismo «Margen» que la entrada), sin pasar de `duration`.
+    /// Con el pulso la cola se cuenta en inicios de compás; sin él, en `barSeconds`.
+    func sectionStop(sectionEnd: Double, bars: Int, duration: Double) -> Double {
+        var stop = sectionEnd
+        if bars > 0 {
+            if let last = downbeats.lastIndex(where: { $0 <= sectionEnd + 0.05 }), last + bars < downbeats.count {
+                stop = downbeats[last + bars]
+            } else {
+                stop = sectionEnd + Double(bars) * barSeconds
+            }
+        }
+        return min(stop, duration)
+    }
+
     /// Compás más cercano a `t` (imán del punch-in).
     func nearestBar(_ t: Double) -> Double {
         if let best = downbeats.min(by: { abs($0 - t) < abs($1 - t) }) { return best }

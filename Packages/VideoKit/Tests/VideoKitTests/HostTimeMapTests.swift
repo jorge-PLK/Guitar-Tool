@@ -81,8 +81,10 @@ final class HostTimeMapTests: XCTestCase {
     func testHostClockMatchesCoreMediaHostClock() {
         let now = mach_absolute_time()
         let cm = CMClockMakeHostTimeFromSystemUnits(now)
-        // CoreMedia guarda ns y la vuelta a ticks redondea: un tick (≈ 42 ns en Apple Silicon) como mucho.
-        XCTAssertEqual(HostClock.seconds(hostTime: cm), HostClock.seconds(ticks: now), accuracy: HostClock.seconds(ticks: 1) + 1e-12)
+        // CoreMedia guarda ns y la vuelta a ticks redondea: un tick (≈ 42 ns en Apple Silicon) como mucho. Holgura de
+        // 1 ns para la coma flotante: con horas de uptime, un ulp de los segundos ya pasa de 1e-12 y el test fallaba
+        // justo en un tick.
+        XCTAssertEqual(HostClock.seconds(hostTime: cm), HostClock.seconds(ticks: now), accuracy: HostClock.seconds(ticks: 1) + 1e-9)
         XCTAssertEqual(CMTimeGetSeconds(cm), HostClock.seconds(ticks: now), accuracy: 1e-6)
         let s = HostClock.nowSeconds
         XCTAssertEqual(HostClock.seconds(hostTime: HostClock.hostTime(seconds: s)), s, accuracy: 1e-7)

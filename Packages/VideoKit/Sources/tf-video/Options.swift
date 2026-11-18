@@ -39,6 +39,8 @@ struct Options {
     /// `montage`: WAV de la mezcla y códec; tamaño y fps solo si se dan.
     var mix: String?
     var codec: String = "hevc"
+    /// `--container mov|mp4`; sin darlo, el de la extensión de la salida (`.mp4` → mp4, si no mov).
+    var container: String?
     var sizeGiven = false
     var fpsGiven = false
 }
@@ -104,6 +106,10 @@ enum Parse {
                 let c = try value(flag)
                 guard c == "hevc" || c == "h264" else { throw CLIError("--codec espera hevc o h264.") }
                 o.codec = c
+            case "--container":
+                let c = try value(flag)
+                guard c == "mov" || c == "mp4" else { throw CLIError("--container espera mov o mp4.") }
+                o.container = c
             case let arg where !arg.hasPrefix("-") && (o.command == .frame || o.command == .montage):
                 o.positional.append(arg)
             case "--simulated":

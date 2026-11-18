@@ -6,8 +6,39 @@ import VideoKit
 
 /// `--screen montage | montage-framing` (solo DEBUG): si el proyecto no tiene tomas con vídeo, se generan tres
 /// partes (dos rítmicas y una solista) con tomas sintéticas de color liso y se marca una sección de solo; todo con
-/// ficheros de verdad en el proyecto (úsalo con una copia: `--projects-folder`). `--montage-layout side|grid|stack|single`
+/// ficheros de verdad en el proyecto (úsalo con una copia: `--projects-folder`). `--montage-layout side|grid|stack|single|single-landscape`
 /// elige el layout y `--seek` el instante de la vista previa (por defecto, un segundo dentro del primer solo).
+/// Cronómetro de la comprobación `--montage-export`: instantes (s desde `reset`) de cada fase. Las fases de la mezcla
+/// salen del progreso de `MontageMixer.mix` (0,5 = fin del pase 1; cada salto posterior por debajo de 1 = una pasada
+/// del limitador; 1 = escrita `mezcla.wav`).
+final class ExportClock: @unchecked Sendable {
+    private let lock = NSLock()
+    private var origin = Date()
+    private var lastMix = -1.0
+    private(set) var marks: [(String, Double)] = []
+
+    func reset() { lock.withLock { origin = Date(); lastMix = -1; marks = [] } }
+
+    func mark(_ name: String) {
+        lock.withLock { marks.append((name, Date().timeIntervalSince(origin))) }
+    }
+
+    func markOnce(_ name: String) {
+        lock.withLock { if !marks.contains(where: { $0.0 == name }) { marks.append((name, Date().timeIntervalSince(origin))) } }
+    }
+
+    func mixProgress(_ p: Double) {
+        lock.withLock {
+            defer { lastMix = max(lastMix, p) }
+            guard p >= 0.5 - 1e-9, p > lastMix + 1e-9 else { return }
+            let name = p >= 1 - 1e-9 ? "mezcla: escritura final" : (lastMix < 0.5 - 1e-9 ? "mezcla: pase 1 (render + medida + pistas)" : "mezcla: pasada limitador")
+            marks.append((name, Date().timeIntervalSince(origin)))
+        }
+    }
+
+    var json: [[String: Any]] { lock.withLock { marks.map { ["phase": $0.0, "t": $0.1] } } }
+}
+
 enum MontageDemo {
     /// Duración máxima de las tomas sintéticas (s).
     private static let maxTakeSeconds = 24.0
@@ -80,8 +111,34 @@ enum MontageDemo {
 
     @MainActor
     static func apply(_ options: LaunchOptions, to ctl: MontageController) {
+        // Primero lo neutro y después lo que pidan los demás argumentos.
+        if options.montageNeutral {
+            ctl.setShowPartLabels(true)
+            ctl.setKeepVideoAspect(false)
+            ctl.clearCuts()
+            ctl.setLayout(.side)
+        }
         if let l = options.montageLayout, let kind = Store.MontageLayoutKind(rawValue: l) { ctl.setLayout(kind) }
+        if let idx = options.montageOrder {
+            let ids = ctl.session.project.recordingOrInitial().parts.map(\.id)
+            ctl.setPartOrder(idx.filter { ids.indices.contains($0) }.map { ids[$0] })
+        }
+        if let c = options.montageContainer, let container = MontageContainer(rawValue: c) {
+            ctl.updateExport { $0.container = container }
+        }
         ctl.setCutGaps(options.montageCutGaps)
+        if options.montageNoPartLabels { ctl.setShowPartLabels(false) }
+        if options.montageKeepAspect { ctl.setKeepVideoAspect(true) }
+        if let cuts = options.montageCuts {
+            // Se sustituyen los cortes guardados; el índice es el de la parte en el orden de Grabar.
+            ctl.clearCuts()
+            let ids = ctl.existingPartIDs
+            for c in cuts {
+                var part: UUID? = nil
+                if let i = c.part, ids.indices.contains(i) { part = ids[i] }
+                ctl.addCut(at: c.time, partID: part, exact: true)
+            }
+        }
         ctl.initialSongTime = options.seek ?? ctl.sections.first(where: \.isSolo).map { $0.start + 1 }
         if options.screen == "montage-framing" { ctl.framingSheetTakeID = ctl.videoLanes.first?.takeID }
     }
@@ -91,15 +148,33 @@ enum MontageDemo {
     static func runExportCheck(_ ctl: MontageController, options: LaunchOptions) async {
         let deadline = Date().addingTimeInterval(300)
         while (ctl.isAnalyzing || ctl.draft == nil) && Date() < deadline { try? await Task.sleep(for: .milliseconds(250)) }
+        let suffix = "\(ctl.state.layout.rawValue)\(ctl.state.cutGaps ? "-cut" : "")\(ctl.state.export.container == .mov ? "" : "-\(ctl.state.export.container.rawValue)")"
+        let cwd = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+        // El plan tal cual, para reproducir con `tf-video montage` sin la app.
+        if let plan = ctl.draft?.plan, let data = try? JSONEncoder().encode(plan) {
+            try? data.write(to: cwd.appendingPathComponent("montage-plan-\(suffix).json"))
+        }
         await ctl.exportAndWait()
-        var out: [String: Any] = ["layout": ctl.state.layout.rawValue, "cutGaps": ctl.state.cutGaps]
+        let ids = ctl.existingPartIDs
+        let cutsJSON = ctl.cuts.map { c -> [String: Any] in
+            ["time": c.time, "part": c.partID.flatMap { ids.firstIndex(of: $0) } as Any? ?? "auto"]
+        }
+        var out: [String: Any] = ["layout": ctl.state.layout.rawValue, "cutGaps": ctl.state.cutGaps,
+                                  "showPartLabels": ctl.state.showPartLabels, "keepVideoAspect": ctl.state.keepVideoAspect,
+                                  "keepAspectApplies": ctl.keepAspectApplies, "singleCuts": cutsJSON,
+                                  "songSeconds": ctl.song.duration, "timings": ctl.exportClock.json]
+        if let e = ctl.exportRawError { out["rawError"] = e }
         switch ctl.exportPhase {
         case .done(let r):
             out["video"] = r.url.path
+            out["container"] = ctl.state.export.container.rawValue
             out["finalLUFS"] = r.finalLUFS as Any? ?? NSNull()
             out["finalTruePeakDB"] = r.finalTruePeakDB
             out["limitedByPeak"] = r.limitedByPeak
             out["normalized"] = r.normalized
+            out["limiterEnabled"] = r.limiterEnabled
+            out["limiterApplied"] = r.limiterApplied
+            out["limiterMaxReductionDB"] = r.limiterMaxReductionDB
             let asset = AVURLAsset(url: r.url)
             if let v = try? await asset.loadTracks(withMediaType: .video).first,
                let (size, fps, range) = try? await v.load(.naturalSize, .nominalFrameRate, .timeRange) {
@@ -122,8 +197,7 @@ enum MontageDemo {
         case .failed(let m): out["error"] = m
         default: out["error"] = "La exportación no terminó"
         }
-        let name = "export-\(ctl.state.layout.rawValue)\(ctl.state.cutGaps ? "-cut" : "").json"
-        let url = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent(name)
+        let url = cwd.appendingPathComponent("export-\(suffix).json")
         if let data = try? JSONSerialization.data(withJSONObject: out, options: [.prettyPrinted, .sortedKeys]) { try? data.write(to: url) }
         exit(0)
     }

@@ -63,6 +63,11 @@ final class VideoFileTests: XCTestCase {
         XCTAssertEqual(CMFormatDescriptionGetMediaSubType(desc), kCMVideoCodecType_HEVC)
         let size = try await videoTracks[0].load(.naturalSize)
         XCTAssertEqual(size, CGSize(width: 320, height: 180))
+        // El escritor no fija `AVAssetWriterInput.transform`: la pista sale con la identidad, y el montaje
+        // (`GuitarFramer`, compositor, `tf-video frame`) lee los píxeles tal cual. Si esto cambia, el montaje tiene
+        // que aplicar `preferredTransform` en todos esos sitios.
+        let transform = try await videoTracks[0].load(.preferredTransform)
+        XCTAssertTrue(transform.isIdentity, "preferredTransform \(transform)")
 
         let read = try await Self.ptsOf(url)
         XCTAssertEqual(read.count, sent.count)

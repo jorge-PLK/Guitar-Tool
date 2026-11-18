@@ -8,6 +8,22 @@ public enum MontageError: Error, Equatable, Sendable {
     case composition(String)
     case read(String)
     case write(String)
+    /// La extensión de la URL de destino no es la del contenedor pedido (`MontageVideoContainer.fileExtension`).
+    case containerMismatch(expected: String, got: String)
+}
+
+/// Texto para el mensaje de la app («No se pudo exportar el vídeo (…)»): la causa, no el nombre del caso.
+extension MontageError: CustomStringConvertible {
+    public var description: String {
+        switch self {
+        case .noVideo: "ninguna parte tiene imagen"
+        case .audio(let s): "no se pudo leer el audio \(s)"
+        case .composition(let s): s
+        case .read(let s): "lectura de la composición: \(s)"
+        case .write(let s): "escritura del fichero: \(s)"
+        case .containerMismatch(let expected, let got): "la extensión .\(got) no es la del contenedor .\(expected)"
+        }
+    }
 }
 
 /// Composición del montaje lista para `AVPlayer` o para exportar. Tiempo 0 del item = `plan.span.start`.
@@ -72,7 +88,7 @@ public final class MontageBuilder: @unchecked Sendable {
         }
         let timeline = MontageTimeline(plan: plan, images: loaded.compactMapValues { v in
             v.firstImage.map { (firstImage: $0, frameSize: v.frameSize) }
-        })
+        }, imageSpans: loaded.mapValues { $0.pieces.map { MontageSpan(start: $0.start, end: $0.end) } })
         var audio: [(MontageAudioTrack, AVURLAsset, AVAssetTrack, CMTimeRange)] = []
         if includeAudio {
             for a in plan.audio {
@@ -90,15 +106,25 @@ public final class MontageBuilder: @unchecked Sendable {
         func t(_ s: Double) -> CMTime { VideoTakeWriter.time(s) }
         let map = timeline.timeMap
         let comp = AVMutableComposition()
+        // Duración del vídeo en la rejilla (la misma que lee el exportador y la de `mezcla.wav`).
+        let total = t(map.duration)
+        // La toma con imagen más tardía se congela hasta el final: así la composición dura `total` aunque las tomas
+        // acaben antes que el último tramo cuantizado (`LoadedTakeVideo.insert(fillToEnd:)`).
+        let end = map.segments.last?.end ?? 0
+        let filler = videos.indices.max { (videos[$0].lastImage(before: end) ?? -.infinity) < (videos[$1].lastImage(before: end) ?? -.infinity) }
         var ids: [CMPersistentTrackID] = []
-        for v in videos {
+        for (i, v) in videos.enumerated() {
             guard let track = comp.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else {
                 throw MontageError.composition("pista de vídeo")
             }
-            do { try v.insert(into: track, map: map, hold: MontageStyle.transition) } catch {
+            do { try v.insert(into: track, map: map, hold: MontageStyle.transition, fillToEnd: i == filler) } catch {
                 throw MontageError.composition("\(error)")
             }
             ids.append(track.trackID)
+        }
+        guard CMTimeCompare(comp.duration, total) >= 0 else {
+            throw MontageError.composition(String(format: "las pistas de vídeo acaban en %.4f s y el montaje dura %.4f s",
+                                                  CMTimeGetSeconds(comp.duration), CMTimeGetSeconds(total)))
         }
 
         var mix: AVMutableAudioMix?
@@ -140,14 +166,16 @@ public final class MontageBuilder: @unchecked Sendable {
 
         let video = AVMutableVideoComposition()
         video.customVideoCompositorClass = MontageCompositor.self
-        video.frameDuration = t(1 / max(1, plan.fps))
+        // La misma rejilla en la que `MontagePlan.quantized` pone los tramos.
+        video.frameDuration = MontagePlan.frameTime(fps: plan.fps)
         video.renderSize = renderSize ?? plan.canvas.size
         // Fotogramas compuestos etiquetados en BT.709, como el fichero exportado.
         video.colorPrimaries = AVVideoColorPrimaries_ITU_R_709_2
         video.colorTransferFunction = AVVideoTransferFunction_ITU_R_709_2
         video.colorYCbCrMatrix = AVVideoYCbCrMatrix_ITU_R_709_2
-        video.instructions = [MontageInstruction(timeRange: CMTimeRange(start: .zero, duration: comp.duration), timeline: timeline,
-                                                 trackIDs: ids, caption: plan.caption)]
+        // Una instrucción sin huecos de 0 al final del vídeo (y de la composición, si un tick de redondeo la alarga).
+        video.instructions = [MontageInstruction(timeRange: CMTimeRange(start: .zero, duration: CMTimeMaximum(comp.duration, total)), timeline: timeline,
+                                                 trackIDs: ids, rotations: videos.map(\.rotation), caption: plan.caption)]
         return MontagePreview(composition: comp, videoComposition: video, audioMix: mix, timeline: timeline)
     }
 

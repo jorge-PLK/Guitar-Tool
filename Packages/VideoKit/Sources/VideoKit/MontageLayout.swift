@@ -6,23 +6,29 @@ import Foundation
 /// el de las partes.
 ///
 /// - `side`: una fila de columnas iguales.
-/// - `grid`: 1 completo; 2 lado a lado; 3 dos arriba y uno centrado abajo; 4 en 2 × 2. Con más de 4 (la spec no lo
-///   fija): `⌈√n⌉` columnas y la última fila centrada, que generaliza los cuatro casos.
+/// - `grid`: 1 completo; 2 apilados con el tamaño de celda del 2 × 2 y centrados en horizontal (Jorge, 17/11/2026;
+///   la tabla de la spec decía lado a lado); 3 dos arriba y uno centrado abajo; 4 en 2 × 2. Con más de 4 (la spec no
+///   lo fija): `⌈√n⌉` columnas y la última fila centrada, que generaliza los casos 3 y 4.
 /// - `stack`: una columna de filas iguales.
-/// - `single`: cada recuadro a pantalla completa, sin margen (en el plano único solo hay uno, salvo en el fundido
-///   cruzado).
+/// - `single`, `singleLandscape`: cada recuadro a pantalla completa, sin margen (en el plano único solo hay uno,
+///   salvo en el fundido cruzado).
 public enum MontageLayout {
     public static func rects(_ kind: MontageLayoutKind, count: Int, canvas: CGSize,
                              margin: Double = MontageStyle.margin, gap: Double = MontageStyle.gap) -> [CGRect] {
         guard count > 0 else { return [] }
         let inner = CGRect(x: margin, y: margin, width: canvas.width - 2 * margin, height: canvas.height - 2 * margin)
         switch kind {
-        case .single:
+        case .single, .singleLandscape:
             return Array(repeating: CGRect(origin: .zero, size: canvas), count: count)
         case .side:
             return grid(inner, columns: count, rows: 1, count: count, gap: gap)
         case .stack:
             return grid(inner, columns: 1, rows: count, count: count, gap: gap)
+        case .grid where count == 2:
+            // Apilados con el tamaño de celda del 2 × 2, centrados en horizontal (petición de Jorge del 17/11/2026):
+            // las celdas de la columna izquierda del 2 × 2 desplazadas media celda a la derecha.
+            let cells = grid(inner, columns: 2, rows: 2, count: 4, gap: gap)
+            return [cells[0], cells[2]].map { $0.offsetBy(dx: inner.midX - $0.midX, dy: 0) }
         case .grid:
             let cols = Int(Double(count).squareRoot().rounded(.up))
             let rows = (count + cols - 1) / cols

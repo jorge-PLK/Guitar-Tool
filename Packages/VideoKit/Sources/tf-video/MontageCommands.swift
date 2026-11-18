@@ -61,8 +61,13 @@ extension CLI {
         do { plan = try JSONDecoder().decode(MontagePlan.self, from: Data(contentsOf: planURL)) } catch {
             throw CLIError("Plan no válido (\(planURL.lastPathComponent)): \(error)")
         }
+        let container: MontageVideoContainer = (o.container ?? out.pathExtension.lowercased()) == "mp4" ? .mp4 : .mov
+        guard out.pathExtension.lowercased() == container.fileExtension else {
+            throw CLIError("La salida debe acabar en .\(container.fileExtension) con --container \(container.rawValue).")
+        }
         let settings = MontageExportSettings(codec: o.codec == "h264" ? .h264 : .hevc, width: o.sizeGiven ? o.width : plan.canvas.width,
-                                             height: o.sizeGiven ? o.height : plan.canvas.height, fps: o.fpsGiven ? o.fps : plan.fps)
+                                             height: o.sizeGiven ? o.height : plan.canvas.height, fps: o.fpsGiven ? o.fps : plan.fps,
+                                             container: container)
         env.line("Plan: \(plan.layout.rawValue), \(plan.parts.count) partes, tramo \(plan.span.start.fixed(3))–\(plan.span.end.fixed(3)) s")
         final class Step: @unchecked Sendable { let lock = NSLock(); var next = 0.1 }
         let step = Step()
@@ -75,7 +80,7 @@ extension CLI {
             if show { env.line("  \(Int((p * 100).rounded())) %") }
         }
         env.line("Vídeo: \(s.url.path)")
-        env.line("\(s.settings.width)×\(s.settings.height) \(s.settings.codec.rawValue) a \(s.settings.fps.fixed(2)) fps, \(s.frames) fotogramas, \(s.duration.fixed(3)) s, audio: \(s.hasAudio ? "sí" : "no")")
+        env.line("\(s.settings.container.rawValue.uppercased()), \(s.settings.width)×\(s.settings.height) \(s.settings.codec.rawValue) a \(s.settings.fps.fixed(2)) fps, \(s.frames) fotogramas, \(s.duration.fixed(3)) s, audio: \(s.hasAudio ? "sí" : "no")")
         return Exit.ok
     }
 }

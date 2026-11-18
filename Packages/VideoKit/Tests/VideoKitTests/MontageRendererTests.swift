@@ -65,9 +65,10 @@ final class MontageRendererTests: XCTestCase {
         return (px, w, h, st)
     }
 
-    /// Píxel (x, y) con origen arriba a la izquierda (el bitmap de Core Image va de abajo arriba).
+    /// Píxel (x, y) con origen arriba a la izquierda (`render(toBitmap:)` escribe la fila de arriba primero; hasta la
+    /// rejilla de 2 apilados ningún caso distinguía arriba de abajo).
     static func pixel(_ r: (px: [UInt8], w: Int, h: Int, state: MontageFrameState), _ x: Double, _ y: Double) -> [Int] {
-        let xi = Int(x), yi = r.h - 1 - Int(y)
+        let xi = Int(x), yi = Int(y)
         let o = (yi * r.w + xi) * 4
         return [Int(r.px[o]), Int(r.px[o + 1]), Int(r.px[o + 2])]
     }

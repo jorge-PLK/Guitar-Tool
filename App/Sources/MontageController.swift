@@ -25,6 +25,12 @@ final class MontageController {
         var finalTruePeakDB: Double
         var normalized: Bool
         var limitedByPeak: Bool
+        var limiterEnabled: Bool = false
+        var limiterApplied: Bool = false
+        var limiterMaxReductionDB: Double = 0
+        var limiterOutOfTolerance: Bool = false
+        /// Nombres de los ficheros con muestras recortadas a 24 bits.
+        var clippedFiles: [String] = []
     }
 
     enum ExportPhase: Equatable {
@@ -40,6 +46,8 @@ final class MontageController {
     static let previewDebounce = 0.15
     /// Anticipación al solo (mini-spec «Transiciones»), leída de VideoKit para no duplicarla, como texto («0,5 s»).
     static let anticipationLabel = "\(MontageStyle.anticipation.formatted(.number.precision(.fractionLength(0...2)))) s"
+    /// Separación mínima entre dos cortes libres del plano único al arrastrar (s); decisión propia, no sale de la spec.
+    static let minCutGap = 0.1
     /// Rebote del guardado, como `StudySession`.
     static let saveDelay = StudySession.saveDelay
 
@@ -64,6 +72,11 @@ final class MontageController {
 
     // Exportación.
     private(set) var exportPhase: ExportPhase = .idle
+    #if DEBUG
+    /// Comprobación `--montage-export`: instantes de cada fase (s desde el inicio) y el error tal cual.
+    @ObservationIgnored let exportClock = ExportClock()
+    @ObservationIgnored private(set) var exportRawError: String?
+    #endif
 
     @ObservationIgnored private var timeObserver: Any?
     @ObservationIgnored private var previewTask: Task<Void, Never>?
@@ -150,8 +163,106 @@ final class MontageController {
         changed()
     }
 
+    /// Reordena los recuadros: la parte `id` pasa a ocupar el sitio de `target` (las demás se desplazan). Se guarda al soltar.
+    func moveLane(_ id: UUID, to target: UUID) {
+        var order = state.effectiveOrder(of: session.project.recordingOrInitial().parts.map(\.id))
+        guard id != target, let from = order.firstIndex(of: id), let to = order.firstIndex(of: target) else { return }
+        order.insert(order.remove(at: from), at: to)
+        state.partOrder = order
+        changed()
+    }
+
+    func setPartOrder(_ ids: [UUID]) {
+        state.partOrder = ids
+        changed()
+    }
+
     func setCaption(_ on: Bool) {
         state.caption = on
+        changed()
+    }
+
+    func setShowPartLabels(_ on: Bool) {
+        state.showPartLabels = on
+        changed()
+    }
+
+    func setKeepVideoAspect(_ on: Bool) {
+        state.keepVideoAspect = on
+        changed()
+    }
+
+    /// «Mantener aspect ratio» solo cuenta en apilado y plano único (mini-spec Fase 7, «Interfaz»); en lado a lado y
+    /// rejilla el valor guardado se conserva pero no se aplica.
+    var keepAspectApplies: Bool { state.layout == .stack || state.layout.isSingleShot }
+
+    // MARK: Cortes libres del plano único
+
+    var isSingleShot: Bool { state.layout.isSingleShot }
+    /// Cortes ordenados por tiempo.
+    var cuts: [MontageSingleCut] { state.singleCuts.normalizedSingleCuts() }
+    /// Partes que se pueden elegir en un corte: las que tienen toma con vídeo.
+    var cutCandidates: [MontageLane] { lanes.filter { $0.hasVideo } }
+    var existingPartIDs: [UUID] { session.project.recordingOrInitial().parts.map(\.id) }
+    /// Parte que manda en `t` según los cortes (nil = automático); es la que hereda un corte nuevo.
+    func singlePart(at t: Double) -> UUID? { state.singlePart(at: t, existingPartIDs: existingPartIDs) }
+    /// Lo que de verdad se ve en el plano único (color del carril «Plano»): un corte a una parte sin toma se pinta
+    /// con la que elige el automático (decisión de Jorge del 17/11/2026).
+    var planeShots: [PlaneShot] { MontagePlanning.planeShots(plan: draft?.plan) }
+    /// ¿Tiene toma con imagen la parte elegida en el corte, en su instante? (nil o automático: sí).
+    func cutPartCovered(_ cut: MontageSingleCut) -> Bool {
+        guard let p = cut.partID else { return true }
+        return MontagePlanning.cutEligibleParts(plan: draft?.plan, at: cut.time).contains(p)
+    }
+
+    /// `t` ajustado al pulso más cercano (sin pulso, sin ajuste) y dentro del tramo del vídeo.
+    func snappedCutTime(_ t: Double) -> Double {
+        let snapped = SectionEditor.snap(t, to: session.beats?.beats ?? [])
+        return min(max(snapped, span.start), span.end)
+    }
+
+    /// Posición de un corte arrastrado: ajustada al pulso y sin pasar de los cortes vecinos.
+    func draggedCutTime(_ id: UUID, to t: Double) -> Double {
+        let all = cuts
+        guard let i = all.firstIndex(where: { $0.id == id }) else { return t }
+        let lo = i > 0 ? all[i - 1].time + Self.minCutGap : span.start
+        let hi = i + 1 < all.count ? all[i + 1].time - Self.minCutGap : span.end
+        return min(max(snappedCutTime(t), lo), max(lo, hi))
+    }
+
+    /// Crea un corte en `t` (ajustado) que conserva la parte vigente y devuelve su id para abrir el menú.
+    @discardableResult
+    func addCut(at t: Double) -> UUID {
+        let time = snappedCutTime(t)
+        let id = UUID()
+        state = state.addingSingleCut(at: time, partID: singlePart(at: time), id: id)
+        changed()
+        return id
+    }
+
+    /// Corte con parte explícita (nil = automático) y sin ajuste al pulso (la demo `--montage-cuts`).
+    func addCut(at t: Double, partID: UUID?, exact: Bool) {
+        state = state.addingSingleCut(at: exact ? min(max(t, span.start), span.end) : snappedCutTime(t), partID: partID)
+        changed()
+    }
+
+    func moveCut(_ id: UUID, to t: Double) {
+        state = state.movingSingleCut(id, to: draggedCutTime(id, to: t))
+        changed()
+    }
+
+    func setCutPart(_ id: UUID, _ partID: UUID?) {
+        state = state.settingSingleCut(id, partID: partID)
+        changed()
+    }
+
+    func removeCut(_ id: UUID) {
+        state = state.removingSingleCut(id)
+        changed()
+    }
+
+    func clearCuts() {
+        state.singleCuts = []
         changed()
     }
 
@@ -350,7 +461,27 @@ final class MontageController {
         gen.requestedTimeToleranceBefore = .positiveInfinity
         gen.requestedTimeToleranceAfter = .positiveInfinity
         // Positivo: la imagen del instante T llega al fichero en T + desfase.
-        return try? await gen.image(at: CMTime(seconds: t + offset, preferredTimescale: 90_000)).image
+        guard let img = try? await gen.image(at: CMTime(seconds: t + offset, preferredTimescale: 90_000)).image else { return nil }
+        // La caja del encuadre está en coordenadas de la imagen ya girada.
+        return video.rotation.apply(img)
+    }
+
+    // MARK: Giro de la toma («Rotar»)
+
+    /// Giro de la toma (0, 90, 180 o 270).
+    func rotation(takeID: UUID) -> Int { session.project.takes.first { $0.id == takeID }?.rotationDegrees ?? 0 }
+
+    /// «Rotar» en la ficha de la toma: 90° más en sentido horario, guardado en la toma. El encuadre guardado se gira con
+    /// la imagen (`TakeFraming.rotatedClockwise`) y el análisis se rehace (su huella incluye el giro).
+    func rotateTake(_ takeID: UUID) {
+        guard var take = session.project.takes.first(where: { $0.id == takeID }) else { return }
+        take.videoRotation = VideoSettings.normalizedRotation(take.rotationDegrees + 90)
+        session.saveTakes([take])
+        if state.framing[takeID] != nil { state.framing[takeID] = state.framing(for: takeID).rotatedClockwise(quarterTurns: 1) }
+        analyses[takeID] = nil
+        framingStatus[takeID] = nil
+        changed()
+        startAnalysis()
     }
 
     // MARK: Exportación
@@ -386,7 +517,7 @@ final class MontageController {
         let layout = session.layout
         let kind = state.layout
         let out = state.export
-        let url = layout.montageVideoURL(layout: kind)
+        let url = layout.montageVideoURL(layout: kind, container: out.container)
         let tracksDir = layout.montageTracksDirectory(layout: kind)
         let temp = fm.temporaryDirectory.appendingPathComponent("tf-montage-export-\(UUID().uuidString)", isDirectory: true)
         let mixURL = (out.trackWAVs ? tracksDir : temp).appendingPathComponent("mezcla.wav")
@@ -394,12 +525,18 @@ final class MontageController {
         let rate = session.project.song.sampleRate
         let job = MontageMixJob(segments: draft.segments.map { MixSegment(start: $0.start, end: $0.end, fadeIn: $0.fadeIn, fadeOut: $0.fadeOut) },
                                 sampleRate: [44_100.0, 48_000.0].contains(rate) ? rate : 48_000,
-                                tracks: draft.mixTracks, fadeIn: plan.fadeIn ? plan.barDuration : nil,
-                                fadeOut: plan.fadeOut ? plan.barDuration : nil,
-                                normalization: out.normalize ? MontageNormalization.standard : MontageNormalization.none,
+                                tracks: draft.mixTracks, fadeIn: plan.barDuration,
+                                fadeOut: plan.barDuration,
+                                normalization: out.normalize ? (out.limiter ? MontageNormalization.standard : MontageNormalization.standardWithoutLimiter) : MontageNormalization.none,
                                 mixURL: mixURL, trackDirectory: out.trackWAVs ? tracksDir : nil)
         let size = MontagePlanning.exportSize(out.resolution, kind: kind)
-        let settings = MontageExportSettings(codec: out.codec == .hevc ? .hevc : .h264, width: size.width, height: size.height, fps: out.fps)
+        let videoContainer: MontageVideoContainer
+        switch out.container {
+        case .mov: videoContainer = .mov
+        case .mp4: videoContainer = .mp4
+        }
+        let settings = MontageExportSettings(codec: out.codec == .hevc ? .hevc : .h264, width: size.width, height: size.height, fps: out.fps,
+                                             container: videoContainer)
         var mixResult: MontageMixResult?
         defer {
             try? fm.removeItem(at: temp)
@@ -409,24 +546,47 @@ final class MontageController {
             try fm.createDirectory(at: layout.videoDir, withIntermediateDirectories: true)
             try fm.createDirectory(at: mixURL.deletingLastPathComponent(), withIntermediateDirectories: true)
             let share = Self.mixProgressShare
+            #if DEBUG
+            let clock = exportClock
+            clock.reset()
+            #endif
             let mixing = Task.detached(priority: .userInitiated) {
                 try await MontageMixer.mix(job) { [weak self] p in
+                    #if DEBUG
+                    clock.mixProgress(p)
+                    #endif
                     Task { @MainActor in self?.setProgress("Mezclando el audio", p * share) }
                 }
             }
             let mixed = try await withTaskCancellationHandler { try await mixing.value } onCancel: { mixing.cancel() }
             mixResult = mixed
+            #if DEBUG
+            clock.mark("mezcla")
+            #endif
             try Task.checkCancellation()
             let exporting = Task.detached(priority: .userInitiated) {
                 try await MontageExporter.export(plan: plan, mixURL: mixed.mixURL, settings: settings, to: url) { [weak self] p in
+                    #if DEBUG
+                    clock.markOnce("vídeo: primer fotograma")
+                    #endif
                     Task { @MainActor in self?.setProgress("Codificando el vídeo", share + p * (1 - share)) }
                 }
             }
             _ = try await withTaskCancellationHandler { try await exporting.value } onCancel: { exporting.cancel() }
+            #if DEBUG
+            clock.mark("vídeo")
+            #endif
             exportPhase = .done(ExportResult(url: url, tracksDirectory: out.trackWAVs ? tracksDir : nil, finalLUFS: mixed.finalLUFS,
                                              finalTruePeakDB: mixed.finalTruePeakDB, normalized: out.normalize,
-                                             limitedByPeak: mixed.limitedByPeak))
+                                             limitedByPeak: mixed.limitedByPeak, limiterEnabled: out.normalize && out.limiter,
+                                             limiterApplied: mixed.limiterApplied,
+                                             limiterMaxReductionDB: mixed.limiterMaxReductionDB,
+                                             limiterOutOfTolerance: mixed.limiterOutOfTolerance,
+                                             clippedFiles: mixed.clippedFiles.map { $0.url.lastPathComponent }))
         } catch {
+            #if DEBUG
+            exportRawError = "\(error) (cancelada: \(Task.isCancelled))"
+            #endif
             // Cancelar borra lo a medias: los WAV ya escritos (el vídeo parcial lo borra el exportador).
             if let r = mixResult {
                 for f in r.trackFiles { try? fm.removeItem(at: f.url) }
@@ -454,6 +614,8 @@ final class MontageController {
         saveTask = nil
         guard dirty else { return }
         dirty = false
+        // Proyecto degradado (tomas huérfanas, sin `recording`): no se persiste un montaje por defecto sobre él.
+        guard !session.project.hasOrphanedTakes else { return }
         try? await model.library?.saveMontage(id: session.projectID, state)
     }
 }

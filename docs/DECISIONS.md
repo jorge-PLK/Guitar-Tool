@@ -19,3 +19,4 @@ Una línea por ADR; el texto está en `docs/adr/ADR-NNN.md`. Nuevo ADR = fichero
 - [ADR-015](adr/ADR-015.md) · 2026-11-16 · Cierre de la Fase 6: grabación con vídeo, reloj de host, desfase manual y multitoma
 - [ADR-016](adr/ADR-016.md) · 2026-11-16 · Cierre de la Fase 5: tablatura (alphaTab embebido, ADTOF para batería, Guitar Pro 8 comprobado; guitarra insuficiente, pasa a la Fase 5b)
 - [ADR-017](adr/ADR-017.md) · 2026-11-17 · Cierre de la Fase 5b: tablatura de Songsterr como fuente por defecto (elige Jorge con vista previa, metrónomo de Songsterr, adornos; la interfaz pasa a la Fase 5c)
+- [ADR-018](adr/ADR-018.md) · 2026-11-18 · Cierre de la Fase 7: montaje (encuadre, layouts, compositor, exportación normalizada, plano único con cortes, rotación)

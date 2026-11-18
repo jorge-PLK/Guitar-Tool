@@ -15,12 +15,16 @@ final class MontageInstruction: NSObject, AVVideoCompositionInstructionProtocol,
     let timeline: MontageTimeline
     /// Pista de la composición de cada parte de `timeline.parts`.
     let trackIDs: [CMPersistentTrackID]
+    /// Giro de cada pista (`VideoRotation`), aplicado a cada fotograma antes de dibujarlo.
+    let rotations: [VideoRotation]
     let caption: MontageCaption?
 
-    init(timeRange: CMTimeRange, timeline: MontageTimeline, trackIDs: [CMPersistentTrackID], caption: MontageCaption?) {
+    init(timeRange: CMTimeRange, timeline: MontageTimeline, trackIDs: [CMPersistentTrackID], rotations: [VideoRotation] = [],
+         caption: MontageCaption?) {
         self.timeRange = timeRange
         self.timeline = timeline
         self.trackIDs = trackIDs
+        self.rotations = rotations
         self.caption = caption
         requiredSourceTrackIDs = trackIDs.map { NSNumber(value: $0) }
     }
@@ -67,7 +71,7 @@ public final class MontageCompositor: NSObject, AVVideoCompositing, @unchecked S
         let size = CGSize(width: CVPixelBufferGetWidth(out), height: CVPixelBufferGetHeight(out))
         let image = renderer.render(ins.timeline.state(at: t), timeline: ins.timeline, caption: ins.caption, renderSize: size) { i in
             guard i < ins.trackIDs.count, let pb = request.sourceFrame(byTrackID: ins.trackIDs[i]) else { return nil }
-            return CIImage(cvPixelBuffer: pb)
+            return (ins.rotations[safe: i] ?? .none).apply(CIImage(cvPixelBuffer: pb))
         }
         context.render(image, to: out, bounds: CGRect(origin: .zero, size: size), colorSpace: nil)
         request.finish(withComposedVideoFrame: out)
@@ -88,29 +92,35 @@ final class MontageRenderer: @unchecked Sendable {
         }
         let bg = MontageStyle.background
         var image = CIImage(color: CIColor(red: Double(bg.r) / 255, green: Double(bg.g) / 255, blue: Double(bg.b) / 255)).cropped(to: bounds)
-        let decorated = timeline.layout != .single
+        let decorated = !timeline.layout.isSingle
 
         for box in state.boxes {
             let d = toCI(box.displayRect)
             var content: CIImage
             if let src = frame(box.partIndex) {
-                let e = src.extent, c = box.crop
-                let crop = CGRect(x: e.minX + c.x * e.width, y: e.minY + (1 - c.y - c.height) * e.height,
-                                  width: c.width * e.width, height: c.height * e.height)
-                content = src.cropped(to: crop)
-                    .transformed(by: CGAffineTransform(translationX: -crop.minX, y: -crop.minY))
-                    .transformed(by: CGAffineTransform(scaleX: d.width / crop.width, y: d.height / crop.height))
-                    .transformed(by: CGAffineTransform(translationX: d.minX, y: d.minY))
+                if box.fit {
+                    content = Self.fitted(src, in: d, scale: s)
+                } else {
+                    let e = src.extent, c = box.crop
+                    let crop = CGRect(x: e.minX + c.x * e.width, y: e.minY + (1 - c.y - c.height) * e.height,
+                                      width: c.width * e.width, height: c.height * e.height)
+                    content = src.cropped(to: crop)
+                        .transformed(by: CGAffineTransform(translationX: -crop.minX, y: -crop.minY))
+                        .transformed(by: CGAffineTransform(scaleX: d.width / crop.width, y: d.height / crop.height))
+                        .transformed(by: CGAffineTransform(translationX: d.minX, y: d.minY))
+                }
                 if box.blur * s > 0.1 {
                     content = content.clampedToExtent().applyingGaussianBlur(sigma: box.blur * s).cropped(to: d)
                 }
             } else {
                 content = CIImage(color: .black).cropped(to: d)
             }
-            if let label = label(box.name, size: MontageStyle.labelFont * s * box.scale) {
+            if timeline.showPartLabels, let label = label(box.name, size: MontageStyle.labelFont * s * box.scale) {
                 let inset = MontageStyle.labelInset * s * box.scale
                 content = label.transformed(by: CGAffineTransform(translationX: d.minX + inset, y: d.minY + inset)).composited(over: content)
             }
+            // Fundido a negro al acabar la toma: imagen, relleno y nombre (el recuadro sigue, en negro).
+            if box.brightness < 1 { content = Self.dimmed(content, box.brightness) }
             var layer = content
             if decorated {
                 let r = MontageStyle.cornerRadius * s * box.scale
@@ -138,6 +148,44 @@ final class MontageRenderer: @unchecked Sendable {
             ])
         }
         return image.cropped(to: bounds)
+    }
+
+    /// «Mantener aspect ratio de vídeo» (petición de Jorge del 17/11/2026): la toma entera ajustada y centrada en `d`
+    /// sobre un relleno de la misma toma ampliada hasta cubrir `d`, difuminada (`MontageStyle.fillBlur`) y
+    /// oscurecida (`fillDim`). El relleno se escala a `fillDownsample` antes de difuminar: el desenfoque trabaja sobre
+    /// 1/64 de los píxeles. Mismo fotograma que la imagen nítida, y la opacidad, la escala y el desenfoque de entrada
+    /// del recuadro se aplican a los dos juntos.
+    static func fitted(_ src: CIImage, in d: CGRect, scale s: Double) -> CIImage {
+        let e = src.extent
+        guard e.width > 0, e.height > 0, e.width.isFinite, e.height.isFinite else { return CIImage(color: .black).cropped(to: d) }
+        func placed(_ k: Double, center: CGPoint) -> CIImage {
+            src.transformed(by: CGAffineTransform(translationX: -e.midX, y: -e.midY))
+                .transformed(by: CGAffineTransform(scaleX: k, y: k))
+                .transformed(by: CGAffineTransform(translationX: center.x, y: center.y))
+        }
+        let fit = min(d.width / e.width, d.height / e.height), cover = max(d.width / e.width, d.height / e.height)
+        let sharp = placed(fit, center: CGPoint(x: d.midX, y: d.midY)).cropped(to: d)
+        let q = MontageStyle.fillDownsample, dim = CGFloat(MontageStyle.fillDim)
+        let lowRect = CGRect(x: d.minX * q, y: d.minY * q, width: d.width * q, height: d.height * q)
+        let fill = placed(cover * q, center: CGPoint(x: d.midX * q, y: d.midY * q)).cropped(to: lowRect)
+            .clampedToExtent()
+            .applyingGaussianBlur(sigma: MontageStyle.fillBlur * s * q)
+            .applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: dim, y: 0, z: 0, w: 0), "inputGVector": CIVector(x: 0, y: dim, z: 0, w: 0),
+                "inputBVector": CIVector(x: 0, y: 0, z: dim, w: 0), "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
+            ])
+            .transformed(by: CGAffineTransform(scaleX: 1 / q, y: 1 / q))
+            .cropped(to: d)
+        return sharp.composited(over: fill)
+    }
+
+    /// RGB multiplicado por `k` (0…1), alfa intacto.
+    static func dimmed(_ image: CIImage, _ k: Double) -> CIImage {
+        let f = CGFloat(min(max(k, 0), 1))
+        return image.applyingFilter("CIColorMatrix", parameters: [
+            "inputRVector": CIVector(x: f, y: 0, z: 0, w: 0), "inputGVector": CIVector(x: 0, y: f, z: 0, w: 0),
+            "inputBVector": CIVector(x: 0, y: 0, z: f, w: 0), "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1)
+        ])
     }
 
     static func opacity(_ image: CIImage, _ a: Double) -> CIImage {

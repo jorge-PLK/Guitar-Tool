@@ -89,8 +89,86 @@ public enum ProjectFile {
     }
 
     public static func save(_ project: Project, to folder: URL) throws {
+        try save(project, to: folder, now: Date())
+    }
+
+    static func save(_ project: Project, to folder: URL, now: Date) throws {
         let data = try makeEncoder().encode(project)
-        try FileOps.atomicWrite(data, to: ProjectLayout(folder: folder).projectFile)
+        let file = ProjectLayout(folder: folder).projectFile
+        // Un fallo al copiar nunca impide guardar (Store no tiene mecanismo de registro).
+        ProjectBackup.backUpIfNeeded(existing: file, newData: data, now: now)
+        try FileOps.atomicWrite(data, to: file)
+    }
+}
+
+// MARK: - Copias de seguridad de project.json
+
+/// Red de seguridad antes de sobrescribir `project.json`: una app con un esquema más antiguo puede perder claves que no
+/// conoce al guardar.
+/// - `project.json.bak-YYYYMMDD`: una por día (la primera escritura del día conserva el estado con el que empezó); se
+///   conservan las `keptDailyBackups` más recientes.
+/// - `project.json.lost-YYYYMMDD-HHMMSS`: siempre que el contenido nuevo pierda claves de primer nivel o tomas con
+///   `videoFile` respecto al existente; no se rota.
+enum ProjectBackup {
+    static let keptDailyBackups = 7
+    static let dailyPrefix = "project.json.bak-"
+    static let lostPrefix = "project.json.lost-"
+
+    private static func formatter(_ format: String) -> DateFormatter {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.calendar = Calendar(identifier: .gregorian)
+        f.timeZone = .current
+        f.dateFormat = format
+        return f
+    }
+
+    static func backUpIfNeeded(existing file: URL, newData: Data, now: Date) {
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: file.path), let old = try? Data(contentsOf: file), old != newData else { return }
+        let dir = file.deletingLastPathComponent()
+
+        if losesData(old: old, new: newData) {
+            let url = dir.appendingPathComponent(lostPrefix + formatter("yyyyMMdd-HHmmss").string(from: now))
+            if !fm.fileExists(atPath: url.path) { try? old.write(to: url, options: .atomic) }
+        }
+
+        let daily = dir.appendingPathComponent(dailyPrefix + formatter("yyyyMMdd").string(from: now))
+        if !fm.fileExists(atPath: daily.path) {
+            guard (try? old.write(to: daily, options: .atomic)) != nil else { return }
+        }
+        rotate(in: dir)
+    }
+
+    static func isDailyBackupName(_ name: String) -> Bool {
+        guard name.hasPrefix(dailyPrefix) else { return false }
+        let suffix = name.dropFirst(dailyPrefix.count)
+        return suffix.count == 8 && suffix.allSatisfy { $0.isASCII && $0.isNumber }
+    }
+
+    private static func rotate(in dir: URL) {
+        let names = ((try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? [])
+            .filter(isDailyBackupName).sorted(by: >)
+        for name in names.dropFirst(keptDailyBackups) {
+            try? FileManager.default.removeItem(at: dir.appendingPathComponent(name))
+        }
+    }
+
+    /// Compara como JSON genérico, sin el modelo: claves de primer nivel que desaparecen o tomas con `videoFile` que
+    /// lo pierden.
+    static func losesData(old: Data, new: Data) -> Bool {
+        guard let o = (try? JSONSerialization.jsonObject(with: old)) as? [String: Any] else { return false }
+        guard let n = (try? JSONSerialization.jsonObject(with: new)) as? [String: Any] else { return true }
+        if !Set(o.keys).subtracting(n.keys).isEmpty { return true }
+        return !videoTakeIDs(o).subtracting(videoTakeIDs(n)).isEmpty
+    }
+
+    private static func videoTakeIDs(_ root: [String: Any]) -> Set<String> {
+        var ids = Set<String>()
+        for case let take as [String: Any] in (root["takes"] as? [Any]) ?? [] {
+            if let v = take["videoFile"] as? String, !v.isEmpty, let id = take["id"] as? String { ids.insert(id) }
+        }
+        return ids
     }
 }
 
@@ -187,8 +265,9 @@ public struct ProjectLayout: Sendable, Equatable {
 
     /// Vídeo montado: `video/<tema>-<layout>.mov`. `songName` por defecto es el nombre de la carpeta del proyecto
     /// (`<Artista> - <Título>`); se sanea como los nombres de carpeta.
-    public func montageVideoURL(layout: MontageLayoutKind, songName: String? = nil) -> URL {
-        videoDir.appendingPathComponent("\(montageBaseName(layout: layout, songName: songName)).mov")
+    public func montageVideoURL(layout: MontageLayoutKind, songName: String? = nil,
+                                container: MontageContainer = .mov) -> URL {
+        videoDir.appendingPathComponent("\(montageBaseName(layout: layout, songName: songName)).\(container.fileExtension)")
     }
 
     /// WAV por pista del montaje: `video/<tema>-<layout>-pistas/`.

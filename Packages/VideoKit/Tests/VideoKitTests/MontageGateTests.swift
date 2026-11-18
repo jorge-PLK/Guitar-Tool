@@ -292,20 +292,26 @@ final class MontageGateTests: XCTestCase {
             }
             print("F7 vista previa \(layout.rawValue) \(Int(size.width))×\(Int(size.height)) a 4,6 s: \(seen)")
 
-            // Mezcla: tres pistas; la de la toma C sube en 80 ms desde el inicio del solo (4,0 s → 2,0 s del item).
+            // Mezcla: tres pistas; la de la toma C sube en 80 ms desde el inicio del solo (4,0 s → 2,0 s del item),
+            // en 16 rampas de 5 ms sobre el seno al cuadrado (la curva se compara en `MontageAudioFadeTests`).
             let params = try XCTUnwrap(preview.audioMix?.inputParameters)
             XCTAssertEqual(params.count, 3)
             var start: Float = -1, end: Float = -1
             var range = CMTimeRange.zero
-            XCTAssertTrue(params[2].getVolumeRamp(for: VideoTakeWriter.time(2.04), startVolume: &start, endVolume: &end, timeRange: &range))
+            let step = MontageStyle.audioFade / Double(MontageAudioEnvelope.fadeSteps)
+            let first = Float(MontageAudioEnvelope.ramp(1 / Double(MontageAudioEnvelope.fadeSteps)))
+            XCTAssertTrue(params[2].getVolumeRamp(for: VideoTakeWriter.time(2.001), startVolume: &start, endVolume: &end, timeRange: &range))
             XCTAssertEqual(CMTimeGetSeconds(range.start), 2.0, accuracy: 1e-4)
-            XCTAssertEqual(CMTimeGetSeconds(range.duration), MontageStyle.audioFade, accuracy: 1e-4)
+            XCTAssertEqual(CMTimeGetSeconds(range.duration), step, accuracy: 1e-4)
             XCTAssertEqual(start, 0, accuracy: 1e-6)
-            XCTAssertEqual(end, 0.5, accuracy: 1e-6)
+            XCTAssertEqual(end, first * 0.5, accuracy: 1e-6)
+            XCTAssertTrue(params[2].getVolumeRamp(for: VideoTakeWriter.time(2.04), startVolume: &start, endVolume: &end, timeRange: &range))
+            XCTAssertEqual(CMTimeGetSeconds(range.start), 2.04, accuracy: 1e-4)
+            XCTAssertEqual(start, 0.25, accuracy: 1e-6, "mitad del fundido: seno² = 0,5, por el volumen 0,5")
             // La guitarra original baja con el fundido inverso en el mismo tramo.
-            XCTAssertTrue(params[1].getVolumeRamp(for: VideoTakeWriter.time(2.04), startVolume: &start, endVolume: &end, timeRange: &range))
+            XCTAssertTrue(params[1].getVolumeRamp(for: VideoTakeWriter.time(2.001), startVolume: &start, endVolume: &end, timeRange: &range))
             XCTAssertEqual(start, 1, accuracy: 1e-6)
-            XCTAssertEqual(end, 0, accuracy: 1e-6)
+            XCTAssertEqual(end, 1 - first, accuracy: 1e-6)
         }
     }
 
