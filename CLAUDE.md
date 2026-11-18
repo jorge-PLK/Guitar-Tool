@@ -4,8 +4,8 @@ App de escritorio para macOS (Swift/SwiftUI) que iguala el tono de un tema reamp
 
 ## Estado actual
 
-Fase 5c · Interfaz de la tablatura cerrada el 18/11/2026 (ADR-019), sin prueba manual de Jorge: lo que salga va a la fase final de arreglos generales. Fusionada con fase-7 y llevada a main.
-Siguiente: fase final de arreglos generales.
+Fases 5 (ADR-016), 5b (ADR-017), 5c (ADR-019, sin prueba manual de Jorge), 6 (ADR-015) y 7 · Montaje (ADR-018) cerradas y juntas en `main` (18/11/2026).
+Siguiente: fase final de arreglos generales (rama desde `main`), con lo que salga de la 5c y la Fase 7b · Retoques de interfaz pendiente (`docs/plan.md`).
 P1, P3 y P5 quedan para el comienzo de la Etapa 2.
 
 ## Contexto: leer solo lo que haga falta

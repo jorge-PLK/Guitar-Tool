@@ -282,13 +282,16 @@ final class BackingController {
 
     /// Carga la última toma no descartada como canal «Tú», igualada en sonoridad al stem de guitarra.
     func loadLastTake() async {
-        guard let t = lastTake, let rel = t.processedFile, let start = t.songStart, let fs = t.sampleRate else { return }
+        guard let t = lastTake, let rel = t.processedFile, let start = t.songStart, t.sampleRate != nil else { return }
         if loadedTake == t { return }
         let url = session.layout.folder.appendingPathComponent(rel)
         let stemURL = session.layout.stemURL(.guitar)
         let hasStem = hasGuitar
         let match = await Task.detached { () -> LoudnessMatch.Result? in
-            guard hasStem, let take = try? AudioSamples.read(url), let frames = take.first?.count, frames > 0,
+            // Toma y stem a la misma frecuencia (la del stem): una toma grabada antes de reconvertir el proyecto
+            // se remuestrea al leerla, sin tocar el fichero.
+            guard hasStem, let fs = try? TakeResampling.sampleRate(of: stemURL),
+                  let take = try? TakeResampling.read(url, at: fs), let frames = take.first?.count, frames > 0,
                   let stem = try? AudioSamples.read(stemURL, from: start, seconds: Double(frames) / fs) else { return nil }
             return LoudnessMatch.gain(take: take, stem: stem, sampleRate: fs)
         }.value

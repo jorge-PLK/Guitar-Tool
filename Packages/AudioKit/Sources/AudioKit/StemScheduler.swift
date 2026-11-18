@@ -23,6 +23,9 @@ final class StemScheduler: @unchecked Sendable {
         /// Silencio del tamaño de un trozo, reutilizable. Con él, el stem se programa con relleno de
         /// silencio (la pista de toma); sin él, como siempre.
         var silence: AVAudioPCMBuffer?
+        /// Punch-in (mini-spec Fase 6): muestra del tema desde la que el stem (una pista de toma) se silencia,
+        /// con un fundido de `PunchFlattener.crossfadeSeconds`. `nil` = suena entero.
+        var fadeOutFrom: Int64?
     }
 
     private let queue = DispatchQueue(label: "ToneForge.StudyPlayer.scheduler", qos: .userInteractive)
@@ -43,6 +46,8 @@ final class StemScheduler: @unchecked Sendable {
     private var endReported = false
     private var onEnd: (@Sendable (Int) -> Void)?
     private var fadeCache: (from: Int64, to: Int64, buffers: [AVAudioPCMBuffer])?
+    /// Muestras del fundido del punch-in a la frecuencia de los stems.
+    private var punchFadeFrames = 1
 
     init(clock: PlaybackClock) {
         self.clock = clock
@@ -63,6 +68,7 @@ final class StemScheduler: @unchecked Sendable {
                                       chunkFrames: Int64(StudyPlayerConstants.chunkSeconds * sampleRate),
                                       halfFade: half, songPos: 0, loop: nil)
             queueFrames = Int64(StudyPlayerConstants.queueSeconds * sampleRate)
+            punchFadeFrames = PunchFlattener.crossfadeFrames(sampleRate: sampleRate)
             historyFrames = StudyPlayerConstants.historySeconds * sampleRate
         }
     }
@@ -140,6 +146,7 @@ final class StemScheduler: @unchecked Sendable {
                 for (i, stem) in stems.enumerated() {
                     if buffered {
                         let buf = read(stem.reader, at: s - stem.offset, frames: n)
+                        applyPunchFade(stem, buf, songStart: s)
                         if i < feeds.count { feeds[i].enqueue(buf) } else { stem.player.scheduleBuffer(buf, at: nil) }
                     } else if stem.silence == nil {
                         stem.player.scheduleSegment(stem.file, startingFrame: AVAudioFramePosition(s),
@@ -164,6 +171,19 @@ final class StemScheduler: @unchecked Sendable {
     /// Tramo `[s, s + n)` del tema en un stem desplazado: la parte dentro del fichero como segmento y el
     /// resto como silencio, en orden y con la duración exacta.
     private func scheduleShifted(_ stem: Stem, songStart s: Int64, frames n: Int64) {
+        if let m = stem.fadeOutFrom, s + n > m {
+            // Punch-in: hasta `m` como siempre; desde ahí, el fundido leído en memoria y luego silencio.
+            if m > s { scheduleShifted(unfaded(stem), songStart: s, frames: m - s) }
+            let from = max(s, m), fadeEnd = m + Int64(punchFadeFrames)
+            if from < fadeEnd {
+                let k = min(s + n, fadeEnd) - from
+                let buf = read(stem.reader, at: from - stem.offset, frames: k)
+                applyPunchFade(stem, buf, songStart: from)
+                stem.player.scheduleBuffer(buf, at: nil)
+            }
+            scheduleSilence(stem, frames: s + n - max(from, min(s + n, fadeEnd)))
+            return
+        }
         let a = s - stem.offset, b = a + n
         let lo = min(max(a, 0), b), hi = max(min(b, stem.file.length), lo)
         scheduleSilence(stem, frames: lo - a)
@@ -172,6 +192,29 @@ final class StemScheduler: @unchecked Sendable {
                                         frameCount: AVAudioFrameCount(hi - lo), at: nil)
         }
         scheduleSilence(stem, frames: b - hi)
+    }
+
+    private func unfaded(_ stem: Stem) -> Stem {
+        var u = stem
+        u.fadeOutFrom = nil
+        return u
+    }
+
+    /// Ganancia del punch-in de la muestra del tema `f`: 1 antes de `m`, `1 − w` en el fundido y 0 después
+    /// (`w` de `PunchFlattener.weight`, la misma curva con que la original entra al aplanar).
+    static func punchGain(_ f: Int64, from m: Int64, fade: Int) -> Float {
+        if f < m { return 1 }
+        let i = f - m
+        return i < Int64(fade) ? 1 - PunchFlattener.weight(Int(i), fade) : 0
+    }
+
+    /// Aplica el silencio del punch-in a un búfer leído de un stem que empieza en la muestra del tema `songStart`.
+    private func applyPunchFade(_ stem: Stem, _ buf: AVAudioPCMBuffer, songStart: Int64) {
+        guard let m = stem.fadeOutFrom, let data = buf.floatChannelData else { return }
+        let n = Int(buf.frameLength)
+        guard songStart + Int64(n) > m else { return }
+        let g = (0..<n).map { Self.punchGain(songStart + Int64($0), from: m, fade: punchFadeFrames) }
+        for ch in 0..<Int(buf.format.channelCount) { vDSP_vmul(data[ch], 1, g, 1, data[ch], 1, vDSP_Length(n)) }
     }
 
     private func scheduleSilence(_ stem: Stem, frames: Int64) {
@@ -202,6 +245,8 @@ final class StemScheduler: @unchecked Sendable {
         let buffers = stems.map { stem -> AVAudioPCMBuffer in
             let out = read(stem.reader, at: from - stem.offset, frames: 2 * h)
             let incoming = read(stem.reader, at: to - h - stem.offset, frames: 2 * h)
+            applyPunchFade(stem, out, songStart: from)
+            applyPunchFade(stem, incoming, songStart: to - h)
             Self.mix(out: out, in: incoming)
             return out
         }

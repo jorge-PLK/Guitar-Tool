@@ -113,6 +113,8 @@ public final class CoreAudioIO: AudioIO, @unchecked Sendable {
     // MARK: Arranque y parada
 
     public func start(render: @escaping AudioIORenderHandler, capture: @escaping AudioIOCaptureHandler) throws {
+        // La base de tiempos se inicializa aquí, no en el primer ciclo del hilo de E/S.
+        _ = HostTimeLog.timebase
         try lock.withLock {
             guard !running else { throw AudioIOError.alreadyRunning }
             let device: AudioDeviceID
@@ -485,7 +487,8 @@ private final class IOProcState: @unchecked Sendable {
                 IOCounters.raise(counters.skewMax, skew)
             }
             capture(AudioIOBuffer(sampleTime: Int64(inTime.pointee.mSampleTime.rounded()), frameCount: nIn,
-                                  channels: UnsafeBufferPointer(inPointers)))
+                                  channels: UnsafeBufferPointer(inPointers),
+                                  hostSeconds: it.mFlags.contains(.hostTimeValid) ? HostTimeLog.seconds(it.mHostTime) : 0))
         }
 
         // Salida: el manejador escribe por canales, con la marca de tiempo de salida del HAL.
@@ -498,7 +501,10 @@ private final class IOProcState: @unchecked Sendable {
         }
         expectedOut = y + Double(nOut)
         for p in outData { p.update(repeating: 0, count: nOut) }
-        render(AudioIOBuffer(sampleTime: Int64(y.rounded()), frameCount: nOut, channels: UnsafeBufferPointer(outPointers)))
+        // Instante de host de la primera muestra del bloque (mini-spec Fase 6, «Cámara y sincronía»).
+        let outHost = outTime.pointee.mFlags.contains(.hostTimeValid) ? HostTimeLog.seconds(outTime.pointee.mHostTime) : 0
+        render(AudioIOBuffer(sampleTime: Int64(y.rounded()), frameCount: nOut, channels: UnsafeBufferPointer(outPointers),
+                             hostSeconds: outHost))
         for (c, s) in outMap.enumerated() {
             guard s.buf >= 0, s.buf < outs.count, let raw = outs[s.buf].mData else { continue }
             let dst = raw.assumingMemoryBound(to: Float.self)

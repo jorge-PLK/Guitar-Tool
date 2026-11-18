@@ -101,13 +101,14 @@ public struct AudioImporter: Sendable {
 
     // MARK: - Conversión
 
-    private struct ConversionInfo {
+    struct ConversionInfo {
         var duration: Double
         var sourceRate: Double
         var sourceChannels: Int
     }
 
-    private static func convert(_ source: URL, to destination: URL, sampleRate: Double,
+    /// Interna (no privada) para `TakeResampling`: el mismo conversor para tomas que para tema y stems.
+    static func convert(_ source: URL, to destination: URL, sampleRate: Double,
                                 progress: @escaping @Sendable (Double) -> Void) throws -> ConversionInfo {
         let fm = FileManager.default
         if let size = (try? fm.attributesOfItem(atPath: source.path))?[.size] as? NSNumber, size.intValue == 0 {

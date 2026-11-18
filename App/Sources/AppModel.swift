@@ -6,6 +6,7 @@ import Observation
 import SourceKit
 import UniformTypeIdentifiers
 import Store
+import VideoKit
 
 #if DEBUG
 /// Argumentos de arranque solo en DEBUG (pruebas y capturas).
@@ -29,6 +30,8 @@ struct LaunchOptions {
     /// Guarda la ventana en PNG tras `snapshotDelay` s y sale (capturas sin permiso de grabación de pantalla).
     var snapshot: URL?
     var snapshotDelay = 4.0
+    /// Tamaño de la ventana de la captura (`--window 1280x720`); por defecto 1440×900.
+    var windowSize: CGSize?
     /// Backing: rejilla de acordes expandida / modo edición de acordes activo.
     var chordsExpanded = false
     var chordsEdit = false
@@ -50,6 +53,13 @@ struct LaunchOptions {
     var tabListen = false
     /// Con `--screen tab`: exporta el `.gp` a esa ruta sin diálogo, cuando la tablatura está lista.
     var tabExport: URL?
+    /// Montaje (Fase 7): `--screen montage | montage-framing` y `--montage-layout side|grid|stack|single`.
+    var montageLayout: String?
+    /// `--montage-order 2,0,1`: índices de las partes (orden de Grabar) en el orden de recuadros que se quiere.
+    var montageOrder: [Int]?
+    /// Con `--screen montage`: exporta por el camino del botón, escribe `export-<layout>[-cut].json` y sale.
+    var montageExport = false
+    var montageCutGaps = false
     /// Comprobación real de Songsterr (WKWebView + CDN): `--songsterr-probe <songId> --songsterr-out <dir>`, con
     /// `--songsterr-search "<artista>|<título>"` opcional. Escribe `<dir>/probe.txt` y sale.
     var songsterrProbe: Int?
@@ -62,6 +72,15 @@ struct LaunchOptions {
     var tabSummary: URL?
     /// Con `--screen tab`: abre la hoja de Songsterr ya en el paso de emparejamiento de ese `songId` (capturas con `--snapshot`).
     var tabSongsterrSheet: Int?
+    /// `--montage-no-part-labels`, `--montage-keep-aspect` y `--montage-cuts "t1:idx,t2:auto"` (segundos : índice de parte en el
+    /// orden de Grabar, o `auto`).
+    var montageNoPartLabels = false
+    var montageKeepAspect = false
+    /// `--montage-neutral`: deja el montaje de la demo por defecto (nombres visibles, aspecto desactivado, sin cortes, side).
+    var montageNeutral = false
+    var montageCuts: [(time: Double, part: Int?)]?
+    /// `--montage-container mov|mp4`: contenedor de la exportación de la comprobación.
+    var montageContainer: String?
 
     init(_ args: [String] = CommandLine.arguments) {
         var i = 1
@@ -86,6 +105,10 @@ struct LaunchOptions {
             case ("--analysis-state", let v?): analysisState = v; i += 1
             case ("--snapshot", let v?): snapshot = path(v); i += 1
             case ("--snapshot-delay", let v?): snapshotDelay = Double(v) ?? 4; i += 1
+            case ("--window", let v?):
+                let p = v.split(separator: "x").compactMap { Double($0) }
+                if p.count == 2 { windowSize = CGSize(width: p[0], height: p[1]) }
+                i += 1
             case ("--chords-expanded", _): chordsExpanded = true
             case ("--chords-edit", _): chordsEdit = true
             case ("--grid-hit-selftest", _): gridHitSelftest = true
@@ -100,12 +123,27 @@ struct LaunchOptions {
             case ("--tab-edit", _): tabEdit = true
             case ("--tab-listen", _): tabListen = true
             case ("--tab-export", let v?): tabExport = path(v); i += 1
+            case ("--montage-layout", let v?): montageLayout = v; i += 1
+            case ("--montage-order", let v?): montageOrder = v.split(separator: ",").compactMap { Int($0) }; i += 1
+            case ("--montage-export", _): montageExport = true
+            case ("--montage-cut-gaps", _): montageCutGaps = true
             case ("--songsterr-probe", let v?): songsterrProbe = Int(v); i += 1
             case ("--songsterr-out", let v?): songsterrOut = path(v); i += 1
             case ("--songsterr-search", let v?): songsterrSearch = v; i += 1
             case ("--tab-songsterr", let v?): tabSongsterr = Int(v); i += 1
             case ("--tab-summary", let v?): tabSummary = path(v); i += 1
             case ("--tab-songsterr-sheet", let v?): tabSongsterrSheet = Int(v); i += 1
+            case ("--montage-no-part-labels", _): montageNoPartLabels = true
+            case ("--montage-keep-aspect", _): montageKeepAspect = true
+            case ("--montage-neutral", _): montageNeutral = true
+            case ("--montage-cuts", let v?):
+                montageCuts = v.split(separator: ",").compactMap { item in
+                    let f = item.split(separator: ":", maxSplits: 1).map(String.init)
+                    guard f.count == 2, let t = Double(f[0]) else { return nil }
+                    return (t, f[1] == "auto" ? nil : Int(f[1]))
+                }
+                i += 1
+            case ("--montage-container", let v?): montageContainer = v; i += 1
             default: break
             }
             i += 1
@@ -114,7 +152,7 @@ struct LaunchOptions {
 }
 #endif
 
-enum AppSection: Hashable { case library, backing, tab, settings }
+enum AppSection: Hashable { case library, backing, tab, record, montage, settings }
 enum SettingsTab: String, CaseIterable, Identifiable {
     case audio = "Audio", video = "Cámara y vídeo", library = "Biblioteca y equipo"
     var id: String { rawValue }
@@ -189,6 +227,16 @@ final class AppModel {
     let audio: AudioController
     /// Hoja «Calibrar latencia» abierta (Ajustes · Audio).
     var showCalibrationSheet = false
+
+    /// Cámaras del sistema (Ajustes · Cámara y vídeo; simuladas con `--screen settings-video` en DEBUG).
+    @ObservationIgnored let cameraProvider: CameraProviding = AppModel.makeCameraProvider()
+
+    private static func makeCameraProvider() -> CameraProviding {
+        #if DEBUG
+        if let s = LaunchOptions().screen, s == "settings-video" || s.hasPrefix("record") { return VideoDemo.provider }
+        #endif
+        return AVCameraProvider()
+    }
 
     private static func makeDeviceProvider() -> AudioDeviceProviding {
         #if DEBUG
@@ -370,6 +418,10 @@ final class AppModel {
         switch options.screen {
         case "settings-library": section = .settings; settingsTab = .library
         case "settings": section = .settings
+        case "settings-video":
+            // Cámaras simuladas (ver `makeCameraProvider`); el perfil se toca solo en memoria, sin guardar.
+            section = .settings; settingsTab = .video
+            profile.video = VideoDemo.profile
         case "settings-audio":
             // Dispositivos y E/S simulados (ver `makeDeviceProvider`); el perfil se toca solo en memoria, sin guardar.
             section = .settings; settingsTab = .audio
@@ -386,6 +438,18 @@ final class AppModel {
             let match = entries.first { e in options.project.map { e.folderName == $0 || e.title == $0 } ?? true }
             backingTarget = match?.id
             section = .backing
+        case "record", "record-counting", "record-offset", "record-mixer-expanded":
+            // Grabar con E/S y cámara simuladas (ver `RecordController.seedDemo`); el perfil se toca solo en memoria.
+            profile.audio = AudioSettings(outputDeviceUID: "sim-flex", inputDeviceUID: "sim-flex", guitarIn: [1])
+            profile.video = VideoDemo.profile
+            let match = entries.first { e in options.project.map { e.folderName == $0 || e.title == $0 } ?? true }
+            backingTarget = match?.id
+            section = .record
+        case "montage", "montage-framing":
+            // Montaje con tomas sintéticas (ver `MontageDemo`); no abre ni el dispositivo de audio ni la cámara.
+            let match = entries.first { e in options.project.map { e.folderName == $0 || e.title == $0 } ?? true }
+            backingTarget = match?.id
+            section = .montage
         case "detail-first": if let first = entries.first { await open(first.id) }
         case "tab":
             let match = entries.first { e in options.project.map { e.folderName == $0 || e.title == $0 } ?? true }
@@ -649,7 +713,7 @@ final class AppModel {
             var state = AnalysisState.missing
             if !analysisPinned { state = try await library.ensureAnalysis(id: id) }
             // Si el usuario ya salió de Backing mientras se abría, no se deja nada abierto.
-            guard section == .backing || section == .tab else { return }
+            guard section == .backing || section == .tab || section == .record || section == .montage else { return }
             let session = StudySession(project: project, folder: folder, library: library, analysisState: state)
             study = session
             let controller = BackingController(session: session, masterGainDB: profile.masterGainDB, output: outputSelection)
@@ -755,7 +819,7 @@ final class AppModel {
                let view = (window.attachedSheet ?? window).contentView {
                 // Con una hoja abierta (--link-import-demo) se captura la hoja, que es otra ventana.
                 if window.attachedSheet == nil {
-                    window.setContentSize(CGSize(width: 1440, height: 900))
+                    window.setContentSize(options.windowSize ?? CGSize(width: 1440, height: 900))
                     window.orderFrontRegardless()
                     try? await Task.sleep(for: .milliseconds(600))
                 }

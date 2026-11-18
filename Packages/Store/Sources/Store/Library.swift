@@ -93,6 +93,8 @@ public enum LibraryError: Error, Equatable, Sendable {
     case unsafeDeletion(URL)
     /// El título corregido a mano está vacío.
     case emptyTitle
+    /// `deleteTake` no encontró la toma en el proyecto.
+    case takeNotFound(UUID)
 }
 
 public enum LibraryEvent: Sendable, Equatable {
@@ -685,6 +687,34 @@ public actor Library {
                 if let i = p.takes.firstIndex(where: { $0.id == t.id }) { p.takes[i] = t } else { p.takes.append(t) }
             }
         }
+    }
+
+    /// Guarda el estado de grabación por partes (Fase 6). Solo toca `recording`.
+    public func saveRecording(id: UUID, _ recording: RecordingState) async throws {
+        try await mutate(id) { $0.recording = recording }
+    }
+
+    /// Guarda el montaje en vídeo (Fase 7). Solo toca `montage`.
+    public func saveMontage(id: UUID, _ montage: MontageState) async throws {
+        try await mutate(id) { $0.montage = montage }
+    }
+
+    /// Borra una toma: su carpeta `takes/<id>/` (con salvaguarda de ruta: tiene que ser hija directa de `takes/` del
+    /// proyecto y llamarse como la toma; si no, lanza `unsafeDeletion` y no toca nada) y la quita de `takes` y de su
+    /// parte, reasignando la mejor. Si la toma no existe en el proyecto, lanza `takeNotFound`.
+    public func deleteTake(projectID: UUID, takeID: UUID) async throws {
+        guard let folder = await locate(projectID) else { throw LibraryError.projectNotFound(projectID) }
+        let project = try ProjectFile.load(folder: folder)
+        guard project.takes.contains(where: { $0.id == takeID }) else { throw LibraryError.takeNotFound(takeID) }
+        let layout = ProjectLayout(folder: folder)
+        let dir = layout.takeDirectory(takeId: takeID)
+        guard dir.lastPathComponent == takeID.uuidString,
+              dir.deletingLastPathComponent().standardizedFileURL.path == layout.takesDir.standardizedFileURL.path else {
+            throw LibraryError.unsafeDeletion(dir)
+        }
+        if FileManager.default.fileExists(atPath: dir.path) { try FileManager.default.removeItem(at: dir) }
+        FileOps.removeIfExists(layout.framingCacheURL(takeId: takeID))
+        try await mutate(projectID) { $0.removeTake(takeID); $0.montage?.removeFraming(takeID) }
     }
 
     /// Corrige a mano título y artista (recortados). Título vacío → `emptyTitle` y no se guarda; artista vacío → `nil`.

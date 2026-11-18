@@ -194,11 +194,38 @@ public struct Take: Codable, Sendable, Equatable {
     public var calibrationKey: CalibrationKey?
     public var clock: ClockMode?
 
+    // Grabación con vídeo (mini-spec Fase 6, «Datos»). Opcionales y aditivos.
+    public var partID: UUID?
+    /// Ruta relativa (`takes/<id>/video.mov`); las marcas del fichero están en tiempo del tema.
+    public var videoFile: String?
+    /// Desfase manual (s, positivo = la imagen llega tarde).
+    public var videoOffset: Double?
+    public var videoFormat: TakeVideoFormat?
+    public var punches: [TakePunch]?
+    /// Audio original antes de aplanar un punch (`takes/<id>/base/processed.wav`).
+    public var baseProcessedFile: String?
+    /// Giro de la imagen en grados en sentido horario (0, 90, 180 o 270; `nil` = 0), aplicado al leer, sin recodificar
+    /// (decisión de Jorge del 17/11/2026). Aditivo: una toma nueva hereda el de su cámara (`VideoSettings.rotations`).
+    public var videoRotation: Int?
+
+    /// Giro normalizado (`VideoSettings.normalizedRotation`).
+    public var rotationDegrees: Int { VideoSettings.normalizedRotation(videoRotation ?? 0) }
+
     public init(id: UUID = UUID(), guitarId: UUID? = nil, sectionId: UUID? = nil, diFile: String? = nil,
                 processedFile: String? = nil, micFile: String? = nil, discarded: Bool = false, createdAt: Date = Date(),
                 songStart: Double? = nil, sampleRate: Double? = nil, latencySamples: Double? = nil,
                 rigDelaySamples: Double? = nil, rigDelayReliable: Bool? = nil, latencyCalibrated: Bool? = nil,
-                calibrationKey: CalibrationKey? = nil, clock: ClockMode? = nil) {
+                calibrationKey: CalibrationKey? = nil, clock: ClockMode? = nil,
+                partID: UUID? = nil, videoFile: String? = nil, videoOffset: Double? = nil,
+                videoFormat: TakeVideoFormat? = nil, punches: [TakePunch]? = nil, baseProcessedFile: String? = nil,
+                videoRotation: Int? = nil) {
+        self.videoRotation = videoRotation
+        self.partID = partID
+        self.videoFile = videoFile
+        self.videoOffset = videoOffset
+        self.videoFormat = videoFormat
+        self.punches = punches
+        self.baseProcessedFile = baseProcessedFile
         self.songStart = songStart
         self.sampleRate = sampleRate
         self.latencySamples = latencySamples
@@ -352,6 +379,10 @@ public struct Project: Codable, Sendable, Equatable {
     public var guitarSettings: GuitarSettings
     /// Con qué opciones y qué entrada se produjeron las pistas de `guitars`; nil si no se procesó. Aditivo.
     public var guitarApplied: GuitarAppliedState?
+    /// Grabación con vídeo por partes (Fase 6). Aditivo; nil si no se ha abierto Grabar.
+    public var recording: RecordingState?
+    /// Montaje en vídeo (Fase 7). Aditivo; nil si no se ha abierto Montaje.
+    public var montage: MontageState?
     /// Fuente de la tablatura elegida (Fase 5b); nil = sin elegir. Aditivo.
     public var tabSource: TabSourceChoice?
     public var createdAt: Date
@@ -362,7 +393,10 @@ public struct Project: Codable, Sendable, Equatable {
                 sections: [Section] = [], rigs: [Rig] = [], takes: [Take] = [], videos: [Video] = [],
                 study: StudyState = StudyState(),
                 createdAt: Date = Date(), updatedAt: Date = Date(), guitarSettings: GuitarSettings = GuitarSettings(),
-                guitarApplied: GuitarAppliedState? = nil, tabSource: TabSourceChoice? = nil) {
+                guitarApplied: GuitarAppliedState? = nil, recording: RecordingState? = nil,
+                montage: MontageState? = nil, tabSource: TabSourceChoice? = nil) {
+        self.recording = recording
+        self.montage = montage
         self.tabSource = tabSource
         self.guitarSettings = guitarSettings
         self.guitarApplied = guitarApplied
@@ -384,7 +418,7 @@ public struct Project: Codable, Sendable, Equatable {
     private enum CodingKeys: String, CodingKey {
         case schemaVersion, id, song, separation, stems, guitars, sections, rigs, takes, videos, study
         case guitarSettings = "guitarOptions"
-        case guitarApplied, tabSource, createdAt, updatedAt
+        case guitarApplied, recording, montage, tabSource, createdAt, updatedAt
     }
 
     public init(from decoder: Decoder) throws {
@@ -394,6 +428,8 @@ public struct Project: Codable, Sendable, Equatable {
         study = try c.decodeIfPresent(StudyState.self, forKey: .study) ?? StudyState()
         guitarSettings = try c.decodeIfPresent(GuitarSettings.self, forKey: .guitarSettings) ?? GuitarSettings()
         guitarApplied = try c.decodeIfPresent(GuitarAppliedState.self, forKey: .guitarApplied)
+        recording = try c.decodeIfPresent(RecordingState.self, forKey: .recording)
+        montage = try c.decodeIfPresent(MontageState.self, forKey: .montage)
         tabSource = try c.decodeIfPresent(TabSourceChoice.self, forKey: .tabSource)
         id = try c.decode(UUID.self, forKey: .id)
         song = try c.decode(Song.self, forKey: .song)

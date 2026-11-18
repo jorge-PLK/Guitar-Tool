@@ -48,8 +48,8 @@ Los once requisitos son viables; RF3 (editar la Flex Prime) es el de más riesgo
 | RF5 | Tonos rítmico y solista | Detecta o deja marcar las secciones en la forma de onda. Genera dos escenas en el mismo rig: solista con más ganancia y medios, +2 a 3 dB y delay corto. | El solo suele llevar otra toma u otro equipo: cada sección se iguala por separado. |
 | RF6 | Guitarras por separado (p. ej. Robe y Uoho) | Separa las guitarras del tema, propone dos pistas y el usuario las nombra y elige cuál igualar. | Todo en local, sin APIs de pago: aislar guitarras con un modelo local y separar A/B por panorama estéreo. Solista frente a rítmica, por heurística con Basic Pitch (acordes = rítmica, notas sueltas = solista) y marcado manual. Calidad parcial cuando ambas tocan lo mismo doblado. |
 | RF7 | Modo backing track | Mezclador con mute, solo y volumen por stem (voz, batería, bajo, resto y cada guitarra separada). Quitar todas las guitarras o solo las elegidas, p. ej. quitar a Uoho y dejar a Robe. Bucle de secciones, tempo variable sin cambiar el tono y metrónomo opcional. Tu guitarra suena por la Flex Prime a la vez (monitorización directa, sin latencia añadida) y se puede grabar la toma: procesada en la Etapa 1; el DI seco queda para la Etapa 2 (ADR-012). Para analizar mejor: A/B de tu tono contra la guitarra original dentro de la mezcla y no en aislado, medida de la diferencia en vivo y la toma grabada se puede usar como DI para el reamp (RF2). | Reutiliza los stems ya separados en RF6: no añade modelos. Cambio de tempo con AVAudioUnitTimePitch. Si se quita una sola guitarra de dos, puede quedar algo de ella en la otra pista. |
-| RF8 | Modo grabación (vídeo + audio multipista) | Graba a la vez la webcam y el audio sobre el backing track. El audio se guarda en pistas separadas y alineadas: backing (estéreo), guitarra DI (seco), guitarra procesada de la Flex Prime (estéreo) y micro opcional. Exporta el vídeo con la mezcla y los WAV de cada pista para remezclar después.Sincronía: el audio manda; el vídeo se alinea por marcas de tiempo y una calibración inicial (palmada o destello en pantalla) corrige el retardo de la cámara. | AVCaptureSession para la cámara y AVAudioEngine para el audio, con el mismo reloj de host. Webcam a 1080p y 30 o 60 fps según lo que dé la cámara. |
-| RF9 | Modo multitoma y montaje en un único vídeo | Eliges qué partes vas a grabar a partir de las guitarras separadas (p. ej. rítmica de Robe, rítmica de Uoho y solo). En cada toma suena el backing sin esa parte y con tus tomas anteriores. Puedes repetir partes y elegir la mejor toma de cada una.Al final monta todo en un vídeo con layouts landscape (1920 × 1080: lado a lado o rejilla) y portrait (1080 × 1920: apilado vertical).Solista: su vídeo y su audio solo aparecen en las secciones de solo (RF5); el resto del tiempo su recuadro desaparece y el layout se redistribuye.Portrait con una rítmica y una solista: un solo plano a pantalla completa, la rítmica durante el tema y la solista en los solos, con encuadre recortado sobre la guitarra para que se vea lo más grande posible. | Montaje con AVMutableComposition + AVVideoComposition y exportación HEVC o H.264 con AVAssetWriter. Encuadre automático con Vision (pose corporal: muñecas, codos y torso delimitan la guitarra), con ajuste manual del recorte por toma. Transiciones suaves y modernas: los recuadros se recolocan y cambian de tamaño con animación tipo muelle (ease-in-out, unos 0,5 s); el que entra aparece con escala del 92 al 100 %, opacidad y un desenfoque que se aclara; el que sale hace lo inverso. Esquinas redondeadas y sombra suave en los recuadros. Las transiciones van alineadas al pulso del tema y empiezan unos 0,3 s antes del solo, para que la solista esté a pantalla completa en la primera nota. El audio de la solista entra y sale con fundidos de 50 a 100 ms, sin cortes. Compositor de vídeo propio (AVVideoCompositing con Metal o Core Image) que interpola cada fotograma; vista previa en tiempo real antes de exportar. |
+| RF8 | Modo grabación (vídeo + audio multipista) | Graba a la vez la webcam y el audio sobre el backing track. El audio se guarda en pistas separadas y alineadas: backing (estéreo), guitarra DI (seco), guitarra procesada de la Flex Prime (estéreo) y micro opcional. Exporta el vídeo con la mezcla y los WAV de cada pista para remezclar después.Sincronía: el audio manda; el vídeo se alinea por marcas de tiempo y una calibración inicial (palmada o destello en pantalla) corrige el retardo de la cámara. | AVCaptureSession para la cámara y AVAudioEngine para el audio, con el mismo reloj de host. Webcam a 1080p y 30 o 60 fps según lo que dé la cámara. Fase 6: sin calibración automática ni micro; desfase manual por cámara, ADR-015. |
+| RF9 | Modo multitoma y montaje en un único vídeo | Eliges qué partes vas a grabar a partir de las guitarras separadas (p. ej. rítmica de Robe, rítmica de Uoho y solo). En cada toma suena el backing sin esa parte y con tus tomas anteriores. Puedes repetir partes y elegir la mejor toma de cada una.Al final monta todo en un vídeo con layouts landscape (1920 × 1080: lado a lado o rejilla) y portrait (1080 × 1920: apilado vertical).Solista: su vídeo y su audio solo aparecen en las secciones de solo (RF5); el resto del tiempo su recuadro desaparece y el layout se redistribuye.Portrait con una rítmica y una solista: un solo plano a pantalla completa, la rítmica durante el tema y la solista en los solos, con encuadre recortado sobre la guitarra para que se vea lo más grande posible. | Montaje con AVMutableComposition + AVVideoComposition y exportación HEVC o H.264 con AVAssetWriter. Encuadre automático con Vision (pose corporal: muñecas, codos y torso delimitan la guitarra), con ajuste manual del recorte por toma. Transiciones suaves y modernas: los recuadros se recolocan y cambian de tamaño con animación tipo muelle (ease-in-out, unos 0,5 s); el que entra aparece con escala del 92 al 100 %, opacidad y un desenfoque que se aclara; el que sale hace lo inverso. Esquinas redondeadas y sombra suave en los recuadros. Las transiciones van alineadas al pulso del tema y empiezan 0,5 s antes del solo, para que la solista esté a pantalla completa en la primera nota. El audio de la solista entra y sale con fundidos de 50 a 100 ms, sin cortes. Compositor de vídeo propio (AVVideoCompositing con Metal o Core Image) que interpola cada fotograma; vista previa en tiempo real antes de exportar. |
 | RF10 | Herramientas de estudio tipo Riffstation | Detecta acordes sincronizados con el tema y muestra su diagrama, con el actual y el siguiente. Detecta tempo, pulso y tonalidad. Velocidad del 50 al 200 % sin cambiar la afinación, transponer, afinación fina en cents y capo virtual. Bucles ajustados al pulso y metrónomo sincronizado. Los acordes se pueden corregir a mano. | Acordes con BTC (transformer, código MIT, vocabulario grande de 170 acordes) en Core ML, aplicado sobre los stems sin voz ni batería para acertar más. Pulso con Beat This!; el tempo es la media de los intervalos entre pulsos. Cambio de tempo y tono con AVAudioUnitTimePitch. Se integra en la pantalla de backing track. |
 | RF11 | Transcripción de bajo y batería | Además de las guitarras, transcribe el bajo (tablatura de 4 cuerdas) y la batería (partitura de percusión) a partir de sus stems. Todo se puede corregir a mano y se exporta en un único archivo de Guitar Pro (.gp, versiones 7 y 8) con una pista por instrumento. Forma parte de la herramienta de estudio. | Bajo: Basic Pitch sobre su stem, fiable porque suele tocar una nota a la vez. Batería: ADTOF en Core ML; bombo, caja y charles salen bien en los 3 temas de prueba, fallan algunos platos y no hay toms en el render de escucha (válido para un Guitar Pro de estudio). Exportación con el exportador de Guitar Pro 7 de alphaTab. |
 
@@ -578,6 +578,109 @@ De 3 a 5 horas, como en el plan; la prueba de modelos puede añadir 1 si un cand
 Condición de paso: en 3 temas de Extremoduro elegidos por Jorge, Robe y Uoho quedan en pistas distintas, juzgado de oído por Jorge en la app.
 
 
+## Grabación con vídeo (mini-spec de la Fase 6)
+
+Grabar tomas con cámara y la señal procesada sobre el backing, por partes y con varias tomas por parte, alineadas con el tema (RF8, parte de RF9). Va en paralelo con la Fase 5, en la rama `fase-6` (worktree aparte, desde `fase-4`). Se apoya en el audio de la Fase 3 (`AudioSession`, `TakeRecorder`, `TakeAligner`) y en las guitarras y secciones de la Fase 4.
+
+Decidido por Jorge el 16/11/2026 (cambia RF8 y dos casillas del plan; va en un ADR nuevo al cerrar):
+
+- **Sin calibración automática de la cámara.** Ni destello ni palmada: al terminar cada toma, un ajuste de desfase a mano con la vista previa. Ese valor queda como desfase por defecto de esa cámara para las tomas siguientes.
+- **Sin micro.** Solo se graba la guitarra procesada (como en la Fase 3). Sin DI (ADR-012).
+- **El backing son los stems con su mezcla**, configurable como en Backing (mezclador con volumen, silencio y solo por stem y por guitarra). No se graba: se reproduce desde los stems, que ya están alineados con el tema.
+- **Punch-in sobre un tramo marcado**, que sustituye audio y vídeo del tramo.
+- **Cada toma graba desde la sección elegida hasta que se pulsa parar** o acaba el tema.
+
+### Cámara y sincronía
+
+- Cámaras: todas las de vídeo del sistema (webcam USB, cámara integrada, iPhone por Continuity Camera), con sus formatos (resolución y fps). Por defecto, la de Ajustes; si no está conectada, se avisa y se puede grabar sin vídeo.
+- Reloj común: la captura de vídeo entrega cada fotograma con su marca en el reloj de host; el audio de la Fase 3 sabe qué instante de host corresponde a cada muestra de salida y el ancla del reproductor, qué posición del tema corresponde a cada muestra. Con eso, cada fotograma se sitúa en tiempo del tema. El fichero de vídeo se escribe con esa marca (tiempo del tema), sin aplicar el desfase manual.
+- Desfase manual (`videoOffset`, en segundos, positivo = la imagen llega tarde): se guarda en la toma y se aplica al reproducir y en el montaje, sin recodificar. Valor inicial de cada toma: el desfase por defecto de la cámara (0 si no hay).
+- Fichero: `takes/<id>/video.mov`, HEVC, solo vídeo, con la resolución y los fps elegidos. Si la cámara no da el formato pedido, el más cercano, y la toma guarda el real.
+
+### Partes y tomas
+
+- **Parte:** nombre, qué guitarra sustituye (una de las pistas de la Fase 4 —rítmica, izq., der., solista— o ninguna, para una parte añadida), si es solista (marcado por defecto cuando sustituye a la solista; el montaje de la Fase 7 la enseña solo en los solos), sus tomas y su mejor toma.
+- Propuesta inicial: una parte por pista de guitarra del proyecto, con su nombre del mezclador. «Añadir parte» pide nombre y qué guitarra sustituye.
+- Al grabar una parte suena el backing con la mezcla de Grabar, con la guitarra de esa parte silenciada, más la mejor toma de cada una de las otras partes («tus tomas anteriores»), cada una como canal «Tú · nombre de la parte» del mezclador.
+- Mejor toma: la última grabada hasta que se elige otra. Una toma se puede borrar (con confirmación; borra su carpeta).
+- La mezcla de Grabar se guarda en el proyecto, aparte de la de Backing; la primera vez se copia de Backing.
+
+### Grabar una toma
+
+- Reglas de la Fase 3: dispositivo conectado, `guitarIn` asignado, velocidad 100 % y sin bucle; si no, el botón se desactiva con el motivo. Sin calibración de latencia se graba, se marca y se avisa.
+- Inicio: selector «Empezar en» con las secciones (por defecto el principio; en una parte solista, el primer solo).
+- Cuenta de 1 compás (activada por defecto) con clics del metrónomo y número grande sobre la vista previa; después arranca el backing en el inicio menos el margen (2 compases por defecto; 1 compás o sin margen) y se graba audio y vídeo. Compases del pulso de la Fase 2; sin pulso, a 120 BPM y 4/4.
+- Fin: al pulsar parar o al acabar el tema. La toma se guarda entera (incluido el margen) y se alinea como en la Fase 3.
+- Al parar se abre la hoja «Ajustar desfase»: vista previa del vídeo con la guitarra grabada, desfase en ms (±500 ms) con botones de ±1 fotograma y ±1 ms, «Guardar como desfase por defecto de esta cámara» (marcado) y los botones «Guardar toma» y «Descartar toma». El desfase se puede volver a ajustar después desde la toma.
+
+### Punch-in
+
+- Con «Punch-in» activado sobre una toma, se marcan entrada y salida en la línea de tiempo (imán al compás, ⌥ libre).
+- Arranca en la entrada menos el margen, con cuenta si está activada; hasta la entrada suena la toma vieja y desde la entrada se silencia (te oyes por la monitorización del aparato). Se para solo 0,5 s después de la salida.
+- Audio: la toma queda aplanada en `takes/<id>/processed.wav`, con fundidos cruzados de 10 ms en la entrada y la salida; la original se guarda en `takes/<id>/base/processed.wav` y cada punch en `takes/<id>/punch-<n>/`. Vídeo: no se recodifica; la toma guarda la lista de punches (tramo, ficheros y su desfase) y la vista previa y el montaje los componen.
+- Varios punches en la misma toma: el último manda en su tramo.
+
+### Interfaz
+
+- **Pantalla Grabar** (boceto `docs/design/Record.dc.html`), en la barra lateral entre Backing y Montaje: vista previa de la cámara con «REC · Toma N · nombre de la parte», formato real y la cuenta; barra de grabación (Grabar/Parar, tiempo, «Empezar en», «Cuenta de 1 compás», «Margen», «Punch-in», y a la derecha el desfase por defecto de la cámara); mezclador como el de Backing en lugar del bloque «Pistas de audio», con el medidor de la entrada de guitarra; panel «Partes» con estado (Pendiente, Grabando, Hecha), botones de toma (la mejor en verde) y menú de toma (Marcar como mejor, Ajustar desfase, Punch-in, Borrar). Sin la línea del rig (Etapa 2) ni el recuadro de encuadre (Fase 7). «Ir al montaje», desactivado hasta la Fase 7.
+- **Ajustes · Cámara y vídeo** (boceto `docs/design/Settings.dc.html`, pestaña existente): Cámara (por defecto, resolución, fps, con vista previa pequeña); Sincronía (desfase por defecto de la cámara elegida, editable, en lugar de «Calibrar retardo»); Exportación por defecto (formato HEVC o H.264 y resolución, -14 LUFS, rótulo sí/no, WAV de cada pista sí/no): solo se guarda, la usa la Fase 7.
+
+### Datos (Store, aditivo, sin subir `schemaVersion`)
+
+- `EquipmentProfile.video: VideoSettings?`: `cameraUID`, `resolution`, `fps`, `offsets` (desfase por defecto por cámara) y `export` (`VideoExportDefaults`).
+- `Project.recording: RecordingState?`: `parts: [RecordingPart]`, `mix` (como `StemMix` de Backing), `startSectionID`, `countIn`, `preRollBars`.
+- `RecordingPart`: `id`, `name`, `replaces: GuitarRole?`, `isLead`, `takeIDs`, `bestTakeID`.
+- `Take` gana campos opcionales: `partID`, `videoFile`, `videoOffset`, `videoFormat` (cámara, ancho, alto, fps reales), `punches: [TakePunch]` y `baseProcessedFile`. `TakePunch`: `start`, `end` (tiempo del tema), `processedFile`, `videoFile`, `videoOffset`.
+- `ProjectLayout`: `videoURL(takeId:)`, `baseProcessedURL(takeId:)`, `punchDirectory(takeId:n:)`.
+- Esta fase va en paralelo con la Fase 5, que también toca Store: los tipos nuevos van en ficheros nuevos y los cambios en `Models.swift`, `Files.swift` y `Library.swift` se limitan a añadir campos y métodos.
+
+### Código
+
+| Pieza | Paquete | Agente |
+|---|---|---|
+| `CameraDevice`, `CameraProviding` (real y simulada), `CameraCapture` (real con AVCaptureSession y simulada con retardo, jitter y fotogramas perdidos), `VideoTakeWriter` (AVAssetWriter HEVC con marcas en tiempo del tema), `HostTimeMap` (host ↔ tema), `TakePreview` (composición de vídeo + toma procesada con desfase y punches), `tf-video` (desarrollo: `cameras`, `record`, `sync`) | VideoKit | `tf-engineer` |
+| Instante de host de cada muestra y del ancla (lo que necesita `HostTimeMap`); varias pistas de toma en `StudyPlayer` (las mejores de las otras partes); silencio con fundido de la toma vieja en la entrada del punch; aplanado del punch con fundidos de 10 ms | AudioKit | `tf-engineer` (mismo agente que VideoKit: comparten tiempos y la caché de `swift build`) |
+| `VideoSettings`, `RecordingState`, `RecordingPart`, campos de `Take`, `TakePunch`, rutas, `Library.saveRecording`, borrar toma | Store | `tf-implementer` |
+| Ajustes · Cámara y vídeo | App | `tf-implementer` |
+| Pantalla Grabar, hoja «Ajustar desfase», flujo de grabación y punch-in, cableado en `AppModel` y barra lateral | App | `tf-implementer` |
+
+Reparto: primera tanda en paralelo, VideoKit + AudioKit (`tf-engineer`) y Store (`tf-implementer`). Segunda, en serie para no pisarse el build de la app: Ajustes · Cámara y vídeo y luego la pantalla Grabar (`tf-implementer`). Después `tf-qa` y capturas revisadas por el orquestador.
+
+### Pruebas
+
+- Sin hardware (puerta de tests): cámara simulada con retardo conocido y jitter de ±2 ms, audio simulado de la Fase 3. Se graban 3 tomas de 60 s (una empezando a mitad de tema, otra con deriva de audio de 50 ppm); con el mismo desfase para las 3, cada fotograma cae en su tiempo del tema con error menor de medio fotograma, al principio y al final. Fotogramas perdidos no desplazan los siguientes.
+- `HostTimeMap`: conversiones ida y vuelta exactas a 44,1 y 48 kHz y con cambio de ancla (seek).
+- Punch: el aplanado conserva fuera del tramo la toma original muestra a muestra y deja fundidos de 10 ms; la composición de vídeo usa el punch dentro del tramo y la base fuera.
+- Store: los campos nuevos se guardan y se leen; un proyecto o un perfil anteriores se abren igual; borrar una toma la quita de su parte y reasigna la mejor.
+- Interfaz: capturas revisadas por el orquestador (Grabar con cámara simulada, hoja de desfase, Ajustes · Cámara y vídeo).
+
+### Medidas con hardware (las hace Jorge)
+
+1. `tf-video cameras`: cámaras y formatos que ve la app (webcam e iPhone).
+2. En la app, con la Flex Prime y el iPhone: 3 tomas de una parte. En cada una, golpe seco en las cuerdas al principio y al final; ajustar el desfase en la primera y comprobar que en las otras dos, con el mismo desfase, golpe e imagen coinciden fotograma a fotograma.
+3. Una parte con punch-in: el tramo sustituido cuadra en audio y vídeo.
+
+### Lo aprendido al cerrar la fase (16/11/2026, ADR-015)
+
+- Con el iPhone (1080p30) y la Flex Prime, `tf-video sync` midió 1754 fotogramas sin pérdidas, jitter RMS 0,93 ms (máx. 15,06 ms), audio +29 ppm frente al host y cámara − audio −83 ppm (cadencia del iPhone, no afecta). El retardo de entrega va de 43 a 254 ms (mediana 57).
+- Por ese retardo la cámara arranca al abrir Grabar (unos 1,5 s hasta el primer fotograma) y al parar se espera unos 0,5 s a los últimos fotogramas.
+- La cuenta suena en un segundo `StudyPlayer`, para no tocar el que reproduce el backing.
+- Las cámaras se re-sondean cada 2 s en Grabar: el proveedor admite un solo manejador de cambios.
+- Mezclador compacto por defecto y vídeo lo más grande, sin scroll en ventanas 16:9.
+- Pendientes: suavizar las marcas de la cámara (solo si hace falta), desfase propio por punch desde la hoja y ganancia igualada en los canales «Tú · parte».
+
+### Retoques al cerrar la Fase 7 (18/11/2026, ADR-018)
+
+- **Parada automática:** la grabación se para sola al acabar la sección elegida más el margen (`BarTiming.sectionStop`).
+- **Tomas a otra frecuencia:** si una toma no está a la frecuencia del proyecto, se remuestrea al cargar (`TakeResampling`); `Library.migrate` no las reconvierte y la caché remuestreada va al temporal, sin limpiarse.
+- **Botón «Rotar»** en la vista previa de Grabar (desactivado mientras se graba): 0°, 90°, 180° y 270° por cámara, heredado por cada toma nueva; ver «Encuadre» en la mini-spec de la Fase 7. También en Ajustes de vídeo, sobre la vista previa en directo.
+- `Tools/test.sh App` compila solo la app (unos 5 s en incremental) y no escribe `Temp/last-run.txt`.
+
+### Estimación y condición de paso
+
+De 4 a 6 horas, como en el plan: quitar la calibración y el micro resta lo que añaden el punch-in con vídeo y el mezclador en Grabar.
+
+Condición de paso: 3 tomas grabadas y alineadas a menos de 1 fotograma con un mismo desfase, comprobado por Jorge en la app; y el test de la puerta con la cámara simulada.
 ## Tablatura (mini-spec de la Fase 5)
 
 Parte de RF2 (tablatura con cursor, editable) y RF11 (bajo y batería, un único Guitar Pro). Rama `fase-5` desde `fase-4`, en un worktree: la Fase 6 va en paralelo y toca App y Store, así que esta fase añade ficheros nuevos y toca lo compartido lo mínimo. El DI guiado (grabar y validar la toma) es de la Fase 8a: la pantalla no lleva el panel «Entrada» ni «Última toma» del boceto `Tab.dc.html`, ni «Grabar toma».
@@ -828,6 +931,139 @@ Orden: 1 y 2 en paralelo; 3 y 4 en paralelo tras 1 (3 toca el sintetizador) y 2 
 
 De 6 a 9 horas. Lo incierto: que el slide legato y el ligado suenen naturales con un soundfont GM, y el arrastre para seleccionar con alphaTab sin su reproductor.
 
+
+## Montaje (mini-spec de la Fase 7)
+
+Montar las mejores tomas de la Fase 6 en un único vídeo, landscape o portrait, con la solista solo en los solos, encuadre sobre la guitarra, transiciones y exportación con la mezcla a -14 LUFS (RF9). Rama `fase-7`, desde `fase-6`; la Fase 5 sigue en paralelo en `fase-5` (desde `fase-4`) y se junta al terminar. Se apoya en `TakePreview` y en las partes y tomas de la Fase 6, y en las secciones de solo de la Fase 4.
+
+Decidido por Jorge el 16/11/2026:
+
+- **Encuadre con conmutador por toma:** fijo (un recuadro para toda la toma) o «Seguir la guitarra» (el recorte la sigue, suavizado). Los dos con ajuste manual.
+- **Solo se exporta lo grabado.** El vídeo va del principio de la primera toma al final de la última; una parte sin toma en un tramo no tiene recuadro ni audio en ese tramo.
+- **Fundidos de un compás:** si el vídeo no empieza con el tema, entra con un compás de fundido (imagen y sonido); si no acaba con el tema, sale con otro.
+- **Rótulo opcional** con título y artista durante los 5 primeros segundos.
+
+Decidido o ajustado por Jorge el 17 y 18/11/2026 (ADR-018):
+
+- Toma que acaba antes que el plan: fundido a negro, no se congela el último fotograma (ver «Transiciones»).
+- Plano único: una guitarra solo se ve donde tiene una toma que cubre ese instante (ver «Layouts»).
+- Botón «Rotar» por cámara y por toma, para vídeo grabado en vertical (ver «Encuadre»).
+- Los valores visuales (margen 48, separación 24, esquinas 24, desenfoque 16 px, plano único sin esquinas ni sombra, encuadre con margen del 15 %, relleno difuminado de 40 px al 50 %) valen por ahora.
+
+### Qué entra en el montaje
+
+- De cada parte de `Project.recording`, su mejor toma. Con vídeo: recuadro y audio. Sin vídeo: solo audio. Parte sin tomas: no entra.
+- **Presencia de una parte:** el tramo del tema que cubre su toma (desde `songStart`, margen incluido, hasta su final). Si la parte es solista, ese tramo cortado con las secciones de solo (`Section.isSolo`); sin secciones de solo en el proyecto no se espera solo (puede ser una versión solo de rítmicas): la solista no aparece ni suena, sin bloquear ni avisar más que con una nota en su carril (Jorge, 16/11/2026). Y al revés: con solos marcados pero sin toma de la solista, el montaje se hace igual (hacer o no el solo se decide al grabar); en el solo siguen las rítmicas y suena la guitarra original. Nada de esto bloquea la exportación.
+- **Tramo del vídeo:** del inicio de presencia más temprano al final más tardío.
+- **Huecos sin ninguna parte, a elegir con el conmutador «Cortar huecos sin tomas»** (Jorge, 16/11/2026; desactivado por defecto): desactivado, en el hueco se ve el fondo y suena el backing; activado, el hueco se quita y el vídeo es la concatenación de los tramos con alguna parte presente. En cada corte, el tramo que acaba sale con un compás de fundido y el siguiente entra con otro (la misma regla que al principio y al final; confirmado por Jorge el 16/11/2026). La línea de tiempo marca los huecos cortados. Con «Cortar huecos», cada tramo empieza 0,5 s antes de la presencia (la entrada del recuadro); sin cortar, no. Los tramos se cuantizan a la rejilla de fotogramas.
+- **Compás** para los fundidos: del pulso de la Fase 2; sin pulso, 120 BPM y 4/4 (como en la Fase 6).
+
+### Layouts
+
+Lienzo de 1920 × 1080 (landscape) o 1080 × 1920 (portrait), escalado a la resolución de exportación. Recuadros con margen, esquinas redondeadas y sombra suave, y el nombre de la parte abajo a la izquierda (como en el boceto; opcional con «Nombre de cada parte»). «Mantener aspect ratio de vídeo» respeta la proporción de la toma en el apilado y en el plano único, en lugar de recortar al recuadro.
+
+| Layout | Reparto de los recuadros visibles |
+|---|---|
+| Landscape · lado a lado | Una fila de columnas iguales |
+| Landscape · rejilla | 1: completo; 2: apilados; 3: dos arriba y uno centrado abajo; 4: 2 × 2 |
+| Portrait · apilado | Una columna de filas iguales |
+| Portrait · plano único | Un solo recuadro a pantalla completa, sin esquinas ni sombra |
+| Landscape · plano único | Lo mismo en 1920 × 1080 |
+
+En los tres primeros, cuando una parte entra o sale, el layout se redistribuye con los recuadros que quedan. Orden de los recuadros: el de las partes, que se cambia arrastrando los carriles de la línea de tiempo (`MontageState.partOrder`).
+
+**Plano único: cortes libres y cobertura.** Por defecto se ve la rítmica elegida (la primera con vídeo) y, en los solos, la solista. El carril «Plano» admite cortes libres (clic o «Añadir corte», elegir guitarra, arrastrar la marca, «Quitar cortes»). La regla vive en `MontageTimeline.singleAppearances`:
+
+- Manda el corte, pero solo donde su parte tiene imagen (`Part.coverage()`).
+- Si no, el automático, solo entre partes con imagen y presencia: solistas en sus solos, luego la rítmica elegida, luego la primera no solista.
+- Si no hay ninguna, sigue la que se veía y funde a negro.
+- En el selector «Plano» las partes sin toma en el instante del corte salen desactivadas (`MontagePlan.singleCutCandidates(at:)`, `MontagePlanning.cutEligibleParts`). Un corte a una parte sin toma se marca en ámbar con el aviso «X no tiene toma aquí: se ve el automático». El carril pinta lo que de verdad se ve (`MontageTimeline.singleShots()`).
+
+### Transiciones
+
+- Recolocación y cambio de tamaño: curva tipo muelle (ease-in-out), 0,5 s.
+- Entrada: escala del 92 al 100 %, opacidad de 0 a 1 y desenfoque que se aclara, en esos 0,5 s. Salida: lo inverso.
+- La entrada empieza siempre 0,5 s antes del inicio de presencia, para que el recuadro esté completo en la primera nota (Jorge, 16/11/2026; RF9 decía 0,3 s, que lo dejaba al 74 % de opacidad); si la toma no tiene imagen tan pronto, desde su primer fotograma. La salida empieza al final de la presencia. Los bordes de las secciones ya están en el pulso (Fase 4).
+- En el plano único, el cambio rítmica ↔ solista (o entre guitarras de un corte) es un fundido cruzado con la misma escala y desenfoque.
+- **Toma que acaba antes que el plan:** `MontageTimeline.imageBrightness` funde de 1 a 0 en 0,5 s (`MontageStyle.endFade`) sobre el último fotograma retenido y queda en negro hasta el final. Se oscurece el recuadro entero (imagen, relleno difuminado y rótulo; `MontageBoxState.brightness`). Solo se aplica si el recuadro sigue más de 50 ms tras la última imagen (`MontageStyle.endFadeTolerance`). En plano único manda la regla de cobertura. Vista previa y exportación comparten timeline y compositor.
+- Audio de cada parte: entra y sale con fundido de 80 ms en los bordes de su presencia, y la entrada y salida del vídeo (un compás) con la misma curva en la vista previa y en la exportación (`MontageAudioEnvelope`); la imagen sigue lineal. La guitarra original que sustituye se silencia con el fundido inverso mientras la parte está presente.
+- El audio del montaje ignora el silencio del canal «Tú · parte» de Grabar y usa solo su volumen.
+
+### Encuadre
+
+- Vision (pose corporal) sobre fotogramas muestreados de la toma ya compuesta (base y punches, en tiempo del tema): muñecas, codos y torso delimitan la caja de la guitarra, con margen.
+- **Fijo:** la mediana de las cajas de la toma. **Seguir:** la trayectoria de la caja, suavizada (sin temblor ni saltos) y con huecos de detección interpolados.
+- El recorte de cada recuadro es la caja ampliada a la proporción del recuadro en ese instante, sin salirse del fotograma. Sin detección: el fotograma entero, centrado.
+- **Rotar** (0°, 90°, 180°, 270° en sentido horario): se guarda por cámara (`VideoSettings.rotations`, como el desfase) y por toma (`Take.videoRotation`, nil = 0°); una toma nueva hereda el de su cámara. Se aplica al leer, sin recodificar: el compositor gira y cambia ancho y alto, el reproductor usa `preferredTransform` y Vision recibe la orientación (`VideoRotation`, `MontagePartVideo.rotation`). `TakeFraming.rotatedClockwise` transforma el encuadre guardado en lugar de reiniciarlo. La huella del análisis incluye el giro solo si no es 0°. Los punches usan el giro de su toma. Botón en la vista previa de Grabar (desactivado mientras se graba), en Ajustes de vídeo y en la ficha de cada toma en Montaje, junto a «Encuadre».
+- Ajuste manual por toma (hoja «Encuadre»): en fijo, mover y escalar la caja sobre el fotograma; en seguir, zoom y desplazamiento sobre la trayectoria. «Restablecer» vuelve al automático.
+- El análisis se guarda en `cache/framing/<takeID>.json` (regenerable, con huella de la toma y sus punches); el modo y el ajuste manual, en el proyecto.
+
+### Compositor y vista previa
+
+- Compositor propio (`AVVideoCompositing`, Core Image sobre Metal) que dibuja cada fotograma a partir de un plan puro: para un tiempo `t`, la lista de recuadros con su rectángulo, escala, opacidad, desenfoque y recorte, más el fundido global y el rótulo.
+- Las tomas entran en una `AVMutableComposition` con su `videoOffset` y sus punches (como `TakePreview`), sin recodificar.
+- Vista previa en tiempo real con `AVPlayer` sobre la misma composición y el mismo compositor, con el audio del montaje sin normalizar (stems y tomas con sus volúmenes y fundidos). Puede bajar la resolución para ir fluida.
+
+### Exportación
+
+- Vídeo: HEVC o H.264, resolución y fps de «Exportación por defecto» de Ajustes (30 fps si no hay), modificables en la pantalla. Contenedor MOV o MP4 (`export.container`). Fichero `video/<tema>-<layout>.<mov|mp4>` (se sobrescribe el del mismo layout) y botón «Mostrar en Finder». El audio del vídeo va en AAC (128 kbit/s por canal).
+- Mezcla: stems con la mezcla de Grabar (`recording.mix`), las guitarras sustituidas silenciadas durante la presencia de su parte, y las tomas con su volumen de canal «Tú · parte» y sus fundidos. Normalizada a -14 LUFS integrados (ITU-R BS.1770-4). El techo de pico real es -1,3 dBTP, con o sin limitador: 0,3 dB de holgura para el códec AAC. Con el conmutador «Limitador» (activado por defecto; Jorge, 16/11/2026), un limitador con anticipación sujeta los picos al techo y la mezcla llega a -14 LUFS; desactivado, si la ganancia llevara el pico real por encima del techo se frena la ganancia y se informa de los LUFS que quedan (en las pruebas, ~-16,3). Opción de no normalizar (el limitador solo actúa al normalizar). Con material muy brillante, el AAC puede subir el pico hasta +0,49 dB, más que la holgura; aceptado.
+- WAV por pista (opcional), en `video/<tema>-<layout>-pistas/`: `backing.wav` (lo que suena del tema, sin tus tomas), uno por parte (`<parte>.wav`, con sus fundidos) y `mezcla.wav` (la normalizada). Todos con la duración del vídeo y alineados; 24 bits a la frecuencia del proyecto.
+- Rótulo opcional: título y debajo artista, abajo a la izquierda, sobre placa oscura translúcida, 5 s con fundido de entrada y salida.
+- Progreso con cancelar; cancelar borra los ficheros a medias.
+
+### Interfaz
+
+**Pantalla Montaje** (boceto `docs/design/Edit.dc.html`), ya en la barra lateral; «Ir al montaje» de Grabar se activa. Cabecera con tema, número de tomas y «Exportar vídeo». Tres columnas: Layout (los cinco, con miniatura), Vista previa (reproductor con play y posición; en portrait limitada a 440 pt para que la línea de tiempo quepa sin scroll) y Exportación, compacta y sin scroll (contenedor, formato, resolución, fps, -14 LUFS con «Limitador», rótulo, «Nombre de cada parte», «Mantener aspect ratio de vídeo», WAV por pista). La lista informativa «Transiciones» va en un popover tras el botón (i) junto a la cabecera. Debajo, la línea de tiempo: secciones y un carril por parte (cabecera de 270 pt) con su presencia (barra llena = en pantalla), el tramo del vídeo y los fundidos marcados; clic para mover la vista previa; los carriles se arrastran para reordenar los recuadros. En layouts de plano único, un carril «Plano» con los cortes. En cada carril, el nombre de la parte (sin partir ni truncar) y los botones «Encuadre» (hoja con fotograma, caja, conmutador «Seguir la guitarra», zoom, «Restablecer») y «Rotar». Sin tomas con vídeo: estado vacío con enlace a Grabar.
+
+### Datos (Store, aditivo, sin subir `schemaVersion`)
+
+- `Project.montage: MontageState?`: `layout` (`side`, `grid`, `stack`, `single`, `singleLandscape`), `singleRhythmPartID`, `singleCuts`, `caption`, `cutGaps`, `partOrder`, `showPartLabels`, `keepVideoAspect`, `export` (copia editable de `VideoExportDefaults` más `normalize`, `limiter`, `trackWAVs` y `container`), `framing: [takeID: TakeFraming]`.
+- `TakeFraming`: `mode` (`fixed`, `follow`), `manualBox` (rectángulo normalizado, para fijo), `followZoom`, `followOffset`; `rotatedClockwise(quarterTurns:)`.
+- `RecordingState.partMix`: fader «Tú · parte» de Grabar, restaurado al reabrir. `Take.videoRotation` y `VideoSettings.rotations`.
+- `ProjectLayout`: `framingCacheURL(takeId:)`, `montageVideoURL(layout:)`, `montageTracksDirectory(layout:)`. `Library.saveMontage`.
+- Copias de seguridad de `project.json`: `project.json.bak-AAAAMMDD` (7 días) y `project.json.lost-<fecha-hora>` cuando una escritura pierde una sección de primer nivel (`losesData` compara todas las claves, también `tabSource`) o el vídeo de una toma. Perder `videoRotation` dentro de una toma no crea `.lost`.
+- Todo aditivo; `schemaVersion` sigue en 2 (decisión de Jorge).
+- Tipos nuevos en fichero nuevo (`Montage.swift`); en `Models.swift`, `Files.swift` y `Library.swift` solo se añade (la Fase 5 también toca Store).
+
+### Código
+
+VideoKit sigue sin depender de AudioKit ni de Store: recibe un `MontagePlan` con tipos propios y la app hace de puente.
+
+| Pieza | Paquete | Agente |
+|---|---|---|
+| `GuitarFramer` (Vision; caja fija y trayectoria), `MontagePlan` (entrada: lienzo, fps, layout, tramo, compás, partes con presencia, ficheros, desfases, punches y encuadre, pistas de audio con volumen y tramos, rótulo), `MontageLayout` (geometría), `MontageTimeline` (estado de los recuadros en `t`), `MontageCompositor`, `MontageBuilder` (composición + compositor + mezcla de audio de la vista previa → `AVPlayerItem`), `MontageExporter` (vídeo con `AVAssetReader`/`AVAssetWriter` y el WAV de la mezcla ya normalizada), `MontageAudioEnvelope` (fundidos de audio), `VideoRotation` (giro al leer), `tf-video frame` y `tf-video montage` (desarrollo) | VideoKit | `tf-engineer` |
+| `LoudnessMeter` (BS.1770-4 integrado y pico real), `MontageMixer` (mezcla fuera de línea de stems y tomas con volúmenes, tramos con fundidos y fundido global; normalización; WAV por pista) | AudioKit | `tf-implementer` |
+| `MontageState`, `TakeFraming`, rutas, `Library.saveMontage` | Store | `tf-implementer` |
+| Pantalla Montaje, hoja «Encuadre», `MontageController` (puente Store → `MontagePlan` y `MontageMixer`, análisis de encuadre, exportación con progreso), datos simulados y `--screen montage` en DEBUG | App | `tf-implementer` |
+
+La geometría de los layouts va con el compositor (mismo paquete y mismos tipos) aunque el plan la asigne a Sonnet. Reparto: primera tanda en paralelo, VideoKit (`tf-engineer`), AudioKit y Store (`tf-implementer`); segunda, la app; después `tf-qa` y capturas revisadas por el orquestador.
+
+### Pruebas
+
+- Puerta (sin hardware): tomas sintéticas (color liso distinto por parte, con `VideoTakeWriter`), una rítmica entera, otra parcial y una solista con dos solos. Se exporta en landscape y en portrait y se comprueba: dimensiones, fps y duración (tramo del vídeo); en instantes dados, el color esperado en el centro de cada recuadro (solista solo en los solos, completa en la primera nota; la parcial fuera al acabar su toma); fundidos de un compás al principio y al final; pista de audio presente.
+- `MontageLayout` y `MontageTimeline`: rectángulos sin solapes dentro del lienzo, continuidad en las transiciones, 0,5 s de anticipación y recuadro completo en la primera nota.
+- `GuitarFramer`: suavizado y huecos con poses sintéticas; caja dentro del fotograma y con la proporción pedida.
+- `LoudnessMeter`: contra el `ebur128` del ffmpeg embebido, diferencia menor de 0,1 LU en tonos y ruido; `MontageMixer`: -14 ± 0,2 LUFS, tope de -1,3 dBTP, fundidos de 80 ms, pistas con la misma duración.
+- Store: `montage` se guarda y se lee; un proyecto anterior se abre igual; copias `.bak` y `.lost` (`ProjectBackupTests`, `testWriteLosingTabSourceCreatesLostCopy`); rotación (`VideoRotationTests`).
+- Cobertura y giro (VideoKit): `MontageSingleCoverageTests` (plano único), `MontageCompositionCoverageTests` (fundido a negro), `MontageOptionsTests`, `MontageFrameGridTests`, `MontageAudioFadeTests`, `VideoRotationTests`.
+- Interfaz: capturas revisadas por el orquestador (Montaje en los cinco layouts, hoja Encuadre).
+
+Límites conocidos: la app no tiene target de tests (sin cubrir `MontagePlanning.build`, la limpieza al cancelar, `BarTiming.sectionStop` ni los retoques de `RecordController` y `BackingController`); `limiterOutOfTolerance` sin test determinista; el solo del canal «Tú · parte» no se guarda; el ffmpeg embebido no trae `ebur128` y la medida de referencia usa el de Homebrew; el iPhone con Continuidad en vertical está sin probar; un fichero con transformación propia se gira según su tamaño natural.
+
+### Lo que comprueba Jorge
+
+1. Hoja «Encuadre» sobre tomas reales: la caja automática coge la guitarra, en fijo y siguiendo.
+2. Vista previa: transiciones y entrada de la solista a la vista.
+3. Exportar el mismo tema en landscape y en portrait y verlos; abrir los WAV por pista en un DAW.
+
+### Estimación y condición de paso
+
+De 6 a 10 horas, como en el plan.
+
+Condición de paso: vídeo final exportado en portrait y en landscape, visto por Jorge; y el test de la puerta.
+
+Cumplida el 18/11/2026 (ADR-018): Jorge probó a mano la app («todo correcto»), con el vídeo exportado en portrait y en landscape, y `MontageGateTests` es el test de la puerta.
 
 ## Fuentes
 

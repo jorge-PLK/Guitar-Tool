@@ -1,6 +1,6 @@
 # ToneForge · Mapa del código
 
-Última actualización: 2026-11-18 · Fase 5c (ADR-019): interfaz de la tablatura (voces, adornos con teclado, ligadura, mute/solo, bucle por selección).
+Última actualización: 2026-11-18 · Fase 5c (ADR-019): interfaz de la tablatura (voces, adornos con teclado, ligadura, mute/solo, bucle por selección), fusionada con la Fase 7 (ADR-018): montaje (encuadre, layouts, compositor, exportación normalizada, plano único con cortes, rotación).
 
 Una sección por paquete (nombres de `docs/plan.md`, «Forma de trabajo»), más la app, las pruebas y las herramientas. Fila por fichero: `| Fichero | qué hace (ADR-NNN): APIs públicas |`. Se lee por secciones: `grep -n '^## ' docs/CODEMAP.md`.
 
@@ -36,8 +36,17 @@ E/S de audio y reproducción: importación (ADR-007), reproductor de estudio (AD
 | `Sources/AudioKit/SignalMath.swift` | Interno: correlación, interpolación sinc, FFT y ruido con semilla |
 | `Sources/AudioKit/StudyPlayer.swift` (Fase 3) | Selección de salida (`setOutput(_:)`, `OutputSelection`), `init(offlineWith:output:)`, pista de toma `setTake(_:)`/`take` (`TakeTrack`), alojamiento `attach(to:)`/`detach()`/`isHosted`, `playbackAnchor` (suma la latencia declarada del TimePitch), `hostedDiagnostics` |
 | `Sources/AudioKit/StemScheduler.swift`, `PlaybackTimeline.swift` (Fase 3) | Programan y ubican también la pista de toma (`TakeTrack`: `id`, `url`, `songStart`, `gainDB`, `muted`) y el ancla |
+| `Sources/AudioKit/AudioIO.swift`, `AudioSession.swift`, `SimulatedAudioIO.swift`, `CoreAudioIO.swift`, `CaptureRing.swift` (Fase 6) | (ADR-015) Marcas de reloj de host: `HostClockPoint` (muestra de salida ↔ segundos de host), `AudioSession.outputHostClock` y su equivalente simulado, con deriva configurable |
+| `Sources/AudioKit/StudyPlayer.swift`, `StudyPlayerTypes.swift`, `StemScheduler.swift` (Fase 6) | (ADR-015) `StudyPlayer.setTakes(_:)`: varias pistas de toma a la vez (las mejores de las otras partes); `TakeTrack.solo` y `TakeTrack.silencedFrom` (silencio con fundido de la toma vieja desde la entrada del punch). La cuenta suena en un segundo `StudyPlayer` |
+| `Sources/AudioKit/PunchFlattener.swift` | (ADR-015) `PunchFlattener`: aplana la toma base y el punch con fundidos cruzados de 10 ms; fuera del tramo conserva la base muestra a muestra |
+| `Sources/AudioKit/LoudnessMeter.swift` (Fase 7) | (ADR-018) `LoudnessMeter` (BS.1770-4: `measure(_:sampleRate:)`, `measure(url:progress:)`, `report`) → `LoudnessReport` (`integratedLUFS`, `truePeakDB`, `duration`) |
+| `Sources/AudioKit/MontageMixer.swift` (Fase 7) | (ADR-018) Mezcla fuera de línea del montaje: `MontageTrack` (`url`, `songStart`, `gainDB`, `group`, `presence`), `MontageGroup`, `MontagePresence`, `MontageSegment` (tramos con fundidos), `MontageNormalization` (`standard`, `standardWithoutLimiter`; -14 LUFS, techo -1,3 dBTP), `MontageMixJob`, `MontageMixer`; WAV por pista y fundido global. `MontageSpan` propio (AudioKit no depende de VideoKit) |
+| `Sources/AudioKit/PeakLimiter.swift` (Fase 7) | (ADR-018) Interno: limitador con anticipación sobre pico real, en una pasada; lo usa `MontageMixer` |
+| `Sources/AudioKit/TakeResampling.swift` (Fase 7) | (ADR-018) `TakeResampling.sampleRate(of:)`, `readable(_:at:)` y `read(_:at:)`: las tomas a otra frecuencia se remuestrean al cargar (caché en el temporal) |
+| `Sources/AudioKit/AudioImporter.swift`, `PunchFlattener.swift`, `StudyPlayer.swift`, `TakeAligner.swift` (Fase 7) | (ADR-018) Retoques para el montaje y la lectura de tomas remuestreadas; `Package.swift` compila el target con `-O` también en Debug |
+| `Tests/AudioKitTests/HostClockTests.swift`, `PunchAndTakesTests.swift` (Fase 6) | (ADR-015) Marcas de host, varias pistas de toma, silencio del punch y aplanado |
 | `Sources/tf-audio/` | Ejecutable de desarrollo, no embebido (`TFAudio`, `Commands`, `Options`, `Rig`): `devices`, `latency` (`--restarts`), `verify`, `record`; `--simulated`; salidas en `Temp/tf-audio/` (incluye `verify-hal.csv`) |
-| `Tests/AudioKitTests/` | 90 tests (`AudioImporterTests`, `StudyPlayerTests` en render offline; Fase 3: `AudioRoutingTests`, `AudioSessionTests`, `LatencyCalibratorTests`, `TakeAlignmentTests`, `PlayerHostingTests`, `HostTimingTests`, `FeedbackLoopTests`, `LoudnessMatchTests`, `AppLogicTests`, `TFAudioToolTests`). Fixtures en `Fixtures/` (unos 300 KB), con un README de los comandos ffmpeg |
+| `Tests/AudioKitTests/` | 144 tests, 1 omitido (Fase 7: `LoudnessMeterTests`, `MontageMixerTests`, `MontageMixerOrderTests`, `MontageLimiterSinglePassTests`, `MontageLimiterTruePeakTests`, `TakeResamplingTests`; `AudioImporterTests`, `StudyPlayerTests` en render offline; Fase 3: `AudioRoutingTests`, `AudioSessionTests`, `LatencyCalibratorTests`, `TakeAlignmentTests`, `PlayerHostingTests`, `HostTimingTests`, `FeedbackLoopTests`, `LoudnessMatchTests`, `AppLogicTests`, `TFAudioToolTests`; Fase 6: `HostClockTests`, `PunchAndTakesTests`). Fixtures en `Fixtures/` (unos 300 KB), con un README de los comandos ffmpeg |
 
 ## Packages/ModelKit
 
@@ -169,7 +178,30 @@ Transcripción y tablatura (ADR-014).
 
 ## Packages/VideoKit
 
-Captura y montaje de vídeo. Sin código (solo test de humo).
+Captura y montaje de vídeo (ADR-015). No depende de AudioKit: la app hace de puente.
+
+| Fichero | qué hace (ADR-015): APIs públicas |
+| --- | --- |
+| `Sources/VideoKit/HostTimeMap.swift` | `HostClock` (ticks ↔ segundos de host) y `HostTimeMap`: ancla del reproductor (`Anchor`) + puntos del reloj de salida; `songTime(atHostSeconds:)`, `hostSeconds(atSongTime:)`, `outputSample(atHostSeconds:)` |
+| `Sources/VideoKit/CameraDevice.swift` | `CameraDevice`, `CameraFormat`, `FrameRateRange`, `CameraKind`, `CameraRequest`, `VideoFormat`; `CameraProviding` con `AVCameraProvider` (real, `ensureAccess()`) y `SimulatedCameraProvider`; un solo manejador de cambios (`setChangeHandler`) |
+| `Sources/VideoKit/CameraCapture.swift` | `CameraCapture` (`start(_:onFrame:)`, `stop()`), `CameraFrame` con marca de host, `CameraError`; `AVCameraCapture` (real) y `SimulatedCameraCapture` (retardo, jitter y fotogramas perdidos) |
+| `Sources/VideoKit/VideoTakeWriter.swift` | `VideoTakeWriter`: `AVAssetWriter` HEVC con PTS = tiempo del tema, sin aplicar el desfase manual |
+| `Sources/VideoKit/VideoTakeRecorder.swift` | `VideoTakeRecorder`: une captura, `HostTimeMap` y escritor; graba fotogramas en tiempo del tema |
+| `Sources/VideoKit/TakePreview.swift` | `TakePreview.load(audioURL:songStart:videoURL:punches:)`, `pieces(videoOffset:punchOffsets:)` y `composition(videoOffset:punchOffsets:)`: vídeo + toma procesada con desfase y punches, sin recodificar; `PreviewPunch`, `PreviewPiece` |
+| `Sources/VideoKit/GuitarFramer.swift`, `GuitarFramer+Vision.swift` (Fase 7) | (ADR-018) Encuadre: `PoseJoint`, `PosePoint`, `PoseSample`; `GuitarFramer.box(joints:)`, `analyze(samples:frameWidth:frameHeight:fingerprint:)` (caja fija y trayectoria suavizada), `crop(box:frameSize:aspect:)`, `fingerprint(video:)` (incluye el giro si no es 0°); la extensión con Vision lee la pose de los fotogramas; `GuitarFramerError` |
+| `Sources/VideoKit/MontagePlan.swift` (Fase 7) | (ADR-018) Plan de entrada, con tipos propios: `MontageSpan`, `MontageCanvas` (`landscape`, `portrait`), `MontageLayoutKind` (cinco layouts; `isSingle`, `honorsVideoAspect`), `MontageCut`, `FramingBox`, partes, pistas, rótulo; `MontagePlan.singleCutCandidates(at:)` y `singleShots()` |
+| `Sources/VideoKit/MontageLayout.swift` (Fase 7) | (ADR-018) `MontageLayout.rects(_:count:canvas:…)`: geometría de cada layout sin solapes |
+| `Sources/VideoKit/MontageTimeline.swift` (Fase 7) | (ADR-018) Estado de los recuadros en `t`: `MontageTimeline` (`Part.coverage()`, `singleAppearances`, `imageBrightness`, `singleShots()`), `MontageBoxState` (`opacity`, `blur`, `crop`, `brightness`), `MontageFrameState`, `MontageShot`, tiempos de fotograma |
+| `Sources/VideoKit/MontageAudioEnvelope.swift` (Fase 7) | (ADR-018) `MontageAudioEnvelope.gain(_:at:timeline:)`: curva de los fundidos de audio, común a la vista previa y la exportación |
+| `Sources/VideoKit/MontageCompositor.swift` (Fase 7) | (ADR-018) `MontageCompositor` (`AVVideoCompositing`, Core Image): dibuja recuadros, relleno difuminado, fundido a negro y rótulo |
+| `Sources/VideoKit/MontageBuilder.swift` (Fase 7) | (ADR-018) `MontageBuilder.load(_:includeAudio:)` y `make(renderSize:includeAudio:)` → `MontagePreview` (`composition`, `videoComposition`, `audioMix`, `makePlayerItem()`, `songTime(itemTime:)`, `itemTime(songTime:)`); `MontageError` |
+| `Sources/VideoKit/MontageExporter.swift` (Fase 7) | (ADR-018) `MontageExporter.export(plan:mixURL:settings:to:…)` con `AVAssetReader`/`AVAssetWriter` (audio AAC); `MontageExportSettings` (`codec`, tamaño, `fps`, `container`), `MontageCodec`, `MontageVideoContainer` (MOV, MP4), `MontageExportSummary` |
+| `Sources/VideoKit/LoadedTakeVideo.swift` (Fase 7) | (ADR-018) Interno: `LoadedTakeVideo.load(_:)` carga una toma (base y punches) y da su tamaño ya girado (`MontagePartVideo.rotation`) para la composición |
+| `Sources/VideoKit/VideoRotation.swift` (Fase 7) | (ADR-018) `VideoRotation` (0°, 90°, 180°, 270° horario): `init(degrees:)`, `next`, `rotatedSize(_:)`, `transform(naturalSize:)`, `orientation`, `apply(_:)` sobre `CIImage` y `CGImage`; `MontagePartVideo.rotation` |
+| `Sources/VideoKit/TakePreview.swift` (Fase 7) | (ADR-018) Aplica el giro de la toma con `preferredTransform` |
+| `Sources/tf-video/` | Ejecutable de desarrollo, no embebido: `cameras`, `record`, `sync` (medida de fotogramas, jitter, deriva y retardo contra el host) |
+| `Sources/tf-video/MontageCommands.swift` (Fase 7) | (ADR-018) `frame` (encuadre de un vídeo: caja, PNG) y `montage` (plan sintético, exportación de pruebas; `--mix`, `--codec`, `--container`) |
+| `Tests/VideoKitTests/` | 55 tests: `SyncGateTests` (puerta: 3 tomas con cámara simulada), `HostTimeMapTests`, `VideoFileTests`, `TFVideoToolTests`, `VideoKitTests`; Fase 7 (ADR-018): `GuitarFramerTests`, `MontageTimelineTests`, `MontageRendererTests`, `MontageGateTests` (puerta del montaje: portrait y landscape), `MontageSingleCoverageTests`, `MontageCompositionCoverageTests`, `MontageOptionsTests`, `MontageFrameGridTests`, `MontageAudioFadeTests`, `VideoRotationTests` |
 
 ## Packages/Store
 
@@ -188,11 +220,20 @@ Archivo de proyecto (JSON por carpeta), índice en SwiftData y orquestación de 
 | `Sources/Store/Guitars.swift` (Fase 4) | (ADR-014) `GuitarOptions` (`stereoSplit`, `soloSpans`), `GuitarSettings`, `GuitarSoloSpan`, `Guitar` (`role`, `name`, `file`, `confidence`), `GuitarRole` (rhythm, left, right, lead; `fileName`), `GuitarConfidence`, `GuitarAppliedState`, `GuitarSplitState`, `SeparatedGuitar`, `GuitarSplitResult` y el protocolo `GuitarSplitting` |
 | `Sources/Store/SectionEditor.swift` | (ADR-014) `SectionEditor`: `mark`, `rename`, `setSolo`, `remove`, `setColor`, `paletteIndices`, `setEdge`, `snapEdge`, `nudgeEdge`; longitud mínima 0,5 s |
 | `Sources/Store/Library.swift` (Fase 4) | `saveGuitarNames`, `saveGuitarStereoSplit`, `guitarSplitState`; paso `splitGuitars` en la cola tras el análisis. `Section` gana `color` y `isSolo` |
+| `Sources/Store/Recording.swift` (Fase 6) | (ADR-015) `RecordingState` (`parts`, `mix`, `startSectionID`, `countIn`, `preRollBars`), `RecordingPart` (`id`, `name`, `replaces`, `isLead`, `takeIDs`, `bestTakeID`), `TakePunch` |
+| `Sources/Store/VideoSettings.swift` (Fase 6) | (ADR-015) `VideoSettings` (`cameraUID`, `resolution`, `fps`, `offsets` por cámara, `export`), `VideoExportDefaults`; `EquipmentProfile.video` |
+| `Sources/Store/Models.swift`, `Files.swift`, `Library.swift`, `EquipmentProfile.swift` (Fase 6) | (ADR-015) `Take` gana `partID`, `videoFile`, `videoOffset`, `videoFormat`, `punches`, `baseProcessedFile`; `Project.recording`; `ProjectLayout.videoURL(takeId:)`, `baseProcessedURL(takeId:)`, `punchDirectory(takeId:n:)`; `Library.saveRecording` y `deleteTake` (la quita de su parte y reasigna la mejor) |
+| `Tests/StoreTests/RecordingTests.swift` | (ADR-015) Campos nuevos, proyectos y perfiles anteriores, borrado de tomas |
+| `Sources/Store/Montage.swift` (Fase 7) | (ADR-018) `MontageState` (`layout`, `singleRhythmPartID`, `singleCuts`, `caption`, `cutGaps`, `partOrder`, `showPartLabels`, `keepVideoAspect`, `export`, `framing`), `MontageLayoutKind`, `MontageSingleCut` (`normalizedSingleCuts()`), `NormalizedRect`, `FramingMode`, `TakeFraming` (`rotatedClockwise(quarterTurns:)`), `FramingOffset`; `Library.saveMontage` |
+| `Sources/Store/Models.swift`, `Files.swift`, `Recording.swift`, `VideoSettings.swift` (Fase 7) | (ADR-018) `Take.videoRotation` y `rotationDegrees`; `VideoSettings.rotations`, `defaultRotation(for:)`, `setDefaultRotation`, `normalizedRotation(_:)`; `RecordingState.partMix`; rutas `framingCacheURL(takeId:)`, `montageVideoURL(layout:)`, `montageTracksDirectory(layout:)`; copias `project.json.bak-AAAAMMDD` y `.lost-<fecha-hora>` al escribir |
+| `Tests/StoreTests/MontageTests.swift`, `ProjectBackupTests.swift`, `VideoRotationTests.swift` (Fase 7) | (ADR-018) Estado del montaje y compatibilidad hacia atrás; copias `.bak`/`.lost` (`testWriteLosingTabSourceCreatesLostCopy`); rotación por cámara y por toma |
+| `Tests/StoreTests/` | 166 tests (`AudioSettingsTests`: ajustes de audio y caducidad de la calibración; `StudyQueueTests`: cola, stems vacíos, v1 → v2; `OriginTests`: origen, duplicados, importación con metadatos; `TrashTests`: Papelera, borrado y edición; `RecoveryTests`: re-encolado al arrancar; Fase 6: `RecordingTests`) |
+
+Fase 6 (ADR-015): la carpeta de proyecto añade `takes/<id>/video.mov`, `takes/<id>/base/processed.wav` (toma original antes de un punch) y `takes/<id>/punch-<n>/`.
 | `Sources/Store/Files.swift` (Fase 5) | (ADR-016) `ProjectLayout.tabDir`, `tabScoreFile` (`tab/score.json`), `tabCacheDir` (`cache/tab/`), `tabSynthURL(trackID:)` |
 | `Sources/Store/TabSources.swift` | (ADR-016) `TabSource` (`id`, `name`, `kind` guitar/bass/drums, `relativePath`, `playerTrackID`) y extensión de `Project` que lista las pistas de la tablatura según `GuitarSettings` y stems no vacíos; probado en `TabSourcesTests` |
 | `Sources/Store/TabSourceChoice.swift` | (ADR-017) `TabSourceChoice` (`.songsterr(songId, revisionId, pairings: [TabStemPairing])` o `.automatic`), `TabStemPairing` (`stemID`, `partId`, `solos`); `Project.tabSource`, `Library.saveTabSource`, `ProjectLayout.songsterrCacheDir` y `tabSongsterrGridFile` (`tab/songsterr-grid.json`). Probado en `TabSourceChoiceTests` |
 | `Sources/Store/TabSources.swift` (Fase 5c) | (ADR-019) `TabSource.Kind.vocal`, `Project.vocalTabSource(fileExists:)` (vincula la vocal al stem `vocals`); probado en `TabSourcesTests` |
-| `Tests/StoreTests/` | 78 tests (`AudioSettingsTests`: ajustes de audio y caducidad de la calibración; `StudyQueueTests`: cola, stems vacíos, v1 → v2; `OriginTests`: origen, duplicados, importación con metadatos; `TrashTests`: Papelera, borrado y edición; `RecoveryTests`: re-encolado al arrancar) |
 
 Carpeta de proyecto: `project.json`, `source/original.<ext>`, `audio/song.wav` (regenerable), `stems/<stem>.wav` (regenerable), `stems/.partial`, `takes/` (`takes/<id>/processed.wav`, ADR-013), `tab/score.json` (tablatura con ediciones; no es caché, ADR-016), `video/`, `rigs/`, `cache/` (regenerable; `cache/analysis.json` es el análisis automático con huella; `cache/tab/` los WAV sintetizados). Perfil e índice en `~/Library/Application Support/ToneForge/` (`profile.json`, `Library.store`). Límite conocido: en la reconversión la sustitución es atómica por fichero, no entre ficheros; `project.json` se actualiza al final y, si falla a mitad, se reintenta al abrir.
 
@@ -233,6 +274,12 @@ Proyecto Xcode generado con XcodeGen (`App/project.yml`; el `.xcodeproj` tambié
 | `App/Sources/SectionBoxes.swift`, `SectionGridBoxes.swift` | (ADR-014) Cajas de secciones sobre la tira de acordes, compacta y expandida: `SectionBoxes`, `SectionPopover`, `SectionMenu`, asas, ◀ ▶, Supr (`SectionKeyMonitor`), colores `TF.sectionPalette` |
 | `App/Sources/BackingMixer.swift` (Fase 4) | (ADR-014) un canal por guitarra (`guitarChannel`) con nombre editable y confianza; sin stems vacíos; plegado en columnas nombre + M/S. Sin grabación ni A/B en Backing: `BackingRecord.swift`, `loadLastTake`, `setCompare` y `AudioController.bind` quedan sin uso desde la UI hasta la Fase 6 |
 | `App/Resources/Models/BasicPitch_nmp.mlpackage.zip`, `LeadRhythmMelRoformer_fp16.mlpackage.zip` | (ADR-014) Recursos: Basic Pitch (116 KB) y lead/rhythm (156 MB) |
+| `App/Sources/VideoSettingsView.swift` (Fase 6) | (ADR-015) Ajustes · Cámara y vídeo: cámara, resolución, fps, desfase por cámara y exportación por defecto |
+| `App/Sources/RecordController.swift`, `RecordTiming.swift` (Fase 6) | (ADR-015) Flujo de grabación (cuenta, margen, audio y vídeo, punch-in, partes y tomas, re-sondeo de cámaras cada 2 s) y cálculo de tiempos en compases |
+| `App/Sources/RecordView.swift`, `RecordMixer.swift` (Fase 6) | (ADR-015) Pantalla Grabar (vídeo lo más grande, sin scroll en 16:9; panel «Partes») y mezclador compacto por defecto con los canales «Tú · parte» |
+| `App/Sources/OffsetSheet.swift`, `PunchTimeline.swift` (Fase 6) | (ADR-015) Hoja «Ajustar desfase» (±500 ms, ±1 fotograma, ±1 ms) y línea de tiempo para marcar el tramo del punch |
+| `App/Sources/RecordDemo.swift` (Fase 6) | (ADR-015) Datos simulados en DEBUG. Opciones `--screen settings-video\|record\|record-counting\|record-offset\|record-mixer-expanded` y `--window WxH` |
+| `App/Sources/AudioController.swift`, `AppModel.swift`, `RootView.swift`, `SettingsView.swift`, `App/project.yml` (Fase 6) | (ADR-015) `AudioController.takeSink`, pantalla Grabar en la barra lateral, Ajustes · Cámara y vídeo; `project.yml` enlaza VideoKit |
 | `App/Sources/TabController.swift` | (ADR-016) Orquestación de la tablatura: transcribe por pista con progreso y huella, guarda `tab/score.json`, edición con deshacer, afinación por pista, sintetizado como pista extra del `StudyPlayer` («Oír transcripción»), cursor y exportación a `.gp` |
 | `App/Sources/TabScreen.swift` | (ADR-016) Pantalla Tablatura: pestañas de pista, transporte, «Editar notas», «Exportar a Guitar Pro» |
 | `App/Sources/TabWebHost.swift` | (ADR-016) `WKWebView` con alphaTab y puente Swift ↔ JS |
@@ -244,6 +291,13 @@ Proyecto Xcode generado con XcodeGen (`App/project.yml`; el `.xcodeproj` tambié
 | `App/Sources/StudySession.swift`, `TabController.swift`, `SectionGridBoxes.swift` (Fase 5b) | (ADR-017) `StudySession.metronomeBeats` con la rejilla de Songsterr (Backing y Tablatura); menú «Fuente», `TabController.customTuning(of:)`; `SpaceKeyMonitor` (espacio = play/pausa); arreglo del cursor en `tf-bridge.js` |
 | `App/Resources/alphaTab/` | (ADR-016) alphaTab 1.9.0 embebido (MPL-2.0, 2,8 MB con soundfont Sonivox): `alphaTab.min.js`, `tab.html`, `tf-bridge.js` (construye el `Score` desde el JSON v1), `font/`, `soundfont/`, `VERSION`, licencia |
 | `App/Resources/Models/ADTOF_FrameRNN_fp32.mlpackage.zip` | (ADR-016) Recurso: ADTOF (1,7 MB) |
+| `App/Sources/MontageView.swift` (Fase 7) | (ADR-018) Pantalla Montaje: `MontageView`, `MontageContent`; columnas Layout (cinco), Vista previa y Exportación compacta con popover (i) de «Transiciones»; línea de tiempo con carriles arrastrables, carril «Plano» y botones «Encuadre» y «Rotar» |
+| `App/Sources/MontageController.swift` (Fase 7) | (ADR-018) `MontageController` (`@Observable`): puente Store → `MontagePlan` y `MontageMixer`, análisis de encuadre, vista previa, exportación con progreso y cancelación, `planeShots`, `cutPartCovered`, rotación por toma |
+| `App/Sources/MontagePlanning.swift` (Fase 7) | (ADR-018) Lógica pura: `MontagePlanning.build(project:layout:state:barDuration:…)` → `MontageDraft`, `cutEligibleParts(plan:at:)`, `planeShots(plan:)`; `MontageLane`, `LaneSpan`, `LaneSegment`, `PlaneShot` |
+| `App/Sources/MontageFramingSheet.swift` (Fase 7) | (ADR-018) Hoja «Encuadre»: fotograma con la caja, «Seguir la guitarra», zoom y «Restablecer» |
+| `App/Sources/MontageAudioTypes.swift`, `MontageVideoTypes.swift` (Fase 7) | (ADR-018) Alias para desambiguar nombres repetidos entre AudioKit, VideoKit y Store: `MixSpan`, `MixSegment` (AudioKit), `VideoSpan`, `VideoLayoutKind` (VideoKit); cada fichero importa un solo módulo |
+| `App/Sources/MontageDemo.swift` (Fase 7) | (ADR-018) Solo DEBUG: `--screen montage` con datos sintéticos, `--montage-layout side\|grid\|stack\|single\|single-landscape`, `--montage-export`, `--montage-container`, `--montage-order`, `--montage-no-part-labels`, `--montage-keep-aspect`, `--montage-cuts`, `--montage-neutral` |
+| `App/Sources/AppModel.swift`, `AudioController.swift`, `BackingController.swift`, `RecordController.swift`, `RecordTiming.swift`, `RecordView.swift`, `OffsetSheet.swift`, `VideoSettingsView.swift` (Fase 7) | (ADR-018) Cableado del montaje; parada automática al acabar la sección más el margen (`BarTiming.sectionStop`); fader «Tú · parte» restaurado al reabrir; botón «Rotar» en Grabar (inactivo al grabar) y en Ajustes de vídeo |
 | `App/Sources/Theme.swift` | `TF`: colores y medidas (ampliado en la Fase 2b) |
 | `App/Resources/AppIcon.svg`, `App/Resources/Assets.xcassets/` | Icono de la app (de Jorge): los PNG salen del SVG con `Tools/make-icon.sh`; `project.yml` fija `ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon` |
 | `App/Sources/ToneForgeApp.swift` | Punto de entrada |
@@ -279,5 +333,6 @@ Recursos: modelos y resultados en `Probes/P4-modelos/*/out/` (no versionados); e
 | Fichero | qué hace |
 | --- | --- |
 | `Tools/test.sh` | `swift test` de cada paquete + build de la app con salida resumida; escribe `Temp/last-run.txt` en la pasada completa (ADR-003) |
+| `Tools/test.sh App` (Fase 6) | Solo el build de la app, unos 5 s en incremental; no escribe `Temp/last-run.txt` (ADR-015) |
 | `Tools/helpers/` | `fetch.sh` (baja y verifica yt-dlp y Deno), `build-ffmpeg.sh` (compila el ffmpeg mínimo) y `versions.env` (versiones y sumas); la salida va a `Vendor/helpers/`, sin versionar (ADR-011) |
 | `Tools/make-icon.sh`, `Tools/make-icon.swift` | Generan los PNG del icono de la app a partir de `App/Resources/AppIcon.svg` (de Jorge) |

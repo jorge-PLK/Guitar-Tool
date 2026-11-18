@@ -134,25 +134,75 @@ El DI guiado (grabar y validar la toma) salió de esta fase el 15/11/2026: solo 
 
 ### Fase 6 · Grabación con vídeo (RF8, parte de RF9)
 
-- [ ] Captura de cámara (webcam o iPhone) con el mismo reloj que el audio
-- [ ] Calibración del retardo de la cámara
-- [ ] Apartado Cámara y vídeo de Ajustes: cámara por defecto, resolución, fotogramas por segundo, retardo y exportación por defecto
-- [ ] Grabación multipista: backing, procesada y micro (sin DI; ADR-012)
-- [ ] Multitoma: partes, tomas por parte, mejor toma y punch-in (el rig recomendado para cada parte llega con la Etapa 2)
-- [ ] Pantalla de grabación
+- [x] Captura de cámara (webcam o iPhone) con el mismo reloj que el audio
+- [x] Desfase de la cámara ajustado a mano al terminar la toma, guardado por cámara (sin calibración automática; Jorge, 16/11/2026)
+- [x] Apartado Cámara y vídeo de Ajustes: cámara por defecto, resolución, fotogramas por segundo, desfase y exportación por defecto
+- [x] Grabación: procesada sobre los stems con su mezcla, como en Backing (sin DI ni micro; ADR-012; Jorge, 16/11/2026)
+- [x] Multitoma: partes, tomas por parte, mejor toma y punch-in (el rig recomendado para cada parte llega con la Etapa 2)
+- [x] Pantalla de grabación
 
 Condición de paso: 3 tomas grabadas y alineadas a menos de 1 fotograma.
 
+Cumplida el 16/11/2026 (ADR-015): test de la puerta con cámara simulada (error máximo 0,069 fotogramas) y 3 tomas con el mismo desfase comprobadas por Jorge en la app con el iPhone, más el punch-in, la cuenta y Ajustes · Cámara y vídeo.
+
 ### Fase 7 · Montaje (RF9)
 
-- [ ] Encuadre automático de la guitarra con Vision y ajuste manual
-- [ ] Layouts landscape y portrait, y plano único para una rítmica y una solista
-- [ ] Aparición de la solista solo en los solos, a partir de las secciones
-- [ ] Compositor propio con las transiciones y vista previa en tiempo real
-- [ ] Exportación: vídeo, mezcla a -14 LUFS, rótulo y WAV por pista
-- [ ] Pantalla de montaje
+- [x] Encuadre automático de la guitarra con Vision y ajuste manual — *`GuitarFramerTests`; hoja «Encuadre» probada por Jorge*
+- [x] Layouts landscape y portrait, y plano único para una rítmica y una solista — cinco layouts, con cortes libres y regla de cobertura (ADR-018) — *`MontageSingleCoverageTests`, `MontageTimelineTests`*
+- [x] Aparición de la solista solo en los solos, a partir de las secciones — *`MontageTimelineTests`, `MontageCompositionCoverageTests`*
+- [x] Compositor propio con las transiciones y vista previa en tiempo real — incluido el fundido a negro de la toma que acaba antes — *`MontageCompositionCoverageTests`, `MontageRendererTests`, `MontageAudioFadeTests`, `MontageFrameGridTests`*
+- [x] Exportación: vídeo (MOV o MP4, audio AAC), mezcla a -14 LUFS con techo de -1,3 dBTP, rótulo y WAV por pista — *`MontageGateTests`, `MontageOptionsTests`; AudioKit: `LoudnessMeterTests`, `MontageMixerTests`, `MontageMixerOrderTests`, `MontageLimiterSinglePassTests`, `MontageLimiterTruePeakTests`, `TakeResamplingTests`*
+- [x] Pantalla de montaje — columna de exportación compacta con (i), orden de carriles arrastrable
+- [x] Botón «Rotar» (0°, 90°, 180°, 270°) por cámara y por toma, aplicado al leer sin recodificar (Grabar, Ajustes de vídeo y ficha de toma en Montaje) — *`VideoRotationTests` (VideoKit y Store); el iPhone con Continuidad en vertical sigue sin probar*
 
 Condición de paso: vídeo final exportado en portrait y en landscape.
+
+Cumplida el 18/11/2026 (ADR-018): Jorge probó a mano la app («todo correcto») con el vídeo exportado en portrait y en landscape, y `MontageGateTests` cubre la puerta sin hardware.
+
+### Fase 7c · Editor de layouts propio (sin rama aún)
+
+Pedida por Jorge el 18/11/2026. Mini-spec al empezar; sin estimación todavía. No consta en las tablas de orden y modelos hasta que se decida orquestador y agentes (iría después de la 7).
+
+- [ ] Elegir dónde va cada guitarra en el lienzo (layouts propios, además de los cinco fijos)
+- [ ] Modos de aparición: empujar (el resto se recoloca) o tapar (el recuadro entra encima)
+- [ ] Fundidos al cambiar una guitarra de lado
+
+Condición de paso: por definir con Jorge.
+
+### Fase 7b · Retoques de interfaz (rama desde `fase-7`)
+
+Lista de Jorge del 17/11/2026, tras usar la app. La mini-spec se escribe al empezar; las dudas abiertas van al final.
+
+Biblioteca:
+
+- [ ] Quitar la cabecera de contadores (temas, tomas grabadas, vídeos exportados): no aporta
+- [ ] Buscador de temas (título y artista)
+- [ ] «Importar tema» abre un popup con un campo para el enlace y un botón «Importar fichero»
+- [ ] Ese campo hace también de buscador de Spotify: si lo escrito no es un enlace, al pulsar «Importar» se buscan 10 resultados en Spotify, cada uno con un botón que lo reproduce en Spotify para oírlo antes de elegir
+- [ ] Dos vistas: por tema (la actual) y por artista
+- [ ] «Abrir» pasa a ser «Seleccionar», con otro botón para mostrar en Finder. El tema seleccionado aparece entre Ajustes y el dispositivo (título y artista, empujándolos); si no cabe se trunca y al pasar el ratón el texto se desplaza para verse entero. Al pulsarlo lleva a su página de información, con Mostrar en Finder, Eliminar y las grabaciones guardadas del tema
+
+Backing track:
+
+- [ ] Alargar o encoger una sección en el modo expandido sigue fallando
+- [ ] No se puede crear una sección dentro de otra. Al empujar una sección contra otra, la segunda se encoge; el solo nunca se encoge de forma indirecta, solo se modifica directamente
+
+Grabar:
+
+- [ ] Reproducir las tomas hechas, para verlas y volver a evaluarlas por si hay que mejorarlas
+
+Ajustes:
+
+- [ ] El apartado «Biblioteca y equipo» pasa a ser solo «Biblioteca», sin las guitarras del perfil de equipo
+
+Condición de paso: los diez puntos comprobados por Jorge en la app.
+
+Decidido con Jorge (17/11/2026):
+
+- Búsqueda en Spotify con clave propia: app de desarrollador gratuita, Web API, flujo client credentials (sin usuario). Client ID y secret en un `.env` que no se versiona (`.env.example` sí, con los nombres de las variables); nunca en el repositorio ni dentro del bundle. La app (lanzada desde Finder no ve el entorno de la shell) lee `<support dir>/.env`, si no existe el del directorio de soporte por defecto (`~/Library/Application Support/ToneForge/.env`, chmod 600), y las variables de entorno con el mismo nombre mandan sobre ambos. Jorge crea la app guiado por el orquestador. Es una excepción a «sin credenciales» de ADR-008 solo para buscar: los metadatos y el audio siguen igual. Reproducir en Spotify = abrir `spotify:track:<id>` en su app. Token: client credentials no da refresh token (los 180 días del panel son del flujo con usuario); el access token dura 1 h, se guarda en memoria y se pide otro al caducar o con un 401. Jorge tiene Premium «por ahora»: si la cuenta o la clave dejan de valer (401/403, sin clave), el campo avisa y sigue aceptando enlaces e «Importar fichero»; la búsqueda no puede ser imprescindible.
+- Solo: si se empuja otra sección contra él, el arrastre se para en su borde.
+- Tema seleccionado en la barra lateral: ocupa el hueco encima del bloque del dispositivo y empuja «Ajustes» hacia arriba. Sin tema seleccionado (al abrir la app, la selección no se recuerda), «Ajustes» queda donde está ahora.
+- Perfil de equipo: las guitarras salen de la interfaz y del modelo de datos (con migración de los proyectos existentes); lo que guarda de audio (dispositivos, canales, latencia) se conserva.
 
 ## Etapa 2 · Igualado de tono (fases 8a, 8 y 9)
 
@@ -216,6 +266,7 @@ Mismo número de orden: se pueden hacer en paralelo o en cualquier orden entre s
 | 5 | Fase 5b · Calidad de la transcripción de guitarra | Fase 5 | No | Opus | Opus (`tf-ml`) |
 | 5 | Fase 6 · Grabación con vídeo | Fases 3 y 4 | Sí | Opus | Opus (reloj común) · Sonnet (multitoma, pantalla) |
 | 6 | Fase 7 · Montaje | Fase 6 | No | Fable | Opus (compositor, encuadre) · Sonnet (layouts, exportación, pantalla) |
+| 6 | Fase 7b · Retoques de interfaz | Fase 7 (rama desde `fase-7`) | No | Opus | Sonnet (pantallas, buscador, Spotify) · Opus (arrastre de secciones) |
 | 7 | P1 · Remote Editor | Etapa 1 en uso | Sí | Fable | Opus (análisis del tráfico) · Sonnet (scripts) |
 | 7 | P3 · TONE3000 | Etapa 1 en uso | No | Fable | Sonnet |
 | 7 | P5 · Velocidad del bucle | P1 | Sí | Fable | Sonnet |
@@ -266,6 +317,7 @@ Cada fase la lleva una sesión orquestadora que escribe la mini-spec, reparte el
 | 5b. Calidad de la transcripción de guitarra | Opus | Opus (`tf-ml`) para la prueba de modelos y la limpieza | Probar modelos fuera de la app y fallar rápido |
 | 6. Grabación con vídeo | Opus | Opus para el reloj común de audio y vídeo; Sonnet para multitoma y pantalla | La sincronía es el único punto fino |
 | 7. Montaje | Fable | Opus para el compositor y el encuadre; Sonnet para layouts, exportación y pantalla | Compositor propio fotograma a fotograma, poco documentado |
+| 7b. Retoques de interfaz | Opus | Sonnet para pantallas, buscador, Spotify y Ajustes; Opus para el arrastre de secciones de Backing | Interfaz casi toda; el arrastre ya ha fallado más de una vez |
 | Pruebas P1, P3 y P5 | Fable | Opus para analizar el tráfico capturado; Sonnet para los scripts | Ingeniería inversa de un protocolo sin documentar |
 | 8a. DI guiado | Opus | Sonnet para la grabación y la validación de la toma | Fase corta sobre el audio de la Fase 3 y la tablatura de la Fase 5 |
 | 8. Análisis del tono | Fable | Opus para huella y distancia; Sonnet para el conector TONE3000 y la pantalla | Diseñar la medida de parecido decide el resultado de la v1 |

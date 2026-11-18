@@ -75,7 +75,9 @@ final class FilesTests: XCTestCase {
     func testAtomicWriteLeavesNoTemporaries() throws {
         let dir = try makeTempDir()
         for _ in 0..<3 { try ProjectFile.save(makeFullProject(), to: dir) }
-        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: dir.path), ["project.json"])
+        // Las copias `project.json.bak-*` son esperadas (ProjectBackup); lo que no debe quedar son temporales.
+        let files = try FileManager.default.contentsOfDirectory(atPath: dir.path).filter { !$0.hasPrefix("project.json.bak-") }
+        XCTAssertEqual(files, ["project.json"])
     }
 
     func testMissingOptionalCollectionsDecode() throws {
