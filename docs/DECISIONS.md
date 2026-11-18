@@ -21,3 +21,4 @@ Una línea por ADR; el texto está en `docs/adr/ADR-NNN.md`. Nuevo ADR = fichero
 - [ADR-017](adr/ADR-017.md) · 2026-11-17 · Cierre de la Fase 5b: tablatura de Songsterr como fuente por defecto (elige Jorge con vista previa, metrónomo de Songsterr, adornos; la interfaz pasa a la Fase 5c)
 - [ADR-018](adr/ADR-018.md) · 2026-11-18 · Cierre de la Fase 7: montaje (encuadre, layouts, compositor, exportación normalizada, plano único con cortes, rotación)
 - [ADR-019](adr/ADR-019.md) · 2026-11-18 · Cierre de la Fase 5c: interfaz de la tablatura (voces como pista `vocal` ligada al stem, adornos con teclado, ligadura, mute/solo, bucle por selección; sin prueba manual de Jorge)
+- [ADR-020](adr/ADR-020.md) · 2026-11-18 · Port a Windows con WebView2 y alcance completo (aceptado: UI web con núcleo Swift, todo de una, validación en hardware real cuando haya PC)

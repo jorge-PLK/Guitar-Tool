@@ -8,4 +8,5 @@
 - [ADTOF batería: GRU en Core ML y contrato](adtof-contract.md) — gru nativa iOS18 (salida reverse invertida), GPU la calcula mal→CPU; 84 bandas; pistas con puerta; package.py/fixture
 - [Guitab / MuScriptor (Fase 5b)](guitab-muscriptor-eval.md) — Guitab sin instalar (6 ficheros); registro 100 % por construcción; MuScriptor gated; BP y silencio
 - [Songsterr como referencia](songsterr-reference.md) — API de búsqueda; 103 Early Hints→curl; CDN en gzip; alinear con saliencia CQT, no con onsets/croma
+- [ONNX Runtime en Windows](ort-windows.md) — GitHub de ORT 404→NuGet; pragma comment(lib); DLL de System32; install.ps1 borra C:\ToneForge; VM sin Python
 - [Lead/Rhythm Mel-Band anónimo](lead-rhythm-contract.md) — weights_only OK, casa estricto; YAML con tupla→SafeLoader; MPS falla→CPU; Core ML sin scatter (K gathers); contrato spec→mask hop 441
