@@ -45,7 +45,48 @@ Decidir si ToneForge puede llevarse a Windows (ARM64 y x64) y con qué alcance. 
 
 ### Observación pendiente
 
-`NumberFormatter(.decimal)` dio «1,234.5» en un Windows es-ES vía SSH. Comprobar el locale en una sesión gráfica antes de concluir nada.
+Resuelta en parte en el paso 3: ver «Locale» en la sección siguiente.
+
+## Compilar, instalar y arrancar en la VM (paso 3)
+
+### Script
+
+- Uso, desde el Mac: `Tools/win/build.sh [--package <ruta del repo>] [--product <nombre>] [--arch arm64|x64|both] [--gui] [--no-run] [--clean] [--stop]`. Por defecto usa el paquete `Tools/win/smoke`, las dos arquitecturas y arranque en consola.
+- Códigos de salida: 0 bien, 1 falla el programa, 2 falla la compilación, 3 VM o ssh inaccesibles.
+- Log completo en `Temp/logs/win-<fecha>.log`; con `--gui`, la salida y las capturas quedan en `Temp/win/`.
+- Los `.ps1` remotos están en `Tools/win/remote/` y llegan con el repo a `C:\tf`. El resultado se instala en `C:\ToneForge\<arch>\`.
+- Si la VM está parada la arranca (`utmctl start ToneForge-Win11`); `--stop` la apaga al acabar.
+
+### Tiempos y verificación
+
+- Compilación incremental: 2,7 s en ARM64 y 1,3 s en x64.
+- Los ejecutables son PE 0xAA64 y 0x8664; los dos imprimen y salen con 0.
+- `--gui` saca la ventana en el escritorio del usuario `tf` y trae la captura al Mac.
+
+### Inicio de sesión automático
+
+- `Tools/win/remote/setup-autologin.ps1`, por ssh: `powershell -NoProfile -ExecutionPolicy Bypass -File setup-autologin.ps1 -Password <contrasena>`. La contraseña se pasa con `-Password` y no va en el repo.
+- Deja al usuario `tf` con la sesión iniciada al arrancar, sin bloqueo ni suspensión.
+
+### Tropiezos y remedios del paso 3
+
+- (f) `true` no existe en PowerShell. Remedio: para probar ssh usar `echo ok`.
+- (g) SwiftPM saca códigos ANSI por ssh. Remedio: `build.sh` los quita.
+- (h) Lanzar procesos en el escritorio interactivo. `schtasks /IT` funciona gracias al inicio de sesión automático, y la captura de pantalla se hace dentro de la propia tarea, que es la que vive en la sesión interactiva.
+
+### Locale
+
+`NumberFormatter(.decimal)` da locale `en_001` y «1,234.5» también en la sesión gráfica de un Windows es-ES, así que no lo causa ssh. Queda abierto para la prueba de viabilidad.
+
+### Cambios respecto a la mini-spec del paso 3
+
+- `--gui` arranca solo en el escritorio, no además en consola.
+- Los ficheros borrados del repo siguen en `C:\tf` hasta usar `--clean`.
+
+### Pendiente
+
+- No se ha probado `--gui` sin sesión iniciada (debe salir con 3).
+- Queda abierta en la VM una ventana «Administrador: C:\WINDOWS…»; habrá que cerrarla desde el script si reaparece con cada `--gui`.
 
 ## Prueba de viabilidad
 
