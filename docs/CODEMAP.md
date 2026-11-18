@@ -1,6 +1,6 @@
 # ToneForge · Mapa del código
 
-Última actualización: 2026-11-17 · Fase 5b (ADR-017): tablatura de Songsterr como fuente por defecto.
+Última actualización: 2026-11-18 · Fase 5c (ADR-019): interfaz de la tablatura (voces, adornos con teclado, ligadura, mute/solo, bucle por selección).
 
 Una sección por paquete (nombres de `docs/plan.md`, «Forma de trabajo»), más la app, las pruebas y las herramientas. Fila por fichero: `| Fichero | qué hace (ADR-NNN): APIs públicas |`. Se lee por secciones: `grep -n '^## ' docs/CODEMAP.md`.
 
@@ -159,6 +159,13 @@ Transcripción y tablatura (ADR-014).
 | `Sources/TabKit/Bridge/AlphaTabScore.swift`, `Synth/TabSynthRenderer.swift` (Fase 5b) | (ADR-017) Adornos al JSON de alphaTab y al `.gp`; suenan P.M., staccato, muteadas, ghost, acentos, bends, palanca y vibrato |
 | `Tests/TabKitTests/` (Fase 5b) | (ADR-017) `Songsterr*Tests` (conversor, alineador, rejilla, tempo escrito, plan, técnicas, solos), `AlphaTabTechniquesTests`, `SilenceGateTests`, `DrumCymbalSeriesTests`, `TuningCustomTests`; puertas reales con `TF_P5B_TESTS=1` y datos de `P5BProjects.swift` (`TF_P5B_PROJECTS`) |
 | `Tests/TabKitTests/` | Tests de Basic Pitch (paridad con Python en fixtures; pesado con `TF_MODEL_TESTS=1`) y del clasificador; Fase 5: `TabGridTests`, `TabQuantizeTests`, `TabTempoDriftTests`, `TabFingeringTests`, `TabEditorTests`, `TabFingerprintTests`, `TabSynthTests`, `AlphaTabScoreTests`, `DrumTranscriberTests`, `DrumHeavyModelTests` (con `Fixtures/drums/`) |
+| `Sources/TabKit/Score/TabScore.swift`, `TabTrackNames.swift` (Fase 5c) | (ADR-019) `TabTrackKind.vocal` (solo pentagrama, altura MIDI), `TabTrack.program: Int?`, `TabScore.trackDisplayNames`; `TabTrackNames` (`defaultName`, `resolve`: nombre de Songsterr o instrumento, con número si se repite) |
+| `Sources/TabKit/Songsterr/` (Fase 5c) | (ADR-019) `SongsterrTrack.resolvedNames`, `SongsterrTrackConverter.isVocal` (GM 52–54 o nombre), `SongsterrImportPlan.trackNames` |
+| `Sources/TabKit/Synth/TabSynthRenderer.swift` (Fase 5c) | (ADR-019) `instrument(for:)`, `vocalProgram` (53 por defecto); internos: adornos de la Parte 1 (canal y sampler por cuerda con curvas, flams 30 ms antes del pulso) y ligadura (`Link.tie`, `inheritingTies`) |
+| `Sources/TabKit/Score/TabOrnaments.swift`, `TabEditor.swift`, `TabTechniques.swift` (Fase 5c) | (ADR-019) `TabOrnament` y extensión de `TabEditor`: `toggle(_:trackID:noteIDs:)`, `toggle(_:trackID:hitPoints:)`, `noteIDs(in:trackID:)`, `hitPoints(in:trackID:)`, `bendCycle`, `whammyVibrato`, `graceFretsBelow`, `setGraceFret(_:trackID:noteID:)`; `TabTechniques.tieDestination`, `TabEditError.noTieOrigin` |
+| `Sources/TabKit/Score/TabSpan.swift` (Fase 5c) | (ADR-019) `TabSpan`: tramo de pulsos seleccionado (Parte 2) |
+| `Sources/TabKit/Bridge/AlphaTabScore.swift` (Fase 5c) | (ADR-019) JSON v1: `kind:"vocal"`, `program`, notas con `p`, `tie` → `isTieDestination` |
+| `Tests/TabKitTests/` (Fase 5c) | (ADR-019) `TabSpanTests`, `TabSynthAdornmentTests`, `TabSynthTieTests`, `TabVocalTests`, `TabVocalRealTests` (`TF_P5B_TESTS=1`), `TabOrnamentsTests` |
 
 ## Packages/VideoKit
 
@@ -184,6 +191,7 @@ Archivo de proyecto (JSON por carpeta), índice en SwiftData y orquestación de 
 | `Sources/Store/Files.swift` (Fase 5) | (ADR-016) `ProjectLayout.tabDir`, `tabScoreFile` (`tab/score.json`), `tabCacheDir` (`cache/tab/`), `tabSynthURL(trackID:)` |
 | `Sources/Store/TabSources.swift` | (ADR-016) `TabSource` (`id`, `name`, `kind` guitar/bass/drums, `relativePath`, `playerTrackID`) y extensión de `Project` que lista las pistas de la tablatura según `GuitarSettings` y stems no vacíos; probado en `TabSourcesTests` |
 | `Sources/Store/TabSourceChoice.swift` | (ADR-017) `TabSourceChoice` (`.songsterr(songId, revisionId, pairings: [TabStemPairing])` o `.automatic`), `TabStemPairing` (`stemID`, `partId`, `solos`); `Project.tabSource`, `Library.saveTabSource`, `ProjectLayout.songsterrCacheDir` y `tabSongsterrGridFile` (`tab/songsterr-grid.json`). Probado en `TabSourceChoiceTests` |
+| `Sources/Store/TabSources.swift` (Fase 5c) | (ADR-019) `TabSource.Kind.vocal`, `Project.vocalTabSource(fileExists:)` (vincula la vocal al stem `vocals`); probado en `TabSourcesTests` |
 | `Tests/StoreTests/` | 78 tests (`AudioSettingsTests`: ajustes de audio y caducidad de la calibración; `StudyQueueTests`: cola, stems vacíos, v1 → v2; `OriginTests`: origen, duplicados, importación con metadatos; `TrashTests`: Papelera, borrado y edición; `RecoveryTests`: re-encolado al arrancar) |
 
 Carpeta de proyecto: `project.json`, `source/original.<ext>`, `audio/song.wav` (regenerable), `stems/<stem>.wav` (regenerable), `stems/.partial`, `takes/` (`takes/<id>/processed.wav`, ADR-013), `tab/score.json` (tablatura con ediciones; no es caché, ADR-016), `video/`, `rigs/`, `cache/` (regenerable; `cache/analysis.json` es el análisis automático con huella; `cache/tab/` los WAV sintetizados). Perfil e índice en `~/Library/Application Support/ToneForge/` (`profile.json`, `Library.store`). Límite conocido: en la reconversión la sustitución es atómica por fichero, no entre ficheros; `project.json` se actualiza al final y, si falla a mitad, se reintenta al abrir.
@@ -231,6 +239,7 @@ Proyecto Xcode generado con XcodeGen (`App/project.yml`; el `.xcodeproj` tambié
 | `App/Sources/AppModel.swift`, `RootView.swift`, `BackingView.swift`, `BackingController.swift` (Fase 5) | (ADR-016) Pestaña Tablatura, acceso desde Backing y opciones DEBUG `--screen tab`, `--tab-track N`, `--tab-edit`, `--tab-listen`, `--tab-export <ruta>`; log con `TF_TAB_LOG` |
 | `App/Sources/SongsterrWebLoader.swift` | (ADR-017) Lector de Songsterr con `WKWebView` oculto (`…/song-tab-s<id>`); implementa `SongsterrServing` |
 | `App/Sources/TabSourceSheet.swift`, `SongsterrPreview.swift` | (ADR-017) Hoja «Tablatura de Songsterr»: búsqueda, resultados, «Usar esta», enlace pegado, «Transcribir automáticamente», lista de emparejamiento con confianza y avisos; vista previa en `WKWebView` visible (`websiteDataStore .default()`) |
+| `App/Sources/TabController.swift`, `TabScreen.swift`, `TabWebHost.swift`, `BackingController.swift`, `Resources/alphaTab/tf-bridge.js` (Fase 5c) | (ADR-019) `TabController`: mute/solo por pista (`isMuted`, `isSolo`, `isDimmed`, `toggleMute`, `toggleSolo`, `syncSynthMix`), `ListenMode`, `listenMode`, `setAllListening`, `synthProgress`, `span`, bucle por selección, `toggleOrnament`, `ornament(forKey:shift:drums:)`, `graceMode`, `source(of:)` con stem de voz. `TabScreen`: M/S por pista, selector «Stems / Transcripción», icono `mic`, «Selección» en el menú de bucle. `BackingController`: estado compartido de mute/solo. `tf-bridge.js`: selección de tramo (resaltado, ⇧clic, arrastre) |
 | `App/Sources/SongsterrProbe.swift` | (ADR-017) Opciones DEBUG `--songsterr-probe`, `--tab-songsterr`, `--tab-summary`, `--tab-songsterr-sheet` |
 | `App/Sources/StudySession.swift`, `TabController.swift`, `SectionGridBoxes.swift` (Fase 5b) | (ADR-017) `StudySession.metronomeBeats` con la rejilla de Songsterr (Backing y Tablatura); menú «Fuente», `TabController.customTuning(of:)`; `SpaceKeyMonitor` (espacio = play/pausa); arreglo del cursor en `tf-bridge.js` |
 | `App/Resources/alphaTab/` | (ADR-016) alphaTab 1.9.0 embebido (MPL-2.0, 2,8 MB con soundfont Sonivox): `alphaTab.min.js`, `tab.html`, `tf-bridge.js` (construye el `Score` desde el JSON v1), `font/`, `soundfont/`, `VERSION`, licencia |
@@ -258,6 +267,7 @@ Sondas de la Fase 0 (`Probes/P<n>-<tema>/`), desechables; resultados en `docs/pr
 | `Probes/P6-timepitch/{run.sh,p6.py,AppleRender}` | Comparación ciega de `AVAudioUnitTimePitch` y Rubber Band: `run.sh Probes/testaudio/out/clips/*.wav` (ADR-005) |
 | `Probes/P4-modelos/{guitar_models,basic_pitch,lead_rhythm}/` | Fase 4 (ADR-014): modelos de guitarra frente a BS-RoFormer SW (`run_torch.py`, `score.py`, `listen.py`), conversión y paridad de Basic Pitch y del lead/rhythm (`convert.py`, `compare.py`) |
 | `Probes/P5b-guitarra/` | (ADR-017) Pruebas de la 5b: evaluación contra Songsterr (`eval_reference.py`) y `check-techniques.js` (46/46 adornos en alphaTab y `.gp`) |
+| `Probes/P5c-voces/check-vocal.js` | (ADR-019) Comprobación de la pista de voz en alphaTab |
 | `Probes/P5-alphatab/make-spike.js` | (ADR-016) Prueba inicial de alphaTab: partitura de guitarra, bajo y batería exportada a `.gp` |
 | `Probes/P4-modelos/adtof/{package.py,make_fase5_fixture.py}` | (ADR-016) `package.py` empaqueta ADTOF para la app; `make_fase5_fixture.py` genera el fixture de `Tests/TabKitTests/Fixtures/drums/` (activaciones y golpes de Python) |
 | `Probes/testaudio/prepare.py` | Prepara los temas y tramos de prueba (`out/` ignorado) |

@@ -21,6 +21,20 @@ public enum SongsterrTrackConverter {
     static let drumInstrumentId = 1024
     /// Programas GM de bajo (Acoustic Bass … Synth Bass 2).
     static let bassPrograms = 32...39
+    /// Programas GM de voz (base 0): 52 Choir Aahs, 53 Voice Oohs, 54 Synth Voice (mini-spec Fase 5c, decisión 4).
+    static let vocalPrograms = 52...54
+    /// Palabras del nombre de la pista o del instrumento que marcan una voz (mini-spec Fase 5c, decisión 4). En las
+    /// cachés de El roce, Tornado Of Souls y Aquellas cosas las voces traen el instrumento 66 o 67 (saxos) y se
+    /// reconocen por el nombre: «Vocals», «Lead Vocals», «Backing Vocals».
+    static let vocalWords: Set<String> = ["vocal", "vocals", "voice", "voices", "voz", "voces", "singer", "choir", "coro"]
+
+    /// ¿Es una pista de voz? Instrumento GM 52–54 o alguna palabra de voz en el nombre de la pista o del instrumento.
+    public static func isVocal(instrumentId: Int?, name: String, instrumentName: String = "") -> Bool {
+        if let instrumentId, vocalPrograms.contains(instrumentId) { return true }
+        let words = (name + " " + instrumentName).lowercased().split { !$0.isLetter }.map(String.init)
+        return words.contains { vocalWords.contains($0) }
+    }
+
     /// Tempo si la pista no trae ninguno (el de MIDI por defecto).
     static let defaultTempo = 120.0
     /// Tope de compases tocados al desplegar repeticiones (un bucle mal formado no cuelga la app).
@@ -39,6 +53,8 @@ public enum SongsterrTrackConverter {
         let kind: TabTrackKind
         if isDrums || instrumentId == drumInstrumentId || instrumentName.lowercased().contains("drum") {
             kind = .drums
+        } else if isVocal(instrumentId: instrumentId, name: root["name"] as? String ?? "", instrumentName: instrumentName) {
+            kind = .vocal
         } else if bassPrograms.contains(instrumentId ?? -1) || instrumentName.lowercased().contains("bass") {
             kind = .bass
         } else {

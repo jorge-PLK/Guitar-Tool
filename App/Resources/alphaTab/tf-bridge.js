@@ -7,17 +7,18 @@
  *     "version": 1, "title": "...", "artist": "...",
  *     "bars": [ { "num": 4, "den": 4, "tempo": 120, "start": 0.0 }, ... ],   // one per master bar
  *     "tracks": [ {
- *       "name": "Guitarra", "kind": "guitar" | "bass" | "drums",
- *       "tuning": [40, 45, 50, 55, 59, 64],        // MIDI, LOW -> HIGH; string index 0 = lowest. Omitted for drums
+ *       "name": "Guitarra", "kind": "guitar" | "bass" | "drums" | "vocal",
+ *       "tuning": [40, 45, 50, 55, 59, 64],        // MIDI, LOW -> HIGH; string index 0 = lowest. Omitted for drums and vocal
+ *       "program": 53,                              // vocal only (Fase 5c): GM program (0-based) the track sounds with
  *       "bars": [ [ beat, ... ], ... ]             // one array of beats per master bar, same count as "bars"
  *     } ]
  *   }
  *   beat = { "d": 8,                       // duration denominator: 1 2 4 8 16 32
  *            "dots": 0,                    // optional
  *            "tuplet": 3 | [3, 2],         // optional; 3 = eighth triplet (3 in the time of 2)
- *            "notes": [ { "s": 0, "f": 5 } ],   // pitched: string index (0 = lowest) and fret
+ *            "notes": [ { "s": 0, "f": 5 } ],   // pitched: string index (0 = lowest) and fret; vocal: { "s": 0, "f": 0, "p": MIDI pitch }
  *            "hits": [ 35, 42 ] }               // drums: GM percussion numbers (35 36 38 42 47 49 ...)
- *   Techniques (Fase 5b, all optional, alphaTab names): note "t" = { pm, lr, hp, dead, ghost, stac: true; vib: "slight"|"wide";
+ *   Techniques (Fase 5b, all optional, alphaTab names): note "t" = { pm, lr, hp, dead, ghost, stac, tie: true; vib: "slight"|"wide";
  *   bend: {type, pts: [[pos 0..60, quarterTones]]}; sin: slide in; sout: slide out; harm: {type, fret}; acc: "normal"|"heavy"|"tenuto" };
  *   beat: tap: true, trem: 8|16|32, whammy: {type, pts}, pick: "down"|"up", brush: "down"|"up", grace: "beforeBeat"|"onBeat"|"bendGrace" (the beat is a grace-note beat, no time of its own; several in a row = a rake, each with its notes on their strings), ghosts: [GM] (subset of hits), accents: {"GM": "normal"|"heavy"|"tenuto"} (subset of hits).
  *   A beat with neither "notes" nor "hits" is a rest. "tempo" is in quarter notes per minute;
@@ -51,6 +52,8 @@
     guitar: { program: 30, clefName: 'G2', displayTranspose: -12 },
     bass: { program: 33, clefName: 'F4', displayTranspose: -12 },
     drums: { program: 0, clefName: 'Neutral', displayTranspose: 0 },
+    // Voz de Songsterr (Fase 5c): solo pentagrama, sin cuerdas; las notas traen la altura MIDI en "p".
+    vocal: { program: 53, clefName: 'G2', displayTranspose: 0 },
   };
 
 
@@ -145,6 +148,7 @@
         score.addTrack(track);
         const staff = track.staves[0];
         const isDrums = t.kind === 'drums';
+        const isVocal = t.kind === 'vocal';
 
         if (isDrums) {
           track.playbackInfo.primaryChannel = 9;
@@ -158,6 +162,14 @@
               track.getOrRegisterPercussionArticulation(makeArticulation(Number(gm)));
             });
           }
+        } else if (isVocal) {
+          track.playbackInfo.primaryChannel = guitarChannel;
+          track.playbackInfo.secondaryChannel = guitarChannel + 1;
+          guitarChannel += 2;
+          if (guitarChannel === 8) guitarChannel = 10; // skip the percussion channel (9)
+          // Solo pentagrama (con o sin opts.tabOnly), sin afinacion de cuerdas.
+          staff.showTablature = false;
+          staff.showStandardNotation = true;
         } else {
           track.playbackInfo.primaryChannel = guitarChannel;
           track.playbackInfo.secondaryChannel = guitarChannel + 1;
@@ -171,7 +183,7 @@
           setTuning(staff, t.tuning.slice().reverse());
           staff.displayTranspositionPitch = kind.displayTranspose;
         }
-        track.playbackInfo.program = kind.program;
+        track.playbackInfo.program = isVocal && t.program != null ? t.program : kind.program;
         track.playbackInfo.bank = 0;
 
         t.bars.forEach(function (beats) {
@@ -201,6 +213,15 @@
                   : track.getOrRegisterPercussionArticulation(makeArticulation(gm));
                 beat.addNote(note);
               });
+            } else if (isVocal) {
+              (bt.notes || []).forEach(function (n) {
+                const note = new model.Note();
+                note.octave = Math.floor(n.p / 12);
+                note.tone = n.p % 12;
+                if (n.t) applyNoteTechniques(note, n.t);
+                beat.addNote(note);
+              });
+              applyBeatTechniques(beat, bt);
             } else {
               (bt.notes || []).forEach(function (n) {
                 if (n.s < 0 || n.s >= t.tuning.length) throw new Error('String out of range: ' + n.s);
@@ -237,6 +258,7 @@
       if (t.dead) note.isDead = true;
       if (t.ghost) note.isGhost = true;
       if (t.stac) note.isStaccato = true;
+      if (t.tie) note.isTieDestination = true; // alphaTab enlaza el origen al hacer finish()
       if (t.vib) note.vibrato = enumValue(model.VibratoType, t.vib, 'vibrato');
       if (t.sin) note.slideInType = enumValue(model.SlideInType, t.sin, 'slide in');
       if (t.sout) note.slideOutType = enumValue(model.SlideOutType, t.sout, 'slide out');
@@ -338,6 +360,11 @@
     let selEl = null;
     let pending = null;
     let pendingSel = null;
+    let rangeEls = [];
+    let rangeArgs = null;
+    let lastShift = false;
+    let dragging = false;
+    let dragBeat = null;
     let pendingScroll = null;
 
     function post(msg) {
@@ -377,26 +404,44 @@
         settings.notation.rhythmHeight = 24;
         api = new alphaTab.AlphaTabApi(host, settings);
         host.style.position = 'relative';
+        host.style.userSelect = 'none';
+        host.style.webkitUserSelect = 'none';
         ensureCursor(host);
         api.postRenderFinished.on(function () {
           if (pendingScroll != null) { window.scrollTo(0, pendingScroll); pendingScroll = null; }
           post({ event: 'rendered' });
+          if (rangeArgs) setRange(rangeArgs[0], rangeArgs[1], rangeArgs[2], rangeArgs[3]);
           if (pendingSel) { const q = pendingSel; pendingSel = null; setSelection(q[0], q[1]); }
           if (pending) { const p = pending; pending = null; setCursor(p[0], p[1]); }
         });
         api.renderFinished.on(function () { /* postRenderFinished carries the bounds */ });
         api.error.on(function (e) { post({ event: 'error', message: 'alphaTab: ' + String(e && e.message || e) + '\n' + (e && e.stack || '') }); });
+        // El modificador se lee en captura: alphaTab solo entrega el pulso, no el evento del raton.
+        document.addEventListener('mousedown', function (e) { lastShift = e.shiftKey; }, true);
+        document.addEventListener('mouseup', function () { dragging = false; dragBeat = null; }, true);
         api.beatMouseDown.on(function (beat) {
-          post({ event: 'beatClick', track: beat.voice.bar.staff.track.index, bar: beat.voice.bar.index, beat: beat.index });
+          dragging = true;
+          dragBeat = beat.voice.bar.index + ':' + beat.index;
+          post({ event: 'beatClick', track: beat.voice.bar.staff.track.index, bar: beat.voice.bar.index, beat: beat.index,
+                 shift: lastShift });
+        });
+        api.beatMouseMove.on(function (beat) {
+          if (!dragging) return;
+          const key = beat.voice.bar.index + ':' + beat.index;
+          if (key === dragBeat) return;
+          dragBeat = key;
+          post({ event: 'beatDrag', track: beat.voice.bar.staff.track.index, bar: beat.voice.bar.index, beat: beat.index });
         });
         api.noteMouseDown.on(function (note) {
           post({ event: 'noteClick', track: note.beat.voice.bar.staff.track.index,
-                 bar: note.beat.voice.bar.index, beat: note.beat.index, string: note.string - 1, fret: note.fret });
+                 bar: note.beat.voice.bar.index, beat: note.beat.index, string: note.string - 1, fret: note.fret,
+                 shift: lastShift });
         });
       }
       pendingScroll = window.scrollY;
       if (cursorEl) cursorEl.style.display = 'none';
       if (selEl) selEl.style.display = 'none';
+      rangeEls.forEach(function (el) { el.style.display = 'none'; });
       api.renderScore(score, [trackIndex || 0]);
     }
 
@@ -424,8 +469,18 @@
     // bar: master bar index; fraction 0..1 of the bar. Linear in time inside the bar (the app converts
     // the player position with TabScore's bar times).
     function place(el, bar, fraction) {
+      const p = locate(bar, fraction);
+      if (!p) { el.style.display = 'none'; return null; }
+      el.style.left = p.x + 'px';
+      el.style.top = p.y + 'px';
+      el.style.height = p.h + 'px';
+      el.style.display = 'block';
+      return p;
+    }
+
+    function locate(bar, fraction) {
       const mbb = api.boundsLookup.findMasterBarByIndex(bar);
-      if (!mbb) { el.style.display = 'none'; return null; }
+      if (!mbb) return null;
       const mb = score.masterBars[bar];
       const barTicks = mb.calculateDuration();
       const tick = Math.max(0, Math.min(1, fraction)) * barTicks;
@@ -449,10 +504,6 @@
           x = bx + (nx - bx) * f;
         }
       }
-      el.style.left = x + 'px';
-      el.style.top = top + 'px';
-      el.style.height = height + 'px';
-      el.style.display = 'block';
       return { x: x, y: top, h: height };
     }
 
@@ -476,6 +527,34 @@
       if (!api || !api.boundsLookup || !selEl) { pendingSel = [bar, fraction]; return; }
       if (bar < 0) { selEl.style.display = 'none'; return; }
       place(selEl, bar, fraction);
+    }
+
+    // Tramo seleccionado: del compas/fraccion de inicio al de fin; un rectangulo por compas (puede ocupar varias lineas).
+    // sb < 0 lo oculta. Se guarda para repintarlo tras cada render.
+    function setRange(sb, sf, eb, ef) {
+      rangeArgs = sb < 0 ? null : [sb, sf, eb, ef];
+      rangeEls.forEach(function (el) { el.style.display = 'none'; });
+      if (sb < 0 || !api || !api.boundsLookup) return;
+      const host = document.getElementById('alphaTab');
+      let n = 0;
+      for (let bar = sb; bar <= eb; bar++) {
+        const a = locate(bar, bar === sb ? sf : 0);
+        const b = locate(bar, bar === eb ? ef : 1);
+        if (!a || !b) continue;
+        let el = rangeEls[n++];
+        if (!el) {
+          el = document.createElement('div');
+          el.style.cssText = 'position:absolute;pointer-events:none;z-index:8;border-radius:3px;' +
+            'background:rgba(80,160,255,.22);border:1px solid rgba(80,160,255,.55)';
+          host.appendChild(el);
+          rangeEls.push(el);
+        }
+        el.style.left = a.x + 'px';
+        el.style.width = Math.max(2, b.x - a.x) + 'px';
+        el.style.top = a.y + 'px';
+        el.style.height = a.h + 'px';
+        el.style.display = 'block';
+      }
     }
 
     function setCursorTime(seconds, follow) {
@@ -511,7 +590,7 @@
     }
     return { load: guarded('load', load), selectTrack: guarded('selectTrack', selectTrack),
              setCursor: guarded('setCursor', setCursor), setCursorTime: guarded('setCursorTime', setCursorTime),
-             setSelection: guarded('setSelection', setSelection), exportGpBase64: guarded('exportGpBase64', exportGpBase64) };
+             setSelection: guarded('setSelection', setSelection), setRange: guarded('setRange', setRange), exportGpBase64: guarded('exportGpBase64', exportGpBase64) };
   }
 
   const api = { create: create, patchDrumGpif: patchDrumGpif, DRUM_ARTICULATIONS: DRUM_ARTICULATIONS };

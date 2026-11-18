@@ -130,14 +130,19 @@ public struct SongsterrImportPlan: Sendable {
 
     // MARK: Edición
 
+    /// Nombre de cada pista de Songsterr: el suyo o, si viene vacío, el del instrumento, numerado si se repite
+    /// (mini-spec Fase 5c, decisión 5).
+    public var trackNames: [String] { SongsterrTrack.resolvedNames(tracks) }
+
     public func assignment(for stemID: String) -> SongsterrAssignment? { assignments.first { $0.stemID == stemID } }
 
     /// Pistas que se pueden elegir para el stem (las de su mismo tipo), con el parecido medido.
     public func choices(for stemID: String) -> [SongsterrTrackChoice] {
         guard let slot = slots.first(where: { $0.id == stemID }) else { return [] }
+        let names = trackNames
         return tracks.indices.filter { Self.compatible(tracks[$0].kind, slot.kind) }.map { i in
             let sim = alignment.candidates.first { $0.role == slot.role && $0.track == i }?.similarity
-            return SongsterrTrackChoice(track: i, name: tracks[i].name, similarity: sim)
+            return SongsterrTrackChoice(track: i, name: names[i], similarity: sim)
         }
     }
 
@@ -164,8 +169,9 @@ public struct SongsterrImportPlan: Sendable {
     public func soloChoices(for stemID: String, solo: Int) -> [SongsterrTrackChoice] {
         guard let slot = slots.first(where: { $0.id == stemID }), alignment.soloPairs.indices.contains(solo) else { return [] }
         let pair = alignment.soloPairs[solo]
+        let names = trackNames
         return tracks.indices.filter { Self.compatible(tracks[$0].kind, slot.kind) }.map { i in
-            SongsterrTrackChoice(track: i, name: tracks[i].name,
+            SongsterrTrackChoice(track: i, name: names[i],
                                  similarity: pair.candidates.first { $0.track == i }?.similarity)
         }
     }
@@ -201,7 +207,8 @@ public struct SongsterrImportPlan: Sendable {
     /// Stems que transcribe la automática (sin pareja ni secciones de solo con pista).
     public var automaticStemIDs: [String] { assignments.filter { !$0.usesSongsterr }.map(\.stemID) }
 
-    /// Pistas de Songsterr que no usa ningún stem (voz, teclados, una tercera guitarra…).
+    /// Pistas de Songsterr que no usa ningún stem (voces, teclados, una tercera guitarra…). Las de voz nunca se
+    /// emparejan con un stem (Fase 5c, decisión 4): salen siempre aquí.
     public var extraTracks: [Int] {
         let used = Set(assignments.compactMap(\.track))
         return tracks.indices.filter { !used.contains($0) }

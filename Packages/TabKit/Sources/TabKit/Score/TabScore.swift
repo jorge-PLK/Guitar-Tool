@@ -106,6 +106,10 @@ public enum Subdivision: String, Codable, Sendable, CaseIterable {
 
 public enum TabTrackKind: String, Codable, Sendable {
     case guitar, bass, drums
+    /// Voz de Songsterr (mini-spec Fase 5c, decisión 4): solo pentagrama, sin cuerdas ni trastes (`TabNote.pitch`
+    /// es la altura MIDI; `string` vale siempre 1 y `tuning` es nil). Suena con `TabTrack.program`. Aditivo: los
+    /// `score.json` anteriores no la usan.
+    case vocal
 }
 
 /// Piezas de batería con su nota de percusión GM (mini-spec Fase 5, «Transcripción»).
@@ -251,11 +255,15 @@ public struct TabTrack: Codable, Sendable, Equatable, Identifiable {
     /// Huella de la importación desde Songsterr (mini-spec Fase 5b, «Datos»); nil en las pistas automáticas y en
     /// los JSON anteriores a la Fase 5b. En las importadas `source` queda nil.
     public var imported: ImportedTrackStamp?
+    /// Programa GM (base 0) con que suena la pista, si no es el de su tipo (Fase 5c: instrumento de las voces de
+    /// Songsterr). nil en los JSON anteriores y en las pistas automáticas.
+    public var program: Int?
 
     public init(id: String, name: String, kind: TabTrackKind, tuning: Tuning?, source: TrackSourceFingerprint?,
                 subdivisions: [Subdivision], notes: [TabNote] = [], hits: [TabDrumHit] = [],
-                imported: ImportedTrackStamp? = nil) {
+                imported: ImportedTrackStamp? = nil, program: Int? = nil) {
         self.imported = imported
+        self.program = program
         self.id = id
         self.name = name
         self.kind = kind
@@ -273,7 +281,7 @@ public struct TabTrack: Codable, Sendable, Equatable, Identifiable {
     }
 
     mutating func sortContents() {
-        notes.sort { ($0.start.absoluteTick, $0.string) < ($1.start.absoluteTick, $1.string) }
+        notes.sort { ($0.start.absoluteTick, $0.string, $0.pitch) < ($1.start.absoluteTick, $1.string, $1.pitch) }
         hits.sort { ($0.at.absoluteTick, $0.piece.rawValue) < ($1.at.absoluteTick, $1.piece.rawValue) }
     }
 }

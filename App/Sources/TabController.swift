@@ -18,6 +18,8 @@ final class TabController {
     static let synthDebounce = 1.0
     /// Dos dígitos seguidos en menos de esto forman un traste de dos cifras («1» y «2» → 12).
     static let digitChain = 0.8
+    /// Nombre del bucle A-B que crea la selección de tramo (menú de bucle).
+    static let spanLoopName = "Selección"
     /// Cuerda inicial (1 = la más aguda) al añadir una nota sin cuerda elegida: la central.
     static func defaultString(of tuning: Tuning) -> Int { max(1, tuning.strings.count / 2) }
 
@@ -72,9 +74,19 @@ final class TabController {
     private(set) var entries: [Entry] = []
     var selectedTrackID: String? { didSet { if selectedTrackID != oldValue { trackChanged() } } }
     var editMode = false { didSet { if !editMode { selection = nil } } }
-    private(set) var selection: Selection? { didSet { updateSelectionMarker() } }
+    private(set) var selection: Selection? {
+        didSet { if selection != oldValue { graceMode = false }; updateSelectionMarker() }
+    }
+    /// Modo adorno (Fase 5c, tecla G): mientras dura, los dígitos cambian el traste de la nota de adorno de la nota
+    /// seleccionada. Acaba al cambiar la selección o con cualquier tecla que no sea dígito, ⌫ o G.
+    private(set) var graceMode = false
     private(set) var listening: Set<String> = []
     private(set) var synth: [String: SynthState] = [:]
+    /// Mute y solo de las pistas extra (sin stem): solo viven en la sesión. Las pistas con stem usan la mezcla de Backing.
+    private(set) var extraMuted: Set<String> = []
+    private(set) var extraSolo: Set<String> = []
+    /// Tramo de pulsos seleccionado (decisión 3 de la Fase 5c); su bucle A-B se llama `spanLoopName`.
+    private(set) var span: TabSpan? { didSet { if span != oldValue { updateRangeMarker() } } }
     /// Mensaje breve del último error de edición o exportación.
     private(set) var flash: String?
     private(set) var webError: String?
@@ -91,6 +103,9 @@ final class TabController {
 
     @ObservationIgnored private let modelStore: ModelStore
     @ObservationIgnored private var sources: [TabSource] = []
+    /// Stem de voz del proyecto, al que van vinculadas todas las pistas `vocal` (Fase 5c, decisión 4). Fuera de `sources`:
+    /// no se transcribe ni se empareja. nil: las voces son pistas extra.
+    @ObservationIgnored private var vocalSource: TabSource?
     @ObservationIgnored private var alpha: AlphaTabScore?
     @ObservationIgnored private var started = false
     @ObservationIgnored private var importTask: Task<Void, Never>?
@@ -108,6 +123,10 @@ final class TabController {
     @ObservationIgnored private var synthTasks: [String: Task<Void, Never>] = [:]
     @ObservationIgnored private var lastDigit: (value: Int, at: Date)?
     @ObservationIgnored private var lastCursorTime = -1.0
+    @ObservationIgnored private var lastSpanStart = -1.0
+    /// Pulso pulsado (extremo fijo del tramo) y pulso al que se arrastra o amplía (extremo móvil).
+    @ObservationIgnored private var spanAnchor: TabSpan?
+    @ObservationIgnored private var spanHead: TabSpan?
     @ObservationIgnored private var keyToken: Any?
     @ObservationIgnored private var terminateToken: NSObjectProtocol?
 
@@ -116,6 +135,7 @@ final class TabController {
         self.ctl = ctl
         self.modelStore = modelStore
         host.onEvent = { [weak self] in self?.handle($0) }
+        ctl.onMixChanged = { [weak self] in self?.syncSynthMix() }
         terminateToken = NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification,
                                                                 object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.saveNow() }
@@ -147,7 +167,12 @@ final class TabController {
         return "\(meter) · \(Int(bpm.rounded())) BPM"
     }
 
-    func source(of id: String) -> TabSource? { sources.first { $0.id == id } }
+    /// Stem de una pista: el suyo, o el de voz si es una pista `vocal` y el proyecto lo tiene; nil = pista extra.
+    func source(of id: String) -> TabSource? {
+        if let s = sources.first(where: { $0.id == id }) { return s }
+        guard let vocalSource, score?.tracks.first(where: { $0.id == id })?.kind == .vocal else { return nil }
+        return vocalSource
+    }
 
     // MARK: Apertura y transcripción
 
@@ -164,7 +189,9 @@ final class TabController {
         guard let g = session.beats else { phase = .waitingAnalysis; started = false; return }
         let times = BeatTimes(beats: g.beats, downbeats: g.downbeats, beatsPerBar: g.beatsPerBar)
         let folder = layout.folder
-        sources = session.project.tabSources { FileManager.default.fileExists(atPath: folder.appendingPathComponent($0).path) }
+        let exists = { (path: String) in FileManager.default.fileExists(atPath: folder.appendingPathComponent(path).path) }
+        sources = session.project.tabSources(fileExists: exists)
+        vocalSource = session.project.vocalTabSource(fileExists: exists)
         guard !sources.isEmpty else { phase = .empty; return }
         guard let choice = session.project.tabSource else { askForSource(); return }
         do {
@@ -207,7 +234,7 @@ final class TabController {
             score.tracks += kept
             // Los nombres editados de las guitarras se aplican sin transcribir.
             for i in score.tracks.indices {
-                if let s = source(of: score.tracks[i].id) { score.tracks[i].name = s.name }
+                if let s = sources.first(where: { $0.id == score.tracks[i].id }) { score.tracks[i].name = s.name }
             }
             editor = TabEditor(score: score)
             queued = needs
@@ -225,6 +252,7 @@ final class TabController {
             phase = .ready
             sortTracks()
             pushScore()
+            listenExtras()
             saveNow()
         } catch is CancellationError {
             started = false
@@ -240,7 +268,7 @@ final class TabController {
         var shifted = 0, dropped = 0
         for id in ids {
             try Task.checkCancellation()
-            guard let s = source(of: id), let fp = fingerprints[id] else { continue }
+            guard let s = sources.first(where: { $0.id == id }), let fp = fingerprints[id] else { continue }
             let url = layout.url(relative: s.relativePath)
             progress[id] = 0
             guard var current = editor else { return }
@@ -256,6 +284,8 @@ final class TabController {
                 let onsets = DrumCymbalSeries.refine(hits).compactMap { h in DrumPiece(rawValue: h.midi).map { DrumOnset(time: h.time, piece: $0) } }
                 let track = TabTrackBuilder.drumTrack(id: id, name: s.name, source: fp, onsets: onsets, in: current.score)
                 current = replace(track, in: current)
+            case .vocal:
+                continue   // las voces no se transcriben: vienen de Songsterr
             case .guitar, .bass:
                 if pitched == nil {
                     let m = try await modelStore.ensureInstalled(ModelCatalog.transcriptionBasicPitch.id) { _ in }
@@ -303,7 +333,9 @@ final class TabController {
     }
 
     private func refreshEntries() {
-        entries = (editor?.score.tracks ?? []).map { Entry(id: $0.id, name: $0.name, kind: $0.kind) }
+        let tracks = editor?.score.tracks ?? []
+        let names = editor?.score.trackDisplayNames ?? []   // nombre vacío → instrumento (Fase 5c, decisión 5)
+        entries = tracks.enumerated().map { Entry(id: $1.id, name: names[$0], kind: $1.kind) }
     }
 
     static func modelVersion(of kind: TabSource.Kind) -> String {
@@ -426,6 +458,7 @@ final class TabController {
         case .guitar: .guitar
         case .bass: .bass
         case .drums: .drums
+        case .vocal: .vocal
         }
     }
 
@@ -602,17 +635,27 @@ final class TabController {
             lastCursorTime = -1   // tras cada pintado el cursor se vuelve a colocar (y a mostrar)
             webError = nil
             updateSelectionMarker()
+            updateRangeMarker()
         case .error(let m): webError = m
-        case .beatClick(let track, let bar, let beat):
+        case .beatClick(let track, let bar, let beat, let shift):
             guard let ref = alpha?.ref(track: track, bar: bar, beat: beat), alpha?.trackIDs[track] == selectedTrackID,
                   let id = selectedTrackID else { return }
+            // ⇧clic con un pulso ya pulsado: amplía el tramo hasta aquí.
+            if shift, spanAnchor != nil { extendSpan(to: ref); return }
+            clearSpan()
+            spanAnchor = Self.span(of: ref)
             // Mismo pulso ya seleccionado: no se toca la selección (ni su cuerda), pero el clic salta otra vez.
             if selection?.trackID == id, selection?.point == ref.start {
                 if let score { ctl.seek(to: min(max(score.time(of: ref.start), 0), ctl.duration)) }
                 return
             }
             select(id, ref.start, string: selection?.string)
-        case .noteClick(let track, let bar, let beat, let s, _):
+        case .beatDrag(let track, let bar, let beat):
+            guard spanAnchor != nil, let ref = alpha?.ref(track: track, bar: bar, beat: beat),
+                  alpha?.trackIDs[track] == selectedTrackID else { return }
+            extendSpan(to: ref)
+        case .noteClick(let track, let bar, let beat, let s, _, let shift):
+            guard !shift else { return }   // el ⇧clic sobre una nota ya lo trata `beatClick`
             guard let ref = alpha?.ref(track: track, bar: bar, beat: beat), alpha?.trackIDs[track] == selectedTrackID,
                   let id = selectedTrackID, let tuning = selectedTrack?.tuning else { return }
             select(id, ref.start, string: AlphaTabExporter.scoreString(forJSONString: s, stringCount: tuning.strings.count))
@@ -635,6 +678,8 @@ final class TabController {
 
     private func trackChanged() {
         selection = nil
+        clearSpan()
+        spanAnchor = nil
         guard let id = selectedTrackID, let a = alpha, let i = a.trackIDs.firstIndex(of: id) else { return }
         host.load(json: a.json, track: i)
     }
@@ -653,6 +698,85 @@ final class TabController {
         let b = score.bars[bar]
         let local = sel.point.absoluteTick - b.firstBeat * TabScore.ticksPerBeat
         host.setSelection(bar: bar, fraction: Double(local) / Double(b.beatCount * TabScore.ticksPerBeat))
+    }
+
+    // MARK: Tramo y bucle (decisión 3)
+
+    private static func span(of ref: AlphaTabBeatRef) -> TabSpan {
+        TabSpan(startTick: ref.start.absoluteTick, endTick: ref.start.absoluteTick + max(ref.length, 1))
+    }
+
+    /// Amplía el tramo desde el pulso pulsado hasta `ref` y lo pone como bucle.
+    private func extendSpan(to ref: AlphaTabBeatRef) {
+        guard let anchor = spanAnchor else { return }
+        let head = Self.span(of: ref)
+        spanHead = head
+        setSpan(anchor.union(head))
+    }
+
+    private func setSpan(_ new: TabSpan) {
+        guard new != span else { return }
+        let first = span == nil
+        span = new
+        guard let score, let range = score.timeRange(of: new) else { return }
+        let upper = min(range.upperBound, ctl.duration)
+        guard upper > range.lowerBound else { return }
+        let startChanged = first || lastSpanStart != range.lowerBound
+        lastSpanStart = range.lowerBound
+        ctl.setLoop(range.lowerBound...upper, name: Self.spanLoopName)
+        if startChanged { ctl.seek(to: range.lowerBound) }
+    }
+
+    /// ⇧← / ⇧→: mueve el extremo móvil del tramo un pulso (en edición también).
+    func extendSpan(forward: Bool) {
+        guard let id = selectedTrackID, let alpha, let ti = alpha.trackIDs.firstIndex(of: id), let score else { return }
+        let refs = alpha.beats[ti].flatMap { $0 }.sorted { $0.start < $1.start }
+        if spanAnchor == nil {
+            // Sin pulso pulsado: parte del punto seleccionado (o del cursor de reproducción).
+            let point = selection?.trackID == id ? selection?.point
+                                                 : score.tracks.first { $0.id == id }.map { score.nearestPoint(to: ctl.player.currentTime, in: $0) }
+            guard let p = point?.absoluteTick,
+                  let ref = refs.last(where: { $0.start.absoluteTick <= p }) ?? refs.first else { return }
+            spanAnchor = Self.span(of: ref)
+        }
+        guard let anchor = spanAnchor else { return }
+        let head = spanHead ?? anchor
+        let next = forward ? refs.first { $0.start.absoluteTick >= head.endTick }
+                           : refs.last { $0.start.absoluteTick < head.startTick }
+        guard let next else { return }
+        extendSpan(to: next)
+    }
+
+    /// Quita el tramo y, si el bucle activo era el suyo, también el bucle (Esc, «Sin bucle», cambio de pista).
+    func clearSpan() {
+        spanHead = nil
+        span = nil
+        if ctl.loopName == Self.spanLoopName { ctl.setLoop(nil) }
+    }
+
+    /// El bucle activo ya no es el del tramo (se eligió otro o ninguno): se quita solo el resaltado.
+    func loopChanged() {
+        guard span != nil, ctl.loopName != Self.spanLoopName else { return }
+        spanHead = nil
+        spanAnchor = nil
+        span = nil
+    }
+
+    /// «Selección» en el menú de bucle: vuelve a poner el bucle del tramo y salta a su inicio.
+    func applySpanLoop() {
+        guard let span, let score, let range = score.timeRange(of: span) else { return }
+        let upper = min(range.upperBound, ctl.duration)
+        guard upper > range.lowerBound else { return }
+        ctl.setLoop(range.lowerBound...upper, name: Self.spanLoopName)
+        ctl.seek(to: range.lowerBound)
+    }
+
+    private func updateRangeMarker() {
+        guard let span, let score, let a = score.barPosition(ofTick: span.startTick),
+              let b = score.barPosition(ofTick: span.endTick, asEnd: true) else {
+            host.setRange(startBar: -1, startFraction: 0, endBar: -1, endFraction: 0); return
+        }
+        host.setRange(startBar: a.bar, startFraction: a.fraction, endBar: b.bar, endFraction: b.fraction)
     }
 
     // MARK: Selección
@@ -743,6 +867,7 @@ final class TabController {
         case .stringOccupied: "Ya hay una nota en esa cuerda en ese punto."
         case .invalidPosition: "Esa posición no está en la rejilla de la pista."
         case .invalidDuration: "Esa duración no cabe."
+        case .noTieOrigin: "No hay una nota anterior igual en esa cuerda a la que ligarla."
         }
     }
 
@@ -781,7 +906,9 @@ final class TabController {
             fret = last.value * 10 + d
         }
         lastDigit = (d, Date())
-        if let n = selectedNote {
+        if graceMode, let n = selectedNote, !n.techniques.graces.isEmpty {
+            edit { try $0.setGraceFret(fret, trackID: track.id, noteID: n.id) }
+        } else if let n = selectedNote {
             edit { try $0.setFret(fret, trackID: track.id, noteID: n.id) }
         } else {
             let dur = step(at: sel.point, in: track)
@@ -827,6 +954,23 @@ final class TabController {
         guard let sel = selection, let track = selectedTrack, track.kind == .drums else { return }
         let present = !track.hits.contains { $0.piece == piece && $0.at == sel.point }   // también el golpe fantasma
         edit { try $0.setHit(piece, at: sel.point, present: present, trackID: track.id) }
+    }
+
+    /// Teclas de adornos (decisión 6 de la Fase 5c): conmuta `ornament` en todas las notas (o golpes de batería) del
+    /// tramo seleccionado o, sin tramo, en la nota (o los golpes) del punto seleccionado. Se guarda, se redibuja y
+    /// vuelve a sintetizar la pista si se oye (`commit`). Las pistas de voz no tienen cuerdas: no hacen nada.
+    func toggleOrnament(_ ornament: TabOrnament) {
+        guard let track = selectedTrack, track.kind != .vocal, let e = editor else { return }
+        if track.kind == .drums {
+            let points = span.map { e.hitPoints(in: $0, trackID: track.id) } ?? selection.map { [$0.point] } ?? []
+            guard !points.isEmpty else { showFlash("No hay golpes seleccionados."); return }
+            edit { try $0.toggle(ornament, trackID: track.id, hitPoints: points) }
+        } else {
+            let ids = span.map { e.noteIDs(in: $0, trackID: track.id) } ?? selectedNote.map { [$0.id] } ?? []
+            guard !ids.isEmpty else { showFlash("No hay ninguna nota seleccionada."); return }
+            edit { try $0.toggle(ornament, trackID: track.id, noteIDs: ids) }
+            graceMode = ornament == .grace && selectedNote?.techniques.graces.isEmpty == false
+        }
     }
 
     /// «Añadir nota»: en el punto de la rejilla más cercano al cursor de reproducción, traste 0 en la cuerda elegida.
@@ -915,17 +1059,26 @@ final class TabController {
     }
 
     private func handleKey(_ e: NSEvent) -> Bool {
-        guard editMode, phase == .ready, !(NSApp.keyWindow?.firstResponder is NSText) else { return false }
+        guard phase == .ready, !(NSApp.keyWindow?.firstResponder is NSText) else { return false }
         let mods = e.modifierFlags.intersection([.command, .control, .option, .shift])
         let ch = e.charactersIgnoringModifiers ?? ""
+        // Esc quita el tramo seleccionado y su bucle, en lectura y en edición.
+        if e.keyCode == 53, mods.isEmpty, span != nil { clearSpan(); return true }
+        guard editMode else { return false }
+        if graceMode, !(e.keyCode == 51 || e.keyCode == 117 || ch.lowercased() == "g" || (mods.isEmpty && Int(ch) != nil)) {
+            graceMode = false
+        }
         if mods == .command, ch == "z" { undo(); return true }
         if mods == [.command, .shift], ch == "z" { redo(); return true }
+        if mods == .option, ch.lowercased() == "y", selectedTrack?.kind != .drums {
+            toggleOrnament(.artificialHarmonic); return true
+        }
         guard mods.isEmpty || mods == .shift else { return false }
         switch e.keyCode {
         case 126: moveString(up: true); return true
         case 125: moveString(up: false); return true
-        case 123: moveSelection(forward: false); return true
-        case 124: moveSelection(forward: true); return true
+        case 123: if mods == .shift { extendSpan(forward: false) } else { moveSelection(forward: false) }; return true
+        case 124: if mods == .shift { extendSpan(forward: true) } else { moveSelection(forward: true) }; return true
         case 51, 117: deleteSelection(); return true
         case 53: selection = nil; return true
         default: break
@@ -946,7 +1099,45 @@ final class TabController {
             default: break
             }
         }
+        if let o = Self.ornament(forKey: ch, shift: mods == .shift, drums: selectedTrack?.kind == .drums) {
+            toggleOrnament(o); return true
+        }
         return false
+    }
+
+    /// Tabla «Teclas (modo edición)» de la Fase 5c. En batería solo valen F, O, `;` y `:` (B C H T P son golpes y se
+    /// tratan antes); en pistas de guitarra y bajo, el resto. Las letras van sin ⇧, salvo ⇧D y ⇧U; los signos valen con
+    /// o sin ⇧ (según el teclado).
+    static func ornament(forKey ch: String, shift: Bool, drums: Bool) -> TabOrnament? {
+        switch ch {
+        case ";": return .accent
+        case ":": return .heavyAccent
+        case "o": return shift ? nil : .ghost
+        default: break
+        }
+        if drums { return ch == "f" && !shift ? .flam : nil }
+        switch ch {
+        case "!": return .staccato
+        case ")": return .tapping
+        case "D": return .pickDown
+        case "U": return .pickUp
+        default: break
+        }
+        if shift { return nil }
+        switch ch {
+        case "p": return .palmMute
+        case "i": return .letRing
+        case "h": return .hammerPull
+        case "s": return .slide
+        case "b": return .bend
+        case "v": return .vibrato
+        case "w": return .whammyVibrato
+        case "x": return .dead
+        case "y": return .naturalHarmonic
+        case "g": return .grace
+        case "l": return .tie
+        default: return nil
+        }
     }
 
     // MARK: Oír transcripción
@@ -968,15 +1159,95 @@ final class TabController {
         } else {
             listening.remove(trackID)
             synthTasks[trackID]?.cancel()
-            if let src { ctl.setSubstituted(src.playerTrackID, false) }
-            ctl.setExtraMuted(Self.synthPlayerID(trackID), true)
+            // Con varias pistas de voz sobre el mismo stem, este solo vuelve a sonar cuando ninguna está en transcripción.
+            if let src { ctl.setSubstituted(src.playerTrackID, stemStaysSubstituted(src)) }
+            syncSynthMix()
         }
+    }
+
+    private func stemStaysSubstituted(_ src: TabSource) -> Bool {
+        entries.contains { listening.contains($0.id) && synth[$0.id] == .ready && source(of: $0.id)?.id == src.id }
     }
 
     private func activateSynth(_ trackID: String, _ src: TabSource?) {
         guard listening.contains(trackID) else { return }
         if let src { ctl.setSubstituted(src.playerTrackID, true) }
-        ctl.setExtraMuted(Self.synthPlayerID(trackID), false)
+        syncSynthMix()
+    }
+
+    // MARK: Mute y solo por pista (decisión 2) y selector global (decisión 2b)
+
+    private func mixState(_ trackID: String) -> (muted: Bool, solo: Bool) {
+        if let src = source(of: trackID), let m = ctl.mix(ofPlayerTrack: src.playerTrackID) { return (m.muted, m.solo) }
+        return (extraMuted.contains(trackID), extraSolo.contains(trackID))
+    }
+
+    func isMuted(_ trackID: String) -> Bool { mixState(trackID).muted }
+    func isSolo(_ trackID: String) -> Bool { mixState(trackID).solo }
+    var anySolo: Bool { ctl.anyStemSolo || !extraSolo.isEmpty }
+    /// Misma regla de atenuación que el mezclador de Backing.
+    func isDimmed(_ trackID: String) -> Bool { isMuted(trackID) || (anySolo && !isSolo(trackID)) }
+
+    func toggleMute(trackID: String) {
+        if let src = source(of: trackID) { ctl.toggleMute(playerTrack: src.playerTrackID); return }
+        if extraMuted.contains(trackID) { extraMuted.remove(trackID) } else { extraMuted.insert(trackID) }
+        syncSynthMix()
+    }
+
+    func toggleSolo(trackID: String) {
+        if let src = source(of: trackID) { ctl.toggleSolo(playerTrack: src.playerTrackID); return }
+        if extraSolo.contains(trackID) { extraSolo.remove(trackID) } else { extraSolo.insert(trackID) }
+        syncSynthMix()
+    }
+
+    /// La síntesis de cada pista sigue la mezcla de su pista: suena solo con «Oír transcripción», con su mute y su solo.
+    /// (El stem sustituido lo mantiene silenciado `BackingController`.)
+    func syncSynthMix() {
+        for extra in ctl.extraTracks {
+            let tid = String(extra.id.dropFirst(4))
+            let m = mixState(tid)
+            ctl.setExtraMuted(extra.id, !listening.contains(tid) || m.muted)
+            ctl.player.setSolo(extra.id, m.solo)
+        }
+    }
+
+    enum ListenMode: Equatable { case stems, transcription, mixed }
+
+    /// Estado del selector «Stems / Transcripción» (decisión 2b): «Stems» = las pistas con stem suenan su stem y las extra
+    /// su síntesis; «Transcripción» = todas su síntesis; cualquier otra combinación es mixta.
+    var listenMode: ListenMode {
+        let withStem = entries.filter { source(of: $0.id) != nil }
+        let extras = entries.filter { source(of: $0.id) == nil }
+        let stemsOn = withStem.filter { listening.contains($0.id) }.count
+        let extrasOn = extras.allSatisfy { listening.contains($0.id) }
+        if entries.isEmpty { return .stems }
+        if stemsOn == withStem.count && extrasOn { return .transcription }
+        if stemsOn == 0 && extrasOn { return .stems }
+        return .mixed
+    }
+
+    /// «Transcripción»: todas las pistas a su síntesis. «Stems»: las pistas con stem a su stem y las extra (que no
+    /// tienen stem) a su síntesis; para callar una extra basta su M. Las síntesis que faltan se pintan en segundo plano
+    /// (`synthProgress`).
+    func setAllListening(_ on: Bool) {
+        for e in entries {
+            let target = on || source(of: e.id) == nil
+            if target != listening.contains(e.id) { setListening(target, trackID: e.id) }
+        }
+    }
+
+    /// Estado inicial de «Stems» (decisión 2b): las pistas extra (sin stem) suenan siempre con su síntesis. Se aplica al
+    /// quedar lista la partitura; `restart()` (cambio de fuente o de emparejamiento) vacía `listening` y vuelve a pasar
+    /// por aquí, así una pista que gana stem vuelve a su stem y una que lo pierde pasa a su síntesis.
+    private func listenExtras() {
+        for e in entries where source(of: e.id) == nil && !listening.contains(e.id) { setListening(true, trackID: e.id) }
+    }
+
+    /// Pistas oídas con su síntesis lista y total de las oídas, mientras alguna se está pintando.
+    var synthProgress: (done: Int, total: Int)? {
+        let heard = entries.map(\.id).filter { listening.contains($0) }
+        guard heard.contains(where: { synth[$0] == .rendering }) else { return nil }
+        return (heard.filter { synth[$0] == .ready }.count, heard.count)
     }
 
     private func scheduleSynth(_ trackID: String) {
@@ -1027,8 +1298,8 @@ final class TabController {
         let playing = ctl.isPlaying
         ctl.loadTracks()
         ctl.seek(to: t)
-        // Las demás pistas extra que no se oyen quedan silenciadas.
-        for extra in ctl.extraTracks where !listening.contains(String(extra.id.dropFirst(4))) { ctl.setExtraMuted(extra.id, true) }
+        // Las demás pistas extra que no se oyen quedan silenciadas; mute y solo de cada una se reaplican.
+        syncSynthMix()
         for tid in listening { if let s = source(of: tid) { ctl.setSubstituted(s.playerTrackID, true) } }
         if playing { ctl.togglePlay() }
     }

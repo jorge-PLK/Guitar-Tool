@@ -55,6 +55,7 @@ enum SongsterrScorePlacement {
 
         var out = score
         var reports: [SongsterrTrackPlacement] = []
+        let names = SongsterrTrack.resolvedNames(tracks)
         for (i, t) in tracks.enumerated() {
             var report = SongsterrTrackPlacement(id: trackID(i))
             if t.kind == .drums {
@@ -69,7 +70,7 @@ enum SongsterrScorePlacement {
                     onsets.append(DrumOnset(time: at, piece: h.piece, ghost: h.ghost, grace: h.grace,
                                              accent: h.accent))
                 }
-                out.upsert(TabTrackBuilder.drumTrack(id: report.id, name: t.name, source: nil, onsets: onsets, in: score))
+                out.upsert(TabTrackBuilder.drumTrack(id: report.id, name: names[i], source: nil, onsets: onsets, in: score))
                 reports.append(report)
                 continue
             }
@@ -85,14 +86,17 @@ enum SongsterrScorePlacement {
                 }
                 let qEnd = SongsterrAligner.quarters(n.start + n.duration)
                 let off = time(placement.gridBeat(q: qEnd, bar: n.bar), allowEnd: true) ?? score.endTime
-                placed.append(Placed(start: on, end: off, string: n.string, pitch: n.pitch, techniques: n.techniques))
+                // Voz: sin cuerdas (la altura MIDI es lo que cuenta), todas en la 1.
+                placed.append(Placed(start: on, end: off, string: t.kind == .vocal ? 1 : n.string, pitch: n.pitch,
+                                     techniques: n.techniques))
             }
             let subdivisions = score.chooseSubdivisions(onsets: placed.map(\.start))
             var byStart: [Int: [(string: Int, pitch: Int, end: Int, techniques: TabTechniques)]] = [:]
             for p in placed {
                 let start = score.snapTick(p.start, subdivisions: subdivisions, allowEnd: false, times: times)
                 let end = score.snapTick(p.end, subdivisions: subdivisions, allowEnd: true, times: times)
-                if byStart[start]?.contains(where: { $0.string == p.string }) == true {
+                // En una voz, «misma cuerda» es misma altura.
+                if byStart[start]?.contains(where: { $0.string == p.string && (t.kind != .vocal || $0.pitch == p.pitch) }) == true {
                     report.mergedOnGrid += 1
                     continue
                 }
@@ -111,10 +115,13 @@ enum SongsterrScorePlacement {
                 }
             }
             // La batería nunca tiene afinación (ni «Personalizada»); solo cuerdas.
-            let tuning: Tuning? = t.kind == .drums ? nil : (t.tuning ?? Tuning.custom(strings: t.tuningStrings))
-            report.customTuning = t.kind != .drums && t.tuning == nil
-            var track = TabTrack(id: report.id, name: t.name, kind: t.kind, tuning: tuning, source: nil,
-                                 subdivisions: subdivisions, notes: notes)
+            // La voz tampoco: solo pentagrama.
+            let hasStrings = t.kind == .guitar || t.kind == .bass
+            let tuning: Tuning? = hasStrings ? (t.tuning ?? Tuning.custom(strings: t.tuningStrings)) : nil
+            report.customTuning = hasStrings && t.tuning == nil
+            var track = TabTrack(id: report.id, name: names[i], kind: t.kind, tuning: tuning, source: nil,
+                                 subdivisions: subdivisions, notes: notes,
+                                 program: t.kind == .vocal ? t.instrumentId : nil)
             track.sortContents()
             for j in track.notes.indices { track.notes[j].id = j + 1 }
             out.upsert(track)

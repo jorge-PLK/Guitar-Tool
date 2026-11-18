@@ -18,3 +18,4 @@ Una línea por ADR; el texto está en `docs/adr/ADR-NNN.md`. Nuevo ADR = fichero
 - [ADR-014](adr/ADR-014.md) · 2026-11-16 · Cierre de la Fase 4: guitarras y secciones (modelo lead/rhythm, tres opciones de guitarra, solo como sección)
 - [ADR-016](adr/ADR-016.md) · 2026-11-16 · Cierre de la Fase 5: tablatura (alphaTab embebido, ADTOF para batería, Guitar Pro 8 comprobado; guitarra insuficiente, pasa a la Fase 5b)
 - [ADR-017](adr/ADR-017.md) · 2026-11-17 · Cierre de la Fase 5b: tablatura de Songsterr como fuente por defecto (elige Jorge con vista previa, metrónomo de Songsterr, adornos; la interfaz pasa a la Fase 5c)
+- [ADR-019](adr/ADR-019.md) · 2026-11-18 · Cierre de la Fase 5c: interfaz de la tablatura (voces como pista `vocal` ligada al stem, adornos con teclado, ligadura, mute/solo, bucle por selección; sin prueba manual de Jorge)

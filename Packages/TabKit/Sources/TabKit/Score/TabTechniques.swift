@@ -46,6 +46,9 @@ public struct TabTechniques: Codable, Sendable, Equatable {
     /// la de esta nota). Las de otra cuerda sin nota principal en la suya (rastrillos) van en la nota del acorde de la
     /// cuerda más cercana. Las de todas las notas del acorde con el mismo `step` forman un beat de adorno.
     public var graces: [TabGrace] = []
+    /// Ligadura de duración (Fase 5c, tecla L): esta nota es la continuación de la anterior de la misma cuerda y altura
+    /// (`Note.isTieDestination`); no vuelve a atacarse. Aditivo: en el JSON solo si es true.
+    public var tieDestination = false
 
     public init() {}
 
@@ -79,7 +82,7 @@ public struct TabTechniques: Codable, Sendable, Equatable {
     /// `grace`: la nota de adorno única de antes (Fase 5b, primera versión), que se sigue leyendo como `graces` de una.
     private enum CodingKeys: String, CodingKey {
         case palmMute, letRing, vibrato, bend, slideIn, slideOut, hammerPull, harmonic, dead, ghost, accent, staccato
-        case tapping, tremoloPicking, whammy, pickStroke, brush, graces, grace
+        case tapping, tremoloPicking, whammy, pickStroke, brush, graces, grace, tieDestination
     }
 
     public init(from decoder: Decoder) throws {
@@ -103,6 +106,7 @@ public struct TabTechniques: Codable, Sendable, Equatable {
         brush = try c.decodeIfPresent(TabStrokeDirection.self, forKey: .brush)
         graces = try c.decodeIfPresent([TabGrace].self, forKey: .graces)
             ?? (try c.decodeIfPresent(TabGrace.self, forKey: .grace)).map { [$0] } ?? []
+        tieDestination = try c.decodeIfPresent(Bool.self, forKey: .tieDestination) ?? false
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -126,6 +130,7 @@ public struct TabTechniques: Codable, Sendable, Equatable {
         try c.encodeIfPresent(pickStroke, forKey: .pickStroke)
         try c.encodeIfPresent(brush, forKey: .brush)
         if !graces.isEmpty { try c.encode(graces, forKey: .graces) }
+        try flag(tieDestination, .tieDestination)
     }
 }
 

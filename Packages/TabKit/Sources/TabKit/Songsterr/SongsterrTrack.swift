@@ -28,12 +28,17 @@ public struct SongsterrTrack: Codable, Sendable, Equatable {
     public var hits: [SongsterrHit]
     public var report: SongsterrImportReport
 
+    /// Un nombre por pista (mismo orden), con la regla de `TabTrackNames` (mini-spec Fase 5c, decisión 5).
+    public static func resolvedNames(_ tracks: [SongsterrTrack]) -> [String] {
+        TabTrackNames.resolve(tracks.map { (name: $0.name, kind: $0.kind) })
+    }
+
     /// Final del último compás en ticks.
     public var totalTicks: Int { bars.last.map { $0.start + $0.length } ?? 0 }
 
     /// La afinación de `TabKit` que coincide con `tuningStrings` (guitarra o bajo); nil si no es ningún preset.
     public var tuning: Tuning? {
-        guard kind != .drums else { return nil }
+        guard kind == .guitar || kind == .bass else { return nil }
         return TuningPreset.fixed
             .map { kind == .bass ? Tuning.bass($0) : Tuning.guitar($0) }
             .first { $0.strings == tuningStrings }

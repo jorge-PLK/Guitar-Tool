@@ -37,6 +37,18 @@ final class TabSourcesTests: XCTestCase {
         XCTAssertEqual(p.tabSources { $0 != "stems/drums.wav" }.map(\.id), ["guitar", "bass"])
     }
 
+    func testVocalSourceIsApartFromTabSourcesAndNeedsAFile() {
+        let p = project(guitars: [], stems: allStems)
+        XCTAssertFalse(p.tabSources { _ in true }.contains { $0.kind == .vocal })
+        let v = p.vocalTabSource { _ in true }
+        XCTAssertEqual(v?.playerTrackID, "vocals")
+        XCTAssertEqual(v?.relativePath, "stems/vocals.wav")
+        XCTAssertNil(p.vocalTabSource { $0 != "stems/vocals.wav" })
+        var empty = allStems
+        empty[3].isEmpty = true
+        XCTAssertNil(project(guitars: [], stems: empty).vocalTabSource { _ in true })
+    }
+
     func testTabPathsAndCleanup() throws {
         let dir = try makeTempDir("tabclean")
         let layout = ProjectLayout(folder: dir)

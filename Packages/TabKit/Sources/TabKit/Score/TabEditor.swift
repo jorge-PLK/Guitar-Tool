@@ -13,6 +13,8 @@ public enum TabEditError: Error, Equatable, Sendable {
     case invalidPosition
     /// Duración ≤ 0, más allá del final o acabando fuera de un punto de la rejilla.
     case invalidDuration
+    /// Ligadura de duración sin una nota anterior de la misma cuerda y altura que acabe donde empieza esta.
+    case noTieOrigin
 }
 
 /// Edición de una `TabScore` con deshacer y rehacer (mini-spec Fase 5, decisión 4). Cada operación guarda la pista
@@ -101,7 +103,7 @@ public struct TabEditor: Sendable {
     public mutating func setTuning(_ tuning: Tuning, trackID: String) throws -> TabBuildReport {
         var report = TabBuildReport()
         try edit(trackID: trackID) { track in
-            guard track.kind != .drums else { throw TabEditError.wrongTrackKind }
+            guard track.kind == .guitar || track.kind == .bass else { throw TabEditError.wrongTrackKind }
             (track, report) = TabTrackBuilder.retuned(track, to: tuning)
         }
         return report
@@ -147,7 +149,7 @@ public struct TabEditor: Sendable {
 
     // MARK: Internos
 
-    private mutating func edit(trackID: String, _ body: (inout TabTrack) throws -> Void) throws {
+    mutating func edit(trackID: String, _ body: (inout TabTrack) throws -> Void) throws {
         guard let i = score.trackIndex(id: trackID) else { throw TabEditError.unknownTrack }
         var track = score.tracks[i]
         try body(&track)

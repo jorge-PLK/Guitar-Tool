@@ -2,7 +2,7 @@ import Foundation
 
 /// Pista de la tablatura según el estado actual del proyecto (mini-spec Fase 5, decisión 2).
 public struct TabSource: Sendable, Equatable {
-    public enum Kind: String, Sendable { case guitar, bass, drums }
+    public enum Kind: String, Sendable { case guitar, bass, drums, vocal }
 
     /// Estable entre aperturas: `guitar-rhythm`, `guitar-left`, `guitar-right`, `guitar-lead`, `guitar`, `bass`, `drums`.
     public var id: String
@@ -47,5 +47,13 @@ public extension Project {
                                  relativePath: s.file, playerTrackID: kind.rawValue))
         }
         return out
+    }
+
+    /// Stem de voz (`stems/vocals.wav`) al que van vinculadas las pistas `vocal` de Songsterr (mini-spec Fase 5c,
+    /// decisión 4). Va aparte de `tabSources`: no se transcribe ni se empareja, solo es lo que suena en «Stems».
+    /// nil si el proyecto no lo tiene (o está vacío): entonces las voces son pistas extra.
+    func vocalTabSource(fileExists: (String) -> Bool) -> TabSource? {
+        guard let s = stems.first(where: { $0.kind == .vocals && !$0.isEmpty }), fileExists(s.file) else { return nil }
+        return TabSource(id: "vocals", name: "Voz", kind: .vocal, relativePath: s.file, playerTrackID: StemKind.vocals.rawValue)
     }
 }

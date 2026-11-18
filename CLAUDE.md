@@ -4,8 +4,8 @@ App de escritorio para macOS (Swift/SwiftUI) que iguala el tono de un tema reamp
 
 ## Estado actual
 
-Fase 5b · Calidad de la tablatura (Songsterr por defecto) cerrada el 17/11/2026 (ADR-017); la 5 cerró el 16/11 (ADR-016).
-Siguiente: Fase 5c · Interfaz de la tablatura (rama desde `fase-5b`); la Fase 7 va en marcha en otra rama.
+Fase 5c · Interfaz de la tablatura cerrada el 18/11/2026 (ADR-019), sin prueba manual de Jorge: lo que salga va a la fase final de arreglos generales. Fusionada con fase-7 y llevada a main.
+Siguiente: fase final de arreglos generales.
 P1, P3 y P5 quedan para el comienzo de la Etapa 2.
 
 ## Contexto: leer solo lo que haga falta

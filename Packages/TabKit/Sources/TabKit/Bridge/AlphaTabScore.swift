@@ -44,17 +44,18 @@ public enum AlphaTabExporter {
     private struct JTech: Encodable {
         var pm: Bool?; var lr: Bool?; var hp: Bool?; var dead: Bool?; var ghost: Bool?; var stac: Bool?
         var vib: String?; var bend: JBend?; var sin: String?; var sout: String?
-        var harm: JHarmonic?; var acc: String?
+        var harm: JHarmonic?; var acc: String?; var tie: Bool?
 
         var isBlank: Bool {
             pm == nil && lr == nil && hp == nil && dead == nil && ghost == nil && stac == nil && vib == nil
-                && bend == nil && sin == nil && sout == nil && harm == nil && acc == nil
+                && bend == nil && sin == nil && sout == nil && harm == nil && acc == nil && tie == nil
         }
     }
     /// Figura por defecto de una nota de adorno (fusa, como en Guitar Pro).
     static let graceDefaultDuration = 32
 
-    private struct JNote: Encodable { var s: Int; var f: Int; var t: JTech? }
+    /// `p`: altura MIDI de las notas de voz (sin cuerda ni traste); las demás no la llevan.
+    private struct JNote: Encodable { var s: Int; var f: Int; var p: Int? = nil; var t: JTech? }
     private struct JBeat: Encodable {
         var d: Int
         var dots: Int?
@@ -78,6 +79,8 @@ public enum AlphaTabExporter {
         var name: String
         var kind: String
         var tuning: [Int]?
+        /// Programa GM (base 0) de una voz.
+        var program: Int?
         var bars: [[JBeat]]
     }
     private struct JScore: Encodable {
@@ -94,7 +97,8 @@ public enum AlphaTabExporter {
         }
         var jtracks: [JTrack] = []
         var maps: [[[AlphaTabBeatRef]]] = []
-        for track in score.tracks {
+        let names = score.trackDisplayNames
+        for (ti, track) in score.tracks.enumerated() {
             var jbars: [[JBeat]] = []
             var bmap: [[AlphaTabBeatRef]] = []
             for bar in score.bars {
@@ -102,8 +106,9 @@ public enum AlphaTabExporter {
                 jbars.append(jb)
                 bmap.append(refs)
             }
-            jtracks.append(JTrack(name: track.name, kind: track.kind.rawValue,
-                                  tuning: track.tuning.map { Array($0.strings.reversed()) }, bars: jbars))
+            jtracks.append(JTrack(name: names[ti], kind: track.kind.rawValue,
+                                  tuning: track.tuning.map { Array($0.strings.reversed()) },
+                                  program: track.kind == .vocal ? track.program : nil, bars: jbars))
             maps.append(bmap)
         }
         let encoder = JSONEncoder()
@@ -128,7 +133,7 @@ public enum AlphaTabExporter {
                      vib: t.vibrato?.rawValue, bend: t.bend.map(jBend), sin: t.slideIn?.rawValue,
                      sout: t.slideOut?.rawValue,
                      harm: t.harmonic.map { JHarmonic(type: $0.type.rawValue, fret: $0.fret) },
-                     acc: t.accent?.rawValue)
+                     acc: t.accent?.rawValue, tie: t.tieDestination ? true : nil)
         return j.isBlank ? nil : j
     }
 
@@ -179,7 +184,7 @@ public enum AlphaTabExporter {
         var beats: [JBeat] = []
         var refs: [AlphaTabBeatRef] = []
 
-        func emit(_ piece: Piece, at start: Int, notes: [(string: Int, fret: Int, id: Int, tech: TabTechniques)] = [],
+        func emit(_ piece: Piece, at start: Int, notes: [(string: Int, fret: Int, id: Int, tech: TabTechniques, pitch: Int?)] = [],
                   hits: [DrumPiece] = [], ghostHits: [DrumPiece] = [], accents: [DrumPiece: TabAccent] = [:],
                   drumGraces: [(piece: DrumPiece, grace: TabGrace)] = []) {
             // Notas de adorno: un beat de adorno por `step`, del más lejano al inmediatamente anterior, cada nota en su
@@ -216,7 +221,7 @@ public enum AlphaTabExporter {
             var jb = JBeat(d: piece.d, dots: piece.dots > 0 ? piece.dots : nil, tuplet: piece.tuplet)
             var ids: [Int: Int] = [:]
             if !notes.isEmpty {
-                jb.notes = notes.map { JNote(s: $0.string, f: $0.fret, t: jTech($0.tech)) }
+                jb.notes = notes.map { JNote(s: $0.string, f: $0.fret, p: $0.pitch, t: jTech($0.tech)) }
                 for n in notes { ids[n.string] = n.id }
                 let techs = notes.map(\.tech)
                 jb.tap = techs.contains { $0.tapping } ? true : nil
@@ -278,9 +283,11 @@ public enum AlphaTabExporter {
             }
             let piece = pickPiece(at: g.tick, atMost: max(wanted, 1), track: track)
             let count = track.tuning?.strings.count ?? 0
-            let notes = g.notes.sorted { $0.string > $1.string }.compactMap { n -> (string: Int, fret: Int, id: Int, tech: TabTechniques)? in
+            let notes = g.notes.sorted { track.kind == .vocal ? $0.pitch < $1.pitch : $0.string > $1.string }.compactMap { n -> (string: Int, fret: Int, id: Int, tech: TabTechniques, pitch: Int?)? in
+                // Voz: sin cuerdas ni trastes, solo la altura.
+                if track.kind == .vocal { return (0, 0, n.id, n.techniques, n.pitch) }
                 guard let fret = track.fret(of: n) else { return nil }
-                return (jsonString(forScoreString: n.string, stringCount: count), fret, n.id, n.techniques)
+                return (jsonString(forScoreString: n.string, stringCount: count), fret, n.id, n.techniques, nil)
             }
             emit(piece, at: g.tick, notes: notes, hits: g.hits.sorted { $0.rawValue < $1.rawValue },
                  ghostHits: g.ghosts.sorted { $0.rawValue < $1.rawValue }, accents: g.accents,

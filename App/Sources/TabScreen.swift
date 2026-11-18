@@ -185,6 +185,7 @@ struct TabContent: View {
     private func tablature(_ tab: TabController) -> some View {
         Card {
             VStack(alignment: .leading, spacing: 12) {
+                if !tab.entries.isEmpty { listenSelector(tab) }
                 trackTabs(tab)
                 if let track = tab.selectedTrack { trackControls(tab, track) }
                 ZStack {
@@ -208,6 +209,7 @@ struct TabContent: View {
             HStack(spacing: 8) {
                 ForEach(tab.entries) { e in
                     let active = e.id == tab.selectedTrackID
+                    HStack(spacing: 4) {
                     Button { tab.selectedTrackID = e.id } label: {
                         HStack(spacing: 6) {
                             Image(systemName: icon(e.kind)).font(.system(size: 12))
@@ -222,6 +224,12 @@ struct TabContent: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityAddTraits(active ? .isSelected : [])
+                    trackToggle("M", on: tab.isMuted(e.id), label: (tab.isMuted(e.id) ? "Activar " : "Silenciar ") + e.name) {
+                        tab.toggleMute(trackID: e.id)
+                    }
+                    trackToggle("S", on: tab.isSolo(e.id), label: "Solo " + e.name) { tab.toggleSolo(trackID: e.id) }
+                    }
+                    .opacity(tab.isDimmed(e.id) ? 0.55 : 1)
                 }
                 ForEach(pending, id: \.self) { id in
                     Text(tab.source(of: id)?.name ?? id)
@@ -233,11 +241,53 @@ struct TabContent: View {
         }
     }
 
+    /// M / S de una pista (mismo aspecto que el mezclador de Backing, más pequeño).
+    private func trackToggle(_ text: String, on: Bool, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(text).font(TF.body(11, .bold))
+                .foregroundStyle(on ? TF.accentInk : TF.text2)
+                .frame(width: 28, height: 28)
+                .background(on ? TF.accent : TF.field, in: RoundedRectangle(cornerRadius: 7))
+                .overlay(RoundedRectangle(cornerRadius: 7).stroke(on ? .clear : TF.fieldLine))
+        }
+        .buttonStyle(.plain).accessibilityLabel(label)
+    }
+
+    /// Selector «Stems / Transcripción» para todas las pistas (mini-spec Fase 5c, decisión 2b). Mixto: ninguna opción marcada.
+    private func listenSelector(_ tab: TabController) -> some View {
+        let mode = tab.listenMode
+        func option(_ title: String, _ on: Bool, _ target: Bool) -> some View {
+            Button { tab.setAllListening(target) } label: {
+                Text(title).font(TF.body(13, on ? .semibold : .medium))
+                    .foregroundStyle(on ? TF.accent : TF.text2)
+                    .padding(.horizontal, 14).frame(height: 30)
+                    .background(on ? TF.accentBg : TF.field, in: Capsule())
+                    .overlay(Capsule().stroke(on ? TF.accent : TF.fieldLine))
+            }
+            .buttonStyle(.plain).accessibilityAddTraits(on ? .isSelected : [])
+        }
+        return HStack(spacing: 8) {
+            Text("Oír").foregroundStyle(TF.muted)
+            option("Stems", mode == .stems, false)
+            option("Transcripción", mode == .transcription, true)
+            if mode == .mixed { Text("Mixto").foregroundStyle(TF.muted) }
+            if let p = tab.synthProgress {
+                HStack(spacing: 6) {
+                    ProgressView().controlSize(.small)
+                    Text("Sintetizando \(p.done)/\(p.total)…").foregroundStyle(TF.muted)
+                }
+            }
+            Spacer()
+        }
+        .font(TF.body(13))
+    }
+
     private func icon(_ k: TabTrackKind) -> String {
         switch k {
         case .guitar: "guitars"
         case .bass: "waveform"
         case .drums: "circle.grid.2x2"
+        case .vocal: "mic"
         }
     }
 
@@ -406,7 +456,10 @@ struct TabContent: View {
 
     private func loopMenu(_ tab: TabController) -> some View {
         Menu {
-            Button("Sin bucle") { ctl.setLoop(nil) }
+            Button("Sin bucle") { tab.clearSpan(); ctl.setLoop(nil) }
+            if tab.span != nil {
+                Button(TabController.spanLoopName) { tab.applySpanLoop() }
+            }
             if let r = tab.selectedBarRange {
                 Button("Compás \(r.bar + 1)") { ctl.setLoop(r.range, name: "compás \(r.bar + 1)") }
             }
@@ -422,5 +475,6 @@ struct TabContent: View {
         }
         .menuStyle(.borderlessButton).fixedSize()
         .font(TF.body(13, .semibold)).foregroundStyle(ctl.loop == nil ? TF.text2 : TF.accent)
+        .onChange(of: ctl.loopName) { tab.loopChanged() }
     }
 }

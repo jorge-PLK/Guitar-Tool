@@ -9,8 +9,10 @@ final class AlphaTabHost: NSObject, WKScriptMessageHandler, WKNavigationDelegate
     enum Event: Equatable {
         case ready
         case rendered
-        case beatClick(track: Int, bar: Int, beat: Int)
-        case noteClick(track: Int, bar: Int, beat: Int, string: Int, fret: Int)
+        case beatClick(track: Int, bar: Int, beat: Int, shift: Bool)
+        /// Arrastre con el botón pulsado sobre otro pulso (selección de tramo).
+        case beatDrag(track: Int, bar: Int, beat: Int)
+        case noteClick(track: Int, bar: Int, beat: Int, string: Int, fret: Int, shift: Bool)
         case error(String)
     }
 
@@ -66,9 +68,12 @@ final class AlphaTabHost: NSObject, WKScriptMessageHandler, WKNavigationDelegate
         switch name {
         case "ready": isReady = true; onEvent?(.ready)
         case "rendered": onEvent?(.rendered)
-        case "beatClick": onEvent?(.beatClick(track: int("track"), bar: int("bar"), beat: int("beat")))
+        case "beatClick":
+            onEvent?(.beatClick(track: int("track"), bar: int("bar"), beat: int("beat"), shift: (b["shift"] as? Bool) ?? false))
+        case "beatDrag": onEvent?(.beatDrag(track: int("track"), bar: int("bar"), beat: int("beat")))
         case "noteClick":
-            onEvent?(.noteClick(track: int("track"), bar: int("bar"), beat: int("beat"), string: int("string"), fret: int("fret")))
+            onEvent?(.noteClick(track: int("track"), bar: int("bar"), beat: int("beat"), string: int("string"), fret: int("fret"),
+                                shift: (b["shift"] as? Bool) ?? false))
         case "error": onEvent?(.error(b["message"] as? String ?? "error de alphaTab"))
         default: break
         }
@@ -96,6 +101,11 @@ final class AlphaTabHost: NSObject, WKScriptMessageHandler, WKNavigationDelegate
     /// Marcador de selección en `bar` a `fraction` (0…1) del compás; `bar < 0` lo oculta.
     func setSelection(bar: Int, fraction: Double) {
         run("TF.setSelection(b, f)", ["b": bar, "f": fraction])
+    }
+
+    /// Resalta el tramo seleccionado de `startBar`/`startFraction` a `endBar`/`endFraction`; `startBar < 0` lo quita.
+    func setRange(startBar: Int, startFraction: Double, endBar: Int, endFraction: Double) {
+        run("TF.setRange(sb, sf, eb, ef)", ["sb": startBar, "sf": startFraction, "eb": endBar, "ef": endFraction])
     }
 
     /// `.gp` (Guitar Pro 7) de todas las pistas de la última partitura cargada.

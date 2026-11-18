@@ -339,7 +339,7 @@ public enum SongsterrAligner {
         switch t.kind {
         case .bass: return true
         case .guitar: return t.instrumentId.map { guitarPrograms.contains($0) } ?? true
-        case .drums: return false
+        case .drums, .vocal: return false
         }
     }
 
@@ -519,6 +519,7 @@ final class StemAnalysis {
         case .bass: return audio[.bass] != nil ? .bass : nil
         case .guitar: return audio[.guitar] != nil || Self.guitarParts.contains { audio[$0] != nil } ? .guitar : nil
         case .drums: return audio[.drums] != nil ? .drums : nil
+        case .vocal: return nil   // las voces no se miden contra ningún stem (Fase 5c, decisión 4)
         }
     }
 

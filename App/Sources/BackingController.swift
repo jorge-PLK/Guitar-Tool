@@ -22,6 +22,9 @@ final class BackingController {
     var extraTracks: [Track] = []
     /// Stems silenciados por la app sin tocar el mute guardado (Fase 5: «Oír transcripción» silencia el stem).
     private(set) var substitutedStems: Set<String> = []
+    /// Se llama tras cambiar mute o solo de un stem o una guitarra (Tablatura lo usa para que la síntesis de esa pista
+    /// siga la misma mezcla, Fase 5c decisión 2).
+    @ObservationIgnored var onMixChanged: (() -> Void)?
     /// Audio con el dispositivo (grabar y A/B); lo asigna la app al abrir el tema.
     @ObservationIgnored weak var audio: AudioController?
 
@@ -86,6 +89,7 @@ final class BackingController {
         applyPitch()
         player.loop = loop
         refreshMetronome()
+        onMixChanged?()   // las pistas extra (síntesis de Tablatura) reaplican su mute y su solo
     }
 
     /// Fase 5: silencia (o restaura) un stem del reproductor sin tocar la mezcla guardada del proyecto.
@@ -181,13 +185,15 @@ final class BackingController {
     func toggleMute(_ kind: StemKind) {
         let m = !session.mix(for: kind).muted
         session.updateMix(kind) { $0.muted = m }
-        player.setMute(kind.rawValue, kind == .guitar ? effectiveGuitarMute : m)
+        player.setMute(kind.rawValue, substitutedStems.contains(kind.rawValue) || (kind == .guitar ? effectiveGuitarMute : m))
+        onMixChanged?()
     }
 
     func toggleSolo(_ kind: StemKind) {
         let s = !session.mix(for: kind).solo
         session.updateMix(kind) { $0.solo = s }
         player.setSolo(kind.rawValue, s)
+        onMixChanged?()
     }
 
     // Pistas de guitarra (Fase 4): el mismo mezclador, con la mezcla guardada por papel.
@@ -201,14 +207,37 @@ final class BackingController {
     func toggleMute(guitar role: GuitarRole) {
         let m = !session.mix(forGuitar: role).muted
         session.updateMix(guitar: role) { $0.muted = m }
-        player.setMute(role.trackID, m)
+        player.setMute(role.trackID, substitutedStems.contains(role.trackID) || m)
+        onMixChanged?()
     }
 
     func toggleSolo(guitar role: GuitarRole) {
         let s = !session.mix(forGuitar: role).solo
         session.updateMix(guitar: role) { $0.solo = s }
         player.setSolo(role.trackID, s)
+        onMixChanged?()
     }
+
+    // Mezcla por id de canal del reproductor (Tablatura, Fase 5c decisión 2): la misma mezcla guardada que Backing.
+
+    private func guitarRole(ofPlayerTrack id: String) -> GuitarRole? { session.guitarTracks.first { $0.role.trackID == id }?.role }
+
+    /// Mezcla guardada del stem o la guitarra con ese canal; nil si no es un canal de estudio.
+    func mix(ofPlayerTrack id: String) -> StemMix? {
+        if let kind = StemKind(rawValue: id) { return session.mix(for: kind) }
+        return guitarRole(ofPlayerTrack: id).map { session.mix(forGuitar: $0) }
+    }
+
+    func toggleMute(playerTrack id: String) {
+        if let kind = StemKind(rawValue: id) { toggleMute(kind) } else if let r = guitarRole(ofPlayerTrack: id) { toggleMute(guitar: r) }
+    }
+
+    func toggleSolo(playerTrack id: String) {
+        if let kind = StemKind(rawValue: id) { toggleSolo(kind) } else if let r = guitarRole(ofPlayerTrack: id) { toggleSolo(guitar: r) }
+    }
+
+    /// Algún stem o guitarra en solo (la misma cuenta que el mezclador de Backing).
+    var anyStemSolo: Bool { session.study.mixer.contains { $0.solo } }
 
     /// Preajuste «Sin guitarras»: silencia el stem guitar (o todas las pistas separadas); otra pulsación lo restaura.
     var hasGuitar: Bool { session.audibleStems.contains(.guitar) }
