@@ -1,17 +1,23 @@
+#if canImport(Darwin)
 import Darwin
+#endif
 import Dispatch
+import NativePlatform
 import Synchronization
 
 /// Vigilante de memoria de un proceso hijo: cada `interval` lee su memoria con
 /// `proc_pid_rusage(RUSAGE_INFO_V4)` (máximo entre `phys_footprint` y residente, como
 /// Probes/P4-modelos/common/guard.py), guarda el pico y, si pasa de `limitBytes`, le manda SIGKILL.
+/// Windows: `max(PrivateUsage, WorkingSetSize)` de `GetProcessMemoryInfo` y `TerminateProcess` con
+/// `ChildProcess.killedExitCode` (137, el 128 + SIGKILL del Mac).
 public final class MemoryGuard: Sendable {
     /// Límite por defecto de un proceso pesado (guard.py: `--limit-gb 10`).
     public static let defaultLimitBytes: UInt64 = 10_000_000_000
     /// Periodo de sondeo de guard.py.
     public static let defaultInterval: Double = 0.5
 
-    public let pid: pid_t
+    /// `pid_t` en el Mac (= `Int32`).
+    public let pid: Int32
     public let limitBytes: UInt64
     public let interval: Double
 
@@ -24,7 +30,7 @@ public final class MemoryGuard: Sendable {
     private let onExceeded: (@Sendable (UInt64) -> Void)?
 
     /// - Parameter onExceeded: se llama una vez, tras el SIGKILL, con el pico medido.
-    public init(pid: pid_t, limitBytes: UInt64 = MemoryGuard.defaultLimitBytes,
+    public init(pid: Int32, limitBytes: UInt64 = MemoryGuard.defaultLimitBytes,
                 interval: Double = MemoryGuard.defaultInterval,
                 onExceeded: (@Sendable (UInt64) -> Void)? = nil) {
         self.pid = pid
@@ -37,20 +43,24 @@ public final class MemoryGuard: Sendable {
 
     /// Empieza a sondear (la primera lectura es inmediata).
     public func start() {
-        let timer = DispatchSource.makeTimerSource(queue: .global(qos: .utility))
-        timer.schedule(deadline: .now(), repeating: interval, leeway: .milliseconds(20))
-        timer.setEventHandler { [weak self] in self?.sample() }
-        state.withLock { $0.timer = timer }
-        timer.resume()
+        // El temporizador nace, arranca y se cancela dentro del cerrojo: en Windows `DispatchSourceTimer` no es
+        // `Sendable` y no puede entrar ni salir del `Mutex` (aislamiento por regiones).
+        let interval = interval
+        state.withLock { s in
+            let timer = DispatchSource.makeTimerSource(queue: .global(qos: .utility))
+            timer.schedule(deadline: .now(), repeating: interval, leeway: .milliseconds(20))
+            timer.setEventHandler { [weak self] in self?.sample() }
+            s.timer = timer
+            timer.resume()
+        }
     }
 
     /// Deja de sondear. Idempotente.
     public func stop() {
-        let timer = state.withLock { s -> DispatchSourceTimer? in
-            defer { s.timer = nil }
-            return s.timer
+        state.withLock { s in
+            s.timer?.cancel()
+            s.timer = nil
         }
-        timer?.cancel()
     }
 
     /// Pico observado en bytes.
@@ -67,14 +77,21 @@ public final class MemoryGuard: Sendable {
             return true
         }
         if kill {
+            #if canImport(Darwin)
             Darwin.kill(pid, SIGKILL)
+            #elseif os(Windows)
+            WindowsProcess.terminate(pid: pid, code: ChildProcess.killedExitCode)
+            #endif
             stop()
             onExceeded?(peakBytes)
         }
     }
 
     /// Memoria de un proceso: `max(phys_footprint, resident_size)` de `rusage_info_v4`; nil si no existe.
-    public static func footprint(pid: pid_t) -> UInt64? {
+    public static func footprint(pid: Int32) -> UInt64? {
+        #if os(Windows)
+        return WindowsProcess.footprint(pid: pid)
+        #else
         var info = rusage_info_v4()
         let rc = withUnsafeMutablePointer(to: &info) { p in
             p.withMemoryRebound(to: rusage_info_t?.self, capacity: 1) {
@@ -83,5 +100,6 @@ public final class MemoryGuard: Sendable {
         }
         guard rc == 0 else { return nil }
         return max(info.ri_phys_footprint, info.ri_resident_size)
+        #endif
     }
 }

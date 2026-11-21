@@ -177,7 +177,7 @@ def stats(a: np.ndarray, b: np.ndarray, mode: str | None) -> dict:
     return r
 
 
-def export_onnx(module, example: tuple, in_names, out_names, opset: int = 17) -> Path:
+def export_onnx(module, example: tuple, in_names, out_names, opset: int = 17, dyn=None) -> Path:
     import torch
     dst = D / "model.onnx"
     if dst.is_symlink():
@@ -185,7 +185,7 @@ def export_onnx(module, example: tuple, in_names, out_names, opset: int = 17) ->
     t0 = time.perf_counter()
     with torch.no_grad():
         torch.onnx.export(module, example, str(dst), input_names=in_names, output_names=out_names,
-                          opset_version=opset, do_constant_folding=True, dynamo=False)
+                          opset_version=opset, do_constant_folding=True, dynamo=False, dynamic_axes=dyn)
     import onnx
     mp = onnx.load(str(dst), load_external_data=False)
     log.info("onnx exportado %s en %.1f s, opset %s, %.1f MB, nodos %d", dst.name, time.perf_counter() - t0,
@@ -311,7 +311,8 @@ def btc():
     xs, sr = B.load_input("T1", "mix")
     wav = B.to_mono_22k([x[:, 60 * sr:121 * sr] for x in xs], sr)
     x = B.normalize_windows(B.cqt_features(wav), mean, std)[0][:6]          # (6, 108, 144) = 60 s
-    path = export_onnx(Wrap(model).eval(), (torch.from_numpy(x),), ["cqt"], ["logits"])
+    path = export_onnx(Wrap(model).eval(), (torch.from_numpy(x),), ["cqt"], ["logits"],
+                       dyn={"cqt": {0: "n"}, "logits": {0: "n"}})       # n ventanas de 108 tramas
     ml = ct.models.MLModel(str(B.MLPACKAGE).format(prec="fp16"), compute_units=ct.ComputeUnit.CPU_AND_NE)
     standard(path, {"cqt": x}, ["logits"], 1.0,
              coreml=lambda: {"logits": np.concatenate([ml.predict({"cqt": x[i:i + 1]})["logits"] for i in range(6)])},
@@ -371,7 +372,8 @@ def adtof():
     model = A.load_torch()
     feats = A.features(P4 / "bs_roformer_sw/out/conv/coremlpub_cpu_gpu/T1/drums.wav")   # (T, 84, 1)
     x = np.ascontiguousarray(feats[6000:9000][None], np.float32)                     # 30 s a 100 fps
-    path = export_onnx(model, (torch.from_numpy(x),), ["spec"], ["act"])
+    path = export_onnx(model, (torch.from_numpy(x),), ["spec"], ["act"],
+                       dyn={"spec": {1: "T"}, "act": {1: "T"}})          # T libre, como el Core ML (RangeDim)
     ml = ct.models.MLModel(str(A.OUT / "conv" / "adtof_fp32n.mlpackage"), compute_units=ct.ComputeUnit.CPU_ONLY)
     sp = ml.get_spec().description
     i_name, o_name = sp.input[0].name, sp.output[0].name

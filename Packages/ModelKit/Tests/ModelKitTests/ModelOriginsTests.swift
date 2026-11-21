@@ -1,4 +1,6 @@
+#if canImport(CoreML)
 import CoreML
+#endif
 import XCTest
 @testable import ModelKit
 
@@ -35,6 +37,22 @@ private struct NoDownloads: ModelDownloading {
     }
 }
 
+#if os(Windows)
+/// Windows (parte 7.8): la release `models-win-v1` no está publicada, así que los tests con modelo real no
+/// descargan: instalan `<TF_MODELS_DIR>\<carpeta>\model.onnx` (los `.onnx` de desarrollo de la parte 7.3) con
+/// `install(_:fromArchive:)`, que verifica el SHA-256 del catálogo. Sin la variable, el test se salta.
+func localOnnxModel(_ folder: String) throws -> URL {
+    guard let dir = ProcessInfo.processInfo.environment["TF_MODELS_DIR"], !dir.isEmpty else {
+        throw XCTSkip("[windows] sin TF_MODELS_DIR: models-win-v1 no está publicada y no hay .onnx local")
+    }
+    let url = URL(fileURLWithPath: dir).appendingPathComponent(folder).appendingPathComponent("model.onnx")
+    guard FileManager.default.fileExists(atPath: url.path) else {
+        throw ModelError.packageNotFound("no está \(url.path)")
+    }
+    return url
+}
+#endif
+
 final class ModelOriginsTests: XCTestCase {
     var tmp: URL!
     var root: URL!
@@ -54,11 +72,7 @@ final class ModelOriginsTests: XCTestCase {
         try Data("{}".utf8).write(to: src.appendingPathComponent("Manifest.json"))
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let zip = dir.appendingPathComponent(zipName)
-        let p = Process()
-        p.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
-        p.arguments = ["-c", "-k", "--keepParent", src.path, zip.path]
-        try p.run(); p.waitUntilExit()
-        XCTAssertEqual(p.terminationStatus, 0)
+        try makeTestZip(folder: src, zip: zip)
         return zip
     }
 
@@ -98,6 +112,10 @@ final class ModelOriginsTests: XCTestCase {
 
     /// Cada modelo embebido del catálogo existe en `App/Resources/Models` con su SHA-256 y su tamaño.
     func testBundledResourcesMatchCatalog() throws {
+        #if os(Windows)
+        try XCTSkipUnless(FileManager.default.fileExists(atPath: appModelsDirectory.path), "[windows] App/Resources/Models no se sincroniza a la VM")
+        try XCTSkipUnless(FileManager.default.fileExists(atPath: appModelsDirectory.appendingPathComponent(ModelCatalog.leadRhythmMelRoformer.url.lastPathComponent).path), "[windows] los zips de App/Resources/Models no se sincronizan a la VM")
+        #endif
         let bundled = ModelCatalog.all.filter { $0.archiveKind == .bundledZippedMLPackage }
         XCTAssertEqual(Set(bundled.map(\.id)), ["btc-chords", "basic-pitch", "lead-rhythm-guitar", "adtof-drums"])
         for d in bundled {
@@ -112,14 +130,21 @@ final class ModelOriginsTests: XCTestCase {
     func testRealBasicPitchBundledInstall() async throws {
         try XCTSkipUnless(ProcessInfo.processInfo.environment["TF_MODEL_TESTS"] == "1", "TF_MODEL_TESTS=1 requerido")
         let d = ModelCatalog.transcriptionBasicPitch
+        #if os(Windows)
+        let s = ModelStore(root: root, catalog: [d])
+        let url = try await s.install(d.id, fromArchive: try localOnnxModel("basic_pitch"))
+        XCTAssertEqual(url.lastPathComponent, "basic_pitch.onnx")
+        #else
         let s = ModelStore(root: root, catalog: [d], bundleResourceDirectory: appModelsDirectory)
         let url = try await s.ensureInstalled(d.id) { _ in }
         XCTAssertEqual(url.lastPathComponent, "BasicPitch_nmp.mlmodelc")
+        #endif
         guard case .installed = await s.state(d.id) else { return XCTFail("estado") }
     }
 
     /// Pesado: copia, verifica y compila de verdad el zip embebido del modelo de solista y comprueba el contrato
     /// de entrada y salida. Solo con TF_MODEL_TESTS=1.
+    #if canImport(CoreML)
     func testRealLeadRhythmBundledInstall() async throws {
         try XCTSkipUnless(ProcessInfo.processInfo.environment["TF_MODEL_TESTS"] == "1", "TF_MODEL_TESTS=1 requerido")
         let d = ModelCatalog.leadRhythmMelRoformer
@@ -153,13 +178,37 @@ final class ModelOriginsTests: XCTestCase {
         XCTAssertEqual(out.featureValue(for: "act")?.multiArrayValue?.shape, [1, 100, 5])
     }
 
+    #elseif os(Windows)
+    /// Windows: instala el `.onnx` local del modelo de solista con el descriptor del catálogo (SHA-256 y tamaño).
+    func testRealLeadRhythmBundledInstall() async throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["TF_MODEL_TESTS"] == "1", "TF_MODEL_TESTS=1 requerido")
+        let d = ModelCatalog.leadRhythmMelRoformer
+        let s = ModelStore(root: root, catalog: [d])
+        let url = try await s.install(d.id, fromArchive: try localOnnxModel("lead_rhythm"))
+        XCTAssertEqual(url.lastPathComponent, "lead_rhythm.onnx")
+        guard case .installed(_, let bytes) = await s.state(d.id) else { return XCTFail("estado") }
+        XCTAssertEqual(bytes, d.onnxFiles.first?.bytes)
+    }
+
+    /// Windows: instala el `.onnx` local de ADTOF con el descriptor del catálogo (SHA-256 y tamaño).
+    func testRealADTOFBundledInstall() async throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["TF_MODEL_TESTS"] == "1", "TF_MODEL_TESTS=1 requerido")
+        let d = ModelCatalog.drumsADTOF
+        let s = ModelStore(root: root, catalog: [d])
+        let url = try await s.install(d.id, fromArchive: try localOnnxModel("adtof"))
+        XCTAssertEqual(url.lastPathComponent, "adtof.onnx")
+        guard case .installed(_, let bytes) = await s.state(d.id) else { return XCTFail("estado") }
+        XCTAssertEqual(bytes, d.onnxFiles.first?.bytes)
+    }
+    #endif
+
     func testCompiledZipInstallsWithoutCompiling() async throws {
         let zip = try makeZip(folder: "Fake.mlmodelc", in: tmp.appendingPathComponent("dl"), zipName: "Fake.mlmodelc.zip")
         let d = ModelDescriptor(id: "beats", version: "v1", displayName: "B", role: .beats,
                                 url: URL(string: "https://example.invalid/Fake.mlmodelc.zip")!,
                                 sha256: try sha256Hex(of: zip), archiveBytes: 1,
                                 archiveKind: .zippedCompiledModel, packageName: "Fake.mlmodelc", license: "test")
-        let s = ModelStore(root: root, catalog: [d], downloader: NoDownloads(), compiler: CompilerMustNotRun())
+        let s = ModelStore(root: root, catalog: [d], downloader: NoDownloads(), compiler: CompilerMustNotRun(), format: .coreML)
         let url = try await s.install("beats", fromArchive: zip)
         XCTAssertEqual(url.lastPathComponent, "Fake.mlmodelc")
         XCTAssertTrue(FileManager.default.fileExists(atPath: url.appendingPathComponent("Manifest.json").path))
@@ -178,7 +227,7 @@ final class ModelOriginsTests: XCTestCase {
                                 archiveKind: .bundledZippedMLPackage, packageName: "Fake.mlpackage", license: "test")
         let compiler = CountingCompiler()
         let s = ModelStore(root: root, catalog: [d], downloader: NoDownloads(), compiler: compiler,
-                           bundleResourceDirectory: res)
+                           bundleResourceDirectory: res, format: .coreML)
         let url = try await s.ensureInstalled("chords") { _ in }
         XCTAssertEqual(compiler.calls, 1)
         XCTAssertEqual(url.lastPathComponent, "Fake.mlmodelc")
@@ -197,7 +246,7 @@ final class ModelOriginsTests: XCTestCase {
                                 archiveKind: .bundledZippedMLPackage, packageName: "Fake.mlpackage", license: "test")
         let compiler = CountingCompiler()
         let s = ModelStore(root: root, catalog: [d], downloader: NoDownloads(), compiler: compiler,
-                           bundleResourceDirectory: res)
+                           bundleResourceDirectory: res, format: .coreML)
         do {
             _ = try await s.ensureInstalled("chords") { _ in }
             XCTFail("debía fallar")
@@ -212,7 +261,8 @@ final class ModelOriginsTests: XCTestCase {
     func testBundledZipMissingResource() async throws {
         let d = ModelCatalog.chordsBTC
         let s = ModelStore(root: root, catalog: [d], downloader: NoDownloads(), compiler: CountingCompiler(),
-                           bundleResourceDirectory: tmp.appendingPathComponent("empty", isDirectory: true))
+                           bundleResourceDirectory: tmp.appendingPathComponent("empty", isDirectory: true),
+                           format: .coreML)
         do {
             _ = try await s.ensureInstalled(d.id) { _ in }
             XCTFail("debía fallar")

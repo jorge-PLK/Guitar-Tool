@@ -1,5 +1,8 @@
+#if canImport(AVFoundation)
 import AVFoundation
+#endif
 import Foundation
+import NativeAudioFile
 
 /// Ancla de reproducción (mini-spec Fase 3, «Alineado con el backing» 1): la posición del tema `songTime`
 /// suena en la muestra de salida `outputSample` de la línea común de `AudioIO`, contando la latencia de los
@@ -184,6 +187,10 @@ public final class TakeRecorder: @unchecked Sendable {
 /// WAV float32 no entrelazado de una toma.
 enum TakeFile {
     static func write(_ channels: [[Float]], sampleRate: Double, to url: URL) throws {
+        #if !canImport(AVFoundation)
+        try? FileManager.default.removeItem(at: url)
+        try NativeAudioFile.write(url, channels: channels, sampleRate: sampleRate, format: .float32)
+        #else
         let frames = channels.first?.count ?? 0
         let settings: [String: Any] = [
             AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: sampleRate, AVNumberOfChannelsKey: channels.count,
@@ -204,9 +211,14 @@ enum TakeFile {
             try file.write(from: buf)
             at += n
         }
+        #endif
     }
 
     static func read(_ url: URL) throws -> [[Float]] {
+        #if !canImport(AVFoundation)
+        let reader = try AudioFileReader(url: url)
+        return try FileChunks.readAll(reader, frames: reader.frameCount)
+        #else
         // Un solo `read(into:)` puede devolver menos de lo pedido (medido: 2 878 464 de 2 878 753): por trozos.
         let file = try AVAudioFile(forReading: url, commonFormat: .pcmFormatFloat32, interleaved: false)
         let channels = Int(file.processingFormat.channelCount)
@@ -221,5 +233,25 @@ enum TakeFile {
             }
         }
         return out
+        #endif
     }
 }
+
+#if !canImport(AVFoundation)
+/// Lectura por trozos con `AudioFileReader` (Windows, dr_*): un `read` puede devolver menos de lo pedido.
+enum FileChunks {
+    static func readAll(_ reader: AudioFileReader, frames: Int) throws -> [[Float]] {
+        var out = Array(repeating: [Float](), count: reader.channelCount)
+        for c in out.indices { out[c].reserveCapacity(frames) }
+        var left = frames
+        while left > 0 {
+            let chunk = try reader.read(maxFrames: min(65_536, left))
+            let n = chunk.first?.count ?? 0
+            if n == 0 { break }
+            for c in out.indices { out[c].append(contentsOf: chunk[c]) }
+            left -= n
+        }
+        return out
+    }
+}
+#endif

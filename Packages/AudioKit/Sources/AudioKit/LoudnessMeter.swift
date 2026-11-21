@@ -1,6 +1,9 @@
-import Accelerate
+import NativeDSP
+#if canImport(AVFoundation)
 import AVFoundation
+#endif
 import Foundation
+import NativeAudioFile
 
 /// Medida de sonoridad de un fichero o de una señal (mini-spec Fase 7, «Exportación» y «Pruebas»).
 public struct LoudnessReport: Sendable, Equatable {
@@ -144,7 +147,7 @@ public struct LoudnessMeter: Sendable {
             for w in 0..<range.count {
                 for phase in Self.phases {
                     var acc = 0.0
-                    phase.withUnsafeBufferPointer { vDSP_dotprD($0.baseAddress!, 1, e.baseAddress! + w, 1, &acc, vDSP_Length(taps)) }
+                    phase.withUnsafeBufferPointer { DSP.dotprD($0.baseAddress!, 1, e.baseAddress! + w, 1, &acc, DSPLength(taps)) }
                     peak = max(peak, abs(acc))
                 }
             }
@@ -186,6 +189,19 @@ public struct LoudnessMeter: Sendable {
     /// verdadero se lanza `CancellationError`.
     public static func measure(url: URL, progress: (Double) -> Void = { _ in },
                                isCancelled: () -> Bool = { false }) throws -> LoudnessReport {
+        #if !canImport(AVFoundation)
+        let reader = try AudioFileReader(url: url)
+        var rmeter = LoudnessMeter(sampleRate: reader.sampleRate, channels: reader.channelCount)
+        let rtotal = max(1, reader.frameCount)
+        while reader.framePosition < reader.frameCount {
+            if isCancelled() { throw CancellationError() }
+            let chunk = try reader.read(maxFrames: 65_536)
+            if chunk.first?.isEmpty ?? true { break }
+            rmeter.process(chunk)
+            progress(min(1, Double(reader.framePosition) / Double(rtotal)))
+        }
+        return rmeter.report
+        #else
         let file = try AVAudioFile(forReading: url, commonFormat: .pcmFormatFloat32, interleaved: false)
         let format = file.processingFormat
         let nch = Int(format.channelCount)
@@ -203,5 +219,6 @@ public struct LoudnessMeter: Sendable {
             progress(min(1, Double(file.framePosition) / Double(total)))
         }
         return meter.report
+        #endif
     }
 }

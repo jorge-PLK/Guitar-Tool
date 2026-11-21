@@ -1,4 +1,4 @@
-import AVFoundation
+import NativeAudioFile
 import XCTest
 @testable import TabKit
 
@@ -106,19 +106,39 @@ final class BasicPitchWindowingTests: XCTestCase {
     func testMonoAudioDownmixesAndResamplesWithoutDelay() throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("tabkit-click-\(UUID().uuidString).wav")
         defer { try? FileManager.default.removeItem(at: url) }
-        let fmt = AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 2)!
         let n = 44_101
-        let buf = AVAudioPCMBuffer(pcmFormat: fmt, frameCapacity: AVAudioFrameCount(n))!
-        buf.frameLength = AVAudioFrameCount(n)
-        buf.floatChannelData![0][22_050] = 0.8   // solo en L: la media da 0,4
-        do {
-            let file = try AVAudioFile(forWriting: url, settings: fmt.settings)
-            try file.write(from: buf)
-        }
+        var left = [Float](repeating: 0, count: n)
+        left[22_050] = 0.8   // solo en L: la media da 0,4
+        try NativeAudioFile.write(url, channels: [left, [Float](repeating: 0, count: n)], sampleRate: 44_100, format: .float32)
         let x = try MonoAudio.load(url, sampleRate: C.sampleRate)
         XCTAssertEqual(x.count, 22_051)
         let peak = x.indices.max { abs(x[$0]) < abs(x[$1]) }!
         XCTAssertEqual(peak, 11_025, accuracy: 1)
         XCTAssertEqual(x[peak], 0.4 * 0.5, accuracy: 0.1)
+    }
+
+    /// Lectura sin remuestreo (lo que hace hoy Windows, plan «Fase 7c», paso 6): estéreo a 22 050 Hz → mono con las
+    /// mismas n muestras, la media exacta de L y R (error ≤ 1 ulp de float32) y el clic en su muestra exacta.
+    func testMonoAudioDownmixesAtNativeRateSampleExact() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("tabkit-mono-\(UUID().uuidString).wav")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let n = 22_051
+        let l = (0..<n).map { Float(0.5 * sin(2 * Double.pi * 440 * Double($0) / C.sampleRate)) }
+        var r = (0..<n).map { Float(0.25 * sin(2 * Double.pi * 97 * Double($0) / C.sampleRate)) }
+        r[11_025] = 0.9
+        try NativeAudioFile.write(url, channels: [l, r], sampleRate: C.sampleRate, format: .float32)
+        let x = try MonoAudio.load(url, sampleRate: C.sampleRate)
+        XCTAssertEqual(x.count, n)
+        let worst = (0..<n).map { abs(x[$0] - (l[$0] + r[$0]) / 2) }.max()!
+        XCTAssertLessThanOrEqual(worst, 1e-7, "media de canales")
+        XCTAssertEqual(x[11_025], (l[11_025] + 0.9) / 2, accuracy: 1e-7)
+    }
+
+    /// Un fichero ilegible da `TranscriptionError.unreadableAudio` en las dos plataformas.
+    func testMonoAudioUnreadableFile() {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("tabkit-missing-\(UUID().uuidString).wav")
+        XCTAssertThrowsError(try MonoAudio.load(url, sampleRate: C.sampleRate)) { error in
+            guard case .unreadableAudio = error as? TranscriptionError else { return XCTFail("\(error)") }
+        }
     }
 }

@@ -1,6 +1,9 @@
-import Accelerate
+#if canImport(CoreML)
 import CoreML
+#endif
 import Foundation
+import NativeDSP
+import NativePlatform
 
 public enum TranscriptionError: Error, Equatable, Sendable {
     case unreadableAudio(String)
@@ -12,9 +15,12 @@ public enum TranscriptionError: Error, Equatable, Sendable {
 /// (mini-spec Fase 4, «Clasificación rítmica o solista»). Lo reutiliza la Fase 5.
 public actor BasicPitchTranscriber {
     private let modelURL: URL?
+    #if canImport(CoreML)
     private let computeUnits: MLComputeUnits
+    #endif
     private var predictor: (any BasicPitchWindowPredictor)?
 
+    #if canImport(CoreML)
     /// `modelURL`: el `.mlmodelc` de Basic Pitch (lo instala ModelKit). Se carga en el primer `transcribe`.
     /// Por defecto CPU+GPU, las unidades con las que `tf-ml` validó el modelo frente a Python.
     public init(modelURL: URL, computeUnits: MLComputeUnits = .cpuAndGPU) {
@@ -28,6 +34,18 @@ public actor BasicPitchTranscriber {
         self.computeUnits = .cpuOnly
         self.predictor = predictor
     }
+    #else
+    /// Windows: `modelURL` es el `.onnx`; ONNX Runtime con el proveedor que elija `OnnxModelLoader` (parte 7.8).
+    public init(modelURL: URL) {
+        self.modelURL = modelURL
+    }
+
+    /// Para tests: un predictor simulado en lugar del modelo.
+    init(predictor: any BasicPitchWindowPredictor) {
+        self.modelURL = nil
+        self.predictor = predictor
+    }
+    #endif
 
     /// Cualquier formato que lea `AVAudioFile`; se pasa a mono (media de canales) y a 22 050 Hz.
     /// Notas ordenadas por inicio y nota, sin las que caen en silencio del audio (`SilenceGate`).
@@ -52,9 +70,18 @@ public actor BasicPitchTranscriber {
     private func loadedPredictor() throws -> any BasicPitchWindowPredictor {
         if let predictor { return predictor }
         guard let modelURL else { throw TranscriptionError.model("sin modelo") }
+        #if canImport(CoreML)
         let p = try CoreMLBasicPitchPredictor(modelURL: modelURL, computeUnits: computeUnits)
         predictor = p
         return p
+        #elseif os(Windows)
+        let p = try OnnxBasicPitchPredictor(modelURL: modelURL)
+        predictor = p
+        return p
+        #else
+        _ = modelURL
+        throw PlatformError.unsupported("sin motor de inferencia en esta plataforma")
+        #endif
     }
 }
 
@@ -96,7 +123,7 @@ enum BasicPitchWindowing {
                 (w.baseAddress! + n).update(repeating: 0, count: C.windowSamples - n)
             }
             var peak: Float = 0
-            vDSP_maxmgv(window, 1, &peak, vDSP_Length(C.windowSamples))
+            DSP.maxmgv(window, 1, &peak, DSPLength(C.windowSamples))
             // Ventana muda: el Core ML da basura (0/0 en `NormalizedLog`), la referencia ninguna nota.
             let out = peak < C.silentWindowPeak
                 ? (note: silent, onset: silent)
@@ -119,6 +146,8 @@ enum BasicPitchWindowing {
 
 /// `nmp` de basic-pitch: entrada `input_2` [1, 43 844, 1] f32; salidas `Identity_1` (note) e `Identity_2` (onset)
 /// [1, 172, 88] (`Identity` es contour, que aquí no hace falta). Admite también salidas llamadas `note` y `onset`.
+/// Solo con Core ML; en Windows el predictor del modelo es pieza del paso 7 (ONNX Runtime).
+#if canImport(CoreML)
 final class CoreMLBasicPitchPredictor: BasicPitchWindowPredictor, @unchecked Sendable {
     private let model: MLModel
     private let inputName: String
@@ -187,3 +216,4 @@ final class CoreMLBasicPitchPredictor: BasicPitchWindowPredictor, @unchecked Sen
         return res
     }
 }
+#endif

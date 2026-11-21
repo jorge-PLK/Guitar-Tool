@@ -257,7 +257,7 @@ final class AudioTranscoderTests: XCTestCase {
 final class HelperLocatorTests: XCTestCase {
     private func makeExec(_ dir: URL, _ name: String) throws {
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let u = dir.appendingPathComponent(name)
+        let u = dir.appendingPathComponent(HelperLocator.fileName(name))
         try Data("#!/bin/sh\n".utf8).write(to: u)
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: u.path)
     }
@@ -286,9 +286,9 @@ final class HelperLocatorTests: XCTestCase {
         XCTAssertEqual(try loc.ytDlp().origin, .bundle, "empate: gana el bundle")
 
         try loc.removeUpdate()
-        XCTAssertFalse(FileManager.default.fileExists(atPath: support.appendingPathComponent("yt-dlp").path))
-        XCTAssertEqual(try loc.deno().lastPathComponent, "deno")
-        XCTAssertEqual(try loc.ffmpeg().lastPathComponent, "ffmpeg")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: support.appendingPathComponent(HelperLocator.fileName("yt-dlp")).path))
+        XCTAssertEqual(try loc.deno().lastPathComponent, HelperLocator.fileName("deno"))
+        XCTAssertEqual(try loc.ffmpeg().lastPathComponent, HelperLocator.fileName("ffmpeg"))
     }
 
     func testVersionCompareAndMissing() throws {
@@ -314,15 +314,15 @@ final class YtDlpUpdaterTests: XCTestCase {
         let support = tempDir(); defer { try? FileManager.default.removeItem(at: support) }
         let base = YtDlpUpdater.releaseBase
         let http = StubHTTP(responses: [
-            base.appendingPathComponent("yt-dlp_macos").absoluteString: Data("binario".utf8),
-            base.appendingPathComponent("SHA2-256SUMS").absoluteString: Data("\(String(repeating: "0", count: 64))  yt-dlp_macos\n".utf8)
+            base.appendingPathComponent(YtDlpUpdater.assetName).absoluteString: Data("binario".utf8),
+            base.appendingPathComponent("SHA2-256SUMS").absoluteString: Data("\(String(repeating: "0", count: 64))  \(YtDlpUpdater.assetName)\n".utf8)
         ])
         let runner = ScriptedProcessRunner()
         runner.on("--version", ScriptedResponse(stdout: "2025.11.12\n"))
         do { try await YtDlpUpdater(supportDirectory: support, http: http, runner: runner).update(); XCTFail() } catch {
             XCTAssertEqual(error as? SourceError, .checksumMismatch)
         }
-        XCTAssertFalse(FileManager.default.fileExists(atPath: support.appendingPathComponent("yt-dlp").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: support.appendingPathComponent(HelperLocator.fileName("yt-dlp")).path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: support.appendingPathComponent("yt-dlp.json").path))
         XCTAssertTrue(runner.requests.isEmpty)
     }
@@ -332,20 +332,24 @@ final class YtDlpUpdaterTests: XCTestCase {
         let base = YtDlpUpdater.releaseBase
         let bin = Data("binario".utf8)
         let http = StubHTTP(responses: [
-            base.appendingPathComponent("yt-dlp_macos").absoluteString: bin,
-            base.appendingPathComponent("SHA2-256SUMS").absoluteString: Data("aaaa  otro\n\(sha(bin))  yt-dlp_macos\n".utf8)
+            base.appendingPathComponent(YtDlpUpdater.assetName).absoluteString: bin,
+            base.appendingPathComponent("SHA2-256SUMS").absoluteString: Data("aaaa  otro\n\(sha(bin))  \(YtDlpUpdater.assetName)\n".utf8)
         ])
         let runner = ScriptedProcessRunner()
         runner.on("--version", ScriptedResponse(stdout: "2025.11.12\n"))
         let info = try await YtDlpUpdater(supportDirectory: support, http: http, runner: runner).update()
         XCTAssertEqual(info.version, "2025.11.12")
-        XCTAssertTrue(FileManager.default.isExecutableFile(atPath: support.appendingPathComponent("yt-dlp").path))
+        XCTAssertTrue(HelperLocator.isRunnable(support.appendingPathComponent(HelperLocator.fileName("yt-dlp")).path))
         XCTAssertEqual(HelperLocator.readInfo(in: support)?.version, "2025.11.12")
         XCTAssertEqual(HelperLocator.readInfo(in: support)?.sha256, sha(bin))
     }
 }
 
+#if canImport(CryptoKit)
 import CryptoKit
+#else
+import Crypto
+#endif
 private extension Data {
     var sha256Bytes: [UInt8] { Array(SHA256.hash(data: self)) }
 }
@@ -353,18 +357,35 @@ private extension Data {
 // MARK: - Proceso real (solo /bin/sh y /bin/sleep, sin helpers)
 
 final class SystemProcessRunnerTests: XCTestCase {
+    /// Un proceso que dura 30 s.
+    static var sleeper: (exe: URL, args: [String]) {
+        #if os(Windows)
+        (URL(fileURLWithPath: "C:\\Windows\\System32\\PING.EXE"), ["-n", "31", "127.0.0.1"])
+        #else
+        (URL(fileURLWithPath: "/bin/sleep"), ["30"])
+        #endif
+    }
+
     func testCapturesOutputAndStatus() async throws {
         let lines = Seen2()
-        let r = try await SystemProcessRunner().run(
-            .init(executable: URL(fileURLWithPath: "/bin/sh"), arguments: ["-c", "echo uno; echo dos; echo err >&2; exit 3"])) { lines.add($0) }
+        #if os(Windows)
+        let exe = URL(fileURLWithPath: "C:\\Windows\\System32\\cmd.exe")
+        let args = ["/c", "echo uno&echo dos&echo err>&2&exit 3"]
+        #else
+        let exe = URL(fileURLWithPath: "/bin/sh")
+        let args = ["-c", "echo uno; echo dos; echo err >&2; exit 3"]
+        #endif
+        let r = try await SystemProcessRunner().run(.init(executable: exe, arguments: args)) { lines.add($0) }
         XCTAssertEqual(r.status, 3)
-        XCTAssertEqual(lines.values, ["uno", "dos"])
-        XCTAssertEqual(r.stderr, "err\n")
+        // cmd.exe termina las líneas con CRLF.
+        XCTAssertEqual(lines.values.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }, ["uno", "dos"])
+        XCTAssertEqual(r.stderr.trimmingCharacters(in: .whitespacesAndNewlines), "err")
     }
 
     func testCancelKillsProcess() async throws {
+        let sleeper = Self.sleeper
         let task = Task {
-            try await SystemProcessRunner(terminateGrace: 1).run(.init(executable: URL(fileURLWithPath: "/bin/sleep"), arguments: ["30"]))
+            try await SystemProcessRunner(terminateGrace: 1).run(.init(executable: sleeper.exe, arguments: sleeper.args))
         }
         try await Task.sleep(for: .milliseconds(300))
         let start = Date()
@@ -376,7 +397,7 @@ final class SystemProcessRunnerTests: XCTestCase {
     func testTimeout() async {
         do {
             _ = try await SystemProcessRunner(terminateGrace: 1).run(
-                .init(executable: URL(fileURLWithPath: "/bin/sleep"), arguments: ["30"], timeout: .total(0.3)))
+                .init(executable: Self.sleeper.exe, arguments: Self.sleeper.args, timeout: .total(0.3)))
             XCTFail()
         } catch { XCTAssertEqual(error as? SourceError, .timedOut) }
     }

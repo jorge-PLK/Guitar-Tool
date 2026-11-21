@@ -1,11 +1,19 @@
-import CryptoKit
 import Foundation
+#if canImport(CryptoKit)
+import CryptoKit
+#else
+import Crypto
+#endif
 
 /// Baja `yt-dlp_macos` y `SHA2-256SUMS` de la última release, verifica y lo instala en
 /// `Application Support/ToneForge/Helpers/yt-dlp` con su `yt-dlp.json`.
 public struct YtDlpUpdater: Sendable {
     public static let releaseBase = URL(string: "https://github.com/yt-dlp/yt-dlp/releases/latest/download/")!
+    #if os(Windows)
+    static let assetName = "yt-dlp.exe"
+    #else
     static let assetName = "yt-dlp_macos"
+    #endif
     static let sumsName = "SHA2-256SUMS"
 
     private let supportDirectory: URL
@@ -38,7 +46,7 @@ public struct YtDlpUpdater: Sendable {
 
         let fm = FileManager.default
         try fm.createDirectory(at: supportDirectory, withIntermediateDirectories: true)
-        let staged = supportDirectory.appendingPathComponent("yt-dlp.new")
+        let staged = supportDirectory.appendingPathComponent(HelperLocator.fileName("yt-dlp.new"))
         try binary.write(to: staged)
         defer { try? fm.removeItem(at: staged) }
         try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: staged.path)
@@ -47,9 +55,15 @@ public struct YtDlpUpdater: Sendable {
         let version = String(decoding: r.stdout, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
         guard r.status == 0, !version.isEmpty else { throw SourceError.updateFailed("el yt-dlp descargado no arranca") }
 
-        let target = supportDirectory.appendingPathComponent("yt-dlp")
+        let target = supportDirectory.appendingPathComponent(HelperLocator.fileName("yt-dlp"))
+        #if os(Windows)
+        // `replaceItemAt` aborta en Foundation de Windows: se borra el destino y se mueve.
+        if fm.fileExists(atPath: target.path) { try fm.removeItem(at: target) }
+        try fm.moveItem(at: staged, to: target)
+        #else
         if fm.fileExists(atPath: target.path) { _ = try fm.replaceItemAt(target, withItemAt: staged) }
         else { try fm.moveItem(at: staged, to: target) }
+        #endif
 
         let info = YtDlpInstallInfo(version: version, sha256: actual, installedAt: now())
         let enc = JSONEncoder()

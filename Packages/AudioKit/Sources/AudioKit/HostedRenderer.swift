@@ -1,3 +1,5 @@
+// Reproductor sobre AVAudioEngine: solo macOS (paso 7: reproductor).
+#if canImport(AVFoundation)
 import AVFoundation
 import Synchronization
 
@@ -181,3 +183,7 @@ final class HostedRenderer: @unchecked Sendable {
         return true
     }
 }
+
+extension HostedRenderer: HostedPlayback {}
+
+#endif // canImport(AVFoundation)

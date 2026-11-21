@@ -1,4 +1,8 @@
+#if canImport(AVFoundation)
 import AVFoundation
+#else
+import NativePlatform
+#endif
 import Foundation
 
 public enum MontageError: Error, Equatable, Sendable {
@@ -26,8 +30,10 @@ extension MontageError: CustomStringConvertible {
     }
 }
 
+// Windows: `MontageBuilder` y `MontagePreview` con Media Foundation y Direct2D en `WindowsMontage.swift`.
+#if canImport(AVFoundation)
 /// Composición del montaje lista para `AVPlayer` o para exportar. Tiempo 0 del item = `plan.span.start`.
-public final class MontagePreview: @unchecked Sendable {
+public final class MontagePreview: MontagePreviewing, @unchecked Sendable {
     public let composition: AVMutableComposition
     public let videoComposition: AVMutableVideoComposition
     /// Mezcla de la vista previa (volúmenes, compuertas con fundidos de 80 ms y fundido global); `nil` sin audio.
@@ -186,3 +192,4 @@ public final class MontageBuilder: @unchecked Sendable {
         return CGSize(width: even(Double(canvas.width) * k), height: even(Double(canvas.height) * k))
     }
 }
+#endif

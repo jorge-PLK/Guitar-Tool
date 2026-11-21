@@ -1,3 +1,4 @@
+#if canImport(AVFoundation)
 import AVFoundation
 import XCTest
 @testable import VideoKit
@@ -91,3 +92,71 @@ final class VideoRotationTests: XCTestCase {
         print("F7 rotar 90°: montaje \(montage.width)×\(montage.height): \(m); reproductor \(player.width)×\(player.height): \(p)")
     }
 }
+#else
+import Foundation
+import XCTest
+@testable import VideoKit
+
+/// Windows (parte 7.9): el giro se aplica al leer cada fotograma (`VideoRotation.apply`), en el compositor y en
+/// `TakePreview`; el fichero no se toca.
+final class VideoRotationTests: XCTestCase {
+    static let size = (w: 1920, h: 1080)
+    static let mark = 200
+
+    static func writeMarkedVideo(_ url: URL) async throws {
+        let writer = try VideoTakeWriter(url: url, format: VideoFormat(cameraID: "sim", cameraName: "sim", width: size.w, height: size.h, fps: 30),
+                                         realTime: false)
+        let pb = RenderSupport.buffer(width: size.w, height: size.h) { x, y in x < mark && y < mark ? (0xFF, 0, 0) : (0x80, 0x80, 0x80) }
+        for i in 0..<30 {
+            XCTAssertTrue(writer.append(CameraFrame(hostSeconds: 0, arrivalHostSeconds: 0, sequence: i, pixelBuffer: pb), songTime: Double(i) / 30))
+        }
+        _ = try await writer.finish()
+    }
+
+    static func isRed(_ c: (Double, Double, Double)) -> Bool { c.0 > 150 && c.1 < 80 && c.2 < 80 }
+    static func isGray(_ c: (Double, Double, Double)) -> Bool { abs(c.0 - c.1) < 30 && abs(c.1 - c.2) < 30 && c.0 > 80 }
+
+    static func checkCorners(_ f: MontageGateTests.Frame, _ label: String) -> String {
+        let w = Double(f.width), h = Double(f.height)
+        var line: [String] = []
+        for (name, fx, fy) in [("arriba-dcha", 0.95, 0.03), ("arriba-izda", 0.05, 0.03), ("abajo-izda", 0.05, 0.97), ("abajo-dcha", 0.95, 0.97)] {
+            let c = f.rgb(fx * w, fy * h)
+            line.append(String(format: "%@ (%.0f, %.0f, %.0f)", name, c.0, c.1, c.2))
+            if name == "arriba-dcha" {
+                XCTAssertTrue(isRed(c), "\(label): marca roja arriba a la derecha, leído \(c)")
+            } else {
+                XCTAssertTrue(isGray(c), "\(label): \(name) gris, leído \(c)")
+            }
+        }
+        return line.joined(separator: ", ")
+    }
+
+    func testRotated90TakeReadsPortraitWithMarkTopRight() async throws {
+        XCTAssertEqual(VideoRotation(degrees: 450), .clockwise90)
+        XCTAssertEqual(VideoRotation.clockwise270.next, .none)
+        let dir = try TestWav.tempDir("VideoRotationTests")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let url = dir.appendingPathComponent("video.mov")
+        try await Self.writeMarkedVideo(url)
+        let take = MontageSpan(start: 0, end: 1)
+        let part = MontagePart(id: "R", name: "R", isSolo: false, presence: [take],
+                               video: MontagePartVideo(url: url, videoOffset: 0, take: take, rotation: .clockwise90))
+        let plan = MontagePlan(canvas: .portrait, fps: 30, layout: .single, span: take, barDuration: 1, fadeIn: false, fadeOut: false,
+                               parts: [part], showPartLabels: false)
+        let builder = try await MontageBuilder.load(plan, includeAudio: false)
+        XCTAssertEqual(builder.timeline.parts.first?.frameSize, CGSize(width: 1080, height: 1920), "tamaño del fotograma girado")
+        let preview = try builder.make(renderSize: CGSize(width: 360, height: 640), includeAudio: false)
+        let montage = MontageGateTests.Frame(try preview.frame(at: 0.7))
+        let m = Self.checkCorners(montage, "montaje")
+        let wav = dir.appendingPathComponent("processed.wav")
+        try TestWav.write([[Float](repeating: 0, count: 48_000)], sampleRate: 48_000, to: wav)
+        let tp = try await TakePreview.load(audioURL: wav, songStart: 0, videoURL: url, punches: [], rotation: .clockwise90)
+        let img = try XCTUnwrap(try tp.frame(at: 0.5, videoOffset: 0))
+        XCTAssertEqual([img.width, img.height], [1080, 1920])
+        let p = Self.checkCorners(MontageGateTests.Frame(img), "reproductor")
+        let info = try MediaFoundationReader.info(url)
+        XCTAssertEqual([info.width, info.height], [1920, 1080])
+        print("7.9 rotar 90°: montaje \(montage.width)×\(montage.height): \(m); reproductor \(img.width)×\(img.height): \(p)")
+    }
+}
+#endif // canImport(AVFoundation)

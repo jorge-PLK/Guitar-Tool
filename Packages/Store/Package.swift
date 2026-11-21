@@ -7,8 +7,14 @@ let package = Package(
     products: [
         .library(name: "Store", targets: ["Store"])
     ],
+    dependencies: [
+        // CryptoKit no existe en Windows (plan, «Fase 7c», paso 6): swift-crypto solo allí.
+        .package(url: "https://github.com/apple/swift-crypto", from: "3.0.0")
+    ],
     targets: [
-        .target(name: "Store"),
+        .target(name: "Store", dependencies: [
+            .product(name: "Crypto", package: "swift-crypto", condition: .when(platforms: [.windows]))
+        ]),
         .testTarget(name: "StoreTests", dependencies: ["Store"])
     ]
 )

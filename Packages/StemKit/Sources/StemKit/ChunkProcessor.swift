@@ -1,4 +1,4 @@
-import Accelerate
+import NativeDSP
 import Foundation
 
 /// Un trozo estéreo → `stemCount` stems estéreo en el dominio del tiempo, como `run_chunk` + la vía `coremlpub`
@@ -70,9 +70,9 @@ private struct PostprocessJob: @unchecked Sendable {
     func run(stem s: Int) {
         let m = mask + s * pairs * 2
         // Producto complejo intercalado (re, im): stride 2 sobre los mismos punteros.
-        var a = DSPSplitComplex(realp: spec, imagp: spec + 1)
-        var b = DSPSplitComplex(realp: m, imagp: m + 1)
-        vDSP_zvmul(&a, 2, &b, 2, &b, 2, vDSP_Length(pairs), 1)
+        var a = SplitComplex(realp: spec, imagp: spec + 1)
+        var b = SplitComplex(realp: m, imagp: m + 1)
+        DSP.zvmul(&a, 2, &b, 2, &b, 2, DSPLength(pairs), 1)
         // Bin 0 (DC) a cero en los dos canales: filas 2·0 + 0 y 2·0 + 1, `frames · 2` floats cada una.
         m.update(repeating: 0, count: 2 * frames * 2)
         for c in 0..<RoformerContract.channels {

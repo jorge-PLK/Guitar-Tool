@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// Descarga de datos por HTTP, inyectable para que los tests no toquen la red.
 public protocol HTTPFetching: Sendable {

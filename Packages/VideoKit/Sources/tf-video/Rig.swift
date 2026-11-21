@@ -1,3 +1,4 @@
+#if canImport(AVFoundation)
 import AudioKit
 import AVFoundation
 import Foundation
@@ -307,3 +308,4 @@ enum WavFile {
         }
     }
 }
+#endif

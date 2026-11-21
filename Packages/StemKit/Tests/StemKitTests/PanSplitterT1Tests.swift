@@ -1,4 +1,3 @@
-import AVFoundation
 import Foundation
 import XCTest
 @testable import StemKit
@@ -25,17 +24,16 @@ final class PanSplitterT1Tests: XCTestCase {
     private var tag: String { env("TF_PAN_T1").map { URL(fileURLWithPath: $0).lastPathComponent } ?? "T1" }
 
     static func readCrop(_ url: URL, start: Double, seconds: Double) throws -> StereoAudio {
-        let file = try AVAudioFile(forReading: url, commonFormat: .pcmFormatFloat32, interleaved: false)
-        let rate = file.processingFormat.sampleRate
-        let s = Int(start * rate), n = Int(seconds * rate)
-        file.framePosition = AVAudioFramePosition(s)
-        let buf = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(n))!
-        try file.read(into: buf, frameCount: AVAudioFrameCount(n))
-        let ch = buf.floatChannelData!
-        let got = Int(buf.frameLength)
-        let right = file.processingFormat.channelCount > 1 ? ch[1] : ch[0]
-        return StereoAudio(left: Array(UnsafeBufferPointer(start: ch[0], count: got)),
-                           right: Array(UnsafeBufferPointer(start: right, count: got)), sampleRate: rate)
+        let file = try AudioIO.openReader(url)
+        let rate = file.sampleRate
+        let s = Int(start * rate), n = min(Int(seconds * rate), max(0, file.frameCount - s))
+        var left = [Float](repeating: 0, count: n), right = left
+        let got = try left.withUnsafeMutableBufferPointer { l in
+            try right.withUnsafeMutableBufferPointer { r in
+                try AudioIO.read(file, from: s, count: n, left: l.baseAddress!, right: r.baseAddress!)
+            }
+        }
+        return StereoAudio(left: Array(left.prefix(got)), right: Array(right.prefix(got)), sampleRate: rate)
     }
 
     static func energy(_ x: [Float]) -> Double { x.reduce(0) { $0 + Double($1) * Double($1) } }
@@ -267,14 +265,15 @@ final class PanSplitterT1Tests: XCTestCase {
     }
 
     private func timeSplit(_ url: URL, label: String) throws {
-        let file = try AVAudioFile(forReading: url)
-        let minutes = Double(file.length) / file.processingFormat.sampleRate / 60
+        let file = try AudioIO.openReader(url)
+        let minutes = Double(file.frameCount) / file.sampleRate / 60
         let dir = try makeTempDir("pan-time")
-        let before = MemoryGuard.footprint(pid: getpid()) ?? 0
+        let me = ProcessInfo.processInfo.processIdentifier
+        let before = MemoryGuard.footprint(pid: me) ?? 0
         let t0 = Date()
         let result = try PanSplitter().withoutGate().split(input: url, outputDirectory: dir)
         let dt = Date().timeIntervalSince(t0)
-        let after = MemoryGuard.footprint(pid: getpid()) ?? 0
+        let after = MemoryGuard.footprint(pid: me) ?? 0
         print("PanSplitter \(label): \(String(format: "%.2f", minutes)) min en \(String(format: "%.2f", dt)) s → "
               + "\(String(format: "%.2f", dt / minutes)) s por minuto; pistas \(result.tracks.map(\.side.rawValue)); "
               + "huella \(before >> 20) → \(after >> 20) MB")

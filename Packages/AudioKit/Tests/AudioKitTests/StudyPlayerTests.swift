@@ -1,10 +1,11 @@
-import Accelerate
-import AVFoundation
+import NativeDSP
 import XCTest
 @testable import AudioKit
 
-/// Pruebas de §4 P6 en render offline con señales sintéticas (48 kHz). Ninguna suena.
-final class StudyPlayerTests: XCTestCase {
+/// Pruebas de §4 P6 en render offline con señales sintéticas (48 kHz). Ninguna suena. `kind` elige el motor: el de
+/// la plataforma aquí; el portátil en `PortableStudyPlayerTests` (solo Mac; en Windows el de la plataforma ya es ese).
+class StudyPlayerTests: XCTestCase {
+    var kind: PlayerKind { .platform }
     static let sr = 48_000.0
     var sr: Double { Self.sr }
 
@@ -60,7 +61,7 @@ final class StudyPlayerTests: XCTestCase {
         var j = from
         while j + w <= to {
             var ms: Float = 0
-            x.withUnsafeBufferPointer { vDSP_measqv($0.baseAddress! + j, 1, &ms, vDSP_Length(w)) }
+            x.withUnsafeBufferPointer { DSP.measqv($0.baseAddress! + j, 1, &ms, DSPLength(w)) }
             rms.append(Double(sqrt(ms)))
             j += w
         }
@@ -77,32 +78,23 @@ final class StudyPlayerTests: XCTestCase {
 
     func writeStem(_ name: String, in dir: URL, left: [Float], right: [Float]) throws -> Track {
         let url = dir.appendingPathComponent("\(name).wav")
-        let settings: [String: Any] = [
-            AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: sr, AVNumberOfChannelsKey: 2,
-            AVLinearPCMBitDepthKey: 32, AVLinearPCMIsFloatKey: true, AVLinearPCMIsBigEndianKey: false,
-            AVLinearPCMIsNonInterleaved: false
-        ]
-        let file = try AVAudioFile(forWriting: url, settings: settings, commonFormat: .pcmFormatFloat32, interleaved: false)
-        let buf = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(left.count))!
-        buf.frameLength = AVAudioFrameCount(left.count)
-        buf.floatChannelData![0].update(from: left, count: left.count)
-        buf.floatChannelData![1].update(from: right, count: right.count)
-        try file.write(from: buf)
+        try TakeFile.write([left, right], sampleRate: sr, to: url)   // WAV float32, como antes con AVAudioFile
         return Track(id: name, url: url)
     }
 
     @MainActor
-    func makePlayer(_ stems: [(String, [Float], [Float])], devices: (any AudioDeviceProviding)? = nil) throws -> (StudyPlayer, URL) {
+    func makePlayer(_ stems: [(String, [Float], [Float])], devices: (any AudioDeviceProviding)? = nil) throws
+        -> (any PlayerUnderTest, URL) {
         let dir = try tempDir()
         let tracks = try stems.map { try writeStem($0.0, in: dir, left: $0.1, right: $0.2) }
-        let p = StudyPlayer(offlineWith: devices)
+        let p = kind.offline(devices: devices)
         try p.load(tracks: tracks)
         return (p, dir)
     }
 
     /// Índice, dentro de lo renderizado, de la muestra de arranque de la pasada.
     @MainActor
-    func runIndex(_ p: StudyPlayer, _ start: Int64) -> Double { p.runStartFrame - Double(start) }
+    func runIndex(_ p: any PlayerUnderTest, _ start: Int64) -> Double { p.runStartFrame - Double(start) }
 
     // MARK: Sincronía, mute/solo, ganancia
 
@@ -336,7 +328,7 @@ final class StudyPlayerTests: XCTestCase {
         var expected = Array(noise[43_200..<(b - h)])
         while expected.count < Int(1.9 * sr) {
             for i in 0..<(2 * h) {
-                let w = StemScheduler.crossfadeWeight(i, 2 * h)
+                let w = Crossfade.weight(i, 2 * h)   // = StemScheduler.crossfadeWeight
                 expected.append(noise[b - h + i] * (1 - w) + noise[a - h + i] * w)
             }
             expected.append(contentsOf: noise[(a + h)..<(b - h)])
@@ -541,7 +533,7 @@ final class StudyPlayerTests: XCTestCase {
                 .split(whereSeparator: \.isNewline).compactMap { Double($0.trimmingCharacters(in: .whitespaces)) }
         }
         let beats = try times("T1.beats.txt"), downs = Set(try times("T1.downbeats.txt"))
-        let p = StudyPlayer(offlineWith: nil)
+        let p = kind.offline()
         try p.load(tracks: ["vocals", "drums", "bass", "guitar", "piano", "other"].map {
             Track(id: $0, url: stems.appendingPathComponent("\($0).wav"))
         })
@@ -555,22 +547,20 @@ final class StudyPlayerTests: XCTestCase {
         try p.play()
         let seconds = ((a - d[7]) + 3 * (b - a)) / 0.7 + 1
         let r = try p.renderOffline(frames: Int(seconds * 48_000))
-        let out = root.appendingPathComponent("Temp/p6/listen-T1-loop70.wav")
+        let out = root.appendingPathComponent(kind == .platform ? "Temp/p6/listen-T1-loop70.wav"
+                                                                : "Temp/p6/listen-T1-loop70-portable.wav")
         let left = r.channels[0], right = r.channels[1]
-        let settings: [String: Any] = [
-            AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: 48_000.0, AVNumberOfChannelsKey: 2,
-            AVLinearPCMBitDepthKey: 32, AVLinearPCMIsFloatKey: true, AVLinearPCMIsBigEndianKey: false,
-            AVLinearPCMIsNonInterleaved: false
-        ]
-        let file = try AVAudioFile(forWriting: out, settings: settings, commonFormat: .pcmFormatFloat32, interleaved: false)
-        let buf = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(left.count))!
-        buf.frameLength = AVAudioFrameCount(left.count)
-        buf.floatChannelData![0].update(from: left, count: left.count)
-        buf.floatChannelData![1].update(from: right, count: right.count)
-        try file.write(from: buf)
+        try TakeFile.write([left, right], sampleRate: 48_000, to: out)
         var ms: Float = 0
-        vDSP_measqv(left, 1, &ms, vDSP_Length(left.count))
+        DSP.measqv(left, 1, &ms, DSPLength(left.count))
         print("P6 escucha: \(out.path) bucle \(a)…\(b) s, \(seconds) s, RMS \(20 * log10(sqrt(ms))) dBFS")
         XCTAssertGreaterThan(ms, 1e-6)
     }
 }
+
+#if canImport(AVFoundation)
+/// Los mismos casos con el motor portátil (el de Windows) en el Mac.
+final class PortableStudyPlayerTests: StudyPlayerTests {
+    override var kind: PlayerKind { .portable }
+}
+#endif

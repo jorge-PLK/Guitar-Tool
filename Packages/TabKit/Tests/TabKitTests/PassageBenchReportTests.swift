@@ -1,4 +1,4 @@
-import AVFoundation
+import NativeAudioFile
 import XCTest
 @testable import TabKit
 
@@ -51,8 +51,8 @@ final class PassageBenchReportTests: XCTestCase {
 
     /// Tabla de pasajes, resumen por papel y CSV por compás; los deja en `out` y devuelve el texto.
     static func report(name: String, url: URL, notes: [NoteEvent], downbeats: [Double], out: URL) throws -> String {
-        let f = try AVAudioFile(forReading: url)
-        let duration = Double(f.length) / f.processingFormat.sampleRate
+        let f = try NativeAudioFile.read(url)
+        let duration = Double(f.frameCount) / f.sampleRate
         let passages = PassageClassifier.classify(notes: notes, downbeats: downbeats, duration: duration)
         var time: [GuitarRole: Double] = [:]
         for p in passages { time[p.role, default: 0] += p.end - p.start }

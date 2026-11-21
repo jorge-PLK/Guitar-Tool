@@ -1,4 +1,5 @@
-import Accelerate
+import Foundation
+import NativeDSP
 
 /// Puerta de silencio para notas transcritas, independiente del modelo: quita las notas que caen donde el stem está
 /// en silencio (Fase 5b, «Limpieza de lo que da Basic Pitch»).
@@ -51,7 +52,7 @@ public enum SilenceGate {
             audio.withUnsafeBufferPointer { a in
                 for b in 0..<count {
                     let lo = b * size, n = min(size, audio.count - lo)
-                    vDSP_rmsqv(a.baseAddress! + lo, 1, &rms[b], vDSP_Length(n))
+                    DSP.rmsqv(a.baseAddress! + lo, 1, &rms[b], DSPLength(n))
                 }
             }
             self.rms = rms

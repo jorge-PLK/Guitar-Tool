@@ -1,5 +1,7 @@
 import AudioKit
+#if canImport(AVFoundation)
 import AVFoundation
+#endif
 import XCTest
 @testable import VideoKit
 import struct VideoKit.MontageSpan
@@ -20,6 +22,7 @@ final class MontageAudioFadeTests: XCTestCase {
     static let maxDBError = 0.5
     static let dbFloor = -30.0
 
+    #if canImport(AVFoundation)
     /// Ganancia aplicada por la exportación, muestra a muestra desde `span.start`.
     static func exportGain(_ dc: URL, presence: MontagePresence, dir: URL) async throws -> [Double] {
         let out = dir.appendingPathComponent("export-\(UUID().uuidString).wav")
@@ -58,6 +61,7 @@ final class MontageAudioFadeTests: XCTestCase {
         XCTAssertEqual(reader.status, .completed)
         return left
     }
+    #endif
 
     /// Curva lineal (trapecio) que usaba la vista previa antes: sirve para dar la diferencia que había.
     static func linear(_ t: Double) -> Double {
@@ -76,6 +80,100 @@ final class MontageAudioFadeTests: XCTestCase {
         }
     }
 
+    #if !canImport(AVFoundation)
+    // Windows (parte 7.9): la vista previa no tiene mezclador de AVFoundation; su envolvente es `MontagePreviewAudio`
+    // (los mismos vértices y rampas lineales que el `AVAudioMix`), aplicada muestra a muestra a la señal continua.
+    static func previewGain(_ preview: MontagePreview, samples: Int) throws -> [Double] {
+        XCTAssertEqual(preview.audioTracks.count, 1)
+        let a = try XCTUnwrap(preview.audioTracks.first)
+        return (0..<samples).map { n in
+            let v = Double(n) / fs
+            return a.fileTime(atVideoTime: v) == nil ? 0 : Double(Float(a.gain(atVideoTime: v)))
+        }
+    }
+
+    func testPreviewFadeFollowsExportCurve() async throws {
+        let dir = try TestWav.tempDir("MontageAudioFadeTests")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let dc = dir.appendingPathComponent("dc.wav")
+        let samples = [Float](repeating: Self.level, count: Int(Self.span.duration * Self.fs))
+        try TestWav.write([samples, samples], sampleRate: Self.fs, to: dc)
+        let video = dir.appendingPathComponent("A.mov")
+        _ = try await VideoFileTests.writeVideo(video, start: Self.span.start, seconds: Self.span.duration, color: (0, 0, 255))
+        let part = MontagePart(id: "A", name: "Rítmica 1", isSolo: false, presence: [Self.span],
+                               video: MontagePartVideo(url: video, videoOffset: 0, take: Self.span))
+        let audioSpans = Self.spans.map { AudioKit.MontageSpan(start: $0.start, end: $0.end) }
+        for (name, gate, presence, inverse) in [("toma", MontageAudioGate.during(Self.spans), MontagePresence.audible(audioSpans), false),
+                                                ("original", .except(Self.spans), .silenced(audioSpans), true)] {
+            let out = dir.appendingPathComponent("export-\(UUID().uuidString).wav")
+            let job = MontageMixJob(start: Self.span.start, end: Self.span.end, sampleRate: Self.fs,
+                                    tracks: [MontageTrack(id: "C", url: dc, songStart: Self.span.start, group: .part("C"), presence: presence)],
+                                    normalization: .none, mixURL: out)
+            _ = try await MontageMixer.mix(job)
+            let ref = try TestWav.readFirst(out).map { Double($0 / Self.level) }
+            let plan = MontagePlan(canvas: .landscape, fps: 30, layout: .side, span: Self.span, barDuration: 1, fadeIn: false, fadeOut: false,
+                                   parts: [part], audio: [MontageAudioTrack(url: dc, songStart: Self.span.start, volume: 1, gate: gate)])
+            let preview = try await MontageBuilder.load(plan).make(renderSize: CGSize(width: 320, height: 180))
+            let got = try Self.previewGain(preview, samples: ref.count)
+            var now = Diff(), before = Diff()
+            for n in 0..<min(ref.count, got.count) {
+                let t = Self.span.start + Double(n) / Self.fs
+                now.add(got[n], ref[n], t: t)
+                before.add(inverse ? 1 - Self.linear(t) : Self.linear(t), ref[n], t: t)
+            }
+            let mid = Int((4.04 - Self.span.start) * Self.fs)
+            XCTAssertEqual(ref[mid], 0.5, accuracy: 1e-3, name)
+            print(String(format: "7.9 fundido 80 ms (%@): vista previa − exportación máx |Δg| %.4f en %.4f s, máx %.3f dB en %.4f s; con la rampa lineal de antes: |Δg| %.4f, %.2f dB",
+                         name, now.maxAbs, now.atAbs, now.maxDB, now.atDB, before.maxAbs, before.maxDB))
+            XCTAssertLessThanOrEqual(now.maxAbs, Self.maxGainError, name)
+            XCTAssertLessThanOrEqual(now.maxDB, Self.maxDBError, name)
+        }
+    }
+
+    func testPreviewGlobalFadeFollowsExportCurve() async throws {
+        let dir = try TestWav.tempDir("MontageAudioFadeTests")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let dc = dir.appendingPathComponent("dc.wav")
+        let samples = [Float](repeating: Self.level, count: Int(14.0 * Self.fs))
+        try TestWav.write([samples, samples], sampleRate: Self.fs, to: dc)
+        let video = dir.appendingPathComponent("A.mov")
+        _ = try await VideoFileTests.writeVideo(video, start: 2, seconds: 10, color: (0, 0, 255))
+        let take = MontageSpan(start: 2, end: 12)
+        let part = MontagePart(id: "A", name: "Rítmica 1", isSolo: false, presence: [take],
+                               video: MontagePartVideo(url: video, videoOffset: 0, take: take))
+        let audioEdges = Self.edgeSpans.map { AudioKit.MontageSpan(start: $0.start, end: $0.end) }
+        for (name, gate, presence) in [("siempre", MontageAudioGate.always, MontagePresence.always),
+                                       ("toma con bordes en los fundidos", .during(Self.edgeSpans), .audible(audioEdges))] {
+            let out = dir.appendingPathComponent("export-\(UUID().uuidString).wav")
+            let job = MontageMixJob(segments: Self.cutSegments.map { MontageSegment(start: $0.start, end: $0.end) }, sampleRate: Self.fs,
+                                    tracks: [MontageTrack(id: "A", url: dc, songStart: 0, group: .part("A"), presence: presence)],
+                                    fadeIn: Self.bar, fadeOut: Self.bar, normalization: .none, mixURL: out)
+            _ = try await MontageMixer.mix(job)
+            let ref = try TestWav.readFirst(out).map { Double($0 / Self.level) }
+            let plan = MontagePlan(canvas: .landscape, fps: 30, layout: .side, segments: Self.cutSegments, barDuration: Self.bar,
+                                   fadeIn: true, fadeOut: true, parts: [part], audio: [MontageAudioTrack(url: dc, songStart: 0, volume: 1, gate: gate)])
+            XCTAssertEqual(plan.segments, Self.cutSegments)
+            let preview = try await MontageBuilder.load(plan).make(renderSize: CGSize(width: 320, height: 180))
+            let got = try Self.previewGain(preview, samples: ref.count)
+            let tl = preview.timeline
+            var now = Diff(), before = Diff()
+            for n in 0..<min(ref.count, got.count) {
+                let t = plan.songTime(videoTime: Double(n) / Self.fs)
+                now.add(got[n], ref[n], t: t)
+                before.add(MontageAudioEnvelope.gate(gate, at: t) * tl.globalFade(at: t), ref[n], t: t)
+            }
+            if case .always = gate {
+                for (v, want) in [(1.0, 0.5), (4.0, 0.5), (6.0, 0.5), (8.0, 0.5)] {
+                    XCTAssertEqual(ref[Int(v * Self.fs)], want, accuracy: 1e-3, "\(name) referencia en \(v) s del vídeo")
+                }
+            }
+            print(String(format: "7.9 fundido global de %.0f s (%@): vista previa − exportación máx |Δg| %.4f en %.4f s, máx %.3f dB en %.4f s; con el lineal de antes: |Δg| %.4f, %.2f dB",
+                         Self.bar, name, now.maxAbs, now.atAbs, now.maxDB, now.atDB, before.maxAbs, before.maxDB))
+            XCTAssertLessThanOrEqual(now.maxAbs, Self.maxGainError, name)
+            XCTAssertLessThanOrEqual(now.maxDB, Self.maxDBError, name)
+        }
+    }
+    #else
     func testPreviewFadeFollowsExportCurve() async throws {
         let dir = try TestWav.tempDir("MontageAudioFadeTests")
         defer { try? FileManager.default.removeItem(at: dir) }
@@ -109,6 +207,7 @@ final class MontageAudioFadeTests: XCTestCase {
             XCTAssertLessThanOrEqual(now.maxDB, Self.maxDBError, name)
         }
     }
+    #endif
 
     // MARK: Fundido global de un compás
 
@@ -120,6 +219,7 @@ final class MontageAudioFadeTests: XCTestCase {
     /// global y la ganancia es el producto de los dos.
     static let edgeSpans = [MontageSpan(start: 2, end: 5), MontageSpan(start: 8, end: 12)]
 
+    #if canImport(AVFoundation)
     func testPreviewGlobalFadeFollowsExportCurve() async throws {
         let dir = try TestWav.tempDir("MontageAudioFadeTests")
         defer { try? FileManager.default.removeItem(at: dir) }
@@ -193,6 +293,7 @@ final class MontageAudioFadeTests: XCTestCase {
             XCTAssertLessThanOrEqual(now.maxDB, Self.maxDBError, name)
         }
     }
+    #endif
 
     /// Lo mismo sin AVFoundation para el fundido global: interpolación entre vértices frente a la curva, en los dos
     /// segmentos, sola y multiplicada por fundidos de 80 ms en los mismos bordes.

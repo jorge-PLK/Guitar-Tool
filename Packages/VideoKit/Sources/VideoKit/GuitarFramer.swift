@@ -1,5 +1,11 @@
+#if canImport(CoreGraphics)
 import CoreGraphics
+#endif
+#if canImport(CryptoKit)
 import CryptoKit
+#else
+import Crypto
+#endif
 import Foundation
 
 /// Articulaciones que delimitan la guitarra (mini-spec Fase 7, «Encuadre»: muñecas, codos y torso).

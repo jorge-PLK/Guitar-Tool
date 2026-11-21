@@ -1,3 +1,4 @@
+#if canImport(AVFoundation)
 import AVFoundation
 import XCTest
 @testable import VideoKit
@@ -162,3 +163,142 @@ final class MontageCompositionCoverageTests: XCTestCase {
         }
     }
 }
+#else
+import Foundation
+import XCTest
+@testable import VideoKit
+
+/// Windows (parte 7.9): las mismas tomas de 29,97 fps. Aquí no hay composición de AVFoundation que pueda quedarse corta,
+/// pero sí la misma regla: la pista que se congela hasta el final tiene imagen en el último fotograma del plan, y vídeo,
+/// audio y `mezcla.wav` duran lo mismo (< medio fotograma).
+final class MontageCompositionCoverageTests: XCTestCase {
+    static let fps = 30.0
+    static let cameraPeriod = 1001.0 / 30_000
+    static let firstImage = 2.0237
+    static let halfFrame = 0.5 / fps
+
+    struct Variant {
+        let name: String
+        let take: MontageSpan
+        let frames: Int
+    }
+
+    static let variants = [
+        Variant(name: "A", take: MontageSpan(start: 2.0, end: 4.2589), frames: 90),
+        Variant(name: "B", take: MontageSpan(start: 2.0, end: 4.4), frames: 71),
+        Variant(name: "C", take: MontageSpan(start: 2.0, end: 4.4), frames: 30)
+    ]
+
+    static func writeCameraVideo(_ url: URL, frames: Int) async throws -> Double {
+        let writer = try VideoTakeWriter(url: url, format: VideoFormat(cameraID: "sim", cameraName: "sim", width: 320, height: 180,
+                                                                       fps: 30_000.0 / 1001), realTime: false)
+        let buffer = RenderSupport.buffer(width: 320, height: 180) { _, _ in (0x80, 0x80, 0x80) }
+        for i in 0..<frames {
+            XCTAssertTrue(writer.append(CameraFrame(hostSeconds: 0, arrivalHostSeconds: 0, sequence: i, pixelBuffer: buffer),
+                                        songTime: firstImage + Double(i) * cameraPeriod))
+        }
+        _ = try await writer.finish()
+        return firstImage + Double(frames) * cameraPeriod
+    }
+
+    static func plan(_ parts: [MontagePart], layout: MontageLayoutKind) throws -> MontagePlan {
+        let span = try XCTUnwrap(MontagePlan.videoSpan(presences: parts.map(\.presence)))
+        return MontagePlan(canvas: .landscape, fps: fps, layout: layout, span: span, barDuration: 1, fadeIn: false, fadeOut: true, parts: parts)
+    }
+
+    func testCompositionCoversQuantizedEndWhenTakesEndEarly() async throws {
+        let dir = try TestWav.tempDir("MontageCompositionCoverageTests")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        var parts: [MontagePart] = []
+        for v in Self.variants {
+            let url = dir.appendingPathComponent("\(v.name).mov")
+            let videoEnd = try await Self.writeCameraVideo(url, frames: v.frames)
+            parts.append(MontagePart(id: v.name, name: v.name, isSolo: false, presence: [v.take],
+                                     video: MontagePartVideo(url: url, videoOffset: 0, take: v.take)))
+            let plan = try Self.plan([parts.last!], layout: .single)
+            let preview = try await MontageBuilder.load(plan, includeAudio: false).make(renderSize: CGSize(width: 320, height: 180), includeAudio: false)
+            let gap = plan.span.end - min(videoEnd, v.take.end)
+            let last = Double(preview.frameCount - 1) / Self.fps
+            let end = preview.tracks[0].last?.end ?? 0
+            print(String(format: "Toma %@: imagen hasta %.4f s, tramo hasta %.4f s (hueco %.1f ms), pista hasta %.4f s del vídeo (plan %.4f s)",
+                         v.name, min(videoEnd, v.take.end), plan.span.end, gap * 1000, end, plan.videoDuration))
+            XCTAssertGreaterThan(gap, 0, "toma \(v.name): debe acabar antes que el tramo cuantizado")
+            XCTAssertEqual(preview.frameCount, Int((plan.videoDuration * Self.fps).rounded()))
+            XCTAssertNotNil(MontageTrackPlan.range(at: last, in: preview.tracks[0]), "toma \(v.name): imagen en el último fotograma")
+            XCTAssertGreaterThanOrEqual(end, plan.videoDuration - 1e-9, "toma \(v.name)")
+            XCTAssertNoThrow(try preview.frame(at: last))
+        }
+        let plan = try Self.plan(Array(parts.prefix(2)), layout: .side)
+        let fs = 48_000.0
+        let samples = Int((plan.videoDuration * fs).rounded())
+        let tone = (0..<samples).map { Float(0.2 * sin(2 * .pi * 440 * Double($0) / fs)) }
+        let mix = dir.appendingPathComponent("mezcla.wav")
+        try TestWav.write([tone, tone], sampleRate: fs, to: mix)
+        let out = dir.appendingPathComponent("montaje.mov")
+        let summary = try await MontageExporter.export(plan: plan, mixURL: mix,
+                                                       settings: MontageExportSettings(codec: .h264, width: 640, height: 360, fps: Self.fps), to: out)
+        var frames = 0
+        try MediaFoundationReader.forEachFrame(out) { _, _, _ in frames += 1; return true }
+        let video = Double(frames) / Self.fps
+        let au = try MediaFoundationReader.audio(out)
+        let audio = Double(au.channels[0].count) / au.sampleRate
+        let wav = Double(samples) / fs
+        print(String(format: "Exportado: %d fotogramas, vídeo %.4f s, audio %.4f s, mezcla.wav %.4f s", summary.frames, video, audio, wav))
+        XCTAssertEqual(summary.frames, Int((plan.videoDuration * Self.fps).rounded()))
+        XCTAssertEqual(frames, summary.frames)
+        XCTAssertEqual(video, wav, accuracy: Self.halfFrame)
+        XCTAssertEqual(audio, wav, accuracy: Self.halfFrame)
+    }
+
+    /// Toma C (gris 0x80 que acaba 1,4 s antes que su audio): funde a negro en 0,5 s desde la última imagen y queda en negro.
+    func testTakeEndingEarlyFadesToBlack() async throws {
+        let dir = try TestWav.tempDir("MontageCompositionCoverageTests-fade")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let v = Self.variants[2]
+        let url = dir.appendingPathComponent("C.mov")
+        let videoEnd = try await Self.writeCameraVideo(url, frames: v.frames)
+        let part = MontagePart(id: "C", name: "C", isSolo: false, presence: [v.take], video: MontagePartVideo(url: url, videoOffset: 0, take: v.take))
+        for (layout, aspect) in [(MontageLayoutKind.single, false), (.side, false), (.stack, true)] {
+            let plan = MontagePlan(canvas: layout.defaultCanvas, fps: Self.fps, layout: layout, span: v.take, barDuration: 1, fadeIn: false,
+                                   fadeOut: false, parts: [part], showPartLabels: false, keepVideoAspect: aspect)
+            let size = MontageBuilder.renderSize(canvas: plan.canvas, maxDimension: 320)
+            let preview = try await MontageBuilder.load(plan, includeAudio: false).make(renderSize: size, includeAudio: false)
+            let tl = preview.timeline
+            let imageEnd = try XCTUnwrap(tl.parts.first?.imageEnd)
+            XCTAssertEqual(imageEnd, videoEnd, accuracy: 1e-3, "última imagen")
+            let start = plan.span.start
+            let k0 = Int(((imageEnd - start) * Self.fps).rounded(.down))
+            let times = [(k0 - 3, "antes"), (k0 + 8, "mitad"), (k0 + 18, "después"), (Int((plan.videoDuration * Self.fps).rounded()) - 1, "final")]
+                .map { (Double($0.0) / Self.fps, $0.1) }
+            var line: [String] = []
+            var values: [String: (sharp: Double, fill: Double, k: Double)] = [:]
+            for (vt, name) in times {
+                let f = MontageGateTests.Frame(try preview.frame(at: vt))
+                let k = tl.imageBrightness(part: 0, at: start + vt)
+                let c = f.rgb(Double(f.width) / 2, Double(f.height) / 2)
+                let fl = f.rgb(Double(f.width) / 2, Double(f.height) * 0.15)
+                values[name] = (c.0, fl.0, k)
+                line.append(String(format: "%@ %.3f s: brillo %.3f, centro %.0f, relleno %.0f", name, start + vt, k, c.0, fl.0))
+            }
+            print("7.9 fin de toma \(layout.rawValue)\(aspect ? " (aspect)" : ""): " + line.joined(separator: "; "))
+            let before = try XCTUnwrap(values["antes"]), mid = try XCTUnwrap(values["mitad"])
+            let after = try XCTUnwrap(values["después"]), last = try XCTUnwrap(values["final"])
+            XCTAssertEqual(before.k, 1, accuracy: 1e-12)
+            XCTAssertEqual(mid.k, 1 - (start + Double(k0 + 8) / Self.fps - imageEnd) / MontageStyle.endFade, accuracy: 1e-9)
+            XCTAssertEqual(after.k, 0, accuracy: 1e-12)
+            XCTAssertEqual(last.k, 0, accuracy: 1e-12)
+            // Mismos umbrales que en el Mac (aquí sin la conversión BT.709 → sRGB del lector de AVFoundation).
+            XCTAssertGreaterThan(before.sharp, 100, "\(layout): imagen antes del final")
+            XCTAssertGreaterThan(mid.sharp, before.sharp * 0.25, "\(layout): a mitad del fundido")
+            XCTAssertLessThan(mid.sharp, before.sharp * 0.8, "\(layout): a mitad del fundido")
+            XCTAssertLessThanOrEqual(after.sharp, 4, "\(layout): negro tras el fundido")
+            XCTAssertLessThanOrEqual(last.sharp, 4, "\(layout): negro hasta el final")
+            if aspect {
+                XCTAssertGreaterThan(before.fill, 30, "relleno difuminado antes del final")
+                XCTAssertLessThanOrEqual(after.fill, 4, "relleno en negro tras el fundido")
+                XCTAssertLessThanOrEqual(last.fill, 4, "relleno en negro hasta el final")
+            }
+        }
+    }
+}
+#endif // canImport(AVFoundation)

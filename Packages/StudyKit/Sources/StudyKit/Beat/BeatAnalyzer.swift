@@ -1,5 +1,8 @@
+#if canImport(CoreML)
 import CoreML
+#endif
 import Foundation
+import NativePlatform
 
 /// Pulso y compás con Beat This! `final0` (mini-spec Fase 2 §1 StudyKit; ADR-006): log-mel, troceado de 1500
 /// tramas con borde 6, `mlmodelc` comunitario en CPU+GPU FP32 y postproceso «minimal».
@@ -31,7 +34,7 @@ public actor BeatAnalyzer {
 
     private func loadedPredictor() throws -> any BeatFramePredictor {
         if let predictor { return predictor }
-        let p = try CoreMLBeatPredictor(modelURL: modelURL!)
+        let p = try makeBeatPredictor(modelURL: modelURL!)
         predictor = p
         return p
     }
@@ -42,6 +45,18 @@ protocol BeatFramePredictor: Sendable {
     func predict(chunk: UnsafeBufferPointer<Float>) throws -> (beat: [Float], downbeat: [Float])
 }
 
+/// El predictor del modelo real de la plataforma: Core ML en el Mac; en Windows, ONNX Runtime (paso 7).
+func makeBeatPredictor(modelURL: URL) throws -> any BeatFramePredictor {
+    #if canImport(CoreML)
+    return try CoreMLBeatPredictor(modelURL: modelURL)
+    #elseif os(Windows)
+    return try OnnxBeatPredictor(modelURL: modelURL)
+    #else
+    throw PlatformError.unsupported("sin motor de inferencia en esta plataforma")
+    #endif
+}
+
+#if canImport(CoreML)
 /// `BeatThis.mlmodelc`: entrada `spect` [1, 1500, 128] f32, salidas `beat` y `downbeat` [1, 1500].
 final class CoreMLBeatPredictor: BeatFramePredictor, @unchecked Sendable {
     private let model: MLModel
@@ -93,6 +108,7 @@ final class CoreMLBeatPredictor: BeatFramePredictor, @unchecked Sendable {
         }
     }
 }
+#endif
 
 /// Troceado y agregado oficiales (`split_piece(avoid_short_end=True)` + `aggregate_prediction("keep_first")`).
 enum BeatChunker {

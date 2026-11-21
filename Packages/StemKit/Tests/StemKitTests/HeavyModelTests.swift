@@ -1,7 +1,111 @@
-import AVFoundation
-import CoreML
 import XCTest
 @testable import StemKit
+
+#if os(Windows)
+import NativeONNX
+
+/// Separación con el ONNX real (parte 7.8). Solo con `TF_MODEL_TESTS=1`, de uno en uno y con la VM sola (pico de
+/// 5,6 GB con T=345). Modelo y referencias en `<TF_MODELS_DIR o C:\tf-models>\bs_roformer` (parte 7.3; T=345):
+/// `model.onnx`, `in_real.bin`/`in_imag.bin` y `ref_real.bin`/`ref_imag.bin` (ORT CPU del Mac, un trozo del
+/// minuto 1 de T1), `T1_mix_60-85s.wav` y `T1_guitar_60-85s_coreml.wav` (guitarra de la app en el Mac).
+final class HeavyModelTests: XCTestCase {
+    /// Misma red, otro equipo: SNR ≥ 60 dB; frente a Core ML: SDR ≥ 15 dB (decisiones de Jorge, 19/11/2026).
+    static let minSNRvsMacORT = 60.0
+    static let minSDRvsCoreML = 15.0
+    /// Bordes del fragmento fuera de la comparación: la app separó el tema entero y aquí solo 25 s (otro troceado).
+    static let edgeSeconds = 2.0
+    static let folder = "bs_roformer"
+
+    private func requireHeavy() throws -> URL {
+        guard ProcessInfo.processInfo.environment["TF_MODEL_TESTS"] == "1" else {
+            throw XCTSkip("tests del modelo real desactivados (TF_MODEL_TESTS != 1)")
+        }
+        guard let url = OnnxDevelopmentModels.model(Self.folder) else {
+            throw XCTSkip("no está el modelo en \(OnnxDevelopmentModels.directory(Self.folder).path)")
+        }
+        return url
+    }
+
+    /// Un trozo por `OnnxMaskModel` (máscara = out/spec y otra vez por spec) frente a ORT CPU del Mac.
+    func test0_ChunkMatchesMacReference() throws {
+        let url = try requireHeavy()
+        let t0 = Date()
+        let model = try OnnxMaskModel(modelURL: url, contract: .bsRoformerSW)
+        let load = Date().timeIntervalSince(t0)
+        XCTAssertEqual(model.interface, .maskedSpectrum)
+        let bins = RoformerContract.bins, frames = model.frames, stems = RoformerContract.stemCount
+        print("[7.8] bs_roformer: T=\(frames) del modelo, proveedor \(model.session.provider), carga \(String(format: "%.1f", load)) s")
+        let re = try OnnxDevelopmentModels.floats(Self.folder, "in_real.bin")
+        let im = try OnnxDevelopmentModels.floats(Self.folder, "in_imag.bin")
+        XCTAssertEqual(re.count, 2 * bins * frames, "entrada de la 7.3 con la T del modelo")
+        var spec = [Float](repeating: 0, count: 2 * bins * frames * 2)
+        for c in 0..<2 { for f in 0..<bins { for t in 0..<frames {
+            let p = (c * bins + f) * frames + t, s = ((2 * f + c) * frames + t) * 2
+            spec[s] = re[p]; spec[s + 1] = im[p]
+        } } }
+        var mask = [Float](repeating: .nan, count: stems * 2 * bins * frames * 2)
+        let t1 = Date()
+        try model.predict(spec: &spec, mask: &mask)
+        print("[7.8] bs_roformer: trozo en \(String(format: "%.1f", Date().timeIntervalSince(t1))) s")
+        var outRe = [Float](repeating: 0, count: stems * 2 * bins * frames), outIm = outRe
+        for st in 0..<stems { for c in 0..<2 { for f in 0..<bins { for t in 0..<frames {
+            let s = ((2 * f + c) * frames + t) * 2, m = ((st * 2 * bins + 2 * f + c) * frames + t) * 2
+            let o = st * 2 * bins * frames + (c * bins + f) * frames + t
+            outRe[o] = mask[m] * spec[s] - mask[m + 1] * spec[s + 1]
+            outIm[o] = mask[m] * spec[s + 1] + mask[m + 1] * spec[s]
+        } } } }
+        let snrRe = snrDB(try OnnxDevelopmentModels.floats(Self.folder, "ref_real.bin"), outRe)
+        let snrIm = snrDB(try OnnxDevelopmentModels.floats(Self.folder, "ref_imag.bin"), outIm)
+        print("[7.8] bs_roformer: SNR frente a ORT Mac \(String(format: "%.1f", snrRe)) / \(String(format: "%.1f", snrIm)) dB")
+        XCTAssertGreaterThanOrEqual(min(snrRe, snrIm), Self.minSNRvsMacORT)
+    }
+
+    /// 25 s de T1 por tf-separate y SeparationRunner: guitarra frente a la de la app (Core ML) en el Mac.
+    func test1_ExcerptThroughRunner() async throws {
+        _ = try requireHeavy()
+        let mix = OnnxDevelopmentModels.directory(Self.folder).appendingPathComponent("T1_mix_60-85s.wav")
+        try await separateAndCompare(input: mix, label: "44,1 kHz")
+    }
+
+    /// El mismo fragmento a 48 kHz (remuestreo r8brain de ida en el test y de vuelta en el helper).
+    func test2_Input48kThroughRunner() async throws {
+        _ = try requireHeavy()
+        let src = try AudioIO.readStereo(OnnxDevelopmentModels.directory(Self.folder).appendingPathComponent("T1_mix_60-85s.wav"))
+        let dir = try makeTempDir("heavy48")
+        let input = dir.appendingPathComponent("mix48.wav")
+        try writeStereo(try AudioIO.resample(src, to: 48_000), to: input)
+        try await separateAndCompare(input: input, label: "48 kHz")
+    }
+
+    private func separateAndCompare(input: URL, label: String) async throws {
+        let model = try requireHeavy()
+        let out = try makeTempDir("heavy-out")
+        let runner = SeparationRunner(helperURL: builtProduct("tf-separate"))
+        var finished: (Double, UInt64)?
+        let t0 = Date()
+        for try await e in runner.run(model: model, input: input, outputDirectory: out) {
+            if case .finished(let s, let p) = e { finished = (s, p) }
+        }
+        let (seconds, peak) = try XCTUnwrap(finished)
+        let source = try AudioIO.readStereo(input)
+        let minutes = Double(source.frameCount) / source.sampleRate / 60
+        print("[7.8] tf-separate \(label): \(String(format: "%.1f", seconds)) s (\(String(format: "%.0f", seconds / minutes)) s/min, pared \(String(format: "%.1f", Date().timeIntervalSince(t0))) s), pico \(peak >> 20) MB")
+        var guitar = try AudioIO.readStereo(out.appendingPathComponent(Stem.guitar.fileName))
+        XCTAssertEqual(guitar.frameCount, source.frameCount, "misma longitud que la entrada")
+        if guitar.sampleRate != 44_100 { guitar = try AudioIO.resample(guitar, to: 44_100) }
+        let app = try AudioIO.readStereo(OnnxDevelopmentModels.directory(Self.folder)
+            .appendingPathComponent("T1_guitar_60-85s_coreml.wav"))
+        let edge = Int(Self.edgeSeconds * 44_100)
+        let n = min(app.frameCount, guitar.frameCount) - edge
+        let sdr = (snrDB(Array(app.left[edge..<n]), Array(guitar.left[edge..<n]))
+                   + snrDB(Array(app.right[edge..<n]), Array(guitar.right[edge..<n]))) / 2
+        print("[7.8] tf-separate \(label): guitarra frente a Core ML de la app \(String(format: "%.1f", sdr)) dB")
+        XCTAssertGreaterThanOrEqual(sdr, Self.minSDRvsCoreML)
+    }
+}
+#else
+import AVFoundation
+import CoreML
 
 /// Tests con el modelo real. Solo con `TF_MODEL_TESTS=1` y siempre bajo el vigilante:
 ///   TF_MODEL_TESTS=1 Tools/py/.venv/bin/python Probes/P4-modelos/common/guard.py --limit-gb 10 \
@@ -147,3 +251,4 @@ final class HeavyModelTests: XCTestCase {
                      Double(r.peak) / 1e9, recon))
     }
 }
+#endif

@@ -1,3 +1,4 @@
+#if canImport(AVFoundation)
 import AVFoundation
 import Foundation
 import ImageIO
@@ -84,3 +85,4 @@ extension CLI {
         return Exit.ok
     }
 }
+#endif

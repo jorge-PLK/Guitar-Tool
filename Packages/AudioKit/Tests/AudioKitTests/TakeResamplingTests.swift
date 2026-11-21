@@ -1,11 +1,15 @@
+#if canImport(AVFoundation)
 import AVFoundation
+#endif
 import XCTest
 @testable import AudioKit
 
 /// Tomas a otra frecuencia que la del proyecto, remuestreadas al cargar (decisión de Jorge, 17/11/2026): un clic
 /// cae en el mismo instante del tema (± 1 muestra de destino) en la carga, el reproductor, el punch-in y la
 /// corrección de latencia; a la misma frecuencia el camino es el de siempre.
-final class TakeResamplingTests: XCTestCase {
+class TakeResamplingTests: XCTestCase {
+    /// Motor del reproductor: el de la plataforma; el portátil en `PortableTakeResamplingTests` (solo Mac).
+    var kind: PlayerKind { .platform }
     var dir: URL!
 
     override func setUpWithError() throws { dir = try SynthWAV.tempDir() }
@@ -75,7 +79,7 @@ final class TakeResamplingTests: XCTestCase {
         let songStart = 24_001 / 48_000.0
         let k = Int(0.9137 * takeRate)
         let take = try clickTake("play-\(Int(takeRate))-\(Int(songRate))", rate: takeRate, seconds: 2, clickAt: [k])
-        let p = StudyPlayer(offlineWith: nil)
+        let p = kind.offline()
         try p.load(tracks: [Track(id: "backing", url: backing)])
         try p.setTakes([TakeTrack(id: "Tú", url: take, songStart: songStart)])
         let from = 1.0
@@ -129,6 +133,17 @@ final class TakeResamplingTests: XCTestCase {
             XCTAssertEqual(e2, 0, accuracy: Self.toleranceSamples)
             XCTAssertEqual(Double(x.count), 3 * projectRate, accuracy: Self.toleranceSamples, "dura lo que la original")
         }
+    }
+
+    /// Lo mismo con la conversión de Windows (r8brain) forzada en el Mac (parte 7.1).
+    func testConvertedTakeAndPunchWithThePortableConverter() throws {
+        #if canImport(AVFoundation)
+        // La caché de `readable` va por ruta y `dir` es único por prueba: no reutiliza copias de AVAudioConverter.
+        try AudioImporter.$forcePortable.withValue(true) {
+            try testConvertedTakeKeepsDurationAndClickInstantAndLeavesTheOriginalAlone()
+            try testPunchAtProjectRateOverABaseAtAnotherRate()
+        }
+        #endif
     }
 
     // MARK: Corrección de latencia
@@ -188,3 +203,10 @@ final class TakeResamplingTests: XCTestCase {
         }
     }
 }
+
+#if canImport(AVFoundation)
+/// Los mismos casos con el motor portátil (el de Windows) en el Mac.
+final class PortableTakeResamplingTests: TakeResamplingTests {
+    override var kind: PlayerKind { .portable }
+}
+#endif

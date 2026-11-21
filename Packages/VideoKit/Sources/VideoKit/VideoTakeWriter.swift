@@ -1,5 +1,7 @@
+#if canImport(AVFoundation)
 import AVFoundation
 import CoreVideo
+#endif
 import Foundation
 
 /// Destino de los fotogramas de una toma con su tiempo del tema (el escritor real o uno de prueba).
@@ -27,6 +29,10 @@ public enum VideoTakeWriterError: Error, Equatable, Sendable {
     case empty
 }
 
+/// Escala de tiempo de los PTS en tiempo del tema (90 000, ver `VideoTakeWriter`), también sin CoreMedia.
+let songTimescale: Int32 = 90_000
+
+#if canImport(AVFoundation)
 /// `takes/<id>/video.mov` (mini-spec Fase 6, «Cámara y sincronía»): HEVC, solo vídeo, con la resolución y los fps
 /// reales, y **PTS = tiempo del tema** sin el desfase manual.
 ///
@@ -40,7 +46,7 @@ public enum VideoTakeWriterError: Error, Equatable, Sendable {
 ///   (tests y ficheros), se espera.
 public final class VideoTakeWriter: VideoFrameSink, @unchecked Sendable {
     /// Escala de tiempo de pista y película (decisión propia, ver arriba).
-    public static let timescale: CMTimeScale = 90_000
+    public static let timescale: CMTimeScale = songTimescale
     /// Espera máxima por fotograma sin `realTime`.
     static let busyTimeoutSeconds = 5.0
 
@@ -147,3 +153,4 @@ public final class VideoTakeWriter: VideoFrameSink, @unchecked Sendable {
         try? FileManager.default.removeItem(at: url)
     }
 }
+#endif

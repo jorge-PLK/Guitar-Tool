@@ -1,3 +1,5 @@
+// Solo Apple (AVFoundation, Core Image, Core Text, Metal). En Windows no existe: paso 7: direct2d.
+#if canImport(AVFoundation)
 import AVFoundation
 import CoreImage
 import CoreText
@@ -76,6 +78,35 @@ public final class MontageCompositor: NSObject, AVVideoCompositing, @unchecked S
         context.render(image, to: out, bounds: CGRect(origin: .zero, size: size), colorSpace: nil)
         request.finish(withComposedVideoFrame: out)
     }
+}
+
+/// `MontageFrameRendering` del Mac: el mismo `MontageRenderer` y el mismo contexto (Metal, sin gestión de color) que
+/// `MontageCompositor`, dibujando en un `CVPixelBuffer` BGRA (plan, «Fase 7c», paso 7, parte 7.9).
+public final class CoreImageMontageRenderer: MontageFrameRendering, @unchecked Sendable {
+    private let context: CIContext
+    private let renderer = MontageRenderer()
+
+    public init() {
+        let options: [CIContextOption: Any] = [.workingColorSpace: NSNull(), .outputColorSpace: NSNull(), .cacheIntermediates: false]
+        if let device = MTLCreateSystemDefaultDevice() {
+            context = CIContext(mtlDevice: device, options: options)
+        } else {
+            context = CIContext(options: options)
+        }
+    }
+
+    public func render(_ state: MontageFrameState, timeline: MontageTimeline, caption: MontageCaption?, into output: CVPixelBuffer,
+                       source: (Int) -> CVPixelBuffer?) throws {
+        let size = CGSize(width: CVPixelBufferGetWidth(output), height: CVPixelBufferGetHeight(output))
+        let image = renderer.render(state, timeline: timeline, caption: caption, renderSize: size) { i in
+            source(i).map { CIImage(cvPixelBuffer: $0) }
+        }
+        context.render(image, to: output, bounds: CGRect(origin: .zero, size: size), colorSpace: nil)
+    }
+
+    /// Tamaño de la placa del nombre y del rótulo a escala `s` (para comparar la geometría con Windows).
+    func labelPlateSize(_ name: String, size: Double) -> CGSize? { renderer.label(name, size: size)?.extent.size }
+    func captionPlateSize(_ caption: MontageCaption, scale s: Double) -> CGSize? { renderer.captionImage(caption, scale: s)?.extent.size }
 }
 
 /// Dibujo de un estado en Core Image (coordenadas de Core Image: origen abajo a la izquierda).
@@ -255,3 +286,4 @@ final class MontageRenderer: @unchecked Sendable {
         return ctx.makeImage().map { CIImage(cgImage: $0) }
     }
 }
+#endif

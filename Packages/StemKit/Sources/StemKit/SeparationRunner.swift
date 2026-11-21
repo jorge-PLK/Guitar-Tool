@@ -1,5 +1,5 @@
-import Darwin
 import Foundation
+import NativePlatform
 
 /// Eventos de una separación lanzada con `SeparationRunner`.
 public enum SeparationEvent: Sendable, Equatable {
@@ -33,7 +33,7 @@ public struct SeparationRunner: Sendable {
     public let memoryLimitBytes: UInt64
     /// Solo tests: periodo de sondeo de `MemoryGuard` y aviso con el pid del helper al lanzarlo.
     var guardInterval: Double = MemoryGuard.defaultInterval
-    var onLaunch: (@Sendable (pid_t) -> Void)?
+    var onLaunch: (@Sendable (Int32) -> Void)?
 
     public init(helperURL: URL, memoryLimitBytes: UInt64 = MemoryGuard.defaultLimitBytes) {
         self.helperURL = helperURL
@@ -42,6 +42,7 @@ public struct SeparationRunner: Sendable {
 
     /// Separa `input` con el modelo compilado `model` y deja `<stem>.wav` en `outputDirectory`.
     /// Cancelar el Task que consume el stream manda SIGTERM al helper y, si no sale en 5 s, SIGKILL.
+    /// Windows: no hay SIGTERM entre procesos; `ChildProcess` termina el árbol en el acto (paso 7: parada ordenada).
     public func run(model: URL, input: URL, outputDirectory: URL) -> AsyncThrowingStream<SeparationEvent, Error> {
         let fm = FileManager.default
         for (what, url) in [("modelo", model), ("entrada", input)] where !fm.fileExists(atPath: url.path) {
@@ -62,9 +63,8 @@ public struct SeparationRunner: Sendable {
         let helperURL = helperURL, limit = memoryLimitBytes, interval = guardInterval, onLaunch = onLaunch
         return AsyncThrowingStream { continuation in
             let run = HelperRun(continuation: continuation)
-            let process = Process()
-            process.executableURL = helperURL
-            process.arguments = arguments
+            let child = ChildProcess(executableURL: helperURL, arguments: arguments)
+            let process = child.process
             process.standardInput = FileHandle.nullDevice
             let out = Pipe(), err = Pipe()
             process.standardOutput = out
@@ -80,8 +80,17 @@ public struct SeparationRunner: Sendable {
             process.terminationHandler = { p in
                 run.exited(reason: p.terminationReason, status: p.terminationStatus)
             }
+            #if os(Windows)
+            // Parada ordenada (parte 7.8): el helper vigila este evento (ver `HelperStop`).
+            if let stop = HelperStop.makeEvent() {
+                var env = ProcessInfo.processInfo.environment
+                env[StopEvent.environmentKey] = stop.name
+                process.environment = env
+                run.stopEvent = stop
+            }
+            #endif
             do {
-                try process.run()
+                try child.run()
             } catch {
                 out.fileHandleForReading.readabilityHandler = nil
                 err.fileHandleForReading.readabilityHandler = nil
@@ -89,9 +98,9 @@ public struct SeparationRunner: Sendable {
                     code: -1, stderrTail: "no se pudo lanzar el helper: \(error.localizedDescription)"))
                 return
             }
-            let pid = process.processIdentifier
+            let pid = child.processIdentifier
             let memGuard = MemoryGuard(pid: pid, limitBytes: limit, interval: interval)
-            run.started(process: process, guard: memGuard)
+            run.started(process: child, guard: memGuard)
             memGuard.start()
             onLaunch?(pid)
             continuation.onTermination = { reason in
@@ -113,9 +122,9 @@ private final class HelperRun: @unchecked Sendable {
 
     private let lock = NSLock()
     private let continuation: AsyncThrowingStream<SeparationEvent, Error>.Continuation
-    private var process: Process?
+    private var process: ChildProcess?
     private var memGuard: MemoryGuard?
-    private var pid: pid_t = 0
+    private var pid: Int32 = 0
     private var lineBuffer = Data()
     private var stderrTail = Data()
     private var stdoutEOF = false, stderrEOF = false
@@ -123,12 +132,16 @@ private final class HelperRun: @unchecked Sendable {
     private var doneSeconds: Double?
     private var cancelled = false
     private var completed = false
+    #if os(Windows)
+    /// Evento de parada ordenada del helper; vive lo que la ejecución.
+    var stopEvent: StopEvent?
+    #endif
 
     init(continuation: AsyncThrowingStream<SeparationEvent, Error>.Continuation) {
         self.continuation = continuation
     }
 
-    func started(process: Process, guard g: MemoryGuard) {
+    func started(process: ChildProcess, guard g: MemoryGuard) {
         lock.withLock {
             self.process = process
             self.memGuard = g
@@ -174,18 +187,25 @@ private final class HelperRun: @unchecked Sendable {
         tryComplete()
     }
 
-    /// SIGTERM ahora y SIGKILL si sigue vivo pasado el margen.
+    /// SIGTERM ahora y SIGKILL si sigue vivo pasado el margen (`ChildProcess.terminate`: al grupo del helper).
+    /// Windows: `TerminateJobObject` en el acto; el helper no llega a borrar su carpeta de trabajo
+    /// (paso 7: parada ordenada de tf-separate).
     func cancel() {
-        let target: pid_t? = lock.withLock {
+        let target: ChildProcess? = lock.withLock {
             cancelled = true
-            return exit == nil && pid > 0 ? pid : nil
+            return exit == nil && pid > 0 ? process : nil
         }
-        guard let pid = target else { return }
-        Darwin.kill(pid, SIGTERM)
-        DispatchQueue.global().asyncAfter(deadline: .now() + SeparationRunner.terminateGrace) { [self] in
-            let alive = lock.withLock { exit == nil }
-            if alive { Darwin.kill(pid, SIGKILL) }
+        #if os(Windows)
+        // Primero el evento (el helper sale limpiando); `TerminateJobObject` solo si sigue vivo pasado el margen.
+        if let target, let stop = lock.withLock({ stopEvent }) {
+            stop.signal()
+            DispatchQueue.global().asyncAfter(deadline: .now() + SeparationRunner.terminateGrace) {
+                if target.isRunning { target.terminate(grace: 0) }
+            }
+            return
         }
+        #endif
+        target?.terminate(grace: SeparationRunner.terminateGrace)
     }
 
     private func tryComplete() {

@@ -1,4 +1,4 @@
-import AVFoundation
+import NativeAudioFile
 import XCTest
 @testable import TabKit
 
@@ -78,15 +78,8 @@ final class DrumTranscriberTests: XCTestCase {
         }
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("tabkit-drums-48k-\(UUID().uuidString).wav")
         defer { try? FileManager.default.removeItem(at: url) }
-        let fmt = try XCTUnwrap(AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 48_000, channels: 2, interleaved: false))
-        do {
-            let file = try AVAudioFile(forWriting: url, settings: fmt.settings, commonFormat: .pcmFormatFloat32, interleaved: false)
-            let x = sine(48_000)
-            let buf = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: fmt, frameCapacity: AVAudioFrameCount(x.count)))
-            buf.frameLength = AVAudioFrameCount(x.count)
-            for c in 0..<2 { x.withUnsafeBufferPointer { buf.floatChannelData![c].update(from: $0.baseAddress!, count: x.count) } }
-            try file.write(from: buf)
-        }
+        let x = sine(48_000)
+        try NativeAudioFile.write(url, channels: [x, x], sampleRate: 48_000, format: .float32)
         let loaded = try MonoAudio.load(url, sampleRate: DrumContract.sampleRate)
         XCTAssertEqual(loaded.count, 88_200)
         let a = DrumSpectrogram.compute(loaded), b = DrumSpectrogram.compute(sine(44_100))

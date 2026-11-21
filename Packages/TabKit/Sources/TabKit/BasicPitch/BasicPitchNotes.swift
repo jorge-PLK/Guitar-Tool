@@ -1,4 +1,5 @@
-import Accelerate
+import Foundation
+import NativeDSP
 
 /// Port de `output_to_notes_polyphonic` (basic-pitch 0.4.0, `note_creation.py`) con `infer_onsets` y
 /// `melodia_trick`, sin límites de frecuencia, y de los tiempos de `model_output_to_notes`. Mismo orden de
@@ -33,13 +34,13 @@ enum BasicPitchNotes {
         let maxIdx = p - 1   // MAX_FREQ_IDX
 
         var energy = [Double](repeating: 0, count: n * p)   // remaining_energy (float64)
-        vDSP.convertElements(of: note, to: &energy)
+        DSP.convertElements(of: note, to: &energy)
         var out: [FrameNote] = []
 
         func amplitude(_ s: Int, _ e: Int, _ f: Int) -> Float {
             // np.mean(frames[s:e, f]) sobre float32
             var m: Float = 0
-            note.withUnsafeBufferPointer { vDSP_meanv($0.baseAddress! + s * p + f, p, &m, vDSP_Length(e - s)) }
+            note.withUnsafeBufferPointer { DSP.meanv($0.baseAddress! + s * p + f, p, &m, DSPLength(e - s)) }
             return m
         }
 
@@ -79,7 +80,7 @@ enum BasicPitchNotes {
         var rowMax = [Double](repeating: 0, count: n)
         func refreshRows(_ lo: Int, _ hi: Int) {
             energy.withUnsafeBufferPointer { e in
-                for t in max(0, lo)...min(n - 1, hi) { vDSP_maxvD(e.baseAddress! + t * p, 1, &rowMax[t], vDSP_Length(p)) }
+                for t in max(0, lo)...min(n - 1, hi) { DSP.maxvD(e.baseAddress! + t * p, 1, &rowMax[t], DSPLength(p)) }
             }
         }
         refreshRows(0, n - 1)
@@ -129,7 +130,7 @@ enum BasicPitchNotes {
     static func inferredOnsets(note: [Float], onset: [Float], frames n: Int) -> [Double]? {
         let p = C.nPitches, nd = C.onsetDiffFrames
         var frames = [Double](repeating: 0, count: n * p)
-        vDSP.convertElements(of: note, to: &frames)
+        DSP.convertElements(of: note, to: &frames)
         var diff = [Double](repeating: 0, count: n * p)
         for t in nd..<max(nd, n) {   // filas 0..<n_diff a 0 (`frame_diff[:n_diff, :] = 0`)
             for f in 0..<p {
@@ -139,11 +140,11 @@ enum BasicPitchNotes {
                 diff[t * p + f] = max(d, 0)
             }
         }
-        let maxDiff = vDSP.maximum(diff)
+        let maxDiff = DSP.maximum(diff)
         guard maxDiff > 0 else { return nil }
-        let maxOnset = Double(vDSP.maximum(onset))
+        let maxOnset = Double(DSP.maximum(onset))
         var res = [Double](repeating: 0, count: n * p)
-        vDSP.convertElements(of: onset, to: &res)
+        DSP.convertElements(of: onset, to: &res)
         for i in 0..<(n * p) {
             res[i] = max(res[i], maxOnset * diff[i] / maxDiff)
         }

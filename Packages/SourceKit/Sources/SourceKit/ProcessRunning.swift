@@ -1,5 +1,5 @@
-import Darwin
 import Foundation
+import NativePlatform
 
 /// Tiempo límite de un helper (spec, «Errores»: 15 s metadatos, 30 s búsqueda, 60 s de descarga sin avance).
 public enum ProcessTimeout: Sendable, Equatable {
@@ -43,8 +43,8 @@ public extension ProcessRunning {
     func run(_ request: ProcessRequest) async throws -> ProcessResult { try await run(request, onLine: nil) }
 }
 
-/// Implementación real con `Process`. Cancelar la tarea manda SIGTERM y, pasado el margen, SIGKILL
-/// (igual que `SeparationRunner`).
+/// Implementación real con `ChildProcess` (NativePlatform). Cancelar la tarea termina el árbol entero (yt-dlp lanza
+/// ffmpeg): Mac, SIGTERM al grupo y, pasado el margen, SIGKILL; Windows, Job Object (plan, «Fase 7c»).
 public struct SystemProcessRunner: ProcessRunning {
     /// Espera tras SIGTERM antes de SIGKILL.
     public static let terminateGrace: TimeInterval = 5
@@ -70,7 +70,8 @@ private final class ProcessSession: @unchecked Sendable {
     private let request: ProcessRequest
     private let grace: TimeInterval
     private let onLine: (@Sendable (String) -> Void)?
-    private let process = Process()
+    private let child = ChildProcess()
+    private var process: Process { child.process }
     private var continuation: CheckedContinuation<ProcessResult, Error>?
     private var stdout = Data(), stderr = Data(), lineBuffer = Data()
     private var stdoutEOF = false, stderrEOF = false
@@ -110,7 +111,7 @@ private final class ProcessSession: @unchecked Sendable {
             tryComplete()
         }
         do {
-            try process.run()
+            try child.run()
         } catch {
             out.fileHandleForReading.readabilityHandler = nil
             err.fileHandleForReading.readabilityHandler = nil
@@ -149,14 +150,11 @@ private final class ProcessSession: @unchecked Sendable {
 
     private let launchDate = Date()
 
-    /// SIGTERM ahora y SIGKILL si sigue vivo pasado el margen.
+    /// Termina el árbol ahora (Mac: SIGTERM y SIGKILL pasado el margen; Windows: Job Object).
     private func terminate() {
-        let pid: pid_t? = lock.withLock { exit == nil ? process.processIdentifier : nil }
-        guard let pid, pid > 0 else { return }
-        Darwin.kill(pid, SIGTERM)
-        DispatchQueue.global().asyncAfter(deadline: .now() + grace) { [self] in
-            if lock.withLock({ exit == nil }) { Darwin.kill(pid, SIGKILL) }
-        }
+        let alive: Bool = lock.withLock { exit == nil }
+        guard alive, child.processIdentifier > 0 else { return }
+        child.terminate(grace: grace)
     }
 
     private func received(stdout data: Data) {
@@ -195,7 +193,12 @@ private final class ProcessSession: @unchecked Sendable {
             timer?.cancel()
             if cancelled { return .failure(SourceError.cancelled) }
             if timedOut { return .failure(SourceError.timedOut) }
+            #if os(Windows)
+            // Windows no tiene señales: el código de salida va tal cual (terminate deja 143, ver ChildProcess).
+            let code = exit.status
+            #else
             let code = exit.reason == .uncaughtSignal ? 128 + exit.status : exit.status
+            #endif
             return .success(ProcessResult(status: code, stdout: stdout, stderr: String(decoding: stderr, as: UTF8.self)))
         }
         if let result { finish(result) }

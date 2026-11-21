@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// Búsqueda de pistas en la API web de Spotify (spec Fase 7b, punto 4).
 public struct SpotifySearchClient: SpotifySearching {

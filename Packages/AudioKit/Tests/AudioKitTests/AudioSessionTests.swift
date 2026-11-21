@@ -1,11 +1,15 @@
+#if canImport(AVFoundation)
 import AVFoundation
+#endif
 import XCTest
 @testable import AudioKit
 
 /// Fachada `AudioSession` con `SimulatedAudioIO` y el `StudyPlayer` alojado (mini-spec Fase 3,
 /// «Demostración sin hardware»): calibrar → grabar → toma alineada, sin calibrar → marcada → corregida,
 /// desconexión a mitad, niveles y errores.
-final class AudioSessionTests: XCTestCase {
+class AudioSessionTests: XCTestCase {
+    /// Motor del reproductor: el de la plataforma; el portátil en `PortableAudioSessionTests` (solo Mac).
+    var kind: PlayerKind { .platform }
     static let declared = 1_200.0
     static let rig = 151.37
     static let t0: Int64 = 987_654
@@ -77,9 +81,9 @@ final class AudioSessionTests: XCTestCase {
     /// desconecta el simulador). Devuelve la toma y lo escrito.
     @MainActor
     static func playAndRecord(_ s: AudioSession, _ io: SimulatedAudioIO, backing: Track, from start: Double, seconds: Double,
-                              url: URL, disconnectAfter: Double? = nil, rate: Double = 1) throws -> (RecordedTake, [[Float]], StudyPlayer) {
+                              url: URL, disconnectAfter: Double? = nil, rate: Double = 1, kind: PlayerKind = .platform) throws -> (RecordedTake, [[Float]], any PlayerUnderTest) {
         let fs = io.format.sampleRate
-        let player = StudyPlayer(offlineWith: nil)
+        let player = kind.offline()
         try player.load(tracks: [backing])
         try player.attach(to: s)
         player.rate = rate
@@ -134,7 +138,7 @@ final class AudioSessionTests: XCTestCase {
             let backing = try Self.writeBacking(seconds: song, fs: fs, in: dir)
             for start in [0.0, 47.31] {
                 let url = dir.appendingPathComponent("processed.wav")
-                let (take, x, _) = try Self.playAndRecord(s, io, backing: backing, from: start, seconds: 60, url: url)
+                let (take, x, _) = try Self.playAndRecord(s, io, backing: backing, from: start, seconds: 60, url: url, kind: kind)
                 XCTAssertTrue(take.latencyCalibrated)
                 XCTAssertEqual(take.rigDelayReliable, true)
                 XCTAssertEqual(take.rigDelaySamples ?? 0, Self.rig, accuracy: 2)
@@ -174,7 +178,7 @@ final class AudioSessionTests: XCTestCase {
         let song = 80.0
         let backing = try Self.writeBacking(seconds: song, fs: fs, in: dir)
         let url = dir.appendingPathComponent("processed.wav")
-        let (take, x, _) = try Self.playAndRecord(s, io, backing: backing, from: 12.5, seconds: 60, url: url)
+        let (take, x, _) = try Self.playAndRecord(s, io, backing: backing, from: 12.5, seconds: 60, url: url, kind: kind)
         XCTAssertFalse(take.latencyCalibrated)
         XCTAssertEqual(take.latencySamples, Self.declared)
         let before = AlignmentCheck.measure(take: x[0], songStart: take.songStart, sampleRate: fs, songSeconds: song)
@@ -212,7 +216,7 @@ final class AudioSessionTests: XCTestCase {
         let song = 60.0
         let backing = try Self.writeBacking(seconds: song, fs: fs, in: dir)
         let url = dir.appendingPathComponent("processed.wav")
-        let (take, x, player) = try Self.playAndRecord(s, io, backing: backing, from: 3, seconds: 60, url: url, disconnectAfter: 20)
+        let (take, x, player) = try Self.playAndRecord(s, io, backing: backing, from: 3, seconds: 60, url: url, disconnectAfter: 20, kind: kind)
         XCTAssertFalse(s.isOpen)
         XCTAssertEqual(s.interruption, .disconnected(io.inputDeviceUID))
         XCTAssertEqual(events.all.first, .recordingSaved(take))
@@ -302,3 +306,10 @@ final class AudioSessionTests: XCTestCase {
         XCTAssertThrowsError(try s.stopRecording()) { XCTAssertEqual($0 as? AudioSessionError, .noPlayback) }
     }
 }
+
+#if canImport(AVFoundation)
+/// Los mismos casos con el motor portátil (el de Windows) en el Mac.
+final class PortableAudioSessionTests: AudioSessionTests {
+    override var kind: PlayerKind { .portable }
+}
+#endif

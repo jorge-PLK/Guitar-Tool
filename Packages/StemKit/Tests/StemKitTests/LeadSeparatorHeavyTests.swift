@@ -1,7 +1,96 @@
-import AVFoundation
-import CoreML
 import XCTest
 @testable import StemKit
+
+#if os(Windows)
+import NativeONNX
+
+/// Modelo de solista con el ONNX real (parte 7.8). Solo con `TF_MODEL_TESTS=1`, de uno en uno. Modelo y referencias
+/// en `<TF_MODELS_DIR o C:\tf-models>\lead_rhythm` (parte 7.3): `in_spec.bin`, `ref_mask.bin` (ORT CPU del Mac) y
+/// `coreml_mask.bin` (Core ML de la app).
+final class LeadSeparatorHeavyTests: XCTestCase {
+    static let minSDRvsTorch = 50.0
+    static let maxMaskProbeError = 0.02
+    /// Misma red: SNR ≥ 60 dB; frente a Core ML: SDR ≥ 15 dB (decisiones de Jorge, 19/11/2026).
+    static let minSNRvsMacORT = 60.0
+    static let minSDRvsCoreML = 15.0
+    static let folder = "lead_rhythm"
+
+    private func requireHeavy() throws -> URL {
+        guard ProcessInfo.processInfo.environment["TF_MODEL_TESTS"] == "1" else {
+            throw XCTSkip("tests del modelo real desactivados (TF_MODEL_TESTS != 1)")
+        }
+        guard let url = OnnxDevelopmentModels.model(Self.folder) else {
+            throw XCTSkip("no está el modelo en \(OnnxDevelopmentModels.directory(Self.folder).path)")
+        }
+        return url
+    }
+
+    /// Máscara de un trozo frente al Mac (ORT y Core ML) y, con el fixture de 2 s, sondas y SDR frente a PyTorch.
+    func test1_ParityWithTorchFixture() throws {
+        let url = try requireHeavy()
+        let model = try OnnxMaskModel(modelURL: url, contract: .leadRhythm)
+        XCTAssertEqual(model.interface, .mask)
+        XCTAssertEqual(model.frames, MaskModelContract.leadRhythm.frames)
+        var spec = try OnnxDevelopmentModels.floats(Self.folder, "in_spec.bin")
+        var mask = [Float](repeating: .nan, count: spec.count)
+        let t0 = Date()
+        try model.predict(spec: &spec, mask: &mask)
+        let chunk = Date().timeIntervalSince(t0)
+        let vsMac = snrDB(try OnnxDevelopmentModels.floats(Self.folder, "ref_mask.bin"), mask)
+        let vsCoreML = snrDB(try OnnxDevelopmentModels.floats(Self.folder, "coreml_mask.bin"), mask)
+        print(String(format: "[7.8] lead_rhythm (%@): trozo %.1f s (%.0f s/min con num_overlap 2); máscara frente a ORT Mac %.1f dB, frente a Core ML %.1f dB",
+                     model.session.provider.rawValue, chunk, chunk * 2 * 60 / 3, vsMac, vsCoreML))
+        XCTAssertGreaterThanOrEqual(vsMac, Self.minSNRvsMacORT)
+        XCTAssertGreaterThanOrEqual(vsCoreML, Self.minSDRvsCoreML)
+
+        let ref = try LeadSeparatorTests.reference()
+        let fixture = try LeadSeparatorTests.fixtureSpec()
+        var fspec = fixture.spec
+        var fmask = [Float](repeating: 0, count: fixture.stft.specCount)
+        try model.predict(spec: &fspec, mask: &fmask)
+        var worstMask = 0.0
+        for p in ref.mask_probes {
+            let i = fixture.stft.specIndex(bin: p.row / 2, channel: p.row % 2, frame: p.frame)
+            worstMask = max(worstMask, abs(Double(fmask[i]) - p.re), abs(Double(fmask[i + 1]) - p.im))
+        }
+        XCTAssertLessThanOrEqual(worstMask, Self.maxMaskProbeError, "sondas de la máscara")
+        let input = try AudioIO.readStereo(LeadSeparatorTests.fixtureDir.appendingPathComponent("input_2s_pcm16.wav"))
+        let torch = try AudioIO.readStereo(LeadSeparatorTests.fixtureDir.appendingPathComponent("lead_torch_2s_f32.wav"))
+        let lead = try CoreMLLeadSeparator(compiledModelURL: url, contract: .leadRhythmMSST)
+            .separateLead(left: input.left, right: input.right, sampleRate: 44_100)
+        XCTAssertEqual(lead.left.count, torch.frameCount)
+        let sdr = snrDB(torch.left + torch.right, lead.left + lead.right)
+        print(String(format: "[7.8] lead_rhythm fixture: sondas %.2e, SDR frente a PyTorch %.1f dB", worstMask, sdr))
+        XCTAssertGreaterThanOrEqual(sdr, Self.minSDRvsTorch)
+    }
+
+    /// Compositor sobre la pista de guitarras de Platero (tramo 157–187 s), si está en `<TF_MODELS_DIR>\platero`:
+    /// las pistas suman la entrada en el tramo.
+    func test2_PlateroComposer() throws {
+        let url = try requireHeavy()
+        let platero = OnnxDevelopmentModels.directory("platero").appendingPathComponent("guitar.wav")
+        guard FileManager.default.fileExists(atPath: platero.path) else { throw XCTSkip("no está Platero en \(platero.path)") }
+        let span = GuitarSoloSpan(start: 157, end: 187)
+        let out = try makeTempDir("platero-composer")
+        let t0 = Date()
+        let tracks = try GuitarStemComposer().compose(input: platero, outputDirectory: out, stereo: false,
+                                                      soloSpans: [span], separator: CoreMLLeadSeparator(compiledModelURL: url))
+        print(String(format: "[7.8] Platero compositor mono: %.1f s", Date().timeIntervalSince(t0)))
+        XCTAssertEqual(tracks.map(\.role), [.rhythm, .lead])
+        let src = try AudioIO.readStereo(platero)
+        let all = try tracks.map { try AudioIO.readStereo($0.url) }
+        let lo = Int((span.start - 2) * src.sampleRate), hi = Int((span.end + 2) * src.sampleRate)
+        var sumErr: Float = 0
+        for k in lo..<hi {
+            sumErr = max(sumErr, abs(all.reduce(0) { $0 + $1.left[k] } - src.left[k]),
+                         abs(all.reduce(0) { $0 + $1.right[k] } - src.right[k]))
+        }
+        XCTAssertLessThanOrEqual(sumErr, 1e-5, "las pistas suman la entrada (mismo umbral que en el Mac)")
+    }
+}
+#else
+import AVFoundation
+import CoreML
 
 /// Modelo de solista real (Mel-Band RoFormer «Lead_Rhythm_Guitar», FP16, `.cpuAndGPU`). Solo con `TF_MODEL_TESTS=1`
 /// y bajo el vigilante, un test cada vez:
@@ -174,3 +263,4 @@ final class LeadSeparatorHeavyTests: XCTestCase {
         print("PESADO lead Platero\n" + report.joined(separator: "\n"))
     }
 }
+#endif

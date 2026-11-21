@@ -1,3 +1,5 @@
+// Reproductor sobre AVAudioEngine: solo macOS (paso 7: reproductor).
+#if canImport(AVFoundation)
 import AVFoundation
 import os
 
@@ -116,3 +118,5 @@ final class StemFeed: @unchecked Sendable {
         }
     }
 }
+
+#endif // canImport(AVFoundation)

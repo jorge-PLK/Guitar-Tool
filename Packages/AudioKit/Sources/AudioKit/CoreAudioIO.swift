@@ -1,6 +1,9 @@
+// HAL de Core Audio: solo macOS. En Windows, `WASAPIAudioIO` (paso 7: wasapi).
+#if canImport(CoreAudio)
 import AVFoundation
 import CoreAudio
 import Foundation
+import NativePlatform
 import Synchronization
 
 /// Sesión dúplex real sobre el HAL (mini-spec Fase 3, «Dispositivo y canales» y «Código»).
@@ -104,7 +107,7 @@ public final class CoreAudioIO: AudioIO, @unchecked Sendable {
     }
 
     /// Hora de host ahora, en la misma escala que `HostTimingSecond.hostSeconds`.
-    public static var hostNowSeconds: Double { HostTimeLog.seconds(mach_absolute_time()) }
+    public static var hostNowSeconds: Double { HostTimeLog.seconds(HostClock.now()) }
 
     public func setInterruptionHandler(_ handler: (@Sendable (AudioIOInterruption) -> Void)?) {
         lock.withLock { interruptionHandler = handler }
@@ -306,97 +309,6 @@ public final class CoreAudioIO: AudioIO, @unchecked Sendable {
     }
 }
 
-/// Registro circular de las marcas de cada ciclo (diagnóstico de los saltos de 12 muestras de la Flex Prime).
-/// Un escritor (el hilo de E/S, sin reservar memoria) y lectores fuera de él: el índice se publica con
-/// `releasing` después de escribir la entrada; el lector copia solo las que el escritor no puede estar pisando.
-final class HostTimeLog: @unchecked Sendable {
-    struct Raw {
-        var inSample: Double
-        var outSample: Double
-        var inHost: UInt64
-        var outHost: UInt64
-        var inRate: Double
-        var outRate: Double
-    }
-    /// 2^16 ciclos: 11,6 min a 512 muestras y 48 kHz (de sobra para `verify --seconds 300`).
-    static let capacity = 1 << 16
-    /// Entradas más recientes que el lector no copia mientras la sesión corre (las que el escritor puede estar pisando).
-    static let guardEntries = 64
-    private let buf: UnsafeMutablePointer<Raw>
-    private let written = Atomic<Int>(0)
-
-    init() {
-        buf = .allocate(capacity: Self.capacity)
-        buf.initialize(repeating: Raw(inSample: 0, outSample: 0, inHost: 0, outHost: 0, inRate: 0, outRate: 0),
-                       count: Self.capacity)
-    }
-
-    deinit { buf.deallocate() }
-
-    func reset() { written.store(0, ordering: .releasing) }
-
-    /// Solo desde el hilo de E/S.
-    func append(_ r: Raw) {
-        let n = written.load(ordering: .relaxed)
-        buf[n & (Self.capacity - 1)] = r
-        written.store(n + 1, ordering: .releasing)
-    }
-
-    func snapshot() -> [Raw] {
-        let n = written.load(ordering: .acquiring)
-        let keep = min(n, Self.capacity - Self.guardEntries)
-        return (n - keep..<n).map { buf[$0 & (Self.capacity - 1)] }
-    }
-
-    /// Segundos de host de `mach_absolute_time`.
-    static func seconds(_ ticks: UInt64) -> Double {
-        guard ticks > 0 else { return 0 }
-        return Double(ticks) * timebase / 1e9
-    }
-
-    static let timebase: Double = {
-        var tb = mach_timebase_info_data_t()
-        mach_timebase_info(&tb)
-        return Double(tb.numer) / Double(max(1, tb.denom))
-    }()
-}
-
-/// Contadores compartidos entre el IOProc, los avisos del HAL y quien pregunte.
-final class IOCounters: Sendable {
-    let overloads = Atomic<Int>(0)
-    let gaps = Atomic<Int>(0)
-    let callbacks = Atomic<Int>(0)
-    let gapMax = Atomic<Int>(0)
-    let inGaps = Atomic<Int>(0)
-    let inGapMax = Atomic<Int>(0)
-    /// `Int.max` / `Int.min` = sin medir.
-    let skewMin = Atomic<Int>(.max)
-    let skewMax = Atomic<Int>(.min)
-
-    func reset() {
-        overloads.store(0, ordering: .relaxed)
-        gaps.store(0, ordering: .relaxed)
-        callbacks.store(0, ordering: .relaxed)
-        gapMax.store(0, ordering: .relaxed)
-        inGaps.store(0, ordering: .relaxed)
-        inGapMax.store(0, ordering: .relaxed)
-        skewMin.store(.max, ordering: .relaxed)
-        skewMax.store(.min, ordering: .relaxed)
-    }
-
-    /// Solo desde el hilo de E/S (un escritor): máximo sin carreras.
-    static func raise(_ a: borrowing Atomic<Int>, _ v: Int) { if v > a.load(ordering: .relaxed) { a.store(v, ordering: .relaxed) } }
-    static func lower(_ a: borrowing Atomic<Int>, _ v: Int) { if v < a.load(ordering: .relaxed) { a.store(v, ordering: .relaxed) } }
-
-    var diagnostics: AudioIODiagnostics {
-        let lo = skewMin.load(ordering: .relaxed), hi = skewMax.load(ordering: .relaxed)
-        return AudioIODiagnostics(overloads: overloads.load(ordering: .relaxed), inputJumps: inGaps.load(ordering: .relaxed),
-                                  inputJumpMaxFrames: inGapMax.load(ordering: .relaxed), outputJumps: gaps.load(ordering: .relaxed),
-                                  outputJumpMaxFrames: gapMax.load(ordering: .relaxed), outMinusInMin: lo == .max ? nil : lo,
-                                  outMinusInMax: hi == .min ? nil : hi, callbacks: callbacks.load(ordering: .relaxed))
-    }
-}
-
 /// Estado del IOProc: todo preasignado. Solo lo toca el hilo de E/S (salvo los contadores atómicos).
 private final class IOProcState: @unchecked Sendable {
     typealias Slot = (buf: Int, off: Int, stride: Int)
@@ -513,3 +425,5 @@ private final class IOProcState: @unchecked Sendable {
         }
     }
 }
+
+#endif // canImport(CoreAudio)

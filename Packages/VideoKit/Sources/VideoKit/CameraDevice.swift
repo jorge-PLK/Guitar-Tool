@@ -1,4 +1,6 @@
+#if canImport(AVFoundation)
 import AVFoundation
+#endif
 import Foundation
 
 /// Rango de fotogramas por segundo que admite un formato.
@@ -138,6 +140,7 @@ public extension CameraProviding {
     func camera(id: String) -> CameraDevice? { cameras().first { $0.id == id } }
 }
 
+#if canImport(AVFoundation)
 /// Cámaras reales con `AVCaptureDevice.DiscoverySession`: integradas, externas (USB) y Continuity Camera.
 public final class AVCameraProvider: CameraProviding, @unchecked Sendable {
     static let deviceTypes: [AVCaptureDevice.DeviceType] = [.builtInWideAngleCamera, .external, .continuityCamera]
@@ -199,6 +202,7 @@ public final class AVCameraProvider: CameraProviding, @unchecked Sendable {
         }
     }
 }
+#endif
 
 /// Cámaras simuladas (tests, `tf-video --simulated` y capturas de la app sin cámara).
 public final class SimulatedCameraProvider: CameraProviding, @unchecked Sendable {

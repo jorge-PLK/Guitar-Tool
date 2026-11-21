@@ -1,5 +1,10 @@
+#if canImport(CryptoKit)
 import CryptoKit
+#else
+import Crypto
+#endif
 import Foundation
+import NativePlatform
 
 public enum ModelState: Sendable, Equatable {
     case notInstalled
@@ -103,8 +108,7 @@ private final class ProgressFanout: @unchecked Sendable {
 
 public actor ModelStore {
     public static var defaultRoot: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("ToneForge/Models", isDirectory: true)
+        SupportFolder.toneForge.appendingPathComponent("Models", isDirectory: true)
     }
 
     private enum Source: Sendable {
@@ -119,20 +123,30 @@ public actor ModelStore {
     private let downloader: ModelDownloading
     private let compiler: ModelCompiling
     private let hub: StateHub
+    private let format: ModelFormat
+    private let physicalMemory: UInt64
     private var inflight: [String: (task: Task<URL, Error>, fanout: ProgressFanout)] = [:]
 
     public init(root: URL = ModelStore.defaultRoot,
                 catalog: [ModelDescriptor] = ModelCatalog.all,
                 downloader: ModelDownloading = URLSessionDownloader(),
                 compiler: ModelCompiling = CoreMLCompiler(),
-                bundleResourceDirectory: URL? = nil) {
+                bundleResourceDirectory: URL? = nil,
+                format: ModelFormat = .native,
+                physicalMemory: UInt64 = ProcessInfo.processInfo.physicalMemory) {
         self.root = root
+        self.format = format
+        self.physicalMemory = physicalMemory
         self.bundleResourceDirectory = bundleResourceDirectory
         self.descriptors = Dictionary(catalog.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         self.downloader = downloader
         self.compiler = compiler
         var initial: [String: ModelState] = [:]
-        for d in catalog { initial[d.id] = Self.loadState(d, root: root) }
+        for d in catalog {
+            initial[d.id] = format == .onnx
+                ? Self.loadOnnxState(d, file: d.onnxFile(physicalMemory: physicalMemory), root: root)
+                : Self.loadState(d, root: root)
+        }
         self.hub = StateHub(initial)
     }
 
@@ -145,6 +159,8 @@ public actor ModelStore {
     public func ensureInstalled(_ id: String, progress: @escaping @Sendable (Double) -> Void) async throws -> URL {
         guard let d = descriptors[id] else { throw ModelError.unknownModel(id) }
         if case .installed(let url, _) = hub.get(id) { progress(1); return url }
+        // Windows: el `.onnx` de la release, sin zip ni compilación (parte 7.8).
+        if format == .onnx { return try await run(d, source: .download, progress: progress) }
         if d.archiveKind == .bundledZippedMLPackage {
             let name = d.url.lastPathComponent
             guard let dir = bundleResourceDirectory,
@@ -187,10 +203,25 @@ public actor ModelStore {
         let fanout = ProgressFanout(id: d.id, hub: hub)
         fanout.add(progress)
         let root = self.root, hub = self.hub, downloader = self.downloader, compiler = self.compiler
+        let onnx: OnnxModelFile?
+        if format == .onnx {
+            guard let file = d.onnxFile(physicalMemory: physicalMemory) else {
+                throw ModelError.packageNotFound("\(d.id) (.onnx)")
+            }
+            onnx = file
+        } else {
+            onnx = nil
+        }
         let task = Task {
             do {
-                let url = try await Self.pipeline(d, source: source, root: root, hub: hub, fanout: fanout,
+                let url: URL
+                if let onnx {
+                    url = try await Self.onnxPipeline(d, file: onnx, source: source, root: root, hub: hub,
+                                                      fanout: fanout, downloader: downloader)
+                } else {
+                    url = try await Self.pipeline(d, source: source, root: root, hub: hub, fanout: fanout,
                                                   downloader: downloader, compiler: compiler)
+                }
                 await self.finish(d.id)
                 return url
             } catch {
@@ -268,6 +299,69 @@ public actor ModelStore {
         }
     }
 
+    /// Windows (parte 7.8): descarga (o copia de `install(_:fromArchive:)`) del `.onnx`, verificación SHA-256 y
+    /// `<root>/<id>/<fichero>.onnx` con su `manifest.json`. Sin descomprimir ni compilar.
+    private static func onnxPipeline(_ d: ModelDescriptor, file: OnnxModelFile, source: Source, root: URL, hub: StateHub,
+                                     fanout: ProgressFanout, downloader: ModelDownloading) async throws -> URL {
+        let fm = FileManager.default
+        let dir = root.appendingPathComponent(d.id, isDirectory: true)
+        let staging = dir.appendingPathComponent(".download", isDirectory: true)
+        do {
+            try? fm.removeItem(at: staging)
+            try fm.createDirectory(at: staging, withIntermediateDirectories: true)
+            let staged = staging.appendingPathComponent(file.fileName)
+            switch source {
+            case .download:
+                hub.set(d.id, .downloading(0))
+                try await downloader.download(from: file.url, to: staged, progress: { fanout.report($0) })
+                fanout.report(1)
+            case .archive(let url), .bundled(let url):
+                try fm.copyItem(at: url, to: staged)
+            }
+            hub.set(d.id, .verifying)
+            let actual = try sha256Hex(of: staged)
+            guard actual == file.sha256.lowercased() else {
+                throw ModelError.hashMismatch(expected: file.sha256, actual: actual)
+            }
+            hub.set(d.id, .installing)
+            let final = dir.appendingPathComponent(file.fileName)
+            try? fm.removeItem(at: final)
+            try? fm.removeItem(at: dir.appendingPathComponent("manifest.json"))
+            try fm.moveItem(at: staged, to: final)
+            let bytes = Int64((try? fm.attributesOfItem(atPath: final.path))?[.size] as? NSNumber ?? 0)
+            let manifest = InstalledManifest(id: d.id, version: d.version, sha256: file.sha256,
+                                             installedAt: Date(), bytes: bytes)
+            let enc = JSONEncoder()
+            enc.dateEncodingStrategy = .iso8601
+            enc.outputFormatting = [.prettyPrinted, .sortedKeys]
+            // Sin `.atomic`: en Windows acaba en `replaceItemAt`, que aborta (trampa del paso 6).
+            try enc.encode(manifest).write(to: dir.appendingPathComponent("manifest.json"))
+            try? fm.removeItem(at: staging)
+            hub.set(d.id, .installed(compiledURL: final, bytes: bytes))
+            return final
+        } catch {
+            try? fm.removeItem(at: staging)
+            if let left = try? fm.contentsOfDirectory(atPath: dir.path), left.isEmpty {
+                try? fm.removeItem(at: dir)
+            }
+            hub.set(d.id, .failed(error.localizedDescription))
+            throw error
+        }
+    }
+
+    private static func loadOnnxState(_ d: ModelDescriptor, file: OnnxModelFile?, root: URL) -> ModelState {
+        guard let file else { return .notInstalled }
+        let dir = root.appendingPathComponent(d.id, isDirectory: true)
+        guard let data = try? Data(contentsOf: dir.appendingPathComponent("manifest.json")) else { return .notInstalled }
+        let dec = JSONDecoder()
+        dec.dateDecodingStrategy = .iso8601
+        guard let m = try? dec.decode(InstalledManifest.self, from: data),
+              m.id == d.id, m.sha256 == file.sha256 else { return .notInstalled }
+        let url = dir.appendingPathComponent(file.fileName)
+        guard FileManager.default.fileExists(atPath: url.path) else { return .notInstalled }
+        return .installed(compiledURL: url, bytes: m.bytes)
+    }
+
     private static func loadState(_ d: ModelDescriptor, root: URL) -> ModelState {
         let dir = root.appendingPathComponent(d.id, isDirectory: true)
         guard let data = try? Data(contentsOf: dir.appendingPathComponent("manifest.json")) else { return .notInstalled }
@@ -303,20 +397,28 @@ func directorySize(_ url: URL) -> Int64 {
     return total
 }
 
+/// Descomprime un zip: `ditto` en el Mac; `tar.exe` (bsdtar, incluido en Windows 10/11) en Windows.
 private func unzip(_ archive: URL, to destination: URL) async throws {
     try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
-    let process = Process()
-    process.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
-    process.arguments = ["-x", "-k", archive.path, destination.path]
+    #if os(Windows)
+    let tool = "tar.exe"
+    let exe = URL(fileURLWithPath: (ProcessInfo.processInfo.environment["SystemRoot"] ?? "C:\\Windows") + "\\System32\\tar.exe")
+    let args = ["-xf", archive.path, "-C", destination.path]
+    #else
+    let tool = "ditto"
+    let exe = URL(fileURLWithPath: "/usr/bin/ditto")
+    let args = ["-x", "-k", archive.path, destination.path]
+    #endif
+    let child = ChildProcess(executableURL: exe, arguments: args)
     let err = Pipe()
-    process.standardError = err
-    process.standardOutput = FileHandle.nullDevice
+    child.process.standardError = err
+    child.process.standardOutput = FileHandle.nullDevice
     let status: Int32 = try await withCheckedThrowingContinuation { cont in
-        process.terminationHandler = { p in cont.resume(returning: p.terminationStatus) }
-        do { try process.run() } catch { process.terminationHandler = nil; cont.resume(throwing: error) }
+        child.process.terminationHandler = { p in cont.resume(returning: p.terminationStatus) }
+        do { try child.run() } catch { child.process.terminationHandler = nil; cont.resume(throwing: error) }
     }
     guard status == 0 else {
         let msg = String(data: err.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-        throw ModelError.unzipFailed("ditto terminó con código \(status). \(msg)")
+        throw ModelError.unzipFailed("\(tool) terminó con código \(status). \(msg)")
     }
 }

@@ -79,6 +79,10 @@ struct TFSeparate {
         } catch SeparationError.cancelled {
             fail("interrumpido por SIGTERM", code: exitTerminated)
         } catch {
+            #if os(Windows)
+            // Parada ordenada: la inferencia cortada sale como error de ONNX Runtime (parte 7.8).
+            if cancel.isSet { fail("interrumpido por el evento de parada", code: exitTerminated) }
+            #endif
             fail(describe(error), code: exitFailure)
         }
         let seconds = Date().timeIntervalSince(start)
@@ -90,8 +94,15 @@ struct TFSeparate {
     /// SIGTERM solo levanta la bandera; el separador la consulta antes de cada trozo.
     /// `nonisolated`: el manejador corre en una cola global y no debe heredar el aislamiento de `main()`
     /// (si lo hereda, la comprobación de actor del runtime aborta el proceso al llegar la señal).
+    ///
+    /// Windows: la fuente se crea (P8), pero ningún proceso puede mandar SIGTERM a otro; la parada ordenada es el
+    /// evento con nombre de `SeparationRunner` (`HelperStop`, parte 7.8), que levanta la misma bandera.
     nonisolated static func installSigtermHandler(_ flag: CancelFlag) -> DispatchSourceSignal {
+        #if !os(Windows)
         signal(SIGTERM, SIG_IGN)
+        #else
+        HelperStop.watchParent { flag.set() }
+        #endif
         let source = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .global())
         source.setEventHandler { flag.set() }
         source.resume()

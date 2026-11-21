@@ -1,3 +1,4 @@
+#if canImport(AVFoundation)
 import CoreImage
 import XCTest
 @testable import VideoKit
@@ -98,3 +99,67 @@ final class MontageRendererTests: XCTestCase {
         print("F7 render: centro con fundido 50 % = \(c)")
     }
 }
+#else
+import Foundation
+import XCTest
+@testable import VideoKit
+
+/// Windows (parte 7.9): los mismos casos con `Direct2DMontageRenderer` en lugar de Core Image.
+final class MontageRendererTests: XCTestCase {
+    static func parts() -> [MontageTimeline.Part] {
+        ["A", "B"].map {
+            MontageTimeline.Part(id: $0, name: "Parte \($0)", isSolo: false, presence: [MontageSpan(start: 0, end: 10)], firstImage: 0,
+                                 frameSize: CGSize(width: 320, height: 180))
+        }
+    }
+
+    static func flat(_ r: UInt8, _ g: UInt8, _ b: UInt8) -> FramePixelBuffer { RenderSupport.buffer(width: 320, height: 180) { _, _ in (r, g, b) } }
+
+    static func pixel(_ pb: FramePixelBuffer, _ x: Double, _ y: Double) -> [Int] {
+        let p = pb.pixel(x: Int(x), y: Int(y))
+        return [Int(p.r), Int(p.g), Int(p.b)]
+    }
+
+    func testPixelBufferSourceKeepsValue() throws {
+        let renderer = try Direct2DMontageRenderer()
+        let pbs = [Self.flat(234, 0, 2), Self.flat(0, 234, 2)]
+        for layout in [MontageLayoutKind.side, .single] {
+            let tl = MontageTimeline(canvas: MontageCanvas.landscape.size, layout: layout, span: MontageSpan(start: 0, end: 10), barDuration: 1,
+                                     fadeIn: false, fadeOut: false, parts: Self.parts())
+            let (out, st) = try RenderSupport.render(renderer, tl, at: 5, width: 640, height: 360, sources: pbs)
+            let b = st.boxes.last!.rect
+            let c = Self.pixel(out, b.midX / 3, b.midY / 3)
+            print("7.9 render búfer \(layout): \(c)")
+            XCTAssertEqual(c, st.boxes.last!.partID == "A" ? [234, 0, 2] : [0, 234, 2], "\(layout)")
+        }
+    }
+
+    func testBoxesKeepSourceColorBackgroundAndCorners() throws {
+        let renderer = try Direct2DMontageRenderer()
+        let sources = [Self.flat(255, 0, 0), Self.flat(0, 255, 0)]
+        func render(_ layout: MontageLayoutKind, at t: Double, fade: Bool = false) throws -> (FramePixelBuffer, MontageFrameState) {
+            let tl = MontageTimeline(canvas: MontageCanvas.landscape.size, layout: layout, span: MontageSpan(start: 0, end: 10), barDuration: 1,
+                                     fadeIn: fade, fadeOut: false, parts: Self.parts())
+            return try RenderSupport.render(renderer, tl, at: t, width: 640, height: 360, sources: sources)
+        }
+        for layout in [MontageLayoutKind.side, .grid, .single] {
+            let (out, st) = try render(layout, at: 5)
+            let k = 640.0 / 1920
+            for b in st.boxes {
+                XCTAssertEqual(Self.pixel(out, b.rect.midX * k, b.rect.midY * k), b.partID == "A" ? [255, 0, 0] : [0, 255, 0], "\(layout) centro \(b.partID)")
+            }
+            if layout != .single {
+                XCTAssertEqual(Self.pixel(out, 2, 2), [0x0F, 0x11, 0x13], "\(layout) fondo")
+                let a = st.boxes[0].rect
+                let corner = Self.pixel(out, a.minX * k + 1, a.minY * k + 1)
+                XCTAssertLessThan(corner[0], 128, "\(layout) esquina \(corner)")
+            }
+        }
+        let (half, st) = try render(.side, at: 0.5, fade: true)
+        let a = st.boxes[0].rect
+        let c = Self.pixel(half, a.midX / 3, a.midY / 3)
+        XCTAssertEqual(Double(c[0]), 127.5, accuracy: 1.5)
+        print("7.9 render: centro con fundido 50 % = \(c)")
+    }
+}
+#endif // canImport(AVFoundation)

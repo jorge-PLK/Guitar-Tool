@@ -1,4 +1,4 @@
-import Accelerate
+import NativeDSP
 import Foundation
 
 /// Error de un clic de la toma de comprobación.
@@ -179,12 +179,12 @@ public enum AlignmentCheck {
             let to = e - searchStartOffset, from = to - len
             guard from >= 0, to <= x.count else { continue }
             let s = SignalMath.powerSpectrum(x[from..<to], n: n)
-            vDSP_vaddD(p, 1, s, 1, &p, 1, vDSP_Length(p.count))
+            DSP.vaddD(p, 1, s, 1, &p, 1, DSPLength(p.count))
             count += 1
         }
         guard count > 0 else { return (nil, nil) }
         var scale = 1 / Double(count)
-        vDSP_vsmulD(p, 1, &scale, &p, 1, vDSP_Length(p.count))
+        DSP.vsmulD(p, 1, &scale, &p, 1, DSPLength(p.count))
         let prominence = pow(10, toneProminenceDB / 10)
         let (g, med) = SignalMath.lineSuppressionWeight(p, prominence: prominence, neighbourBins: Int(toneNeighbourHz / fs * Double(n)))
         guard g.contains(where: { $0 < 1 }) else { return (nil, nil) }

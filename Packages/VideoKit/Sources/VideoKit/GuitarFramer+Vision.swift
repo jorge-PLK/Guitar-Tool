@@ -1,12 +1,31 @@
+#if canImport(Vision)
 import AVFoundation
 import CoreVideo
-import Foundation
 import Vision
+#else
+import NativePlatform
+#endif
+import Foundation
 
 public enum GuitarFramerError: Error, Equatable, Sendable {
     case noVideo(String)
     case read(String)
 }
+
+#if !canImport(Vision)
+/// Windows: sin lector de vídeo ni detector de pose todavía (paso 7: encuadre). Misma API que la extensión de
+/// Vision; la lógica de la caja (`analyze(samples:…)`, `crop`, `box`) sí está.
+public extension GuitarFramer {
+    static func analyze(video: MontagePartVideo, interval: Double = defaultInterval,
+                        progress: (@Sendable (Double) -> Void)? = nil) async throws -> FramingAnalysis {
+        throw PlatformError.unsupported("paso 7: encuadre")
+    }
+
+    static func analyze(videoURL: URL, interval: Double = defaultInterval) async throws -> FramingAnalysis {
+        throw PlatformError.unsupported("paso 7: encuadre")
+    }
+}
+#else
 
 /// La parte de `GuitarFramer` que lee la toma y llama a Vision (pose corporal).
 public extension GuitarFramer {
@@ -81,3 +100,4 @@ public extension GuitarFramer {
         return best
     }
 }
+#endif

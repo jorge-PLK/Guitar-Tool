@@ -1,10 +1,14 @@
+#if canImport(AVFoundation)
 import AVFoundation
+#endif
 import XCTest
 @testable import AudioKit
 
 /// Retardo del rig, grabación alineada y condición de paso sin hardware (mini-spec Fase 3,
 /// «Demostración sin hardware»).
-final class TakeAlignmentTests: XCTestCase {
+class TakeAlignmentTests: XCTestCase {
+    /// Motor del reproductor: el de la plataforma; el portátil en `PortableTakeAlignmentTests` (solo Mac).
+    var kind: PlayerKind { .platform }
     static let fs = 48_000.0
     static let latency = 2_400.81
     static let declared = 1_200.0
@@ -104,8 +108,8 @@ final class TakeAlignmentTests: XCTestCase {
     /// y graba `seconds`. Devuelve la toma y lo escrito.
     @MainActor
     static func playAndRecord(backing: Track, from start: Double, seconds: Double, io: SimulatedAudioIO,
-                              calibration: LatencyCalibrationResult?, guitarIn: [Int], url: URL) throws -> (RecordedTake, [[Float]]) {
-        let player = StudyPlayer(offlineWith: nil)
+                              calibration: LatencyCalibrationResult?, guitarIn: [Int], url: URL, kind: PlayerKind = .platform) throws -> (RecordedTake, [[Float]]) {
+        let player = kind.offline()
         try player.load(tracks: [backing])
         player.seek(to: start)
         try player.play()
@@ -226,7 +230,7 @@ final class TakeAlignmentTests: XCTestCase {
         let backing = try Self.writeBacking(seconds: song, to: dir.appendingPathComponent("backing.wav"))
         for start in [0.0, 47.31] {
             let (take, x) = try Self.playAndRecord(backing: backing, from: start, seconds: 60, io: io, calibration: cal,
-                                                   guitarIn: [1, 2], url: dir.appendingPathComponent("processed.wav"))
+                                                   guitarIn: [1, 2], url: dir.appendingPathComponent("processed.wav"), kind: kind)
             print(String(format: "F3 toma desde %.2f s: songStart %.6f s, latencia %.4f, rig %.4f (fiable %@), desplazamiento %d, %d canales, %d muestras",
                          start, take.songStart, take.latencySamples, take.rigDelaySamples ?? .nan,
                          "\(take.rigDelayReliable ?? false)", take.shiftSamples, take.channelCount, take.frameCount))
@@ -261,7 +265,7 @@ final class TakeAlignmentTests: XCTestCase {
         let backing = try Self.writeBacking(seconds: song, to: dir.appendingPathComponent("backing.wav"))
         let url = dir.appendingPathComponent("processed.wav")
         let (take, x) = try Self.playAndRecord(backing: backing, from: 12.5, seconds: 60, io: io, calibration: stale,
-                                               guitarIn: [1], url: url)
+                                               guitarIn: [1], url: url, kind: kind)
         XCTAssertFalse(take.latencyCalibrated)
         XCTAssertEqual(take.latencySamples, Self.declared)
         XCTAssertNil(take.rigDelaySamples)
@@ -303,3 +307,10 @@ final class TakeAlignmentTests: XCTestCase {
         XCTAssertEqual(y[0], x[1_201])
     }
 }
+
+#if canImport(AVFoundation)
+/// Los mismos casos con el motor portátil (el de Windows) en el Mac.
+final class PortableTakeAlignmentTests: TakeAlignmentTests {
+    override var kind: PlayerKind { .portable }
+}
+#endif

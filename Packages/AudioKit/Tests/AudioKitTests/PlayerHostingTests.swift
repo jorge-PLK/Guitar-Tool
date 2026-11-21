@@ -1,10 +1,12 @@
-import AVFoundation
 import XCTest
 @testable import AudioKit
 
 /// Retardo del Varispeed por frecuencia, pista de toma y reproductor alojado en una sesión de `AudioIO`
-/// (mini-spec Fase 3, «Alineado con el backing» 1 y «A/B dentro de la mezcla»).
-final class PlayerHostingTests: XCTestCase {
+/// (mini-spec Fase 3, «Alineado con el backing» 1 y «A/B dentro de la mezcla»). `kind`: el motor de la plataforma;
+/// el portátil en `PortablePlayerHostingTests` (solo Mac). En el portátil el retardo de modelo a velocidad 1 es 0.
+class PlayerHostingTests: XCTestCase {
+    var kind: PlayerKind { .platform }
+
     func tempDir() throws -> URL {
         let d = FileManager.default.temporaryDirectory.appendingPathComponent("PlayerHostingTests-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
@@ -23,7 +25,7 @@ final class PlayerHostingTests: XCTestCase {
             x[at] = 0.5
             let url = dir.appendingPathComponent("imp\(Int(fs)).wav")
             try TakeFile.write([x, x], sampleRate: fs, to: url)
-            let p = StudyPlayer(offlineWith: nil)
+            let p = kind.offline()
             try p.load(tracks: [Track(id: "imp", url: url)])
             try p.play()
             let r = try p.renderOffline(frames: Int(0.5 * fs))
@@ -77,7 +79,7 @@ final class PlayerHostingTests: XCTestCase {
         for rate in [1.0, 0.8, 1.25] {
             let from = rate == 1 ? 5.0 : 9.13
             func render(muteBacking: Bool, takeGain: Double = 0) throws -> (out: [Float], run: Double, latency: Double) {
-                let p = StudyPlayer(offlineWith: nil)
+                let p = kind.offline()
                 try p.load(tracks: [Track(id: "backing", url: backing)])
                 try p.setTake(TakeTrack(id: "Tú", url: takeURL, songStart: takeStart, gainDB: takeGain, muted: !muteBacking))
                 XCTAssertEqual(p.tracks.map(\.id), ["backing", "Tú"])
@@ -104,7 +106,7 @@ final class PlayerHostingTests: XCTestCase {
         }
 
         // Ganancia propia: −6 dB en la toma.
-        let p = StudyPlayer(offlineWith: nil)
+        let p = kind.offline()
         try p.load(tracks: [Track(id: "backing", url: backing)])
         try p.setTake(TakeTrack(id: "Tú", url: takeURL, songStart: takeStart, gainDB: -6))
         p.setMute("backing", true)
@@ -144,7 +146,7 @@ final class PlayerHostingTests: XCTestCase {
         let cal = try await AudioSessionTests.calibrate(s, io)
         XCTAssertTrue(cal.isValid)
 
-        let player = StudyPlayer(devices: SimulatedDeviceProvider(devices: [], defaultID: nil))
+        let player = kind.realtime(devices: SimulatedDeviceProvider(devices: [], defaultID: nil))
         try player.load(tracks: [backing])
         try player.attach(to: s)
         XCTAssertTrue(player.isHosted)
@@ -252,3 +254,10 @@ final class PlayerHostingTests: XCTestCase {
         func get() -> T? { lock.withLock { value } }
     }
 }
+
+#if canImport(AVFoundation)
+/// Los mismos casos con el motor portátil (el de Windows) en el Mac.
+final class PortablePlayerHostingTests: PlayerHostingTests {
+    override var kind: PlayerKind { .portable }
+}
+#endif

@@ -1,5 +1,11 @@
+#if canImport(AVFoundation)
 import AVFoundation
+#elseif os(Windows)
+import NativeResample
+#endif
 import Foundation
+import NativeAudioFile
+import NativePlatform
 
 /// Audio estéreo planar en memoria.
 struct StereoAudio {
@@ -10,80 +16,80 @@ struct StereoAudio {
 }
 
 enum AudioIO {
-    /// Formato de proceso: float32 estéreo no intercalado.
-    static func processingFormat(_ rate: Double) -> AVAudioFormat {
-        AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: rate, channels: 2, interleaved: false)!
+    /// Abre un fichero para leer por bloques (`AVAudioFile` float32 no intercalado en el Mac, dr_* en Windows).
+    /// Los errores de apertura salen como `SeparationError.invalidInput("no se puede leer <fichero>: …")`.
+    static func openReader(_ url: URL) throws -> AudioFileReader {
+        do {
+            return try AudioFileReader(url: url)
+        } catch AudioFileError.unreadable(let why) {
+            throw SeparationError.invalidInput("no se puede leer \(why)")
+        } catch {
+            throw SeparationError.invalidInput("no se puede leer \(url.lastPathComponent): \(error.localizedDescription)")
+        }
+    }
+
+    /// Lee `count` fotogramas estéreo desde `start` en `left`/`right`. Devuelve los leídos.
+    /// Un fichero mono se duplica en los dos canales (`right` = `left`).
+    @discardableResult
+    static func read(_ reader: AudioFileReader, from start: Int, count: Int,
+                     left: UnsafeMutablePointer<Float>, right: UnsafeMutablePointer<Float>) throws -> Int {
+        try reader.seek(toFrame: start)
+        var done = 0
+        while done < count {
+            let ptrs = reader.channelCount == 1 ? [left + done] : [left + done, right + done]
+            let got = try reader.read(into: ptrs, maxFrames: count - done)
+            if got == 0 { break }
+            if reader.channelCount == 1 { (right + done).update(from: left + done, count: got) }
+            done += got
+        }
+        return done
     }
 
     /// Lee un WAV estéreo a 44,1 o 48 kHz entero en memoria.
     static func readStereo(_ url: URL) throws -> StereoAudio {
-        let file: AVAudioFile
-        do {
-            file = try AVAudioFile(forReading: url, commonFormat: .pcmFormatFloat32, interleaved: false)
-        } catch {
-            throw SeparationError.invalidInput("no se puede leer \(url.lastPathComponent): \(error.localizedDescription)")
+        let reader = try openReader(url)
+        guard reader.channelCount == 2 else {
+            throw SeparationError.invalidInput("se esperaba audio estéreo y tiene \(reader.channelCount) canales")
         }
-        let fmt = file.processingFormat
-        guard fmt.channelCount == 2 else {
-            throw SeparationError.invalidInput("se esperaba audio estéreo y tiene \(fmt.channelCount) canales")
+        guard RoformerContract.acceptedInputRates.contains(reader.sampleRate) else {
+            throw SeparationError.invalidInput("frecuencia \(reader.sampleRate) Hz no admitida (44100 o 48000)")
         }
-        guard RoformerContract.acceptedInputRates.contains(fmt.sampleRate) else {
-            throw SeparationError.invalidInput("frecuencia \(fmt.sampleRate) Hz no admitida (44100 o 48000)")
-        }
-        let n = Int(file.length)
+        let n = reader.frameCount
         guard n > 0 else { throw SeparationError.invalidInput("el audio está vacío") }
-        guard let buf = AVAudioPCMBuffer(pcmFormat: fmt, frameCapacity: AVAudioFrameCount(n)) else {
-            throw SeparationError.invalidInput("no hay memoria para \(n) muestras")
+        var left = [Float](repeating: 0, count: n), right = [Float](repeating: 0, count: n)
+        var got = 0
+        try left.withUnsafeMutableBufferPointer { l in
+            try right.withUnsafeMutableBufferPointer { r in
+                got = try read(reader, from: 0, count: n, left: l.baseAddress!, right: r.baseAddress!)
+            }
         }
-        try file.read(into: buf, frameCount: AVAudioFrameCount(n))
-        let got = Int(buf.frameLength)
-        let ch = buf.floatChannelData!
-        return StereoAudio(left: Array(UnsafeBufferPointer(start: ch[0], count: got)),
-                           right: Array(UnsafeBufferPointer(start: ch[1], count: got)),
-                           sampleRate: fmt.sampleRate)
+        if got < n {
+            left.removeLast(n - got)
+            right.removeLast(n - got)
+        }
+        return StereoAudio(left: left, right: right, sampleRate: reader.sampleRate)
     }
 
-    /// Escritor WAV float32 estéreo en streaming.
+    /// Escritor WAV float32 estéreo en streaming (`AudioFileWriter`: `AVAudioFile` en el Mac, dr_wav en Windows).
     final class StereoWriter {
         let url: URL
-        private let file: AVAudioFile
-        private let buffer: AVAudioPCMBuffer
+        private let file: AudioFileWriter
+        private let blockFrames: Int
         private(set) var written = 0
 
         init(url: URL, sampleRate: Double, blockFrames: Int = 1 << 16) throws {
             self.url = url
-            let settings: [String: Any] = [
-                AVFormatIDKey: kAudioFormatLinearPCM,
-                AVSampleRateKey: sampleRate,
-                AVNumberOfChannelsKey: 2,
-                AVLinearPCMBitDepthKey: 32,
-                AVLinearPCMIsFloatKey: true,
-                AVLinearPCMIsNonInterleaved: false,
-                AVLinearPCMIsBigEndianKey: false
-            ]
-            file = try AVAudioFile(forWriting: url, settings: settings, commonFormat: .pcmFormatFloat32,
-                                   interleaved: false)
-            buffer = AVAudioPCMBuffer(pcmFormat: processingFormat(sampleRate),
-                                      frameCapacity: AVAudioFrameCount(blockFrames))!
+            self.blockFrames = blockFrames
+            file = try AudioFileWriter(url: url, sampleRate: sampleRate, channelCount: 2, format: .float32)
         }
 
         func write(left: UnsafePointer<Float>, right: UnsafePointer<Float>, count: Int) throws {
-            var done = 0
-            let cap = Int(buffer.frameCapacity)
-            let ch = buffer.floatChannelData!
-            while done < count {
-                let n = min(cap, count - done)
-                ch[0].update(from: left + done, count: n)
-                ch[1].update(from: right + done, count: n)
-                buffer.frameLength = AVAudioFrameCount(n)
-                try file.write(from: buffer)
-                done += n
-            }
+            try file.write([left, right], count: count)
             written += count
         }
 
         func writeSilence(_ count: Int) throws {
-            let zeros = [Float](repeating: 0, count: min(count, Int(buffer.frameCapacity)))
+            let zeros = [Float](repeating: 0, count: min(count, blockFrames))
             var left = count
             while left > 0 {
                 let n = min(left, zeros.count)
@@ -92,7 +98,67 @@ enum AudioIO {
             }
         }
 
-        func close() { file.close() }
+        func close() { try? file.close() }
+    }
+
+    /// Remuestrea audio en memoria.
+    static func resample(_ audio: StereoAudio, to targetRate: Double) throws -> StereoAudio {
+        var out = StereoAudio(left: [], right: [], sampleRate: targetRate)
+        let expected = Int((Double(audio.frameCount) * targetRate / audio.sampleRate).rounded(.up)) + 1024
+        out.left.reserveCapacity(expected)
+        out.right.reserveCapacity(expected)
+        var pos = 0
+        try audio.left.withUnsafeBufferPointer { l in
+            try audio.right.withUnsafeBufferPointer { r in
+                try resample(from: audio.sampleRate, to: targetRate, pull: { dl, dr, maxN in
+                    let n = min(maxN, audio.frameCount - pos)
+                    if n > 0 {
+                        dl.update(from: l.baseAddress! + pos, count: n)
+                        dr.update(from: r.baseAddress! + pos, count: n)
+                        pos += n
+                    }
+                    return n
+                }, push: { sl, sr, n in
+                    out.left.append(contentsOf: UnsafeBufferPointer(start: sl, count: n))
+                    out.right.append(contentsOf: UnsafeBufferPointer(start: sr, count: n))
+                })
+            }
+        }
+        return out
+    }
+
+    /// Remuestrea un WAV estéreo en streaming y escribe exactamente `exactLength` muestras
+    /// (recorta o completa con silencio el final).
+    static func resampleFile(_ src: URL, to dst: URL, targetRate: Double, exactLength: Int) throws {
+        let input = try openReader(src)
+        let block = 1 << 15
+        var bl = [Float](repeating: 0, count: block), br = [Float](repeating: 0, count: block)
+        let writer = try StereoWriter(url: dst, sampleRate: targetRate)
+        defer { writer.close() }
+        try resample(from: input.sampleRate, to: targetRate, pull: { dl, dr, maxN in
+            let want = min(maxN, block, input.frameCount - input.framePosition)
+            guard want > 0 else { return 0 }
+            let n = try bl.withUnsafeMutableBufferPointer { l in
+                try br.withUnsafeMutableBufferPointer { r in
+                    try read(input, from: input.framePosition, count: want, left: l.baseAddress!, right: r.baseAddress!)
+                }
+            }
+            if n > 0 {
+                dl.update(from: bl, count: n)
+                dr.update(from: br, count: n)
+            }
+            return n
+        }, push: { sl, sr, n in
+            let room = exactLength - writer.written
+            if room > 0 { try writer.write(left: sl, right: sr, count: min(n, room)) }
+        })
+        if writer.written < exactLength { try writer.writeSilence(exactLength - writer.written) }
+    }
+
+    #if canImport(AVFoundation)
+    /// Formato de proceso: float32 estéreo no intercalado.
+    static func processingFormat(_ rate: Double) -> AVAudioFormat {
+        AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: rate, channels: 2, interleaved: false)!
     }
 
     /// Conversión de frecuencia en streaming con `AVAudioConverter` (calidad .max, algoritmo Mastering).
@@ -171,57 +237,35 @@ enum AudioIO {
             }
         }
     }
-
-    /// Remuestrea audio en memoria.
-    static func resample(_ audio: StereoAudio, to targetRate: Double) throws -> StereoAudio {
-        var out = StereoAudio(left: [], right: [], sampleRate: targetRate)
-        let expected = Int((Double(audio.frameCount) * targetRate / audio.sampleRate).rounded(.up)) + 1024
-        out.left.reserveCapacity(expected)
-        out.right.reserveCapacity(expected)
-        var pos = 0
-        try audio.left.withUnsafeBufferPointer { l in
-            try audio.right.withUnsafeBufferPointer { r in
-                try resample(from: audio.sampleRate, to: targetRate, pull: { dl, dr, maxN in
-                    let n = min(maxN, audio.frameCount - pos)
-                    if n > 0 {
-                        dl.update(from: l.baseAddress! + pos, count: n)
-                        dr.update(from: r.baseAddress! + pos, count: n)
-                        pos += n
-                    }
-                    return n
-                }, push: { sl, sr, n in
-                    out.left.append(contentsOf: UnsafeBufferPointer(start: sl, count: n))
-                    out.right.append(contentsOf: UnsafeBufferPointer(start: sr, count: n))
-                })
+    #else
+    /// Sin `AVAudioConverter` (Windows): r8brain por `StreamResampler` (plan, «Corte del paso 7», parte 7.8, como
+    /// `PortableImport` de AudioKit en la 7.1). Muestra 0 de la salida = muestra 0 de la entrada (r8brain recorta su
+    /// latencia) y longitud total round(n · destino / origen); `resampleFile` ajusta luego a `exactLength`.
+    static func resample(from sourceRate: Double, to targetRate: Double,
+                         pull: (UnsafeMutablePointer<Float>, UnsafeMutablePointer<Float>, Int) throws -> Int,
+                         push: (UnsafePointer<Float>, UnsafePointer<Float>, Int) throws -> Void) throws {
+        let resampler: StreamResampler
+        do {
+            resampler = try StreamResampler(from: sourceRate, to: targetRate, channels: 2)
+        } catch {
+            throw SeparationError.invalidInput("remuestreador no disponible para \(sourceRate) → \(targetRate) Hz: \(error)")
+        }
+        let block = 1 << 15
+        var l = [Float](repeating: 0, count: block), r = [Float](repeating: 0, count: block)
+        func emit(_ out: [[Float]]) throws {
+            guard out.count == 2, !out[0].isEmpty else { return }
+            try out[0].withUnsafeBufferPointer { a in
+                try out[1].withUnsafeBufferPointer { b in try push(a.baseAddress!, b.baseAddress!, out[0].count) }
             }
         }
-        return out
-    }
-
-    /// Remuestrea un WAV estéreo en streaming y escribe exactamente `exactLength` muestras
-    /// (recorta o completa con silencio el final).
-    static func resampleFile(_ src: URL, to dst: URL, targetRate: Double, exactLength: Int) throws {
-        let input = try AVAudioFile(forReading: src, commonFormat: .pcmFormatFloat32, interleaved: false)
-        let fmt = input.processingFormat
-        let readBuf = AVAudioPCMBuffer(pcmFormat: fmt, frameCapacity: 1 << 15)!
-        let writer = try StereoWriter(url: dst, sampleRate: targetRate)
-        defer { writer.close() }
-        try resample(from: fmt.sampleRate, to: targetRate, pull: { dl, dr, maxN in
-            // AVAudioFile.read al final del fichero devuelve false sin NSError (Swift lanza "nilError").
-            let want = min(maxN, Int(readBuf.frameCapacity), Int(input.length - input.framePosition))
-            guard want > 0 else { return 0 }
-            try input.read(into: readBuf, frameCount: AVAudioFrameCount(want))
-            let n = Int(readBuf.frameLength)
-            if n > 0 {
-                let ch = readBuf.floatChannelData!
-                dl.update(from: ch[0], count: n)
-                dr.update(from: ch[1], count: n)
+        while true {
+            let n = try l.withUnsafeMutableBufferPointer { lp in
+                try r.withUnsafeMutableBufferPointer { rp in try pull(lp.baseAddress!, rp.baseAddress!, block) }
             }
-            return n
-        }, push: { sl, sr, n in
-            let room = exactLength - writer.written
-            if room > 0 { try writer.write(left: sl, right: sr, count: min(n, room)) }
-        })
-        if writer.written < exactLength { try writer.writeSilence(exactLength - writer.written) }
+            if n == 0 { break }
+            try emit(resampler.process([Array(l[0..<n]), Array(r[0..<n])]))
+        }
+        try emit(resampler.flush())
     }
+    #endif
 }

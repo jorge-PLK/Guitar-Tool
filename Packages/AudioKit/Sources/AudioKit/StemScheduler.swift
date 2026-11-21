@@ -1,4 +1,6 @@
-import Accelerate
+// Reproductor sobre AVAudioEngine: solo macOS (paso 7: reproductor).
+#if canImport(AVFoundation)
+import NativeDSP
 import AVFoundation
 
 /// Programa los stems por trozos en sus `AVAudioPlayerNode`, todos con las mismas piezas, para que
@@ -214,7 +216,7 @@ final class StemScheduler: @unchecked Sendable {
         let n = Int(buf.frameLength)
         guard songStart + Int64(n) > m else { return }
         let g = (0..<n).map { Self.punchGain(songStart + Int64($0), from: m, fade: punchFadeFrames) }
-        for ch in 0..<Int(buf.format.channelCount) { vDSP_vmul(data[ch], 1, g, 1, data[ch], 1, vDSP_Length(n)) }
+        for ch in 0..<Int(buf.format.channelCount) { DSP.vmul(data[ch], 1, g, 1, data[ch], 1, DSPLength(n)) }
     }
 
     private func scheduleSilence(_ stem: Stem, frames: Int64) {
@@ -255,21 +257,18 @@ final class StemScheduler: @unchecked Sendable {
     }
 
     /// `out = out·(1 − w) + in·w`, `w = sin²(π/2 · (i + ½)/n)` (suma constante, derivada suave).
-    static func crossfadeWeight(_ i: Int, _ n: Int) -> Float {
-        let s = sin(Double.pi / 2 * (Double(i) + 0.5) / Double(n))
-        return Float(s * s)
-    }
+    static func crossfadeWeight(_ i: Int, _ n: Int) -> Float { Crossfade.weight(i, n) }
 
     private static func mix(out: AVAudioPCMBuffer, in incoming: AVAudioPCMBuffer) {
         let n = Int(out.frameLength)
         let w = (0..<n).map { crossfadeWeight($0, n) }
         let ones = [Float](repeating: 1, count: n)
         var wOut = [Float](repeating: 0, count: n)
-        vDSP_vsub(w, 1, ones, 1, &wOut, 1, vDSP_Length(n))   // 1 − w
+        DSP.vsub(w, 1, ones, 1, &wOut, 1, DSPLength(n))   // 1 − w
         guard let a = out.floatChannelData, let b = incoming.floatChannelData else { return }
         for ch in 0..<Int(out.format.channelCount) {
-            vDSP_vmul(a[ch], 1, wOut, 1, a[ch], 1, vDSP_Length(n))
-            vDSP_vma(b[ch], 1, w, 1, a[ch], 1, a[ch], 1, vDSP_Length(n))
+            DSP.vmul(a[ch], 1, wOut, 1, a[ch], 1, DSPLength(n))
+            DSP.vma(b[ch], 1, w, 1, a[ch], 1, a[ch], 1, DSPLength(n))
         }
     }
 
@@ -290,5 +289,18 @@ final class StemScheduler: @unchecked Sendable {
             (buf.floatChannelData![ch] + offset).update(from: tmp.floatChannelData![ch], count: Int(tmp.frameLength))
         }
         return buf
+    }
+}
+
+#endif // canImport(AVFoundation)
+
+import Foundation
+
+/// Peso del fundido `sin²(π/2·(i + ½)/n)` (suma constante): el del bucle de `StemScheduler` y el de `PunchFlattener`.
+/// Fuera del `#if` porque `PunchFlattener` es portátil.
+enum Crossfade {
+    static func weight(_ i: Int, _ n: Int) -> Float {
+        let s = sin(Double.pi / 2 * (Double(i) + 0.5) / Double(n))
+        return Float(s * s)
     }
 }

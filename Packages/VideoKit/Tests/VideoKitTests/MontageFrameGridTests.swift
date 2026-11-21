@@ -1,6 +1,8 @@
+#if canImport(AVFoundation)
 import Accelerate
-import AudioKit
 import AVFoundation
+#endif
+import AudioKit
 import XCTest
 @testable import VideoKit
 import struct VideoKit.MontageSpan
@@ -48,7 +50,11 @@ final class MontageFrameGridTests: XCTestCase {
     // MARK: Rejilla (sin AVFoundation)
 
     func frameDuration(_ fps: Double) -> Double {
+        #if canImport(CoreMedia)
         let f = MontagePlan.frameTime(fps: fps)
+        #else
+        let f = MontagePlan.frameTicks(fps: fps)
+        #endif
         return Double(f.value) / Double(f.timescale)
     }
 
@@ -112,6 +118,7 @@ final class MontageFrameGridTests: XCTestCase {
         XCTAssertEqual(try JSONDecoder().decode(MontagePlan.self, from: JSONEncoder().encode(decoded)), decoded)
     }
 
+    // Mac y Windows (parte 7.9): en Windows el audio se decodifica con Media Foundation y el pico real va sin vDSP.
     // MARK: Señales
 
     /// Ruido uniforme determinista.
@@ -223,6 +230,11 @@ final class MontageFrameGridTests: XCTestCase {
 
     /// Audio de un fichero decodificado a PCM float con AVFoundation (el AAC del `.mov`, sin el cebado del códec).
     static func decodeAudio(_ url: URL) async throws -> Decoded {
+        #if !canImport(AVFoundation)
+        // Windows: lector de Media Foundation (el AAC va sin compensar y Media Foundation lo lee en su sitio).
+        let a = try MediaFoundationReader.audio(url)
+        return Decoded(channels: a.channels, sampleRate: a.sampleRate)
+        #else
         let asset = AVURLAsset(url: url)
         let tracks = try await asset.loadTracks(withMediaType: .audio)
         let track = try XCTUnwrap(tracks.first, "pista de audio")
@@ -247,9 +259,14 @@ final class MontageFrameGridTests: XCTestCase {
         }
         XCTAssertEqual(reader.status, .completed)
         return Decoded(channels: ch, sampleRate: asbd.mSampleRate)
+        #endif
     }
 
     static func readWAV(_ url: URL) throws -> Decoded {
+        #if !canImport(AVFoundation)
+        let a = try MediaFoundationReader.audio(url)
+        return Decoded(channels: a.channels, sampleRate: a.sampleRate)
+        #else
         let file = try AVAudioFile(forReading: url, commonFormat: .pcmFormatFloat32, interleaved: false)
         let nch = Int(file.processingFormat.channelCount)
         var ch = [[Float]](repeating: [], count: nch)
@@ -260,6 +277,7 @@ final class MontageFrameGridTests: XCTestCase {
             for c in 0..<nch { ch[c].append(contentsOf: UnsafeBufferPointer(start: buf.floatChannelData![c], count: Int(buf.frameLength))) }
         }
         return Decoded(channels: ch, sampleRate: file.processingFormat.sampleRate)
+        #endif
     }
 
     /// RMS (dBFS, todos los canales) en `[from, from + length)` s.
@@ -294,9 +312,21 @@ final class MontageFrameGridTests: XCTestCase {
             var env = c.map { abs(Double($0)) }
             var y = [Double](repeating: 0, count: n)
             for h in kernels {
+                #if canImport(Accelerate)
                 vDSP_convD(ext, 1, h, 1, &y, 1, vDSP_Length(n), vDSP_Length(taps))
                 vDSP_vabsD(y, 1, &y, 1, vDSP_Length(n))
                 vDSP_vmaxD(env, 1, y, 1, &env, 1, vDSP_Length(n))
+                #else
+                // Windows: la misma correlación que `vDSP_convD` (y[i] = Σ ext[i + k]·h[k]).
+                ext.withUnsafeBufferPointer { e in
+                    for i in 0..<n {
+                        var s = 0.0
+                        for k in 0..<taps { s += e[i + k] * h[k] }
+                        y[i] = abs(s)
+                        if y[i] > env[i] { env[i] = y[i] }
+                    }
+                }
+                #endif
             }
             for i in 0..<n where env[i] > peak[i / w] { peak[i / w] = env[i] }
         }
@@ -330,6 +360,17 @@ final class MontageFrameGridTests: XCTestCase {
         let mix = try await MontageMixer.mix(job)
         let mov = fx.dir.appendingPathComponent("montaje-\(name).\(settings.container.fileExtension)")
         let summary = try await MontageExporter.export(plan: plan, mixURL: mixURL, settings: settings, to: mov)
+        #if !canImport(AVFoundation)
+        // Windows: duración del vídeo = último PTS + su duración (lector de Media Foundation); pista de audio = suma de
+        // las duraciones de sus muestras (`stts`).
+        var frames = 0, videoEnd = 0.0
+        try MediaFoundationReader.forEachFrame(mov) { t, d, _ in frames += 1; videoEnd = max(videoEnd, t + d); return true }
+        XCTAssertEqual(summary.frames, frames)
+        let soun = try XCTUnwrap(MP4EditList.tracks(in: mov).first { $0.handler == "soun" }, "pista de audio")
+        return Run(plan: plan, mix: mix, mov: mov, frames: frames, videoDuration: videoEnd,
+                   movAudioTrack: Double(soun.sampleDuration) / Double(soun.mediaTimescale),
+                   movAudio: try await decodeAudio(mov), wav: try readWAV(mixURL))
+        #else
         let asset = AVURLAsset(url: mov)
         let vts = try await asset.loadTracks(withMediaType: .video)
         let ats = try await asset.loadTracks(withMediaType: .audio)
@@ -340,6 +381,7 @@ final class MontageFrameGridTests: XCTestCase {
                    videoDuration: CMTimeGetSeconds(try await vt.load(.timeRange).duration),
                    movAudioTrack: CMTimeGetSeconds(try await at.load(.timeRange).duration),
                    movAudio: try await decodeAudio(mov), wav: try readWAV(mixURL))
+        #endif
     }
 
     /// Duraciones: vídeo = suma de tramos cuantizados = `mezcla.wav` = audio del `.mov`, todo a menos de medio
@@ -421,6 +463,13 @@ final class MontageFrameGridTests: XCTestCase {
 
     /// Etiqueta del códec de vídeo (`hvc1`, `avc1`…), tamaño y fps nominales de la pista.
     static func videoInfo(_ url: URL) async throws -> (fourCC: String, size: CGSize, fps: Double) {
+        #if !canImport(AVFoundation)
+        // Windows: la etiqueta de la entrada de muestra en el `moov`; tamaño y fps del lector de Media Foundation.
+        let (moov, _) = try MP4EditList.readMoov(url)
+        let cc = ["hvc1", "hev1", "avc1", "avc3"].first { moov.range(of: Data($0.utf8)) != nil } ?? "?"
+        let info = try MediaFoundationReader.info(url)
+        return (cc, CGSize(width: info.width, height: info.height), info.fps)
+        #else
         let tracks = try await AVURLAsset(url: url).loadTracks(withMediaType: .video)
         let vt = try XCTUnwrap(tracks.first)
         let descs = try await vt.load(.formatDescriptions)
@@ -428,6 +477,7 @@ final class MontageFrameGridTests: XCTestCase {
         let st = CMFormatDescriptionGetMediaSubType(desc)
         let cc = String(decoding: [24, 16, 8, 0].map { UInt8((st >> $0) & 0xFF) }, as: UTF8.self)
         return (cc, try await vt.load(.naturalSize), Double(try await vt.load(.nominalFrameRate)))
+        #endif
     }
 
     /// Puerta en MP4 (Jorge, 17/11/2026): la misma puerta escrita como MP4 con H.264 y con HEVC frente al `.mov`:
@@ -443,18 +493,26 @@ final class MontageFrameGridTests: XCTestCase {
             try await Self.run(fx, segments: raw, fps: 30, fadeIn: fades.fadeIn, fadeOut: fades.fadeOut, name: name, settings: s)
         }
         let mov = try await go("mov", MontageExportSettings(codec: .h264, width: 320, height: 180, fps: 30))
+        #if canImport(AVFoundation)
         XCTAssertEqual(try Self.majorBrand(mov.mov), "qt  ")
+        let hevcTag = "hvc1"
+        #else
+        // [windows] `IMFSinkWriter` escribe MPEG-4 sea cual sea la extensión (parte 7.2): el `.mov` lleva marca MP4.
+        XCTAssertTrue(["mp42", "isom", "mp41"].contains(try Self.majorBrand(mov.mov)))
+        // Sin codificador HEVC (la VM), H.264.
+        let hevcTag = MediaFoundationEncoders.hasHEVC ? "hev1|hvc1" : "avc1"
+        #endif
         let movLoud = LoudnessMeter.measure(mov.movAudio.channels, sampleRate: mov.movAudio.sampleRate)
         let dt = frameDuration(30)
         var lines: [String] = []
-        for (codec, w, h, tag) in [(MontageCodec.h264, 320, 180, "avc1"), (MontageCodec.hevc, 640, 360, "hvc1")] {
+        for (codec, w, h, tag) in [(MontageCodec.h264, 320, 180, "avc1"), (MontageCodec.hevc, 640, 360, hevcTag)] {
             let name = "mp4-\(codec.rawValue)"
             let r = try await go(name, MontageExportSettings(codec: codec, width: w, height: h, fps: 30, container: .mp4))
             XCTAssertEqual(r.mov.pathExtension, "mp4")
             let brand = try Self.majorBrand(r.mov)
             XCTAssertTrue(["mp42", "isom", "mp41"].contains(brand), "\(name): marca \(brand)")
             let info = try await Self.videoInfo(r.mov)
-            XCTAssertEqual(info.fourCC, tag, "\(name): etiqueta del códec")
+            XCTAssertTrue(tag.split(separator: "|").contains { $0 == info.fourCC }, "\(name): etiqueta del códec \(info.fourCC), esperada \(tag)")
             XCTAssertEqual(info.size, CGSize(width: w, height: h), "\(name): tamaño")
             XCTAssertEqual(info.fps, 30, accuracy: 0.01, "\(name): fps")
             XCTAssertEqual(r.frames, mov.frames, "\(name): fotogramas")
@@ -495,8 +553,10 @@ final class MontageFrameGridTests: XCTestCase {
         XCTAssertEqual(try JSONDecoder().decode(MontageExportSettings.self, from: Data(legacy.utf8)).container, .mov)
         let mp4 = MontageExportSettings(codec: .hevc, width: 1920, height: 1080, fps: 30, container: .mp4)
         XCTAssertEqual(try JSONDecoder().decode(MontageExportSettings.self, from: JSONEncoder().encode(mp4)), mp4)
+        #if canImport(AVFoundation)
         XCTAssertEqual(MontageVideoContainer.mp4.fileType, .mp4)
         XCTAssertEqual(MontageVideoContainer.mov.fileType, .mov)
+        #endif
     }
 
     /// «Cortar huecos» con tramos de 7,013 y 3,3371 s, sin fundidos globales: a 30 y a 29,97 fps, duraciones iguales a

@@ -8,6 +8,7 @@ coremltools==9.0
 onnx==1.23.2
 onnxruntime==1.32.0
 onnxscript==0.7.2
+pillow==11.3.0
 # numpy < 2.5: con 2.5 coremltools 9.0 falla en _cast ("only 0-dimensional arrays can be converted")
 numpy==2.3.5
 scipy==1.18.1

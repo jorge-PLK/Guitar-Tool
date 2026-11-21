@@ -1,44 +1,42 @@
-import AVFoundation
-import Accelerate
+import Foundation
+import NativeAudioFile
+import NativeDSP
 
 /// Lectura para el pulso: media de canales y remuestreo a 22 050 Hz con `AVAudioConverter` (calidad máxima,
-/// algoritmo Mastering), como `bt_common.to_mono_22k` (media + soxr HQ).
+/// algoritmo Mastering), como `bt_common.to_mono_22k` (media + soxr HQ). Decodifica `AudioFileReader`
+/// (`AVAudioFile` en el Mac, dr_* en Windows).
 enum BeatAudio {
     static func loadMono(_ url: URL, sampleRate: Double = BeatContract.sampleRate) throws -> [Float] {
-        let file: AVAudioFile
+        let file: AudioFileReader
         do {
-            file = try AVAudioFile(forReading: url, commonFormat: .pcmFormatFloat32, interleaved: false)
+            file = try AudioFileReader(url: url)
         } catch {
             throw BeatError.unreadableAudio("\(url.lastPathComponent): \(error.localizedDescription)")
         }
-        let fmt = file.processingFormat
-        let channels = Int(fmt.channelCount)
-        let total = Int(file.length)
+        let channels = file.channelCount
+        let total = file.frameCount
         var mono = [Float](repeating: 0, count: total)
-        let block: AVAudioFrameCount = 1 << 16
-        guard let buf = AVAudioPCMBuffer(pcmFormat: fmt, frameCapacity: block) else {
-            throw BeatError.unreadableAudio("sin búfer para \(fmt)")
-        }
+        let block = 1 << 16
+        let ch = (0..<max(channels, 1)).map { _ in UnsafeMutablePointer<Float>.allocate(capacity: block) }
+        defer { ch.forEach { $0.deallocate() } }
         var pos = 0
         while pos < total {
-            try file.read(into: buf, frameCount: min(block, AVAudioFrameCount(total - pos)))
-            let n = Int(buf.frameLength)
+            let n = try file.read(into: Array(ch.prefix(channels)), maxFrames: min(block, total - pos))
             if n == 0 { break }
-            let ch = buf.floatChannelData!
             mono.withUnsafeMutableBufferPointer { m in
                 let dst = m.baseAddress! + pos
                 dst.update(from: ch[0], count: n)
-                for c in 1..<max(channels, 1) { vDSP_vadd(dst, 1, ch[c], 1, dst, 1, vDSP_Length(n)) }
+                for c in 1..<max(channels, 1) { DSP.vadd(dst, 1, ch[c], 1, dst, 1, DSPLength(n)) }
                 if channels > 1 {
                     var k = 1 / Float(channels)
-                    vDSP_vsmul(dst, 1, &k, dst, 1, vDSP_Length(n))
+                    DSP.vsmul(dst, 1, &k, dst, 1, DSPLength(n))
                 }
             }
             pos += n
         }
         if pos < total { mono.removeLast(total - pos) }
-        if fmt.sampleRate == sampleRate { return mono }
-        return try resample(mono, from: fmt.sampleRate, to: sampleRate)
+        if file.sampleRate == sampleRate { return mono }
+        return try resample(mono, from: file.sampleRate, to: sampleRate)
     }
 
     /// Remuestreo mono en memoria (`MonoResampler`). La salida tiene round(n · destino / origen) muestras y no

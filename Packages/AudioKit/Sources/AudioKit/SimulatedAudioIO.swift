@@ -1,4 +1,4 @@
-import Accelerate
+import NativeDSP
 import Foundation
 
 /// Copia retrasada que llega después de la primera (eco del bucle o repetición de un delay del rig).
@@ -293,7 +293,7 @@ public final class SimulatedAudioIO: AudioIO, @unchecked Sendable {
                             if p == phases { p = 0; base += 1 }
                             let start = Int((base - Int64(SignalMath.sincHalfWidth - 1)) & mask)
                             var v: Float = 0
-                            vDSP_dotpr(h.baseAddress! + start, 1, table.baseAddress! + p * width, 1, &v, vDSP_Length(width))
+                            DSP.dotpr(h.baseAddress! + start, 1, table.baseAddress! + p * width, 1, &v, DSPLength(width))
                             dst[i] += g * v
                         }
                     }

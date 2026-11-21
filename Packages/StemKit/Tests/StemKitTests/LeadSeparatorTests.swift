@@ -1,4 +1,6 @@
+#if canImport(CoreML)
 import CoreML
+#endif
 import XCTest
 @testable import StemKit
 
@@ -159,9 +161,15 @@ final class LeadSeparatorTests: XCTestCase {
         for r in 0..<rows { for t in 0..<frames { for ri in 0..<2 { storage[r * st2 + t * pairStride + ri] = value(r, t, ri) } } }
         var out = [Float](repeating: .nan, count: rows * frames * 2)
         try storage.withUnsafeMutableBufferPointer { p in
+            #if canImport(CoreML)
             let m = try MLMultiArray(dataPointer: p.baseAddress!, shape: [1, 1, NSNumber(value: rows), NSNumber(value: frames), 2],
                                      dataType: .float32, strides: strides.map { NSNumber(value: $0) }, deallocator: nil)
             try CoreMLMaskModel.copyMask(m, stems: 1, rows: rows, frames: frames, into: &out)
+            #else
+            // Lo que hará el modelo ONNX con su tensor (paso 7): la misma copia sin MLMultiArray.
+            try MaskTensor.copy(UnsafeRawPointer(p.baseAddress!), scalar: .float32, shape: [1, 1, rows, frames, 2],
+                                strides: strides, stems: 1, rows: rows, frames: frames, into: &out)
+            #endif
         }
         var bad = 0
         for r in 0..<rows { for t in 0..<frames { for ri in 0..<2 where out[(r * frames + t) * 2 + ri] != value(r, t, ri) { bad += 1 } } }

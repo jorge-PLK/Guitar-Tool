@@ -1,5 +1,19 @@
 import Foundation
 
+/// Formato de modelo por plataforma. Mac: Core ML (`.mlpackage` / `.mlmodelc`). Windows: ONNX (`.onnx` de la release
+/// `models-win-v1`, sin compilar; `ModelDescriptor.onnxFiles`, parte 7.8).
+public enum ModelFormat: String, Sendable, Equatable {
+    case coreML, onnx
+
+    public static var native: ModelFormat {
+        #if os(Windows)
+        return .onnx
+        #else
+        return .coreML
+        #endif
+    }
+}
+
 public enum ModelRole: String, Sendable, Equatable, Codable, CaseIterable {
     case separation, chords, beats, guitarTranscription, drumTranscription
     /// Guitarra solista frente a rítmica dentro de los tramos de solo (mini-spec de la Fase 4).
@@ -28,10 +42,12 @@ public struct ModelDescriptor: Sendable, Equatable, Identifiable {
     /// Nombre del `.mlpackage` dentro del zip.
     public let packageName: String
     public let license: String
+    /// Ficheros `.onnx` de Windows (una variante por trozo en la separación). Vacío: sin versión ONNX.
+    public let onnxFiles: [OnnxModelFile]
 
     public init(id: String, version: String, displayName: String, role: ModelRole, url: URL,
                 sha256: String, archiveBytes: Int64, archiveKind: ModelArchiveKind = .zippedMLPackage,
-                packageName: String, license: String) {
+                packageName: String, license: String, onnxFiles: [OnnxModelFile] = []) {
         self.id = id
         self.version = version
         self.displayName = displayName
@@ -42,6 +58,13 @@ public struct ModelDescriptor: Sendable, Equatable, Identifiable {
         self.archiveKind = archiveKind
         self.packageName = packageName
         self.license = license
+        self.onnxFiles = onnxFiles
+    }
+
+    /// Variante `.onnx` para un equipo: la de mayor `minimumPhysicalMemory` que cabe en su RAM física.
+    public func onnxFile(physicalMemory: UInt64) -> OnnxModelFile? {
+        onnxFiles.filter { $0.minimumPhysicalMemory <= physicalMemory }
+            .max { $0.minimumPhysicalMemory < $1.minimumPhysicalMemory }
     }
 
     /// Nombre del `.mlmodelc` resultante (`packageName` sin extensión).
@@ -50,7 +73,44 @@ public struct ModelDescriptor: Sendable, Equatable, Identifiable {
     }
 }
 
+/// Un `.onnx` de la release `models-win-v1` (parte 7.3: `Probes/P8-windows/ort-models/out/release_files.txt`).
+public struct OnnxModelFile: Sendable, Equatable {
+    public let fileName: String
+    public let sha256: String
+    public let bytes: Int64
+    /// Tramas del trozo (separación); el modelo las declara también en la forma de su entrada.
+    public let frames: Int?
+    /// RAM física mínima para elegir esta variante.
+    public let minimumPhysicalMemory: UInt64
+
+    public init(fileName: String, sha256: String, bytes: Int64, frames: Int? = nil, minimumPhysicalMemory: UInt64 = 0) {
+        self.fileName = fileName
+        self.sha256 = sha256
+        self.bytes = bytes
+        self.frames = frames
+        self.minimumPhysicalMemory = minimumPhysicalMemory
+    }
+
+    public var url: URL { ModelCatalog.onnxReleaseBase.appendingPathComponent(fileName) }
+}
+
 public enum ModelCatalog {
+    /// Release de los `.onnx` de Windows. Aún sin publicar (decisión de Jorge, 19/11/2026; plan, «Corte del paso 7»,
+    /// parte 7.3): hasta entonces se instalan desde un fichero local con `ModelStore.install(_:fromArchive:)`.
+    public static let onnxReleaseBase = URL(string: "https://github.com/jorge-PLK/Guitar-Tool/releases/download/models-win-v1")!
+
+    /// Trozo de separación grande (T=575) solo con 16 GB de RAM o más (decisión de Jorge, 19/11/2026). Windows da
+    /// algo menos que lo nominal (memoria reservada al hardware: un equipo de 16 GB ve ~15,8 GiB), así que el umbral
+    /// es 15 GiB: entra uno de 16 GB y no uno de 12.
+    public static let separationLargeChunkMemory: UInt64 = 15 << 30
+
+    static let onnxSeparation = [
+        OnnxModelFile(fileName: "bs_roformer.onnx", sha256: "224f5f54a7ff9ff0e487aabca0a365d94513d51a6cdb7778152f2371716f2b68",
+                      bytes: 701_010_313, frames: 345),
+        OnnxModelFile(fileName: "bs_roformer_T575.onnx", sha256: "f2969881ea94334ba7b5c0fb7ed9386e4cc2a20a7db6838e8fd87c013e201dcf",
+                      bytes: 710_602_834, frames: 575, minimumPhysicalMemory: separationLargeChunkMemory),
+    ]
+
     /// Separador de stems de la Fase 1. Datos del manifest de Probes/P4-modelos/bs_roformer_sw.
     public static let separatorBSRoformerSW = ModelDescriptor(
         id: "bs-roformer-sw",
@@ -62,7 +122,8 @@ public enum ModelCatalog {
         archiveBytes: 327_743_996,
         archiveKind: .zippedMLPackage,
         packageName: "BSRoformerSW.mlpackage",
-        license: "Pesos de licencia desconocida: uso personal, no redistribuir")
+        license: "Pesos de licencia desconocida: uso personal, no redistribuir",
+        onnxFiles: onnxSeparation)
 
     /// Pulso y downbeats (mini-spec Fase 2, §1 ModelKit). Se descarga en el primer análisis.
     public static let beatsBeatThis = ModelDescriptor(
@@ -75,7 +136,8 @@ public enum ModelCatalog {
         archiveBytes: 81_000_000,
         archiveKind: .zippedCompiledModel,
         packageName: "BeatThis.mlmodelc",
-        license: "MIT")
+        license: "MIT",
+        onnxFiles: [OnnxModelFile(fileName: "beat_this.onnx", sha256: "1337dc6c21257ed6b803418efc320df42b5d8eb296ef16648ef60457cd4b9e55", bytes: 190_649_026)])
 
     /// SHA-256 y tamaño de `App/Resources/Models/BTC_large_voca_fp16.mlpackage.zip`.
     static let chordsBTCSHA256 = "32a981d4d157d4bf0e0133f220e43c280bf642ee90e73e6a76b54c8c390cd0bf"
@@ -92,7 +154,8 @@ public enum ModelCatalog {
         archiveBytes: chordsBTCBytes,
         archiveKind: .bundledZippedMLPackage,
         packageName: "BTC_large_voca_fp16.mlpackage",
-        license: "Pesos no comerciales, uso personal")
+        license: "Pesos no comerciales, uso personal",
+        onnxFiles: [OnnxModelFile(fileName: "btc.onnx", sha256: "1fc065501018aada80888f50cc1f337387f74afb1f15333eedeaba33bdf82c3d", bytes: 12_911_355)])
 
     /// SHA-256 y tamaño de `App/Resources/Models/BasicPitch_nmp.mlpackage.zip` (lo genera, idéntico en cada
     /// ejecución, `Probes/P4-modelos/basic_pitch/convert.py --install`).
@@ -113,7 +176,8 @@ public enum ModelCatalog {
         archiveBytes: transcriptionBasicPitchBytes,
         archiveKind: .bundledZippedMLPackage,
         packageName: "BasicPitch_nmp.mlpackage",
-        license: "Apache-2.0")
+        license: "Apache-2.0",
+        onnxFiles: [OnnxModelFile(fileName: "basic_pitch.onnx", sha256: "2c3c1d144bfa61ad236e92e169c13535c880469a12a047d4e73451f2c059a0ec", bytes: 230_444)])
 
     /// SHA-256 y tamaño de `App/Resources/Models/LeadRhythmMelRoformer_fp16.mlpackage.zip` (lo genera
     /// `Probes/P4-modelos/lead_rhythm/convert.py fp16 --install`; una nueva conversión cambia el hash).
@@ -138,7 +202,8 @@ public enum ModelCatalog {
         archiveBytes: leadRhythmBytes,
         archiveKind: .bundledZippedMLPackage,
         packageName: "LeadRhythmMelRoformer_fp16.mlpackage",
-        license: "openrail; pesos anónimos de HF, uso personal")
+        license: "openrail; pesos anónimos de HF, uso personal",
+        onnxFiles: [OnnxModelFile(fileName: "lead_rhythm.onnx", sha256: "8a42c4ecf266a8a1cf20641a2cd1756a8b863665877c420bf453dbf425ead51d", bytes: 338_871_118)])
 
     /// SHA-256 y tamaño de `App/Resources/Models/ADTOF_FrameRNN_fp32.mlpackage.zip` (lo genera, idéntico en cada
     /// ejecución, `Probes/P4-modelos/adtof/package.py --install`; una nueva conversión cambia el hash).
@@ -160,7 +225,8 @@ public enum ModelCatalog {
         archiveBytes: drumsADTOFBytes,
         archiveKind: .bundledZippedMLPackage,
         packageName: "ADTOF_FrameRNN_fp32.mlpackage",
-        license: "CC BY-NC-SA 4.0 (ADTOF; puerto sin licencia): uso personal, no redistribuir")
+        license: "CC BY-NC-SA 4.0 (ADTOF; puerto sin licencia): uso personal, no redistribuir",
+        onnxFiles: [OnnxModelFile(fileName: "adtof.onnx", sha256: "93dc6055181e6f47c5e59995a88006504ddcd351f8f8341ffeb32ef02468ceaf", bytes: 1_822_247)])
 
     public static let all: [ModelDescriptor] = [separatorBSRoformerSW, chordsBTC, beatsBeatThis,
                                                 transcriptionBasicPitch, leadRhythmMelRoformer, drumsADTOF]

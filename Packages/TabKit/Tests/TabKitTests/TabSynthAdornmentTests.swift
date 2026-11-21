@@ -1,5 +1,4 @@
-import Accelerate
-import AVFoundation
+import NativeDSP
 import XCTest
 @testable import TabKit
 
@@ -31,11 +30,11 @@ final class TabSynthAdornmentTests: XCTestCase {
         x.withUnsafeBufferPointer { p in
             let a = p.baseAddress! + from
             var e0: Float = 0
-            vDSP_dotpr(a, 1, a, 1, &e0, vDSP_Length(n))
+            DSP.dotpr(a, 1, a, 1, &e0, DSPLength(n))
             for lag in minLag...maxLag {
                 var c: Float = 0, e1: Float = 0
-                vDSP_dotpr(a, 1, a + lag, 1, &c, vDSP_Length(n))
-                vDSP_dotpr(a + lag, 1, a + lag, 1, &e1, vDSP_Length(n))
+                DSP.dotpr(a, 1, a + lag, 1, &c, DSPLength(n))
+                DSP.dotpr(a + lag, 1, a + lag, 1, &e1, DSPLength(n))
                 let r = c / max(1e-12, (e0 * e1).squareRoot())
                 corrs.append(r)
                 if r > best.corr { best = (lag, r) }
@@ -68,7 +67,7 @@ final class TabSynthAdornmentTests: XCTestCase {
         try TabSynthRenderer.renderFile(events: events.sorted { $0.frame < $1.frame }, totalFrames: frames,
                                         sampleRate: rate, soundFontURL: TabSynthTests.soundFont,
                                         program: TabSynthRenderer.GuitarSound.clean.program,
-                                        bankMSB: UInt8(kAUSampler_DefaultMelodicBankMSB), to: url)
+                                        bankMSB: TabSynthRenderer.melodicBankMSB, to: url)
         return try TabSynthTests.read(url).channels[0]
     }
 
@@ -349,7 +348,7 @@ extension TabSynthAdornmentTests {
     /// RMS de `x[from..<from+n]`.
     static func rms(_ x: [Float], from: Int, n: Int) -> Float {
         var r: Float = 0
-        x.withUnsafeBufferPointer { vDSP_rmsqv($0.baseAddress! + from, 1, &r, vDSP_Length(n)) }
+        x.withUnsafeBufferPointer { DSP.rmsqv($0.baseAddress! + from, 1, &r, DSPLength(n)) }
         return r
     }
 

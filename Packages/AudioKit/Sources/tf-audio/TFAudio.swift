@@ -5,6 +5,7 @@ import Foundation
 struct TFAudio {
     @MainActor
     static func main() async {
+        // En Windows solo `--simulated` hasta la parte 7.10 (WASAPI).
         let code = await CLI.run(Array(CommandLine.arguments.dropFirst()), env: .standard())
         exit(code)
     }

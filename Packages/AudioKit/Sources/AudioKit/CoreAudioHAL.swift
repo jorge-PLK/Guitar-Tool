@@ -1,3 +1,5 @@
+// HAL de Core Audio: solo macOS.
+#if canImport(CoreAudio)
 import CoreAudio
 import Foundation
 
@@ -111,3 +113,5 @@ enum HAL {
         return (Int(device), Int(safety), Int(stream))
     }
 }
+
+#endif // canImport(CoreAudio)

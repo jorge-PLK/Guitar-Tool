@@ -1,4 +1,3 @@
-import AVFoundation
 import XCTest
 @testable import AudioKit
 
@@ -167,18 +166,17 @@ final class MontageMixerTests: XCTestCase {
         let mix = try read(r.mixURL)
         var sum = [[Float]](repeating: [Float](repeating: 0, count: mix[0].count), count: 2)
         for f in r.trackFiles {
-            let file = try AVAudioFile(forReading: f.url)
-            XCTAssertEqual(Int(file.length), r.frames)
-            XCTAssertEqual(file.processingFormat.channelCount, 2)
-            XCTAssertEqual(file.fileFormat.settings[AVLinearPCMBitDepthKey] as? Int, 24)
-            XCTAssertEqual(file.fileFormat.sampleRate, 48_000)
+            let file = try WAVHeader(f.url)
+            XCTAssertEqual(file.frames, r.frames)
+            XCTAssertEqual(file.channels, 2)
+            XCTAssertEqual(file.bits, 24)
+            XCTAssertEqual(file.sampleRate, 48_000)
             let x = try read(f.url)
             for ch in 0..<2 { for i in 0..<x[ch].count { sum[ch][i] += x[ch][i] } }
         }
         XCTAssertEqual(mix[0].count, r.frames)
         for ch in 0..<2 { for i in stride(from: 0, to: mix[ch].count, by: 13) { XCTAssertEqual(sum[ch][i], mix[ch][i], accuracy: 5e-7) } }
-        let mixFile = try AVAudioFile(forReading: r.mixURL)
-        XCTAssertEqual(mixFile.fileFormat.settings[AVLinearPCMBitDepthKey] as? Int, 24)
+        XCTAssertEqual(try WAVHeader(r.mixURL).bits, 24)
     }
 
     func testNormalizationGainOnlyAffectsTheMixFile() async throws {
@@ -237,6 +235,13 @@ final class MontageMixerTests: XCTestCase {
         XCTAssertTrue(leftovers.isEmpty)
     }
 
+    /// Lo mismo con la conversión de Windows (r8brain) forzada en el Mac (parte 7.1).
+    func testTrackAtAnotherSampleRateIsConvertedWithThePortableConverter() async throws {
+        #if canImport(AVFoundation)
+        try await AudioImporter.$forcePortable.withValue(true) { try await testTrackAtAnotherSampleRateIsConverted() }
+        #endif
+    }
+
     // MARK: Varios tramos
 
     func segmentJob(_ tracks: [MontageTrack], _ segs: [MontageSegment], normalization: MontageNormalization = .none,
@@ -293,8 +298,8 @@ final class MontageMixerTests: XCTestCase {
         XCTAssertEqual(r.duration, 7, accuracy: 1e-9)
         XCTAssertEqual(try LoudnessMeter.measure(url: r.mixURL).integratedLUFS ?? .nan, -14, accuracy: 0.2)
         XCTAssertEqual(r.finalLUFS ?? .nan, -14, accuracy: 0.2)
-        for f in r.trackFiles { XCTAssertEqual(Int(try AVAudioFile(forReading: f.url).length), 7 * 48_000) }
-        XCTAssertEqual(Int(try AVAudioFile(forReading: r.mixURL).length), 7 * 48_000)
+        for f in r.trackFiles { XCTAssertEqual(try WAVHeader(f.url).frames, 7 * 48_000) }
+        XCTAssertEqual(try WAVHeader(r.mixURL).frames, 7 * 48_000)
     }
 
     func testRejectsOverlappingSegments() async throws {
@@ -341,7 +346,7 @@ final class MontageMixerTests: XCTestCase {
         XCTAssertNil(r.finalLUFS)
         XCTAssertEqual(r.gainDB, 0)
         XCTAssertTrue(FileManager.default.fileExists(atPath: r.mixURL.path))
-        XCTAssertEqual(Int(try AVAudioFile(forReading: r.mixURL).length), 2 * 48_000)
+        XCTAssertEqual(try WAVHeader(r.mixURL).frames, 2 * 48_000)
         XCTAssertFalse(r.limiterOutOfTolerance)
     }
 
@@ -447,7 +452,7 @@ final class MontageMixerTests: XCTestCase {
         let m = try LoudnessMeter.measure(url: r.mixURL)
         XCTAssertEqual(m.integratedLUFS ?? .nan, -14, accuracy: 0.2)
         XCTAssertLessThanOrEqual(m.truePeakDB, MontageMixer.peakCeilingDB - MontageMixer.codecHeadroomDB)
-        XCTAssertEqual(Int(try AVAudioFile(forReading: r.mixURL).length), 8 * 48_000)
+        XCTAssertEqual(try WAVHeader(r.mixURL).frames, 8 * 48_000)
         // Las pistas no llevan ni ganancia ni limitador: pico alto.
         let t = try LoudnessMeter.measure(url: r.trackFiles[0].url)
         XCTAssertGreaterThan(t.truePeakDB, -20)
@@ -494,4 +499,22 @@ private final class ProgressBox: @unchecked Sendable {
     private var storage: [Double] = []
     func add(_ v: Double) { lock.lock(); storage.append(v); lock.unlock() }
     var values: [Double] { lock.lock(); defer { lock.unlock() }; return storage }
+}
+
+/// Cabecera de un WAV PCM (chunks `fmt ` y `data`), sin AVFoundation: la comprobación vale igual en Windows.
+struct WAVHeader {
+    var channels = 0, sampleRate = 0.0, bits = 0, frames = 0
+
+    init(_ url: URL) throws {
+        let d = [UInt8](try Data(contentsOf: url))
+        func u16(_ i: Int) -> Int { Int(d[i]) | Int(d[i + 1]) << 8 }
+        func u32(_ i: Int) -> Int { u16(i) | u16(i + 2) << 16 }
+        var i = 12
+        while i + 8 <= d.count {
+            let id = String(decoding: d[i..<i + 4], as: UTF8.self), size = u32(i + 4)
+            if id == "fmt " { channels = u16(i + 10); sampleRate = Double(u32(i + 12)); bits = u16(i + 22) }
+            if id == "data", channels > 0, bits > 0 { frames = size / (channels * bits / 8) }
+            i += 8 + size + (size & 1)
+        }
+    }
 }

@@ -32,15 +32,26 @@ final class RunnerTests: XCTestCase {
         let p = Process()
         p.executableURL = memhogURL
         p.arguments = ["400"]
-        p.standardOutput = FileHandle.nullDevice
+        // Tubería que se vacía, no `FileHandle.nullDevice`: en Windows tf-memhog salía con código 29 a los
+        // ~70 MB escribiendo en el dispositivo nulo (medido en la VM).
+        let sink = Pipe()
+        sink.fileHandleForReading.readabilityHandler = { h in
+            if h.availableData.isEmpty { h.readabilityHandler = nil }
+        }
+        p.standardOutput = sink
         try p.run()
         let killed = expectation(description: "SIGKILL")
         let g = MemoryGuard(pid: p.processIdentifier, limitBytes: 200_000_000) { _ in killed.fulfill() }
         g.start()
         wait(for: [killed], timeout: 20)
         p.waitUntilExit()
+        #if os(Windows)
+        // TerminateProcess con 128 + SIGKILL (ChildProcess.killedExitCode).
+        XCTAssertEqual(p.terminationStatus, 137)
+        #else
         XCTAssertEqual(p.terminationReason, .uncaughtSignal)
         XCTAssertEqual(p.terminationStatus, SIGKILL)
+        #endif
         XCTAssertTrue(g.limitExceeded)
         XCTAssertGreaterThan(g.peakBytes, 200_000_000)
         print("MemoryGuard: pico \(g.peakBytes / 1_000_000) MB con límite 200 MB")
@@ -81,7 +92,7 @@ final class RunnerTests: XCTestCase {
     func testCancelTerminatesHelper() async throws {
         let input = try toneWav("runner-cancel", frames: 5 * 44_100)
         let out = input.deletingLastPathComponent().appendingPathComponent("stems")
-        let pidBox = Mutex<pid_t>(0)
+        let pidBox = Mutex<Int32>(0)
         var runner = SeparationRunner(helperURL: separateURL)
         runner.onLaunch = { pid in pidBox.withLock { $0 = pid } }
         let started = expectation(description: "primer trozo")
@@ -107,6 +118,7 @@ final class RunnerTests: XCTestCase {
         print("cancelación: helper terminado en \(String(format: "%.2f", elapsed)) s")
         XCTAssertFalse(alive, "el helper sigue vivo tras \(elapsed) s")
         XCTAssertLessThan(elapsed, SeparationRunner.terminateGrace + 1)
+        // Windows: el evento de parada (parte 7.8) deja salir al helper por su camino ordenado, que borra la carpeta.
         let left = (try? FileManager.default.contentsOfDirectory(atPath: out.path)) ?? []
         XCTAssertTrue(left.allSatisfy { !$0.hasSuffix(".wav") && !$0.hasPrefix(".tf-separate") }, "\(left)")
     }

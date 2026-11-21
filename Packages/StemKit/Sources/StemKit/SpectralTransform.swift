@@ -1,4 +1,5 @@
-import Accelerate
+import Foundation
+import NativeDSP
 
 /// STFT/iSTFT compatibles con `torch.stft`/`torch.istft` (center=True, relleno reflect,
 /// Hann periódica, iSTFT normalizada por la suma de ventanas al cuadrado), como
@@ -19,11 +20,12 @@ final class SpectralTransform {
     /// `1 + length / hop`, como `torch.stft(center=True)`.
     let frames: Int
 
-    private let forwardSetup: vDSP_DFT_Setup
-    private let inverseSetup: vDSP_DFT_Setup
-    /// Hann · 0,5: compensa el factor 2 de la DFT real directa de vDSP.
+    /// DFT real empaquetada de la fachada `NativeDSP` (vDSP en el Mac, pocketfft en Windows; misma convención).
+    private let forwardSetup: DSP.RealDFT
+    private let inverseSetup: DSP.RealDFT
+    /// Hann · 0,5: compensa el factor 2 de la DFT real directa (convención vDSP).
     private let analysisWindow: UnsafeMutablePointer<Float>
-    /// Hann / n_fft: la DFT real inversa de vDSP devuelve n_fft · irfft.
+    /// Hann / n_fft: la DFT real inversa (convención vDSP) devuelve n_fft · irfft.
     private let synthesisWindow: UnsafeMutablePointer<Float>
     /// 1 / Σ w² en cada muestra de salida (1 donde la suma ≤ 1e-11, como istft_np).
     private let inverseEnvelope: UnsafeMutablePointer<Float>
@@ -45,9 +47,9 @@ final class SpectralTransform {
         self.frames = 1 + length / hop
         let n = RoformerContract.nFFT
         let half = n / 2
-        guard let f = vDSP_DFT_zrop_CreateSetup(nil, vDSP_Length(n), .FORWARD),
-              let i = vDSP_DFT_zrop_CreateSetup(f, vDSP_Length(n), .INVERSE) else {
-            fatalError("vDSP_DFT_zrop_CreateSetup falló para n=\(n)")
+        guard let f = DSP.RealDFT(count: n, direction: .forward),
+              let i = DSP.RealDFT(count: n, direction: .inverse) else {
+            fatalError("DSP.RealDFT falló para n=\(n)")
         }
         forwardSetup = f
         inverseSetup = i
@@ -89,8 +91,6 @@ final class SpectralTransform {
     }
 
     deinit {
-        vDSP_DFT_DestroySetup(forwardSetup)
-        vDSP_DFT_DestroySetup(inverseSetup)
         for p in [analysisWindow, synthesisWindow, inverseEnvelope, padded, ola, frame,
                   splitInR, splitInI, splitOutR, splitOutI] {
             p.deallocate()
@@ -111,15 +111,15 @@ final class SpectralTransform {
         let half = nFFT / 2
         // center=True: relleno reflect de n_fft/2 por cada lado (sin repetir el borde, como numpy/torch).
         reflectPad(x, count: length, left: half, right: half, into: padded)
-        let binStride = vDSP_Stride(4 * frames)
-        var inSplit = DSPSplitComplex(realp: splitInR, imagp: splitInI)
+        let binStride = DSPStride(4 * frames)
+        var inSplit = SplitComplex(realp: splitInR, imagp: splitInI)
         for t in 0..<frames {
-            vDSP_vmul(padded + t * hop, 1, analysisWindow, 1, frame, 1, vDSP_Length(nFFT))
-            frame.withMemoryRebound(to: DSPComplex.self, capacity: half) {
-                vDSP_ctoz($0, 2, &inSplit, 1, vDSP_Length(half))
+            DSP.vmul(padded + t * hop, 1, analysisWindow, 1, frame, 1, DSPLength(nFFT))
+            frame.withMemoryRebound(to: InterleavedComplex.self, capacity: half) {
+                DSP.ctoz($0, 2, &inSplit, 1, DSPLength(half))
             }
-            vDSP_DFT_Execute(forwardSetup, splitInR, splitInI, splitOutR, splitOutI)
-            // Formato empaquetado de vDSP: R[0] = DC, I[0] = Nyquist (ambos reales).
+            forwardSetup.execute(splitInR, splitInI, splitOutR, splitOutI)
+            // Formato empaquetado (convención vDSP): R[0] = DC, I[0] = Nyquist (ambos reales).
             let dc = specIndex(bin: 0, channel: channel, frame: t)
             let nyq = specIndex(bin: bins - 1, channel: channel, frame: t)
             spec[dc] = splitOutR[0]
@@ -127,9 +127,9 @@ final class SpectralTransform {
             spec[nyq] = splitOutI[0]
             spec[nyq + 1] = 0
             let first = specIndex(bin: 1, channel: channel, frame: t)
-            var src = DSPSplitComplex(realp: splitOutR + 1, imagp: splitOutI + 1)
-            var dst = DSPSplitComplex(realp: spec + first, imagp: spec + first + 1)
-            vDSP_zvmov(&src, 1, &dst, binStride, vDSP_Length(half - 1))
+            var src = SplitComplex(realp: splitOutR + 1, imagp: splitOutI + 1)
+            var dst = SplitComplex(realp: spec + first, imagp: spec + first + 1)
+            DSP.zvmov(&src, 1, &dst, binStride, DSPLength(half - 1))
         }
     }
 
@@ -138,24 +138,24 @@ final class SpectralTransform {
     func inverse(_ spec: UnsafePointer<Float>, channel: Int, into y: UnsafeMutablePointer<Float>) {
         let half = nFFT / 2
         let spec = UnsafeMutablePointer(mutating: spec)
-        let binStride = vDSP_Stride(4 * frames)
+        let binStride = DSPStride(4 * frames)
         ola.update(repeating: 0, count: length + nFFT)
-        var outSplit = DSPSplitComplex(realp: splitOutR, imagp: splitOutI)
+        var outSplit = SplitComplex(realp: splitOutR, imagp: splitOutI)
         for t in 0..<frames {
             splitInR[0] = spec[specIndex(bin: 0, channel: channel, frame: t)]
             splitInI[0] = spec[specIndex(bin: bins - 1, channel: channel, frame: t)]
             let first = specIndex(bin: 1, channel: channel, frame: t)
-            var src = DSPSplitComplex(realp: spec + first, imagp: spec + first + 1)
-            var dst = DSPSplitComplex(realp: splitInR + 1, imagp: splitInI + 1)
-            vDSP_zvmov(&src, binStride, &dst, 1, vDSP_Length(half - 1))
-            vDSP_DFT_Execute(inverseSetup, splitInR, splitInI, splitOutR, splitOutI)
-            frame.withMemoryRebound(to: DSPComplex.self, capacity: half) {
-                vDSP_ztoc(&outSplit, 1, $0, 2, vDSP_Length(half))
+            var src = SplitComplex(realp: spec + first, imagp: spec + first + 1)
+            var dst = SplitComplex(realp: splitInR + 1, imagp: splitInI + 1)
+            DSP.zvmov(&src, binStride, &dst, 1, DSPLength(half - 1))
+            inverseSetup.execute(splitInR, splitInI, splitOutR, splitOutI)
+            frame.withMemoryRebound(to: InterleavedComplex.self, capacity: half) {
+                DSP.ztoc(&outSplit, 1, $0, 2, DSPLength(half))
             }
             let dstOLA = ola + t * hop
-            vDSP_vma(frame, 1, synthesisWindow, 1, dstOLA, 1, dstOLA, 1, vDSP_Length(nFFT))
+            DSP.vma(frame, 1, synthesisWindow, 1, dstOLA, 1, dstOLA, 1, DSPLength(nFFT))
         }
-        vDSP_vmul(ola + half, 1, inverseEnvelope, 1, y, 1, vDSP_Length(length))
+        DSP.vmul(ola + half, 1, inverseEnvelope, 1, y, 1, DSPLength(length))
     }
 }
 
@@ -166,12 +166,12 @@ func reflectPad(_ x: UnsafePointer<Float>, count n: Int, left: Int, right: Int,
     precondition(left < n && right < n, "reflect: relleno mayor que la señal")
     if left > 0 {
         dst.update(from: x + 1, count: left)
-        vDSP_vrvrs(dst, 1, vDSP_Length(left))
+        DSP.vrvrs(dst, 1, DSPLength(left))
     }
     (dst + left).update(from: x, count: n)
     if right > 0 {
         let tail = dst + left + n
         tail.update(from: x + (n - 1 - right), count: right)
-        vDSP_vrvrs(tail, 1, vDSP_Length(right))
+        DSP.vrvrs(tail, 1, DSPLength(right))
     }
 }

@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// Foto de un artista desde Spotify (spec Fase 7b, punto 6c).
 public enum ArtistImagePicker {

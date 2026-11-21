@@ -1,11 +1,19 @@
+#if canImport(AVFoundation)
 import AVFoundation
+#else
+import NativeAudioFile
+#endif
+#if canImport(CryptoKit)
 import CryptoKit
+#else
+import Crypto
+#endif
 import Foundation
 
 /// Tomas a otra frecuencia que la del proyecto: las grabadas antes de reconvertirlo (`Library.migrate`
 /// reconvierte tema y stems, no las tomas). Decisión de Jorge (17/11/2026): no se reescriben en disco; se
 /// remuestrean **al cargar**, con el mismo conversor que el tema y los stems (`AudioImporter`: AVAudioConverter,
-/// calidad máxima, algoritmo Mastering).
+/// calidad máxima, algoritmo Mastering, en el Mac; r8brain en Windows).
 ///
 /// La muestra 0 del fichero convertido es el mismo instante que la del original, y `songStart` va en
 /// segundos: la toma cae donde caía. El único redondeo nuevo es el de `songStart` a muestras de destino
@@ -13,7 +21,7 @@ import Foundation
 public enum TakeResampling {
     /// Frecuencia del fichero.
     public static func sampleRate(of url: URL) throws -> Double {
-        try AVAudioFile(forReading: url).processingFormat.sampleRate
+        try AudioSamples.sampleRate(of: url)
     }
 
     /// `url` si ya está a `sampleRate` (mismo camino que siempre, sin copia); si no, una copia remuestreada en
@@ -49,7 +57,11 @@ public enum TakeResampling {
 
     /// El conversor entrega estéreo (mono duplicado): una toma mono vuelve a mono.
     private static func convert(_ url: URL, to sampleRate: Double, scratch: URL) throws -> [[Float]] {
+        #if canImport(AVFoundation)
         let channels = Int(try AVAudioFile(forReading: url).processingFormat.channelCount)
+        #else
+        let channels = try AudioFileReader(url: url).channelCount
+        #endif
         let tmp = scratch.appendingPathComponent(".\(UUID().uuidString).conv.wav")
         defer { try? FileManager.default.removeItem(at: tmp) }
         _ = try AudioImporter.convert(url, to: tmp, sampleRate: sampleRate, progress: { _ in })

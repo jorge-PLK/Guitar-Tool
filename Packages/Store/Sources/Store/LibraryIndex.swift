@@ -1,6 +1,9 @@
 import Foundation
+#if canImport(SwiftData)
 import SwiftData
+#endif
 
+#if canImport(SwiftData)
 /// Índice SwiftData de la biblioteca: solo una caché reconstruible; la verdad son los project.json.
 @Model
 public final class LibraryEntry {
@@ -37,6 +40,8 @@ public final class LibraryEntry {
         self.diskBytes = diskBytes
     }
 }
+
+#endif
 
 /// Copia inmutable y Sendable de una entrada (los `@Model` no cruzan actores).
 public struct LibraryEntryInfo: Sendable, Equatable {
@@ -94,10 +99,11 @@ public enum ProjectScanner {
     }
 }
 
+#if canImport(SwiftData)
 @ModelActor
 public actor LibraryIndex {
     public static var defaultStoreURL: URL {
-        URL.applicationSupportDirectory.appendingPathComponent("ToneForge/Library.store")
+        PlatformPaths.appSupport.appendingPathComponent("ToneForge/Library.store")
     }
 
     /// Crea el contenedor en `storeURL` (por defecto Application Support/ToneForge/Library.store).
@@ -179,3 +185,4 @@ public actor LibraryIndex {
         }
     }
 }
+#endif

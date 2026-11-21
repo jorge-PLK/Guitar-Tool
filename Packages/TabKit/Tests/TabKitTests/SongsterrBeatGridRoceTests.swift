@@ -1,5 +1,5 @@
-import AVFoundation
 import Foundation
+import NativeAudioFile
 import XCTest
 @testable import TabKit
 
@@ -119,21 +119,16 @@ enum ClickMix {
     static let gap = 1.0
 
     static func write(song: URL, beats: [Double], downbeats: [Double], spans: [ClosedRange<Double>], to url: URL) throws {
-        let file = try AVAudioFile(forReading: song)
-        let format = file.processingFormat
-        let sr = format.sampleRate
-        let channels = Int(format.channelCount)
+        let file = try NativeAudioFile.read(song)
+        let sr = file.sampleRate
+        let channels = file.channelCount
         let accents = Set(downbeats)
         var out: [[Float]] = Array(repeating: [], count: channels)
         for (s, span) in spans.enumerated() {
             if s > 0 { for c in 0..<channels { out[c] += [Float](repeating: 0, count: Int(gap * sr)) } }
-            let start = AVAudioFramePosition(max(0, span.lowerBound) * sr)
-            let frames = AVAudioFrameCount(min(Double(file.length - start), (span.upperBound - span.lowerBound) * sr))
-            file.framePosition = start
-            let buf = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames)!
-            try file.read(into: buf, frameCount: frames)
-            let n = Int(buf.frameLength)
-            var seg = (0..<channels).map { c in Array(UnsafeBufferPointer(start: buf.floatChannelData![c], count: n)).map { $0 * songGain } }
+            let start = min(file.frameCount, Int(max(0, span.lowerBound) * sr))
+            let n = max(0, Int(min(Double(file.frameCount - start), (span.upperBound - span.lowerBound) * sr)))
+            var seg = (0..<channels).map { c in file.channels[c][start..<(start + n)].map { $0 * songGain } }
             for t in beats where t >= span.lowerBound && t < span.upperBound {
                 let accent = accents.contains(t)
                 let hz = accent ? accentHz : beatHz, gain = accent ? accentGain : beatGain
@@ -147,17 +142,6 @@ enum ClickMix {
             for c in 0..<channels { out[c] += seg[c] }
         }
         try? FileManager.default.removeItem(at: url)
-        let outFormat = AVAudioFormat(standardFormatWithSampleRate: sr, channels: AVAudioChannelCount(channels))!
-        let writer = try AVAudioFile(forWriting: url, settings: [AVFormatIDKey: kAudioFormatLinearPCM,
-                                                                 AVSampleRateKey: sr, AVNumberOfChannelsKey: channels,
-                                                                 AVLinearPCMBitDepthKey: 16, AVLinearPCMIsFloatKey: false],
-                                     commonFormat: .pcmFormatFloat32, interleaved: false)
-        let total = out[0].count
-        let buf = AVAudioPCMBuffer(pcmFormat: outFormat, frameCapacity: AVAudioFrameCount(total))!
-        buf.frameLength = AVAudioFrameCount(total)
-        for c in 0..<channels {
-            for i in 0..<total { buf.floatChannelData![c][i] = max(-1, min(1, out[c][i])) }
-        }
-        try writer.write(from: buf)
+        try NativeAudioFile.write(url, channels: out.map { $0.map { max(-1, min(1, $0)) } }, sampleRate: sr, format: .int16)
     }
 }

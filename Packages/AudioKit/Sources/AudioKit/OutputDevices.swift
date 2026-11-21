@@ -1,4 +1,6 @@
+#if canImport(CoreAudio)
 import CoreAudio
+#endif
 import Foundation
 
 /// Dispositivo de audio del sistema, con sus entradas y salidas (mini-spec Fase 3, «Dispositivo y canales»).
@@ -216,6 +218,7 @@ public final class SimulatedDeviceProvider: AudioDeviceProviding, @unchecked Sen
     }
 }
 
+#if canImport(CoreAudio)
 // MARK: - CoreAudio
 
 /// Dispositivos reales del sistema, con avisos de CoreAudio al cambiar la lista, la salida por defecto o
@@ -359,3 +362,5 @@ public final class CoreAudioDeviceProvider: AudioDeviceProviding, @unchecked Sen
         return list.reduce(0) { $0 + Int($1.mNumberChannels) }
     }
 }
+
+#endif // canImport(CoreAudio)

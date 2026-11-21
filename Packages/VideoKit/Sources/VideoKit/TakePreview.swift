@@ -1,4 +1,6 @@
+#if canImport(AVFoundation)
 import AVFoundation
+#endif
 import Foundation
 
 /// Un punch de la toma visto por la vista previa (los campos de `TakePunch` de Store que importan aquí).
@@ -38,6 +40,8 @@ public enum TakePreviewError: Error, Equatable, Sendable {
     case composition(String)
 }
 
+// `TakePreview` del Mac (composición AVFoundation). La de Windows (Media Foundation) está en `WindowsMontage.swift`.
+#if canImport(AVFoundation)
 /// Vista previa de una toma (mini-spec Fase 6, «Cámara y sincronía» y «Punch-in»): `processed.wav` (ya aplanado)
 /// con el vídeo de la toma desplazado `videoOffset` y, en el tramo de cada punch, el vídeo del punch con su propio
 /// desfase; fuera, la base. El último punch manda en su tramo. Nada se recodifica.
@@ -123,35 +127,11 @@ public final class TakePreview: @unchecked Sendable {
     }
 
     /// Tramos de imagen: base en todo el tramo de la toma, cada punch encima en el suyo (el último manda), y cada
-    /// tramo recortado a lo que su fichero tiene.
+    /// tramo recortado a lo que su fichero tiene. El cálculo es `TakePreviewPlan` (puro, también en Windows).
     static func plan(songStart: Double, duration: Double, base: ClosedRange<Double>?, baseOffset: Double,
                      punches: [(start: Double, end: Double, available: ClosedRange<Double>?, offset: Double)]) -> [PreviewPiece] {
-        // Intervalos en tiempo del tema con su fuente (-1 = base).
-        var spans: [(a: Double, b: Double, src: Int)] = [(songStart, songStart + duration, -1)]
-        for (i, p) in punches.enumerated() {
-            let a = max(p.start, songStart), b = min(p.end, songStart + duration)
-            guard b > a else { continue }
-            var next: [(a: Double, b: Double, src: Int)] = []
-            for s in spans {
-                if s.b <= a || s.a >= b { next.append(s); continue }
-                if s.a < a { next.append((s.a, a, s.src)) }
-                if s.b > b { next.append((b, s.b, s.src)) }
-            }
-            next.append((a, b, i))
-            spans = next.sorted { $0.a < $1.a }
-        }
-        var out: [PreviewPiece] = []
-        for s in spans {
-            let available = s.src < 0 ? base : punches[s.src].available
-            let offset = s.src < 0 ? baseOffset : punches[s.src].offset
-            guard let available else { continue }
-            // Fichero: [a + o, b + o) recortado a donde hay imagen.
-            let lo = max(s.a + offset, available.lowerBound), hi = min(s.b + offset, available.upperBound)
-            guard hi > lo else { continue }
-            out.append(PreviewPiece(start: lo - offset - songStart, end: hi - offset - songStart,
-                                    source: s.src < 0 ? .base : .punch(s.src), sourceStart: lo))
-        }
-        return out
+        TakePreviewPlan.pieces(songStart: songStart, duration: duration, base: base, baseOffset: baseOffset,
+                               punches: punches.map { TakePreviewPlan.Punch(start: $0.start, end: $0.end, available: $0.available, offset: $0.offset) })
     }
 
     /// Composición de vídeo + toma procesada para un desfase. Barata: no lee ficheros.
@@ -192,6 +172,7 @@ public final class TakePreview: @unchecked Sendable {
         return comp
     }
 }
+#endif
 
 extension Array {
     subscript(safe i: Int) -> Element? { indices.contains(i) ? self[i] : nil }

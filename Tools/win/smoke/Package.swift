@@ -5,6 +5,7 @@ import PackageDescription
 let package = Package(
     name: "tf-smoke",
     targets: [
-        .executableTarget(name: "tf-smoke", path: "Sources/tf-smoke")
+        .executableTarget(name: "tf-smoke", path: "Sources/tf-smoke"),
+        .testTarget(name: "tf-smokeTests", path: "Tests/tf-smokeTests")
     ]
 )

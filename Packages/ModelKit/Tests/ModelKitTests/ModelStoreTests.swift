@@ -1,5 +1,9 @@
 import XCTest
+#if canImport(CryptoKit)
 import CryptoKit
+#else
+import Crypto
+#endif
 @testable import ModelKit
 
 private struct Boom: Error, LocalizedError { var errorDescription: String? { "boom" } }
@@ -56,11 +60,7 @@ final class ModelStoreTests: XCTestCase {
         try FileManager.default.createDirectory(at: pkg, withIntermediateDirectories: true)
         try Data("{}".utf8).write(to: pkg.appendingPathComponent("Manifest.json"))
         zip = tmp.appendingPathComponent("Fake.mlpackage.zip")
-        let p = Process()
-        p.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
-        p.arguments = ["-c", "-k", "--keepParent", pkg.path, zip.path]
-        try p.run(); p.waitUntilExit()
-        XCTAssertEqual(p.terminationStatus, 0)
+        try makeTestZip(folder: pkg, zip: zip)
         desc = makeDescriptor(version: "v1", sha: try sha256Hex(of: zip))
     }
 
@@ -74,8 +74,10 @@ final class ModelStoreTests: XCTestCase {
 
     private func store(_ d: ModelDescriptor? = nil, dl: MockDownloader? = nil, failCompile: Bool = false) -> (ModelStore, MockDownloader) {
         let downloader = dl ?? MockDownloader(zip: zip)
+        // Fixture de zip + `.mlpackage`: se fuerza Core ML para que en Windows (formato nativo ONNX) pruebe la misma
+        // tubería; la de `.onnx` la cubre `ModelStoreOnnxTests`.
         return (ModelStore(root: root, catalog: [d ?? desc], downloader: downloader,
-                           compiler: MockCompiler(fail: failCompile)), downloader)
+                           compiler: MockCompiler(fail: failCompile), format: .coreML), downloader)
     }
 
     private func assertState(_ s: ModelStore, _ e: ModelState, line: UInt = #line) async {
@@ -209,6 +211,9 @@ final class ModelStoreTests: XCTestCase {
     }
 
     func testURLSessionDownloaderFileURL() async throws {
+        #if os(Windows)
+        throw XCTSkip("[windows] FoundationNetworking no soporta file:// en URLSession")
+        #endif
         let dest = tmp.appendingPathComponent("copy.zip")
         let prog = Box([Double]())
         try await URLSessionDownloader().download(from: zip, to: dest) { p in prog.mutate { $0.append(p) } }
@@ -220,6 +225,20 @@ final class ModelStoreTests: XCTestCase {
     /// Pesado: compilación real del modelo de la Fase 0. Solo con TF_MODEL_TESTS=1.
     func testRealSeparatorInstall() async throws {
         try XCTSkipUnless(ProcessInfo.processInfo.environment["TF_MODEL_TESTS"] == "1", "TF_MODEL_TESTS=1 requerido")
+        #if os(Windows)
+        // `.onnx` local T=345 (ver `localOnnxModel`); 8 GB fijos para que el catálogo elija esa variante.
+        let d = ModelCatalog.separatorBSRoformerSW
+        let source = try localOnnxModel("bs_roformer")
+        let heavyRoot = FileManager.default.temporaryDirectory.appendingPathComponent("modelkit-real-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: heavyRoot) }
+        let s = ModelStore(root: heavyRoot, catalog: [d], physicalMemory: 8 << 30)
+        let t0 = Date()
+        let url = try await s.install(d.id, fromArchive: source)
+        print("MODELKIT-REAL onnx install: \(String(format: "%.1f", Date().timeIntervalSince(t0))) s")
+        XCTAssertEqual(url.lastPathComponent, "bs_roformer.onnx")
+        guard case .installed(_, let bytes) = await s.state(d.id) else { return XCTFail("estado") }
+        XCTAssertEqual(bytes, d.onnxFile(physicalMemory: 8 << 30)?.bytes)
+        #else
         var dir = URL(fileURLWithPath: #filePath)
         while !FileManager.default.fileExists(atPath: dir.appendingPathComponent("Package.swift").path)
                 || dir.lastPathComponent != "ModelKit" { dir.deleteLastPathComponent() }
@@ -236,6 +255,7 @@ final class ModelStoreTests: XCTestCase {
         XCTAssertEqual(url.lastPathComponent, "BSRoformerSW.mlmodelc")
         XCTAssertGreaterThan(bytes, 0)
         guard case .installed = await s.state("bs-roformer-sw") else { return XCTFail("estado") }
+        #endif
     }
 }
 

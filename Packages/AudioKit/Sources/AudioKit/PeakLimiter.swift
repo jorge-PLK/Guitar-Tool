@@ -1,4 +1,4 @@
-import Accelerate
+import NativeDSP
 import Foundation
 
 /// Limitador de pico real con anticipación para la normalización del montaje (mini-spec Fase 7, «Exportación»).
@@ -109,13 +109,13 @@ final class PeakLimiter {
             var interp = [Double](repeating: 0, count: n)
             span.withUnsafeMutableBufferPointer { s in
                 interp.withUnsafeMutableBufferPointer { v in
-                    let len = vDSP_Length(n)
-                    vDSP_vabsD(samples, 1, v.baseAddress!, 1, len)
-                    vDSP_vmaxD(s.baseAddress!, 1, v.baseAddress!, 1, s.baseAddress!, 1, len)
+                    let len = DSPLength(n)
+                    DSP.vabsD(samples, 1, v.baseAddress!, 1, len)
+                    DSP.vmaxD(s.baseAddress!, 1, v.baseAddress!, 1, s.baseAddress!, 1, len)
                     for phase in LoudnessMeter.phases {
-                        vDSP_convD(ext, 1, phase, 1, v.baseAddress!, 1, len, vDSP_Length(taps))
-                        vDSP_vabsD(v.baseAddress!, 1, v.baseAddress!, 1, len)
-                        vDSP_vmaxD(s.baseAddress!, 1, v.baseAddress!, 1, s.baseAddress!, 1, len)
+                        DSP.convD(ext, 1, phase, 1, v.baseAddress!, 1, len, DSPLength(taps))
+                        DSP.vabsD(v.baseAddress!, 1, v.baseAddress!, 1, len)
+                        DSP.vmaxD(s.baseAddress!, 1, v.baseAddress!, 1, s.baseAddress!, 1, len)
                     }
                 }
             }

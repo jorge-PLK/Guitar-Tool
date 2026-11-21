@@ -1,5 +1,8 @@
+#if canImport(CoreML)
 import CoreML
+#endif
 import Foundation
+import NativePlatform
 
 /// Transcripción de batería con ADTOF Frame_RNN en Core ML FP32 (mini-spec Fase 5, «Transcripción», Batería):
 /// audio → espectrograma logarítmico → activaciones de 5 piezas a 100 fps → golpes.
@@ -52,9 +55,18 @@ public actor DrumTranscriber {
     private func loadedPredictor() throws -> any DrumActivationPredictor {
         if let predictor { return predictor }
         guard let modelURL else { throw TranscriptionError.model("sin modelo") }
+        #if canImport(CoreML)
         let p = try CoreMLDrumPredictor(modelURL: modelURL)
         predictor = p
         return p
+        #elseif os(Windows)
+        let p = try OnnxDrumPredictor(modelURL: modelURL)
+        predictor = p
+        return p
+        #else
+        _ = modelURL
+        throw PlatformError.unsupported("sin motor de inferencia en esta plataforma")
+        #endif
     }
 }
 
@@ -123,6 +135,8 @@ enum DrumChunking {
 }
 
 /// ADTOF Frame_RNN FP32 con GRU nativa: entrada `spec` [1, T, 84, 1] f32, salida `act` [1, T, 5] (sigmoide).
+/// Solo con Core ML; en Windows el predictor del modelo es pieza del paso 7 (ONNX Runtime).
+#if canImport(CoreML)
 final class CoreMLDrumPredictor: DrumActivationPredictor, @unchecked Sendable {
     private let model: MLModel
     private let inputName: String
@@ -187,3 +201,4 @@ final class CoreMLDrumPredictor: DrumActivationPredictor, @unchecked Sendable {
         return res
     }
 }
+#endif

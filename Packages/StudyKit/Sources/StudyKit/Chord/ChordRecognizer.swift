@@ -1,5 +1,8 @@
+#if canImport(CoreML)
 import CoreML
+#endif
 import Foundation
+import NativePlatform
 
 /// Resultado del reconocimiento de acordes: segmentos fusionados y croma por fotograma.
 public struct ChordAnalysis: Codable, Sendable, Equatable {
@@ -70,7 +73,7 @@ public actor ChordRecognizer {
     private func loadedPredictor() throws -> any ChordWindowPredictor {
         if let predictor { return predictor }
         guard let modelURL else { throw ChordError.model("sin modelo") }
-        let p = try CoreMLChordPredictor(modelURL: modelURL)
+        let p = try makeChordPredictor(modelURL: modelURL)
         predictor = p
         return p
     }
@@ -81,6 +84,18 @@ protocol ChordWindowPredictor: Sendable {
     func logits(window: UnsafeBufferPointer<Float>) throws -> [Float]
 }
 
+/// El predictor del modelo real de la plataforma: Core ML en el Mac; en Windows, ONNX Runtime (paso 7).
+func makeChordPredictor(modelURL: URL) throws -> any ChordWindowPredictor {
+    #if canImport(CoreML)
+    return try CoreMLChordPredictor(modelURL: modelURL)
+    #elseif os(Windows)
+    return try OnnxChordPredictor(modelURL: modelURL)
+    #else
+    throw PlatformError.unsupported("sin motor de inferencia en esta plataforma")
+    #endif
+}
+
+#if canImport(CoreML)
 /// `BTC_large_voca_fp16`: entrada `cqt` [1, 108, 144] f32, salida `logits` [1, 108, 170].
 final class CoreMLChordPredictor: ChordWindowPredictor, @unchecked Sendable {
     private let model: MLModel
@@ -129,6 +144,7 @@ final class CoreMLChordPredictor: ChordWindowPredictor, @unchecked Sendable {
         return res
     }
 }
+#endif
 
 /// Preproceso y postproceso de BTC sin el modelo.
 enum ChordFeatures {

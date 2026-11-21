@@ -1,6 +1,6 @@
 # ToneForge · Mapa del código
 
-Última actualización: 2026-11-18 · Fase 5c (ADR-019): interfaz de la tablatura (voces, adornos con teclado, ligadura, mute/solo, bucle por selección), fusionada con la Fase 7 (ADR-018): montaje (encuadre, layouts, compositor, exportación normalizada, plano único con cortes, rotación).
+Última actualización: 2026-11-19 · Fase 7c, paso 6 (ADR-020): capa de plataforma del port a Windows (`Packages/NativeKit` y costuras en los demás paquetes; stubs `[paso 7]` en Windows).
 
 Una sección por paquete (nombres de `docs/plan.md`, «Forma de trabajo»), más la app, las pruebas y las herramientas. Fila por fichero: `| Fichero | qué hace (ADR-NNN): APIs públicas |`. Se lee por secciones: `grep -n '^## ' docs/CODEMAP.md`.
 
@@ -46,6 +46,10 @@ E/S de audio y reproducción: importación (ADR-007), reproductor de estudio (AD
 | `Sources/AudioKit/AudioImporter.swift`, `PunchFlattener.swift`, `StudyPlayer.swift`, `TakeAligner.swift` (Fase 7) | (ADR-018) Retoques para el montaje y la lectura de tomas remuestreadas; `Package.swift` compila el target con `-O` también en Debug |
 | `Tests/AudioKitTests/HostClockTests.swift`, `PunchAndTakesTests.swift` (Fase 6) | (ADR-015) Marcas de host, varias pistas de toma, silencio del punch y aplanado |
 | `Sources/tf-audio/` | Ejecutable de desarrollo, no embebido (`TFAudio`, `Commands`, `Options`, `Rig`): `devices`, `latency` (`--restarts`), `verify`, `record`; `--simulated`; salidas en `Temp/tf-audio/` (incluye `verify-hal.csv`) |
+| `Sources/AudioKit/PlatformShims.swift`, `IOTimingLog.swift`, `DuplexClockSync.swift` (Fase 7c, paso 6) | (ADR-020) Costuras de plataforma. `StateLock` interno (`OSAllocatedUnfairLock` en Mac), `HostTimeLog`/`IOCounters` sobre `NativePlatform.HostClock`. `DuplexClockSync` (público): `addRenderClock`, `addCapturePacket`, `renderBuffer`, `captureHostSeconds`, `driftPPM`, `resetCapture`, `seconds(qpc100ns:)`; el offset de captura sale de dos rectas de mínimos cuadrados (50 arranques con ±0,5 ms de temblor: peor caso 0,10 ms) |
+| `Sources/AudioKit/WASAPIAudioIO.swift` (Fase 7c, paso 6) | (ADR-020) Solo Windows: `WASAPIAudioIO`, stub `[paso 7] wasapi` con el contrato documentado. `AudioSession.systemIO` elige CoreAudio (Mac) o WASAPI (Windows) por defecto en `makeIO` |
+| `Sources/AudioKit/` bajo `#if canImport(AVFoundation)` (Fase 7c, paso 6) | (ADR-020) `StudyPlayer`, `StemFeed`, `StemScheduler`, `HostedRenderer`, `ClickRenderer`, `CoreAudioIO` y `CoreAudioDeviceProvider` no existen en Windows (sin clase stub). `AudioImporter` conserva la API y lanza `paso 7: remuestreador`. El análisis (`AlignmentCheck`, `SignalMath`, `LoudnessMeter`, etc.) va sobre `NativeDSP`; `tf-audio` compila en Windows y sale con aviso |
+| `Tests/AudioKitTests/DuplexClockSyncTests.swift` (Fase 7c, paso 6) | (ADR-020) Offset, temblor, paquete suelto y deriva del reloj dúplex. En Windows se saltan 4 pruebas de grabación alineada (`AudioSessionTests`, `TakeAlignmentTests`, `FeedbackLoopTests`) por depender de `StudyPlayer` |
 | `Tests/AudioKitTests/` | 144 tests, 1 omitido (Fase 7: `LoudnessMeterTests`, `MontageMixerTests`, `MontageMixerOrderTests`, `MontageLimiterSinglePassTests`, `MontageLimiterTruePeakTests`, `TakeResamplingTests`; `AudioImporterTests`, `StudyPlayerTests` en render offline; Fase 3: `AudioRoutingTests`, `AudioSessionTests`, `LatencyCalibratorTests`, `TakeAlignmentTests`, `PlayerHostingTests`, `HostTimingTests`, `FeedbackLoopTests`, `LoudnessMatchTests`, `AppLogicTests`, `TFAudioToolTests`; Fase 6: `HostClockTests`, `PunchAndTakesTests`). Fixtures en `Fixtures/` (unos 300 KB), con un README de los comandos ffmpeg |
 
 ## Packages/ModelKit
@@ -59,6 +63,8 @@ Descarga, verificación y compilación de modelos (paquete añadido en la Fase 1
 | `Sources/ModelKit/Downloading.swift` | Protocolos `ModelDownloading` y `ModelCompiling`; `URLSessionDownloader`; `ModelDownloadError` |
 | `Sources/ModelKit/CoreMLCompiler.swift` | `CoreMLCompiler`: `compileModel` (1,7 s; la especialización para la GPU ocurre en la primera carga) |
 | `Sources/ModelKit/ModelDescriptor.swift` (Fase 5) | (ADR-016) `ModelCatalog.drumsADTOF`: ADTOF FP32 con GRU nativa, embebido (zip de `.mlpackage`, 1,7 MB, CC BY-NC-SA), entra en `all` |
+| `Sources/ModelKit/ModelDescriptor.swift`, `ModelStore.swift`, `Downloading.swift`, `CoreMLCompiler.swift` (Fase 7c, paso 6) | (ADR-020) `public enum ModelFormat { coreML, onnx; static var native }`. `CoreMLCompiler` en Windows es un stub `[paso 7] onnx-runtime`. La descompresión usa `ChildProcess` (`ditto` en Mac, `tar.exe -xf` en Windows); `defaultRoot` = `SupportFolder.toneForge/Models`; descarga con FoundationNetworking. Depende de `NativeKit` (`NativePlatform`) y, en Windows, de swift-crypto |
+| `Tests/ModelKitTests/ZipHelper.swift` (Fase 7c, paso 6) | (ADR-020) Crea zips de prueba (`tar.exe -a -c -f` en Windows). En Windows se saltan 2 pruebas `[windows]`: zips de `App/Resources/Models` no sincronizados y `file://` en `URLSession` |
 | `Tests/ModelKitTests/` | 16 tests (`ModelOriginsTests`: orígenes y catálogo); 1 pesado con `TF_MODEL_TESTS=1` |
 
 ## Packages/StemKit
@@ -82,6 +88,8 @@ Separación de stems con BS-RoFormer SW en Core ML, `.cpuAndGPU` (ADR-004, ADR-0
 | `Sources/StemKit/PanSplitter.swift`, `PanSoloSpan.swift` | (ADR-014) `PanSplitter` (máscaras de panorama por canal, puerta del centro por tramos), `GuitarSide`, `PanSoloSpan`. Sin uso en la app: descartado, ver ADR-014 |
 | `Sources/tf-separate/` | Ejecutable `tf-separate` (producto): un proceso por tema, vigilado por `MemoryGuard` |
 | `Sources/tf-memhog/` | Ejecutable `tf-memhog`, solo para tests del vigilante |
+| `Sources/StemKit/` STFT, `AudioIO.swift`, `MaskModel` (Fase 7c, paso 6) | (ADR-020) STFT/iSTFT sobre `NativeDSP` (ida y vuelta 5,4e-7 a hop 512). Protocolo `MaskModel`; `SystemMaskModel.load` es un stub `[paso 7] onnx-runtime` en Windows; `MaskTensor.copy` ya no depende de Core ML. El remuestreo de `AudioIO` es stub: en Windows solo 44,1 kHz. `arc4random_buf` pasa a semilla `SystemRandomNumberGenerator` + SplitMix64 |
+| `Sources/StemKit/WindowsProcess.swift` (Fase 7c, paso 6) | (ADR-020) Solo Windows: `MemoryGuard` con `K32GetProcessMemoryInfo` + `TerminateProcess` (código 137). `MemoryGuard` usa `Int32` en vez de `pid_t`. `tf-separate` y `tf-memhog` compilan en ARM64 y x64 |
 | `Tests/StemKitTests/` | 36 tests (`StemLevelMeterTests`); 3 pesados con `TF_MODEL_TESTS=1` y 1 de referencia Python con `TF_REF_DIR` |
 
 ## Packages/StudyKit
@@ -102,6 +110,7 @@ Pulso, acordes, tonalidad y su caché (ADR-009). No depende de ningún paquete p
 | `Sources/StudyKit/ChordTimeline.swift` | `ChordSegment`, `ChordOverride`, `ChordTimeline.effective(detected:overrides:)` |
 | `Sources/StudyKit/AnalysisCache.swift` | `AnalysisFingerprint`, `AnalysisCache.load(at:expecting:)` y `save` |
 | `Sources/StudyKit/SectionEdgePicker.swift` | (ADR-014) `SectionEdgePicker`: qué borde de sección se agarra con el ratón (asas de las cajas de secciones) |
+| `Sources/StudyKit/` LogMel, CQT, decodificación (Fase 7c, paso 6) | (ADR-020) `LogMel` y `CQT` sobre `NativeDSP` (log-mel frente al fixture 4,05e-5; CQT frente a librosa, medio 5e-6); decodificación con `AudioFileReader`. En Windows, `MonoResampler` y `makeBeatPredictor`/`makeChordPredictor` (internos) son stubs `[paso 7]` remuestreador y onnx-runtime |
 | `Tests/StudyKitTests/` | 47 tests (`BeatTests`, `ChordTests`, `ChordRecognizerTests`; pesados `BeatHeavyModelTests` y `ChordHeavyModelTests` con `TF_MODEL_TESTS=1` bajo `guard.py`). Fixtures en `Fixtures/` con su README; las genera `Probes/P4-modelos/fixtures/make_fase2_fixtures.py` |
 
 ## Packages/SourceKit
@@ -125,6 +134,7 @@ Importar desde enlaces de YouTube y Spotify (ADR-008, ADR-011). No depende de ni
 | `Sources/tf-fetch/main.swift` | Ejecutable de desarrollo `tf-fetch <enlace> --helpers <dir> --out <dir> [--pick N]`; no se embebe |
 | `Sources/SourceKit/Songsterr/` | (ADR-017) `SongsterrClient` (búsqueda y pistas), `SongsterrReader` (estado de la página), `SongsterrModels`, `SongsterrLookup` (artista y título → resultados), `SongsterrServing` (protocolo que implementa la app con el `WKWebView`), `SongsterrIssue` (errores y avisos). Sin red en los tests |
 | `Tests/SourceKitTests/SongsterrTests.swift`, `SongsterrLookupTests.swift` | (ADR-017) Lector y búsqueda con páginas de muestra |
+| `Sources/SourceKit/ProcessRunning.swift`, `HelperLocator`, `YtDlpUpdater`, `SongsterrClient` (Fase 7c, paso 6) | (ADR-020) `SystemProcessRunner` sobre `ChildProcess` (sin `kill`/`pid_t`). `HelperLocator.fileName(_:)` (público): nombre por plataforma (`.exe` en Windows); `defaultSupportDirectory` = `SupportFolder.toneForge/Helpers`. `YtDlpUpdater` en Windows borra y mueve (no atómico). Songsterr descomprime con `CMiniz` (deflate crudo) en Windows y `Compression` en Mac. swift-crypto en Windows y FoundationNetworking. Sin stubs ni saltos; `tf-fetch` no enlaza en Windows (`curl.lib`) |
 | `Tests/SourceKitTests/` | 63 tests (`SourceKitTests`, `PlaylistTests`, `OrphanTests`) con fixtures grabados; sin red ni helpers |
 
 ## Packages/AnalysisKit
@@ -174,6 +184,7 @@ Transcripción y tablatura (ADR-014).
 | `Sources/TabKit/Score/TabOrnaments.swift`, `TabEditor.swift`, `TabTechniques.swift` (Fase 5c) | (ADR-019) `TabOrnament` y extensión de `TabEditor`: `toggle(_:trackID:noteIDs:)`, `toggle(_:trackID:hitPoints:)`, `noteIDs(in:trackID:)`, `hitPoints(in:trackID:)`, `bendCycle`, `whammyVibrato`, `graceFretsBelow`, `setGraceFret(_:trackID:noteID:)`; `TabTechniques.tieDestination`, `TabEditError.noTieOrigin` |
 | `Sources/TabKit/Score/TabSpan.swift` (Fase 5c) | (ADR-019) `TabSpan`: tramo de pulsos seleccionado (Parte 2) |
 | `Sources/TabKit/Bridge/AlphaTabScore.swift` (Fase 5c) | (ADR-019) JSON v1: `kind:"vocal"`, `program`, notas con `p`, `tie` → `isTieDestination` |
+| `Sources/TabKit/Synth/TabSynthRenderer.swift`, `SamplerTabSynth.swift` (Fase 7c, paso 6) | (ADR-020) Protocolo interno `TabSynthBackend`: `SamplerTabSynth` en Mac (el sampler de antes) y `PendingTabSynth` en Windows (`[paso 7] sintetizador`). `melodicBankMSB` (0x79) y `percussionBankMSB` (0x78), con test contra AudioToolbox. Espectrograma de batería sobre `NativeDSP` (6,4e-7); lectura de audio con `NativeAudioFile.readMono`. En Windows, `BasicPitchTranscriber` solo tiene `init(modelURL:)` y los transcriptores son stubs `[paso 7]` onnx-runtime; `MonoAudio` depende del remuestreador (stub) |
 | `Tests/TabKitTests/` (Fase 5c) | (ADR-019) `TabSpanTests`, `TabSynthAdornmentTests`, `TabSynthTieTests`, `TabVocalTests`, `TabVocalRealTests` (`TF_P5B_TESTS=1`), `TabOrnamentsTests` |
 
 ## Packages/VideoKit
@@ -201,6 +212,9 @@ Captura y montaje de vídeo (ADR-015). No depende de AudioKit: la app hace de pu
 | `Sources/VideoKit/TakePreview.swift` (Fase 7) | (ADR-018) Aplica el giro de la toma con `preferredTransform` |
 | `Sources/tf-video/` | Ejecutable de desarrollo, no embebido: `cameras`, `record`, `sync` (medida de fotogramas, jitter, deriva y retardo contra el host) |
 | `Sources/tf-video/MontageCommands.swift` (Fase 7) | (ADR-018) `frame` (encuadre de un vídeo: caja, PNG) y `montage` (plan sintético, exportación de pruebas; `--mix`, `--codec`, `--container`) |
+| `Sources/VideoKit/MediaFoundationStubs.swift` (Fase 7c, paso 6) | (ADR-020) Solo Windows, API igual que la de Apple: `MediaFoundationCameraProvider` (sin cámaras), `MediaFoundationCameraCapture` y `VideoTakeWriter` (lanzan `paso 7: media-foundation`); `MontageExporter.export` (comprueba la extensión y lanza media-foundation); `MontageBuilder.load` (lanza `paso 7: direct2d`; `renderSize` sí funciona); `GuitarFramer.analyze` (lanza `paso 7: encuadre`) |
+| `Sources/VideoKit/` costuras (Fase 7c, paso 6) | (ADR-020) `public typealias FramePixelBuffer` (= `CVPixelBuffer` en Mac, clase vacía en Windows) en `CameraFrame.pixelBuffer`. `VideoKit.HostClock` delega en `NativePlatform.HostClock` (API pública igual). `MontagePlan.frameTicks(fps:)` (interno, sin CoreMedia). `GuitarFramer.fingerprint` con swift-crypto en Windows. Solo Apple (sin clase en Windows): `AVCameraProvider`, `AVCameraCapture`, `TakePreview` (con su `plan`), `MontagePreview`, `MontageCompositor`, `LoadedTakeVideo`, `VideoRotation.transform`. `tf-video` solo Mac (en Windows sale con aviso). La biblioteca sigue sin depender de `AudioKit`; depende de `NativeKit` |
+| `Tests/VideoKitTests/SyncPortableTests.swift` (Fase 7c, paso 6) | (ADR-020) `testHostClockIsTheNativePlatformClock` y `testTakesWithoutPlayerLandWithinHalfAFrameWithTheSameOffset` (puerta F6 sin `StudyPlayer`: Mac y VM idénticos, máximo 2,299 ms) |
 | `Tests/VideoKitTests/` | 55 tests: `SyncGateTests` (puerta: 3 tomas con cámara simulada), `HostTimeMapTests`, `VideoFileTests`, `TFVideoToolTests`, `VideoKitTests`; Fase 7 (ADR-018): `GuitarFramerTests`, `MontageTimelineTests`, `MontageRendererTests`, `MontageGateTests` (puerta del montaje: portrait y landscape), `MontageSingleCoverageTests`, `MontageCompositionCoverageTests`, `MontageOptionsTests`, `MontageFrameGridTests`, `MontageAudioFadeTests`, `VideoRotationTests` |
 
 ## Packages/Store
@@ -227,6 +241,8 @@ Archivo de proyecto (JSON por carpeta), índice en SwiftData y orquestación de 
 | `Sources/Store/Montage.swift` (Fase 7) | (ADR-018) `MontageState` (`layout`, `singleRhythmPartID`, `singleCuts`, `caption`, `cutGaps`, `partOrder`, `showPartLabels`, `keepVideoAspect`, `export`, `framing`), `MontageLayoutKind`, `MontageSingleCut` (`normalizedSingleCuts()`), `NormalizedRect`, `FramingMode`, `TakeFraming` (`rotatedClockwise(quarterTurns:)`), `FramingOffset`; `Library.saveMontage` |
 | `Sources/Store/Models.swift`, `Files.swift`, `Recording.swift`, `VideoSettings.swift` (Fase 7) | (ADR-018) `Take.videoRotation` y `rotationDegrees`; `VideoSettings.rotations`, `defaultRotation(for:)`, `setDefaultRotation`, `normalizedRotation(_:)`; `RecordingState.partMix`; rutas `framingCacheURL(takeId:)`, `montageVideoURL(layout:)`, `montageTracksDirectory(layout:)`; copias `project.json.bak-AAAAMMDD` y `.lost-<fecha-hora>` al escribir |
 | `Tests/StoreTests/MontageTests.swift`, `ProjectBackupTests.swift`, `VideoRotationTests.swift` (Fase 7) | (ADR-018) Estado del montaje y compatibilidad hacia atrás; copias `.bak`/`.lost` (`testWriteLosingTabSourceCreatesLostCopy`); rotación por cámara y por toma |
+| `Sources/Store/LibraryIndexJSON.swift`, `PlatformPaths.swift`, `WindowsFileMove.swift` (Fase 7c, paso 6) | (ADR-020) `LibraryIndex` con dos implementaciones: SwiftData en Apple y `Library.json` en Windows (caché reconstruible, unos 250 B por tema); en Windows no existe `LibraryEntry`. `PlatformPaths` (interno) elige rutas por sistema. `windowsMoveReplacing` (interno, `MoveFileEx` con `MOVEFILE_REPLACE_EXISTING`, porque `replaceItemAt` aborta en Windows). La Papelera de reciclaje es un stub `[paso 7]`. swift-crypto en Windows |
+| `Tests/StoreTests/HashTests.swift` (Fase 7c, paso 6) | (ADR-020) Vectores SHA-256 conocidos: mismos hashes en Apple y Windows. En Windows 201 pasados y 1 salto `[windows]` (`RelocateTests.testMoveFailureMidwayKeepsOriginal`) |
 | `Tests/StoreTests/` | 166 tests (`AudioSettingsTests`: ajustes de audio y caducidad de la calibración; `StudyQueueTests`: cola, stems vacíos, v1 → v2; `OriginTests`: origen, duplicados, importación con metadatos; `TrashTests`: Papelera, borrado y edición; `RecoveryTests`: re-encolado al arrancar; Fase 6: `RecordingTests`) |
 
 Fase 6 (ADR-015): la carpeta de proyecto añade `takes/<id>/video.mov`, `takes/<id>/base/processed.wav` (toma original antes de un punch) y `takes/<id>/punch-<n>/`.
@@ -236,6 +252,23 @@ Fase 6 (ADR-015): la carpeta de proyecto añade `takes/<id>/video.mov`, `takes/<
 | `Sources/Store/TabSources.swift` (Fase 5c) | (ADR-019) `TabSource.Kind.vocal`, `Project.vocalTabSource(fileExists:)` (vincula la vocal al stem `vocals`); probado en `TabSourcesTests` |
 
 Carpeta de proyecto: `project.json`, `source/original.<ext>`, `audio/song.wav` (regenerable), `stems/<stem>.wav` (regenerable), `stems/.partial`, `takes/` (`takes/<id>/processed.wav`, ADR-013), `tab/score.json` (tablatura con ediciones; no es caché, ADR-016), `video/`, `rigs/`, `cache/` (regenerable; `cache/analysis.json` es el análisis automático con huella; `cache/tab/` los WAV sintetizados). Perfil e índice en `~/Library/Application Support/ToneForge/` (`profile.json`, `Library.store`). Límite conocido: en la reconversión la sustitución es atómica por fichero, no entre ficheros; `project.json` se actualiza al final y, si falla a mitad, se reintenta al abrir.
+
+## Packages/NativeKit
+
+Capa de plataforma del port a Windows (paquete nuevo, Fase 7c paso 6, ADR-020). Lo usan casi todos los demás paquetes; en el Mac delega en Apple, en Windows usa código C vendorizado (fuentes con su licencia, sin binarios en git).
+
+| Fichero | qué hace (ADR-020): APIs públicas |
+| --- | --- |
+| `Sources/CPocketFFT/` | pocketfft (BSD-3) en C: FFT real y compleja para el motor portátil |
+| `Sources/CDrAudio/` | dr_wav 0.14.7, dr_flac 0.13.5 y dr_mp3 0.7.5 (`dr_audio.c`, cabecera `CDrAudio.h`) |
+| `Sources/CMiniz/` | miniz 3.0.2 (MIT); `SourceKit` lo usa para el deflate crudo de Songsterr (`tinfl_decompress_mem_to_heap`) |
+| `Sources/NativeDSP/Types.swift`, `AccelerateDSP.swift`, `PortableDSP.swift`, `PortableDFT.swift`, `README.md` | Fachada `DSP` con 46 operaciones de vDSP/vForce y vImage 16F: `DSPAccelerate` (Mac, pasa directa a vDSP) y `DSPPortable` (Swift + pocketfft, Windows; en el Mac se prueba contra vDSP operación por operación). DFT y biquad como clases `DSP.RealDFT`, `ComplexDFT`, `ComplexDFTD` y `Biquad` (el biquad portátil usa `Double`). La tabla de operaciones está en el `README.md` |
+| `Sources/NativeAudioFile/NativeAudioFile.swift` | `NativeAudioFile.read`, `readMono` y `write` (`WAVSampleFormat`), `DecodedAudio`, `AudioFileError`; `AVAudioFile` en Mac y dr_* en Windows |
+| `Sources/NativeAudioFile/AudioFileIO.swift` | `AudioFileReader` (`init(url:)`, `read(into:maxFrames:)`, `read(maxFrames:)`, `seek(toFrame:)`) y `AudioFileWriter` |
+| `Sources/NativePlatform/HostClock.swift` | `HostClock`: `now`, `seconds(ticks:)`, `ticks(seconds:)`, `nanoseconds(ticks:)`, `nowSeconds`, `timebase`; `mach_absolute_time` en Mac y QPC en Windows, con la misma unidad |
+| `Sources/NativePlatform/ChildProcess.swift` | `ChildProcess` (`run`, `terminate(grace:)`, `kill`, `waitUntilExit`, `terminationStatus`, `terminationReason`): grupo de procesos con SIGTERM → SIGKILL en Mac; Job Object `KILL_ON_JOB_CLOSE` en Windows (código 143, sin parada ordenada). `terminatedExitCode` 143 y `killedExitCode` 137 |
+| `Sources/NativePlatform/SupportFolder.swift`, `PlatformError.swift` | `SupportFolder.base` y `toneForge` (`Application Support` o `%LOCALAPPDATA%\ToneForge`); `PlatformError.unsupported("paso 7: <pieza>")`, el error de los stubs de Windows |
+| `Tests/NativeKitTests/` | `DSPEngineTests` y `DSPCases` (58 casos frente a vDSP; FFT ≤ 7,1e-8), `DSPReferenceData` (referencias regenerables con `TF_NATIVEKIT_WRITE_REFS=1 Tools/test.sh NativeKit WriteReference`), `AudioFileAndProcessTests` (WAV24 y FLAC Δ0, MP3 ≤ 3,1e-5), `PlatformTests`. Mac 21 tests (1 salto); VM 12 en ARM64 y x64 |
 
 ## App
 
@@ -334,5 +367,7 @@ Recursos: modelos y resultados en `Probes/P4-modelos/*/out/` (no versionados); e
 | --- | --- |
 | `Tools/test.sh` | `swift test` de cada paquete + build de la app con salida resumida; escribe `Temp/last-run.txt` en la pasada completa (ADR-003) |
 | `Tools/test.sh App` (Fase 6) | Solo el build de la app, unos 5 s en incremental; no escribe `Temp/last-run.txt` (ADR-015) |
+| `Tools/win/build.sh` (Fase 7c) | Compila, instala y arranca en la VM de Windows (ADR-020); `--test [--filter X]` hace `swift test` del paquete en ARM64 y x64, sin instalar, con pasados, fallados y saltos (`[paso 7]` pendiente, `[windows]` permanente) y toma él mismo el cerrojo `Temp/win/vm.lock` (`TF_VM_LOCK_WAIT`, 20 min) |
+| `Tools/win/remote/test.ps1`, `x64-runtime.ps1` (Fase 7c, paso 6) | `test.ps1` ejecuta `swift test` en la VM y resume su salida; `x64-runtime.ps1` extrae las DLL x64 de `Redistributables\6.4.2\rtl.shared.amd64.msm` a `C:\tf-rtl-x64` (se antepone al PATH solo en x64; `--clean` no lo borra) |
 | `Tools/helpers/` | `fetch.sh` (baja y verifica yt-dlp y Deno), `build-ffmpeg.sh` (compila el ffmpeg mínimo) y `versions.env` (versiones y sumas); la salida va a `Vendor/helpers/`, sin versionar (ADR-011) |
 | `Tools/make-icon.sh`, `Tools/make-icon.swift` | Generan los PNG del icono de la app a partir de `App/Resources/AppIcon.svg` (de Jorge) |

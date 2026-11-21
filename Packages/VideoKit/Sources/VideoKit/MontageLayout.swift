@@ -1,4 +1,6 @@
+#if canImport(CoreGraphics)
 import CoreGraphics
+#endif
 import Foundation
 
 /// Geometría de los layouts (mini-spec Fase 7, tabla de «Layouts»), en unidades del lienzo con **origen arriba a la

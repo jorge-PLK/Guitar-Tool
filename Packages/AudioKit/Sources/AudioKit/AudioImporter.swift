@@ -1,5 +1,8 @@
+#if canImport(AVFoundation)
 import AVFoundation
+#endif
 import Foundation
+import NativePlatform
 
 /// Resultado de importar un tema al formato de trabajo.
 public struct ImportedAudio: Sendable, Equatable {
@@ -31,6 +34,7 @@ public enum AudioImportError: Error, Equatable {
     case writeFailed(String)
 }
 
+#if canImport(AVFoundation)
 /// Importa WAV/FLAC/MP3 y los convierte a estéreo, float32, WAV, a la frecuencia de trabajo.
 public struct AudioImporter: Sendable {
     public static let supportedSampleRates: [Double] = [44_100, 48_000]
@@ -107,9 +111,14 @@ public struct AudioImporter: Sendable {
         var sourceChannels: Int
     }
 
+    /// Solo pruebas: fuerza en el Mac la conversión de Windows (`portableConvert`, r8brain) para pasarle los mismos
+    /// casos (plan, «Corte del paso 7», parte 7.1). En producción es falso.
+    @TaskLocal static var forcePortable = false
+
     /// Interna (no privada) para `TakeResampling`: el mismo conversor para tomas que para tema y stems.
     static func convert(_ source: URL, to destination: URL, sampleRate: Double,
                                 progress: @escaping @Sendable (Double) -> Void) throws -> ConversionInfo {
+        if forcePortable { return try portableConvert(source, to: destination, sampleRate: sampleRate, progress: progress) }
         let fm = FileManager.default
         if let size = (try? fm.attributesOfItem(atPath: source.path))?[.size] as? NSNumber, size.intValue == 0 {
             throw AudioImportError.emptyAudio
@@ -256,3 +265,61 @@ public struct AudioImporter: Sendable {
                               sourceRate: inFormat.sampleRate, sourceChannels: channels)
     }
 }
+
+#else
+
+/// Windows: la misma API con dr_* y r8brain (`portableConvert`). Sin etiquetas: título y artista del nombre del
+/// fichero (plan, «Corte del paso 7», fuera del corte).
+public struct AudioImporter: Sendable {
+    public static let supportedSampleRates: [Double] = [44_100, 48_000]
+    public static let supportedExtensions: Set<String> = ["wav", "flac", "mp3"]
+
+    public init() {}
+
+    public func importAudio(from source: URL, to destination: URL, sampleRate: Double,
+                            progress: @escaping @Sendable (Double) -> Void) async throws -> ImportedAudio {
+        guard Self.supportedSampleRates.contains(sampleRate) else {
+            throw AudioImportError.unsupportedSampleRate(sampleRate)
+        }
+        let ext = source.pathExtension.lowercased()
+        guard Self.supportedExtensions.contains(ext) else {
+            throw AudioImportError.unsupportedFormat(ext)
+        }
+        let info = try Self.convert(source, to: destination, sampleRate: sampleRate, progress: progress)
+        let meta = await metadata(of: source)
+        return ImportedAudio(title: meta.title, artist: meta.artist, duration: info.duration,
+                             sourceFormat: ext, sourceSampleRate: info.sourceRate,
+                             sourceChannels: info.sourceChannels)
+    }
+
+    /// Remuestrea un WAV ya convertido a otra frecuencia de trabajo.
+    public func resample(_ file: URL, to destination: URL, sampleRate: Double) async throws {
+        guard Self.supportedSampleRates.contains(sampleRate) else {
+            throw AudioImportError.unsupportedSampleRate(sampleRate)
+        }
+        _ = try Self.convert(file, to: destination, sampleRate: sampleRate, progress: { _ in })
+    }
+
+    /// Sin etiquetas (fuera del corte del paso 7): título y artista del nombre («Artista - Título.ext»).
+    public func metadata(of source: URL) async -> (title: String?, artist: String?) {
+        let base = source.deletingPathExtension().lastPathComponent
+        guard let range = base.range(of: " - ") else { return (base, nil) }
+        let a = base[..<range.lowerBound].trimmingCharacters(in: .whitespaces)
+        let t = base[range.upperBound...].trimmingCharacters(in: .whitespaces)
+        return !a.isEmpty && !t.isEmpty ? (t, a) : (base, nil)
+    }
+
+    struct ConversionInfo {
+        var duration: Double
+        var sourceRate: Double
+        var sourceChannels: Int
+    }
+
+    /// Interna para `TakeResampling`: el mismo conversor para tomas que para tema y stems.
+    static func convert(_ source: URL, to destination: URL, sampleRate: Double,
+                        progress: @escaping @Sendable (Double) -> Void) throws -> ConversionInfo {
+        try portableConvert(source, to: destination, sampleRate: sampleRate, progress: progress)
+    }
+}
+
+#endif // canImport(AVFoundation)

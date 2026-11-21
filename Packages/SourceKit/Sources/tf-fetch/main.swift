@@ -29,9 +29,9 @@ let helpersDir = URL(fileURLWithPath: helpers, isDirectory: true)
 let outDir = URL(fileURLWithPath: out, isDirectory: true)
 let runner = SystemProcessRunner()
 let http = URLSessionFetcher()
-let ytDlpURL = helpersDir.appendingPathComponent("yt-dlp")
-let denoURL = helpersDir.appendingPathComponent("deno")
-let ffmpegURL = helpersDir.appendingPathComponent("ffmpeg")
+let ytDlpURL = helpersDir.appendingPathComponent(HelperLocator.fileName("yt-dlp"))
+let denoURL = helpersDir.appendingPathComponent(HelperLocator.fileName("deno"))
+let ffmpegURL = helpersDir.appendingPathComponent(HelperLocator.fileName("ffmpeg"))
 for u in [ytDlpURL, denoURL, ffmpegURL] where !FileManager.default.isExecutableFile(atPath: u.path) {
     fail("falta el helper \(u.path)")
 }

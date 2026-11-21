@@ -1,4 +1,4 @@
-import Accelerate
+import NativeDSP
 import Foundation
 
 /// Por qué no vale una calibración (mini-spec Fase 3, «Calibración de latencia» · Resultado).
@@ -126,7 +126,7 @@ public struct LatencyProbe: Sendable {
             var seg = [Float](repeating: 0, count: to - from)
             for i in 0..<seg.count where from + i >= 0 && from + i < recording.count { seg[i] = recording[from + i] }
             var p: Float = 0
-            vDSP_maxmgv(seg, 1, &p, vDSP_Length(seg.count))
+            DSP.maxmgv(seg, 1, &p, DSPLength(seg.count))
             peak = max(peak, p)
             let rep = measure(seg)
             lags.append(rep.lag)

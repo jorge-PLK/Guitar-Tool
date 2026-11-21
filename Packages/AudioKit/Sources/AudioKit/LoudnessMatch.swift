@@ -1,4 +1,4 @@
-import Accelerate
+import NativeDSP
 import Foundation
 
 /// Igualado de sonoridad de la toma frente al stem (mini-spec Fase 3, «A/B dentro de la mezcla»): RMS con
@@ -58,7 +58,7 @@ public enum LoudnessMatch {
             var sum = 0.0
             for ch in weighted {
                 var ms: Float = 0
-                ch.withUnsafeBufferPointer { vDSP_measqv($0.baseAddress! + start, 1, &ms, vDSP_Length(block)) }
+                ch.withUnsafeBufferPointer { DSP.measqv($0.baseAddress! + start, 1, &ms, DSPLength(block)) }
                 sum += Double(ms)
             }
             z.append(channelWeight * sum)
@@ -94,11 +94,10 @@ public enum LoudnessMatch {
 
     static func kWeighted(_ x: [Float], sampleRate: Double) -> [Float] {
         let coeffs = kWeightingCoefficients(sampleRate: sampleRate).flatMap { $0 }
-        guard let setup = vDSP_biquad_CreateSetup(coeffs, 2) else { return x }
-        defer { vDSP_biquad_DestroySetup(setup) }
-        var delay = [Float](repeating: 0, count: 2 * 2 + 2)
+        guard let setup = DSP.Biquad(coefficients: coeffs, sections: 2) else { return x }
+            var delay = [Float](repeating: 0, count: 2 * 2 + 2)
         var y = [Float](repeating: 0, count: x.count)
-        vDSP_biquad(setup, &delay, x, 1, &y, 1, vDSP_Length(x.count))
+        setup.execute(&delay, x, 1, &y, 1, DSPLength(x.count))
         return y
     }
 }

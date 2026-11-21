@@ -1,5 +1,8 @@
-import Accelerate
+#if canImport(AVFoundation)
 import AVFoundation
+#endif
+import NativeAudioFile
+import NativeDSP
 import XCTest
 @testable import AudioKit
 
@@ -10,9 +13,23 @@ final class ProgressLog: @unchecked Sendable {
     var all: [Double] { lock.lock(); defer { lock.unlock() }; return values }
 }
 
-final class AudioImporterTests: XCTestCase {
+/// En el Mac corre con AVAudioConverter y, en `AudioImporterPortableTests`, con la conversión de Windows
+/// (dr_* + r8brain, forzada); en Windows, con la de Windows.
+class AudioImporterTests: XCTestCase {
     let importer = AudioImporter()
     var tmpDir: URL!
+
+    /// La subclase del Mac lo pone a cierto para forzar `AudioImporter.portableConvert`.
+    class var portable: Bool { false }
+
+    /// Ejecuta `body` con el conversor de la clase.
+    func converting<T>(_ body: () async throws -> T) async throws -> T {
+        #if canImport(AVFoundation)
+        return try await AudioImporter.$forcePortable.withValue(Self.portable) { try await body() }
+        #else
+        return try await body()
+        #endif
+    }
 
     override func setUpWithError() throws {
         tmpDir = FileManager.default.temporaryDirectory.appendingPathComponent("AudioKitTests-\(UUID().uuidString)")
@@ -34,50 +51,55 @@ final class AudioImporterTests: XCTestCase {
 
     func importFile(_ name: String, rate: Double, progress: @escaping @Sendable (Double) -> Void = { _ in }) async throws -> (ImportedAudio, URL) {
         let dest = out("\(UUID().uuidString).wav")
-        let r = try await importer.importAudio(from: fixture(name), to: dest, sampleRate: rate, progress: progress)
+        let r = try await converting {
+            try await importer.importAudio(from: fixture(name), to: dest, sampleRate: rate, progress: progress)
+        }
         return (r, dest)
     }
 
     /// Lee el canal `ch` entero.
     func samples(_ url: URL, channel ch: Int = 0) throws -> [Float] {
-        let f = try AVAudioFile(forReading: url, commonFormat: .pcmFormatFloat32, interleaved: false)
-        let buf = AVAudioPCMBuffer(pcmFormat: f.processingFormat, frameCapacity: AVAudioFrameCount(f.length))!
-        try f.read(into: buf)
-        return Array(UnsafeBufferPointer(start: buf.floatChannelData![ch], count: Int(buf.frameLength)))
+        let f = try AudioFileReader(url: url)
+        return try f.read(maxFrames: f.frameCount)[ch]
     }
 
     /// Frecuencia del pico de FFT (ventana Hann de 16384 muestras del centro) y ancho de bin.
     func peak(_ x: [Float], rate: Double) -> (freq: Double, bin: Double) {
         let n = 16_384
         let start = (x.count - n) / 2
-        var win = [Float](repeating: 0, count: n)
-        vDSP_hann_window(&win, vDSP_Length(n), Int32(vDSP_HANN_NORM))
-        var seg = [Float](repeating: 0, count: n)
-        vDSP_vmul(Array(x[start..<start + n]), 1, win, 1, &seg, 1, vDSP_Length(n))
-        let log2n = vDSP_Length(14)
-        let setup = vDSP_create_fftsetup(log2n, FFTRadix(kFFTRadix2))!
-        defer { vDSP_destroy_fftsetup(setup) }
-        var re = [Float](repeating: 0, count: n / 2)
-        var im = [Float](repeating: 0, count: n / 2)
-        var mags = [Float](repeating: 0, count: n / 2)
-        re.withUnsafeMutableBufferPointer { rp in
-            im.withUnsafeMutableBufferPointer { ip in
-                var split = DSPSplitComplex(realp: rp.baseAddress!, imagp: ip.baseAddress!)
-                seg.withUnsafeBufferPointer { sp in
-                    sp.baseAddress!.withMemoryRebound(to: DSPComplex.self, capacity: n / 2) {
-                        vDSP_ctoz($0, 2, &split, 1, vDSP_Length(n / 2))
-                    }
-                }
-                vDSP_fft_zrip(setup, &split, 1, log2n, FFTDirection(FFT_FORWARD))
-                vDSP_zvmags(&split, 1, &mags, 1, vDSP_Length(n / 2))
-            }
+        // Hann periódica (`vDSP_HANN_NORM`), en pares e impares para la DFT real empaquetada.
+        var even = [Float](repeating: 0, count: n / 2), odd = [Float](repeating: 0, count: n / 2)
+        for i in 0..<n {
+            let w = Float(0.5 * (1 - cos(2 * Double.pi * Double(i) / Double(n))))
+            if i % 2 == 0 { even[i / 2] = x[start + i] * w } else { odd[i / 2] = x[start + i] * w }
         }
-        mags[0] = 0
-        var maxV: Float = 0
-        var maxI: vDSP_Length = 0
-        vDSP_maxvi(mags, 1, &maxV, &maxI, vDSP_Length(n / 2))
+        var re = [Float](repeating: 0, count: n / 2), im = [Float](repeating: 0, count: n / 2)
+        DSP.RealDFT(count: n, direction: .forward)!.execute(even, odd, &re, &im)
+        var maxI = 0, maxV: Float = 0
+        for k in 1..<(n / 2) {          // k = 0 lleva DC y Nyquist empaquetados
+            let m = re[k] * re[k] + im[k] * im[k]
+            if m > maxV { maxV = m; maxI = k }
+        }
         let bin = rate / Double(n)
         return (Double(maxI) * bin, bin)
+    }
+
+    /// Etiqueta de formato (1 PCM, 3 float, 0xFFFE extensible) y bits por muestra del bloque `fmt ` de un WAV.
+    func wavFormat(_ url: URL) throws -> (tag: Int, bits: Int) {
+        let d = [UInt8](try Data(contentsOf: url))
+        func u16(_ i: Int) -> Int { Int(d[i]) | Int(d[i + 1]) << 8 }
+        func u32(_ i: Int) -> Int { u16(i) | u16(i + 2) << 16 }
+        var p = 12
+        while p + 8 <= d.count {
+            let size = u32(p + 4)
+            if d[p..<(p + 4)].elementsEqual(Array("fmt ".utf8)) {
+                var tag = u16(p + 8)
+                if tag == 0xFFFE, size >= 40 { tag = u16(p + 8 + 24) }    // subformato de WAVE_FORMAT_EXTENSIBLE
+                return (tag, u16(p + 8 + 14))
+            }
+            p += 8 + size + (size & 1)
+        }
+        throw AudioFileError.unreadable("sin bloque fmt")
     }
 
     func assertTone(_ url: URL, rate: Double, file: StaticString = #filePath, line: UInt = #line) throws {
@@ -91,11 +113,20 @@ final class AudioImporterTests: XCTestCase {
         for name in tonal {
             for rate in rates {
                 let (_, dest) = try await importFile(name, rate: rate)
+                #if canImport(AVFoundation)
                 let f = try AVAudioFile(forReading: dest)
                 XCTAssertEqual(f.fileFormat.channelCount, 2, "\(name) @\(rate)")
                 XCTAssertEqual(f.fileFormat.sampleRate, rate, "\(name) @\(rate)")
                 XCTAssertEqual(f.fileFormat.commonFormat, .pcmFormatFloat32, "\(name) @\(rate)")
                 XCTAssertEqual(f.fileFormat.settings[AVLinearPCMBitDepthKey] as? Int, 32)
+                #else
+                let f = try AudioFileReader(url: dest)
+                XCTAssertEqual(f.channelCount, 2, "\(name) @\(rate)")
+                XCTAssertEqual(f.sampleRate, rate, "\(name) @\(rate)")
+                #endif
+                let fmt = try wavFormat(dest)
+                XCTAssertEqual(fmt.tag, 3, "IEEE float, \(name) @\(rate)")
+                XCTAssertEqual(fmt.bits, 32, "\(name) @\(rate)")
                 XCTAssertEqual(dest.pathExtension, "wav")
             }
         }
@@ -105,8 +136,7 @@ final class AudioImporterTests: XCTestCase {
         for name in tonal {
             for rate in rates {
                 let (r, dest) = try await importFile(name, rate: rate)
-                let f = try AVAudioFile(forReading: dest)
-                let dur = Double(f.length) / rate
+                let dur = Double(try AudioFileReader(url: dest).frameCount) / rate
                 XCTAssertEqual(r.duration, dur, accuracy: 1e-9)
                 if name.hasSuffix(".mp3") {
                     XCTAssertEqual(dur * rate, 1.5 * rate, accuracy: 2048, "\(name) @\(rate)")
@@ -149,13 +179,15 @@ final class AudioImporterTests: XCTestCase {
     func testResampleRoundTrip() async throws {
         let (_, a) = try await importFile("sine1k_stereo_44k.mp3", rate: 44_100)
         let up = out("up.wav"), back = out("back.wav")
-        try await importer.resample(a, to: up, sampleRate: 48_000)
-        try await importer.resample(up, to: back, sampleRate: 44_100)
-        let fa = try AVAudioFile(forReading: a), fu = try AVAudioFile(forReading: up), fb = try AVAudioFile(forReading: back)
-        XCTAssertEqual(fu.fileFormat.sampleRate, 48_000)
-        XCTAssertEqual(fb.fileFormat.sampleRate, 44_100)
-        XCTAssertEqual(Double(fb.length) / 44_100, Double(fa.length) / 44_100, accuracy: 0.001)
-        XCTAssertEqual(Double(fu.length) / 48_000, Double(fa.length) / 44_100, accuracy: 0.001)
+        try await converting {
+            try await importer.resample(a, to: up, sampleRate: 48_000)
+            try await importer.resample(up, to: back, sampleRate: 44_100)
+        }
+        let fa = try AudioFileReader(url: a), fu = try AudioFileReader(url: up), fb = try AudioFileReader(url: back)
+        XCTAssertEqual(fu.sampleRate, 48_000)
+        XCTAssertEqual(fb.sampleRate, 44_100)
+        XCTAssertEqual(Double(fb.frameCount) / 44_100, Double(fa.frameCount) / 44_100, accuracy: 0.001)
+        XCTAssertEqual(Double(fu.frameCount) / 48_000, Double(fa.frameCount) / 44_100, accuracy: 0.001)
         try assertTone(up, rate: 48_000)
         try assertTone(back, rate: 44_100)
     }
@@ -175,6 +207,9 @@ final class AudioImporterTests: XCTestCase {
     // MARK: - Metadatos
 
     func testMP3Metadata() async throws {
+        #if !canImport(AVFoundation)
+        throw XCTSkip("[windows] sin etiquetas ID3 (fuera del corte del paso 7): el título sale del nombre del fichero")
+        #endif
         let m = await importer.metadata(of: fixture("sine1k_stereo_44k.mp3"))
         XCTAssertEqual(m.title, "Tema MP3")
         XCTAssertEqual(m.artist, "Artista MP3")
@@ -210,7 +245,9 @@ final class AudioImporterTests: XCTestCase {
                      file: StaticString = #filePath, line: UInt = #line) async {
         let dest = out("fail-\(UUID().uuidString).wav")
         do {
-            _ = try await importer.importAudio(from: source, to: dest, sampleRate: rate, progress: { _ in })
+            _ = try await converting {
+                try await importer.importAudio(from: source, to: dest, sampleRate: rate, progress: { _ in })
+            }
             XCTFail("debía fallar", file: file, line: line)
         } catch let e as AudioImportError {
             XCTAssertTrue(expected(e), "error inesperado: \(e)", file: file, line: line)
@@ -240,3 +277,41 @@ final class AudioImporterTests: XCTestCase {
         await assertFails(fixture("sine1k_stereo_44k.mp3"), rate: 22_050) { $0 == .unsupportedSampleRate(22_050) }
     }
 }
+
+#if canImport(AVFoundation)
+/// Los mismos casos con la conversión de Windows forzada en el Mac (parte 7.1). La decodificación sigue siendo la
+/// de AVAudioFile; remuestreo (r8brain) y escritura (`AudioFileWriter`) son los de Windows.
+final class AudioImporterPortableTests: AudioImporterTests {
+    override class var portable: Bool { true }
+
+    /// Punto fino: la muestra 0 no se mueve. Clic en el instante t0 fuera de las dos rejillas: el pico (parabólico)
+    /// cae en t0 · destino ± 0,05 muestras con r8brain, igual que con AVAudioConverter.
+    func testClickInstantMatchesAVAudioConverter() async throws {
+        for (from, to) in [(48_000.0, 44_100.0), (44_100.0, 48_000.0), (96_000.0, 44_100.0)] {
+            // Pulso gaussiano (σ = 0,2 ms) en t0 = 0,7 s + 0,37 muestras de destino.
+            let t0 = 0.7 + 0.37 / to, sigma = 0.0002
+            let x = (0..<Int(from)).map { i -> Float in
+                let t = Double(i) / from - t0
+                return Float(0.8 * exp(-t * t / (2 * sigma * sigma)))
+            }
+            let src = out("click-\(Int(from)).wav")
+            try AudioFileWriter(url: src, sampleRate: from, channelCount: 1, format: .float32).write([x])
+            var found: [Double] = []
+            for portable in [false, true] {
+                let dest = out("click-\(Int(from))-\(Int(to))-\(portable).wav")
+                try await AudioImporter.$forcePortable.withValue(portable) {
+                    _ = try await importer.importAudio(from: src, to: dest, sampleRate: to, progress: { _ in })
+                }
+                let y = try samples(dest)
+                let k = y.indices.max { y[$0] < y[$1] }!
+                var num = 0.0, den = 0.0
+                for i in (k - 30)...(k + 30) { num += Double(i) * Double(y[i]); den += Double(y[i]) }
+                found.append(num / den - t0 * to)
+            }
+            print(String(format: "importar clic %.0f → %.0f: AVAudioConverter %+.1e, r8brain %+.1e muestras", from, to, found[0], found[1]))
+            XCTAssertEqual(found[1], 0, accuracy: 0.05)
+            XCTAssertEqual(found[1], found[0], accuracy: 0.05)
+        }
+    }
+}
+#endif

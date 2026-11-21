@@ -1,5 +1,7 @@
-import CoreGraphics
 import Foundation
+#if canImport(CoreGraphics)
+import CoreGraphics
+#endif
 
 /// Cuenta del arrastre de un borde de sección, la misma en la tira plegada y en la rejilla expandida (mini-spec
 /// Fase 7b, punto 7): posición del puntero → tiempo, borde inicial, imán y límites (`SectionEditor`, punto 8).

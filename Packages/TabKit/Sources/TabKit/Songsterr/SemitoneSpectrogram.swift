@@ -1,5 +1,5 @@
-import Accelerate
 import Foundation
+import NativeDSP
 
 /// |CQT| de 12 bins por octava desde E1 (84 bins, 7 octavas), hop 256 a 22 050 Hz: lo que mide la alineación con
 /// Songsterr (mini-spec Fase 5b, «Alineación»), como `cqt_salience` de `Probes/P5b-guitarra/eval_reference.py`.
@@ -96,18 +96,18 @@ struct SemitoneSpectrogram {
                     }
                 }
             }
-            vDSP_mmul(rows, 1, kernels, 1, &response, 1, vDSP_Length(frames), vDSP_Length(2 * bpo), vDSP_Length(width))
+            DSP.mmul(rows, 1, kernels, 1, &response, 1, DSPLength(frames), DSPLength(2 * bpo), DSPLength(width))
             // scale=True de librosa: × √(longitud de la ventana a la frecuencia de muestreo original).
             for j in 0..<bpo {
                 let bin = o * bpo + j
                 var gain = Float((lengths[j] * Double(decimation)).squareRoot())
                 response.withUnsafeBufferPointer { r in
                     out.withUnsafeMutableBufferPointer { m in
-                        var split = DSPSplitComplex(realp: UnsafeMutablePointer(mutating: r.baseAddress! + 2 * j),
+                        var split = SplitComplex(realp: UnsafeMutablePointer(mutating: r.baseAddress! + 2 * j),
                                                     imagp: UnsafeMutablePointer(mutating: r.baseAddress! + 2 * j + 1))
                         let dst = m.baseAddress! + bin * frames
-                        vDSP_zvabs(&split, vDSP_Stride(2 * bpo), dst, 1, vDSP_Length(frames))
-                        vDSP_vsmul(dst, 1, &gain, dst, 1, vDSP_Length(frames))
+                        DSP.zvabs(&split, DSPStride(2 * bpo), dst, 1, DSPLength(frames))
+                        DSP.vsmul(dst, 1, &gain, dst, 1, DSPLength(frames))
                     }
                 }
             }
@@ -125,7 +125,7 @@ struct SemitoneSpectrogram {
             x.withUnsafeBufferPointer { s in (p.baseAddress! + m).update(from: s.baseAddress!, count: s.count) }
         }
         var y = [Float](repeating: 0, count: outCount)
-        vDSP_desamp(padded, 2, halfBand, &y, vDSP_Length(outCount), vDSP_Length(taps))
+        DSP.desamp(padded, 2, halfBand, &y, DSPLength(outCount), DSPLength(taps))
         return y
     }
 
@@ -136,15 +136,15 @@ struct SemitoneSpectrogram {
         var eps: Float = 1e-9
         magnitude.withUnsafeBufferPointer { m in
             peak.withUnsafeMutableBufferPointer { p in
-                for b in 0..<nb { vDSP_vmax(m.baseAddress! + b * n, 1, p.baseAddress!, 1, p.baseAddress!, 1, vDSP_Length(n)) }
-                vDSP_vsadd(p.baseAddress!, 1, &eps, p.baseAddress!, 1, vDSP_Length(n))
+                for b in 0..<nb { DSP.vmax(m.baseAddress! + b * n, 1, p.baseAddress!, 1, p.baseAddress!, 1, DSPLength(n)) }
+                DSP.vsadd(p.baseAddress!, 1, &eps, p.baseAddress!, 1, DSPLength(n))
             }
         }
         var out = magnitude
         out.withUnsafeMutableBufferPointer { o in
             for b in 0..<nb {
                 let row = o.baseAddress! + b * n
-                vDSP_vdiv(peak, 1, row, 1, row, 1, vDSP_Length(n))
+                DSP.vdiv(peak, 1, row, 1, row, 1, DSPLength(n))
             }
         }
         return out
@@ -160,7 +160,7 @@ struct SemitoneSpectrogram {
                 for b in 0..<nb {
                     let cls = (Self.lowestMIDI + b) % 12
                     let dst = c.baseAddress! + cls * n
-                    vDSP_vadd(dst, 1, m.baseAddress! + b * n, 1, dst, 1, vDSP_Length(n))
+                    DSP.vadd(dst, 1, m.baseAddress! + b * n, 1, dst, 1, DSPLength(n))
                 }
             }
         }
@@ -172,7 +172,7 @@ struct SemitoneSpectrogram {
                     let lo = max(0, t * pool - pool / 2), hi = min(n, t * pool + (pool + 1) / 2)
                     guard hi > lo else { continue }
                     var mean: Float = 0
-                    vDSP_meanv(c.baseAddress! + cls * n + lo, 1, &mean, vDSP_Length(hi - lo))
+                    DSP.meanv(c.baseAddress! + cls * n + lo, 1, &mean, DSPLength(hi - lo))
                     out[cls * frames + t] = mean
                 }
             }
@@ -203,11 +203,10 @@ struct OnsetEnvelope {
         let frames = 1 + samples.count / hop
         frameRate = sampleRate / Double(hop)
         start = 0.5 / frameRate
-        guard frames >= 2, let setup = vDSP_DFT_zrop_CreateSetup(nil, vDSP_Length(nfft), .FORWARD) else {
+        guard frames >= 2, let setup = DSP.RealDFT(count: nfft, direction: .forward) else {
             values = []
             return
         }
-        defer { vDSP_DFT_DestroySetup(setup) }
         let window = (0..<nfft).map { Float(0.5 - 0.5 * cos(2 * Double.pi * Double($0) / Double(nfft))) }
         var frame = [Float](repeating: 0, count: nfft)
         var inRe = [Float](repeating: 0, count: half), inIm = [Float](repeating: 0, count: half)
@@ -224,35 +223,35 @@ struct OnsetEnvelope {
                 frame.withUnsafeMutableBufferPointer { fr in
                     fr.update(repeating: 0)
                     if hi > lo { (fr.baseAddress! + (lo - s)).update(from: x.baseAddress! + lo, count: hi - lo) }
-                    vDSP_vmul(fr.baseAddress!, 1, window, 1, fr.baseAddress!, 1, vDSP_Length(nfft))
+                    DSP.vmul(fr.baseAddress!, 1, window, 1, fr.baseAddress!, 1, DSPLength(nfft))
                 }
                 inRe.withUnsafeMutableBufferPointer { ir in
                     inIm.withUnsafeMutableBufferPointer { ii in
-                        var split = DSPSplitComplex(realp: ir.baseAddress!, imagp: ii.baseAddress!)
+                        var split = SplitComplex(realp: ir.baseAddress!, imagp: ii.baseAddress!)
                         frame.withUnsafeBytes { raw in
-                            vDSP_ctoz(raw.bindMemory(to: DSPComplex.self).baseAddress!, 2, &split, 1, vDSP_Length(half))
+                            DSP.ctoz(raw.bindMemory(to: InterleavedComplex.self).baseAddress!, 2, &split, 1, DSPLength(half))
                         }
-                        vDSP_DFT_Execute(setup, ir.baseAddress!, ii.baseAddress!, &outRe, &outIm)
+                        setup.execute(ir.baseAddress!, ii.baseAddress!, &outRe, &outIm)
                     }
                 }
                 outRe[0] = 0  // continua fuera (y en im[0] va Nyquist)
                 outIm[0] = 0
                 outRe.withUnsafeMutableBufferPointer { orr in
                     outIm.withUnsafeMutableBufferPointer { oi in
-                        var split = DSPSplitComplex(realp: orr.baseAddress!, imagp: oi.baseAddress!)
-                        vDSP_zvabs(&split, 1, &cur, 1, vDSP_Length(half))
+                        var split = SplitComplex(realp: orr.baseAddress!, imagp: oi.baseAddress!)
+                        DSP.zvabs(&split, 1, &cur, 1, DSPLength(half))
                     }
                 }
                 cur.withUnsafeMutableBufferPointer { c in
-                    vDSP_vsmsa(c.baseAddress!, 1, &gamma, &one, c.baseAddress!, 1, vDSP_Length(half))
-                    vvlogf(c.baseAddress!, c.baseAddress!, &count)
+                    DSP.vsmsa(c.baseAddress!, 1, &gamma, &one, c.baseAddress!, 1, DSPLength(half))
+                    DSP.vvlogf(c.baseAddress!, c.baseAddress!, &count)
                 }
                 if t > 0 {
                     diff.withUnsafeMutableBufferPointer { d in
-                        vDSP_vsub(prev, 1, cur, 1, d.baseAddress!, 1, vDSP_Length(half))
-                        vDSP_vthres(d.baseAddress!, 1, &zero, d.baseAddress!, 1, vDSP_Length(half))
+                        DSP.vsub(prev, 1, cur, 1, d.baseAddress!, 1, DSPLength(half))
+                        DSP.vthres(d.baseAddress!, 1, &zero, d.baseAddress!, 1, DSPLength(half))
                         var sum: Float = 0
-                        vDSP_sve(d.baseAddress!, 1, &sum, vDSP_Length(half))
+                        DSP.sve(d.baseAddress!, 1, &sum, DSPLength(half))
                         env[t - 1] = sum
                     }
                 }
@@ -260,11 +259,11 @@ struct OnsetEnvelope {
             }
         }
         var mean: Float = 0
-        vDSP_meanv(env, 1, &mean, vDSP_Length(env.count))
+        DSP.meanv(env, 1, &mean, DSPLength(env.count))
         if mean > 0 {
             var inv = 1 / mean
             env.withUnsafeMutableBufferPointer { e in
-                vDSP_vsmul(e.baseAddress!, 1, &inv, e.baseAddress!, 1, vDSP_Length(e.count))
+                DSP.vsmul(e.baseAddress!, 1, &inv, e.baseAddress!, 1, DSPLength(e.count))
             }
         }
         values = env

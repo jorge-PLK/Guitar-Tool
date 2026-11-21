@@ -6,8 +6,9 @@ public final class RoformerSeparator {
     private let processor: ChunkProcessor
 
     /// Carga el `.mlmodelc` compilado con `.cpuAndGPU` (ADR-004) y comprueba el contrato de entrada.
+    /// En Windows lanza `PlatformError.unsupported("paso 7: onnx-runtime")`.
     public convenience init(compiledModelURL: URL) throws {
-        self.init(model: try CoreMLMaskModel(compiledModelURL: compiledModelURL))
+        self.init(model: try SystemMaskModel.load(modelURL: compiledModelURL, contract: .bsRoformerSW))
     }
 
     /// Separador con un modelo simulado (máscara 1 + 0i en todos los stems). Para tests de integración

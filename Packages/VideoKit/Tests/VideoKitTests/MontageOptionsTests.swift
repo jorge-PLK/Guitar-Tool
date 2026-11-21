@@ -1,7 +1,9 @@
+#if canImport(AVFoundation)
 import AVFoundation
 import CoreImage
 import ImageIO
 import UniformTypeIdentifiers
+#endif
 import XCTest
 @testable import VideoKit
 
@@ -15,6 +17,7 @@ final class MontageOptionsTests: XCTestCase {
 
     // MARK: Ayudas
 
+    #if canImport(AVFoundation)
     /// Búfer BGRA 320 × 180 con el color de `f(x, y)` (origen arriba a la izquierda).
     static func buffer(_ f: (Int, Int) -> (r: UInt8, g: UInt8, b: UInt8)) -> CVPixelBuffer {
         var pb: CVPixelBuffer?
@@ -93,6 +96,7 @@ final class MontageOptionsTests: XCTestCase {
         print("F7 PNG: \(url.path)")
         return url
     }
+    #endif
 
     static func parts(_ ids: [String], solo: Set<String> = []) -> [MontageTimeline.Part] {
         ids.map { id in
@@ -109,6 +113,148 @@ final class MontageOptionsTests: XCTestCase {
 
     static func near(_ c: [Int], _ e: [Double], _ tol: Double) -> Bool { zip(c, e).allSatisfy { abs(Double($0) - $1) <= tol } }
 
+    #if !canImport(AVFoundation)
+    // Windows (parte 7.9): los mismos casos con `Direct2DMontageRenderer`.
+    struct Pixels {
+        let px: [UInt8]
+        let w: Int
+        let h: Int
+        let state: MontageFrameState
+
+        func at(_ x: Double, _ y: Double, k: Double) -> [Int] {
+            let xi = min(max(Int(x * k), 0), w - 1), yi = min(max(Int(y * k), 0), h - 1)
+            let o = (yi * w + xi) * 4
+            return [Int(px[o]), Int(px[o + 1]), Int(px[o + 2])]
+        }
+    }
+
+    static func buffer(_ f: (Int, Int) -> (r: UInt8, g: UInt8, b: UInt8)) -> FramePixelBuffer { RenderSupport.buffer(width: 320, height: 180, f) }
+    static func flat(_ r: UInt8, _ g: UInt8, _ b: UInt8) -> FramePixelBuffer { buffer { _, _ in (r, g, b) } }
+    static var banded: FramePixelBuffer { buffer { x, _ in x < 32 ? (0, 255, 0) : (255, 0, 0) } }
+    nonisolated(unsafe) static var shared: Direct2DMontageRenderer?
+
+    static func render(_ tl: MontageTimeline, at t: Double, scale k: Double, sources: [FramePixelBuffer]) throws -> Pixels {
+        let r = try shared ?? Direct2DMontageRenderer()
+        shared = r
+        let (pb, st) = try RenderSupport.render(r, tl, at: t, width: Int((tl.canvas.width * k).rounded()), height: Int((tl.canvas.height * k).rounded()),
+                                                sources: sources)
+        return Pixels(px: RenderSupport.rgba(pb), w: pb.width, h: pb.height, state: st)
+    }
+
+    func testGridTwoStackedRender() throws {
+        let tl = Self.timeline(.grid, Self.parts(["A", "B"]))
+        let p = try Self.render(tl, at: 5, scale: 0.5, sources: [Self.flat(255, 0, 0), Self.flat(0, 255, 0)])
+        let a = p.state.boxes[0].rect, b = p.state.boxes[1].rect
+        XCTAssertEqual(p.at(a.midX, a.midY, k: 0.5), [255, 0, 0])
+        XCTAssertEqual(p.at(b.midX, b.midY, k: 0.5), [0, 255, 0])
+        XCTAssertLessThan(a.maxY, b.minY, "A encima de B")
+        XCTAssertEqual(p.at(a.minX / 2, a.midY, k: 0.5), Self.background)
+        XCTAssertEqual(p.at((a.maxX + 1920) / 2, b.midY, k: 0.5), Self.background)
+    }
+
+    func testPartLabelsCanBeHidden() throws {
+        let sources = [Self.flat(255, 0, 0), Self.flat(0, 255, 0)]
+        for layout in [MontageLayoutKind.side, .stack, .single, .singleLandscape] {
+            let on = try Self.render(Self.timeline(layout, Self.parts(["A", "B"])), at: 5, scale: 0.5, sources: sources)
+            let off = try Self.render(Self.timeline(layout, Self.parts(["A", "B"]), labels: false), at: 5, scale: 0.5, sources: sources)
+            let r = on.state.boxes.last!.rect
+            let color = on.state.boxes.last!.partID == "A" ? [255, 0, 0] : [0, 255, 0]
+            let x = r.minX + MontageStyle.labelInset + 5, y = r.maxY - MontageStyle.labelInset - 22
+            let withLabel = on.at(x, y, k: 0.5), without = off.at(x, y, k: 0.5)
+            XCTAssertNotEqual(withLabel, color, "\(layout): con rótulo, la placa oscurece")
+            XCTAssertLessThan(withLabel.max()!, 200, "\(layout) \(withLabel)")
+            XCTAssertEqual(without, color, "\(layout): sin rótulo, el color de la toma")
+            XCTAssertEqual(on.at(r.midX, r.midY, k: 0.5), off.at(r.midX, r.midY, k: 0.5))
+            print("7.9 rótulos \(layout.rawValue): placa con rótulo \(withLabel), sin rótulo \(without)")
+        }
+    }
+
+    func testKeepAspectInStackShowsWholeFrameOverDimmedFill() throws {
+        let k = 0.5
+        let on = try Self.render(Self.timeline(.stack, Self.parts(["A", "B"]), aspect: true), at: 5, scale: k, sources: [Self.banded, Self.banded])
+        let off = try Self.render(Self.timeline(.stack, Self.parts(["A", "B"])), at: 5, scale: k, sources: [Self.banded, Self.banded])
+        XCTAssertTrue(on.state.boxes.allSatisfy { $0.fit && $0.crop == .full })
+        for box in on.state.boxes {
+            let r = box.rect
+            let fitH = r.width * 9 / 16, strip = (r.height - fitH) / 2
+            XCTAssertEqual(on.at(r.midX, r.midY, k: k), [255, 0, 0], "centro: la toma")
+            XCTAssertEqual(on.at(r.minX + 10, r.midY, k: k), [0, 255, 0], "borde izquierdo: la franja verde (fotograma entero)")
+            XCTAssertEqual(off.at(r.minX + 10, r.midY, k: k), [255, 0, 0], "sin la bandera, el encuadre recorta la franja")
+            for y in [r.minY + strip / 2, r.maxY - strip / 2] {
+                let fill = on.at(r.midX, y, k: k)
+                XCTAssertTrue(Self.near(fill, [255 * MontageStyle.fillDim, 0, 0], 3), "relleno = toma oscurecida: \(fill)")
+                XCTAssertNotEqual(fill, Self.background)
+                print("7.9 aspecto apilado \(box.partID): relleno \(fill) (esperado \(255 * MontageStyle.fillDim), 0, 0)")
+            }
+        }
+    }
+
+    func testKeepAspectChangesNothingInSideAndGrid() throws {
+        for layout in [MontageLayoutKind.side, .grid] {
+            let tlOn = Self.timeline(layout, Self.parts(["A", "B", "C"]), aspect: true)
+            XCTAssertFalse(tlOn.keepVideoAspect)
+            let on = try Self.render(tlOn, at: 5, scale: 0.25, sources: [Self.banded, Self.banded, Self.banded])
+            let off = try Self.render(Self.timeline(layout, Self.parts(["A", "B", "C"])), at: 5, scale: 0.25, sources: [Self.banded, Self.banded, Self.banded])
+            XCTAssertEqual(on.px, off.px, "\(layout): misma imagen con y sin la bandera")
+        }
+    }
+
+    func testKeepAspectSingleCrossfadeEachWithOwnFill() throws {
+        let tl = Self.timeline(.single, Self.parts(["A", "C"], solo: ["C"]), aspect: true)
+        let p = try Self.render(tl, at: 3.75, scale: 0.5, sources: [Self.flat(255, 0, 0), Self.flat(0, 0, 255)])
+        XCTAssertEqual(p.state.boxes.map(\.partID), ["A", "C"])
+        for b in p.state.boxes { XCTAssertEqual(b.opacity, 0.5, accuracy: 1e-9) }
+        let dim = 255 * MontageStyle.fillDim
+        let bg: [Double] = Self.background.map { Double($0) }
+        let dimA: [Double] = [dim, 0, 0], dimC: [Double] = [0, 0, dim]
+        var expected: [Double] = []
+        for c in 0..<3 { expected.append(0.5 * dimC[c] + 0.5 * (0.5 * dimA[c] + 0.5 * bg[c])) }
+        let fill = p.at(540, 300, k: 0.5)
+        XCTAssertTrue(Self.near(fill, expected, 3), "relleno en el fundido \(fill), esperado \(expected)")
+        print("7.9 aspecto plano único, fundido al 50 %: relleno \(fill), esperado \(expected.map { Int($0.rounded()) })")
+    }
+
+    func testSingleLandscapeFullCanvas() throws {
+        XCTAssertEqual(MontageLayoutKind.singleLandscape.rawValue, "single-landscape")
+        XCTAssertEqual(MontageLayoutKind.singleLandscape.defaultCanvas, .landscape)
+        XCTAssertEqual(MontageLayoutKind.single.defaultCanvas, .portrait)
+        let tl = Self.timeline(.singleLandscape, Self.parts(["A", "C"], solo: ["C"]))
+        let p = try Self.render(tl, at: 2, scale: 0.5, sources: [Self.flat(255, 0, 0), Self.flat(0, 0, 255)])
+        XCTAssertEqual([p.w, p.h], [960, 540])
+        XCTAssertEqual(p.state.boxes.map(\.partID), ["A"])
+        XCTAssertEqual(p.state.boxes[0].rect, CGRect(x: 0, y: 0, width: 1920, height: 1080))
+        XCTAssertEqual(p.at(1, 1, k: 0.5), [255, 0, 0])
+        XCTAssertEqual(p.at(960, 540, k: 0.5), [255, 0, 0])
+        let solo = try Self.render(tl, at: 4.5, scale: 0.5, sources: [Self.flat(255, 0, 0), Self.flat(0, 0, 255)])
+        XCTAssertEqual(solo.state.boxes.map(\.partID), ["C"])
+        XCTAssertEqual(solo.at(960, 540, k: 0.5), [0, 0, 255])
+    }
+
+    /// Plano único landscape con cortes y sin rótulos por `MontageBuilder` y el compositor de Windows.
+    func testBuilderSingleLandscapeCutsWithoutLabels() async throws {
+        let fx = try await MontageGateTests.fixture()
+        defer { try? FileManager.default.removeItem(at: fx.dir) }
+        var plan = fx.plan(.singleLandscape, .landscape)
+        plan.showPartLabels = false
+        plan.singleCuts = Self.shuffled
+        let builder = try await MontageBuilder.load(plan)
+        let size = MontageBuilder.renderSize(canvas: plan.canvas, maxDimension: 480)
+        let preview = try builder.make(renderSize: size, includeAudio: false)
+        let k = size.width / 1920
+        let expect: [(Double, String)] = [(3.2, "verde"), (4.5, "verde"), (5.7, "azul"), (6.7, "rojo"), (7.7, "azul"), (9.0, "rojo")]
+        var seen: [String] = []
+        for (t, name) in expect {
+            let f = MontageGateTests.Frame(try preview.frame(at: preview.videoTime(songTime: t)))
+            XCTAssertEqual([f.width, f.height], [Int(size.width), Int(size.height)])
+            let center = MontageGateTests.name(f.rgb(960 * k, 540 * k))
+            let label = MontageGateTests.name(f.rgb((MontageStyle.labelInset + 8) * k, (1080 - MontageStyle.labelInset - 22) * k))
+            XCTAssertEqual(center, name, "centro en \(t)")
+            XCTAssertEqual(label, name, "sitio del rótulo en \(t): sin placa")
+            seen.append("\(t): \(center)")
+        }
+        print("7.9 compositor plano único landscape \(Int(size.width))×\(Int(size.height)) con cortes y sin rótulos: \(seen)")
+    }
+    #else
     // MARK: 1. Rejilla con 2
 
     func testGridTwoStackedRender() throws {
@@ -233,6 +379,7 @@ final class MontageOptionsTests: XCTestCase {
         let aspect = Self.render(Self.timeline(.singleLandscape, Self.parts(["A"]), aspect: true), at: 2, scale: 1, sources: [Self.pattern(1)])
         try Self.png(aspect, "plano-unico-landscape-aspecto.png")
     }
+    #endif
 
     // MARK: 5. Cortes libres
 
@@ -353,6 +500,7 @@ final class MontageOptionsTests: XCTestCase {
 
     // MARK: Composición real (la de la vista previa y la exportación)
 
+    #if canImport(AVFoundation)
     /// Plano único landscape con cortes y sin rótulos, por `MontageBuilder` y el compositor: dimensiones, colores en
     /// cada instante y el sitio del rótulo con el color de la toma.
     func testBuilderSingleLandscapeCutsWithoutLabels() async throws {
@@ -380,4 +528,5 @@ final class MontageOptionsTests: XCTestCase {
         }
         print("F7 compositor plano único landscape \(Int(size.width))×\(Int(size.height)) con cortes y sin rótulos: \(seen)")
     }
+    #endif
 }

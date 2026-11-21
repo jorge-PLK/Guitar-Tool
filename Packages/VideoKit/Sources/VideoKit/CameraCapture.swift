@@ -1,6 +1,15 @@
+#if canImport(AVFoundation)
 import AVFoundation
+#endif
+#if canImport(CoreVideo)
 import CoreVideo
+#endif
 import Foundation
+
+#if canImport(CoreVideo)
+/// Imagen de un fotograma: `CVPixelBuffer` en el Mac. Fuera del Mac, la clase propia de `FramePixelBuffer.swift`.
+public typealias FramePixelBuffer = CVPixelBuffer
+#endif
 
 /// Un fotograma de la cámara con su marca en el reloj de host (mini-spec Fase 6, «Cámara y sincronía»).
 public struct CameraFrame: @unchecked Sendable {
@@ -12,9 +21,9 @@ public struct CameraFrame: @unchecked Sendable {
     /// Número de fotograma de la cámara desde `start` (en la simulada cuenta también los perdidos).
     public var sequence: Int
     /// Imagen (`nil` en los tests que solo miran tiempos).
-    public var pixelBuffer: CVPixelBuffer?
+    public var pixelBuffer: FramePixelBuffer?
 
-    public init(hostSeconds: Double, arrivalHostSeconds: Double, sequence: Int, pixelBuffer: CVPixelBuffer?) {
+    public init(hostSeconds: Double, arrivalHostSeconds: Double, sequence: Int, pixelBuffer: FramePixelBuffer?) {
         self.hostSeconds = hostSeconds
         self.arrivalHostSeconds = arrivalHostSeconds
         self.sequence = sequence
@@ -47,6 +56,7 @@ public protocol CameraCapture: AnyObject, Sendable {
 
 // MARK: - Real
 
+#if canImport(AVFoundation)
 /// Captura real con `AVCaptureSession` + `AVCaptureVideoDataOutput`.
 ///
 /// **Marcas.** El `presentationTimeStamp` de cada `CMSampleBuffer` está en el reloj de sincronización de la sesión
@@ -168,6 +178,7 @@ extension AVCameraCapture: AVCaptureVideoDataOutputSampleBufferDelegate {
         }
     }
 }
+#endif
 
 // MARK: - Simulada
 
@@ -226,7 +237,11 @@ public final class SimulatedCameraCapture: CameraCapture, @unchecked Sendable {
     private var next = 0
     private var dropped = 0
     private var timer: (any DispatchSourceTimer)?
+    #if canImport(CoreVideo)
     private var pool: CVPixelBufferPool?
+    #else
+    private var pixelSize: (Int, Int)?
+    #endif
 
     /// `originHostSeconds`: instante verdadero del fotograma 0 en modo manual (en automático, la hora de `start`).
     public init(camera: CameraDevice = .simulated, config: Config = Config(), automatic: Bool = false,
@@ -273,7 +288,11 @@ public final class SimulatedCameraCapture: CameraCapture, @unchecked Sendable {
             next = 0
             dropped = 0
             if automatic { origin = HostClock.nowSeconds }
+            #if canImport(CoreVideo)
             pool = nil
+            #else
+            pixelSize = nil
+            #endif
         }
         if config.pixels { makePool(width: format.width, height: format.height) }
         if automatic {
@@ -322,6 +341,7 @@ public final class SimulatedCameraCapture: CameraCapture, @unchecked Sendable {
         }
     }
 
+    #if canImport(CoreVideo)
     private func makePool(width: Int, height: Int) {
         let attrs: [String: Any] = [
             kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
@@ -354,4 +374,15 @@ public final class SimulatedCameraCapture: CameraCapture, @unchecked Sendable {
         }
         return pb
     }
+    #else
+    // Fuera del Mac: un búfer BGRA nuevo por fotograma, del color de la configuración.
+    private func makePool(width: Int, height: Int) { lock.withLock { pixelSize = (width, height) } }
+
+    private func makePixels() -> FramePixelBuffer? {
+        guard let (w, h) = lock.withLock({ pixelSize }) else { return nil }
+        let pb = FramePixelBuffer(pixelFormat: .bgra, width: w, height: h)
+        pb.fill(b: config.color.b, g: config.color.g, r: config.color.r)
+        return pb
+    }
+    #endif
 }

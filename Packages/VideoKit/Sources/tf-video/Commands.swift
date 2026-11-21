@@ -1,3 +1,5 @@
+// Solo Apple (cámara, CoreAudio y escritor reales). En Windows `tf-video` sale con un aviso (paso 7).
+#if canImport(AVFoundation)
 import AudioKit
 import Foundation
 import VideoKit
@@ -184,3 +186,4 @@ enum CLI {
         return code
     }
 }
+#endif

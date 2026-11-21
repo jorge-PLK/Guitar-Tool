@@ -22,7 +22,8 @@ public final class CoreMLLeadSeparator: LeadGuitarSeparating, @unchecked Sendabl
 
     /// `contract`: `.leadRhythmMSST` para medir paridad con la referencia de MSST (num_overlap 1).
     convenience init(compiledModelURL: URL, contract: MaskModelContract) {
-        self.init { try CoreMLMaskModel(compiledModelURL: compiledModelURL, contract: contract) }
+        // Core ML en el Mac; en Windows lanza `PlatformError.unsupported("paso 7: onnx-runtime")` al cargar.
+        self.init { try SystemMaskModel.load(modelURL: compiledModelURL, contract: contract) }
     }
 
     init(loader: @escaping () throws -> MaskModel) {

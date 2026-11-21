@@ -1,6 +1,6 @@
-import Accelerate
-import AVFoundation
 import Foundation
+import NativeAudioFile
+import NativeDSP
 
 // No usado desde la revisión del 15/11/2026; ver spec, «Opciones de guitarras y tramos de solo». El producto compone
 // las pistas con `GuitarStemComposer` (L/R = canales, solista con modelo en tramos). Se conserva, con sus tests, por
@@ -184,17 +184,11 @@ public struct PanSplitter: Sendable {
         precondition(coherenceRadius >= 0 && coherenceHigh > coherenceLow, "PanSplitter: coherencia no válida")
         precondition(blockFrames > 0 && blockFrames % RoformerContract.hop == 0,
                      "PanSplitter: el bloque debe ser múltiplo del hop")
-        let file: AVAudioFile
-        do {
-            file = try AVAudioFile(forReading: input, commonFormat: .pcmFormatFloat32, interleaved: false)
-        } catch {
-            throw SeparationError.invalidInput("no se puede leer \(input.lastPathComponent): \(error.localizedDescription)")
+        let file = try AudioIO.openReader(input)
+        guard file.channelCount == 2 else {
+            throw SeparationError.invalidInput("se esperaba audio estéreo y tiene \(file.channelCount) canales")
         }
-        let fmt = file.processingFormat
-        guard fmt.channelCount == 2 else {
-            throw SeparationError.invalidInput("se esperaba audio estéreo y tiene \(fmt.channelCount) canales")
-        }
-        let n = Int(file.length)
+        let n = file.frameCount
         guard n > RoformerContract.nFFT else {
             throw SeparationError.invalidInput("audio demasiado corto para separar por panorama (\(n) muestras)")
         }
@@ -213,17 +207,17 @@ public struct PanSplitter: Sendable {
                                        coherenceHigh: coherenceHigh, centerModel: centerModel,
                                        phasePenalty: phasePenalty, noteGuide: centerNotes,
                                        guideWidthCents: guideWidthCents, guideMode: guideMode,
-                                       sampleRate: fmt.sampleRate)
+                                       sampleRate: file.sampleRate)
         if !ungated {
-            params.gate = soloSpans.compactMap { PanGateSpan($0, sampleRate: fmt.sampleRate) }
+            params.gate = soloSpans.compactMap { PanGateSpan($0, sampleRate: file.sampleRate) }
         }
-        var stats = try runPass(params, file: file, format: fmt, frameCount: n, partials: partials,
+        var stats = try runPass(params, file: file, frameCount: n, partials: partials,
                                 outputDirectory: outputDirectory)
         if params.gate != nil && stats.isNearMono(relativeDB: relativeDiscardDB) {
             // Entrada casi mono: todo a C, sin puerta (mini-spec Fase 4, «Centro con puerta», excepción).
             params.gate = nil
             for u in partials { try? fm.removeItem(at: u) }
-            stats = try runPass(params, file: file, format: fmt, frameCount: n, partials: partials,
+            stats = try runPass(params, file: file, frameCount: n, partials: partials,
                                 outputDirectory: outputDirectory)
         }
 
@@ -262,17 +256,17 @@ public struct PanSplitter: Sendable {
     }
 
     /// Una pasada completa: escribe las tres pistas en `partials` (y las de la sonda, si hay) y devuelve los acumulados.
-    private func runPass(_ params: PanMaskParameters, file: AVAudioFile, format fmt: AVAudioFormat, frameCount n: Int,
+    private func runPass(_ params: PanMaskParameters, file: AudioFileReader, frameCount n: Int,
                          partials: [URL], outputDirectory: URL) throws -> PanSplitStats {
-        let writers = try partials.map { try AudioIO.StereoWriter(url: $0, sampleRate: fmt.sampleRate) }
+        let writers = try partials.map { try AudioIO.StereoWriter(url: $0, sampleRate: file.sampleRate) }
         let engine = PanBlockEngine(params: params, maxLength: min(n, blockFrames + 2 * params.margin),
-                                    format: fmt, totalFrames: n)
-        var probe: (AVAudioFile, [AudioIO.StereoWriter])?
+                                    totalFrames: n)
+        var probe: (AudioFileReader, [AudioIO.StereoWriter])?
         if let probeInput {
-            let pf = try AVAudioFile(forReading: probeInput, commonFormat: .pcmFormatFloat32, interleaved: false)
+            let pf = try AudioIO.openReader(probeInput)
             let pw = try GuitarSide.allCases.map {
                 try AudioIO.StereoWriter(url: outputDirectory.appendingPathComponent("probe-\($0.fileName)"),
-                                         sampleRate: fmt.sampleRate)
+                                         sampleRate: file.sampleRate)
             }
             probe = (pf, pw)
         }
@@ -437,7 +431,9 @@ final class PanBlockEngine {
     private let maxLength: Int
     private let maxFrames: Int
     private var transforms: [Int: SpectralTransform] = [:]
-    private let inBuffer: AVAudioPCMBuffer
+    /// Bloque de entrada leído, un búfer por canal (`maxLength` muestras).
+    private let inL: UnsafeMutablePointer<Float>
+    private let inR: UnsafeMutablePointer<Float>
     private let spec: UnsafeMutablePointer<Float>
     private let work: UnsafeMutablePointer<Float>
     /// Máscara lateral s por (bin, trama).
@@ -461,20 +457,20 @@ final class PanBlockEngine {
     /// Muestra del bloque a la que llega alguna trama abierta (si no, L y R se copian de la entrada y C = 0).
     private let sampleOpen: UnsafeMutablePointer<Bool>
 
-    /// - Parameter format: formato de proceso del fichero de entrada (float32 estéreo no intercalado).
-    init(params: PanMaskParameters, maxLength: Int, format: AVAudioFormat, totalFrames: Int) {
+    init(params: PanMaskParameters, maxLength: Int, totalFrames: Int) {
         self.params = params
         self.maxLength = maxLength
         stats = PanSplitStats(totalFrames: totalFrames)
         maxFrames = 1 + maxLength / RoformerContract.hop
         let specCount = 4 * RoformerContract.bins * maxFrames
         let maskCount = RoformerContract.bins * maxFrames
-        inBuffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(maxLength))!
         func alloc(_ count: Int) -> UnsafeMutablePointer<Float> {
             let p = UnsafeMutablePointer<Float>.allocate(capacity: count)
             p.initialize(repeating: 0, count: count)
             return p
         }
+        inL = alloc(maxLength)
+        inR = alloc(maxLength)
         spec = alloc(specCount)
         work = alloc(specCount)
         centerL = alloc(maskCount)
@@ -503,7 +499,7 @@ final class PanBlockEngine {
     }
 
     deinit {
-        for p in [spec, work, centerL, centerR, guideMask, trackMask, magL, magR, outL, outR, zeros] {
+        for p in [inL, inR, spec, work, centerL, centerR, guideMask, trackMask, magL, magR, outL, outR, zeros] {
             p.deallocate()
         }
         for p in [cumLR, cumLL, cumRR, cumIm] { p.deallocate() }
@@ -511,8 +507,8 @@ final class PanBlockEngine {
         sampleOpen.deallocate()
     }
 
-    func run(file: AVAudioFile, frameCount n: Int, blockFrames: Int, writers: [AudioIO.StereoWriter],
-             probe: (AVAudioFile, [AudioIO.StereoWriter])? = nil) throws {
+    func run(file: AudioFileReader, frameCount n: Int, blockFrames: Int, writers: [AudioIO.StereoWriter],
+             probe: (AudioFileReader, [AudioIO.StereoWriter])? = nil) throws {
         let m = params.margin
         var k0 = 0
         while k0 < n {
@@ -596,21 +592,18 @@ final class PanBlockEngine {
         return t
     }
 
-    private func read(_ file: AVAudioFile, from start: Int, count: Int) throws -> (UnsafePointer<Float>, UnsafePointer<Float>) {
-        file.framePosition = AVAudioFramePosition(start)
-        let buf = inBuffer
-        try file.read(into: buf, frameCount: AVAudioFrameCount(count))
-        guard Int(buf.frameLength) == count else {
-            throw SeparationError.invalidInput("lectura incompleta: \(buf.frameLength) de \(count) muestras")
+    private func read(_ file: AudioFileReader, from start: Int, count: Int) throws -> (UnsafePointer<Float>, UnsafePointer<Float>) {
+        let got = try AudioIO.read(file, from: start, count: count, left: inL, right: inR)
+        guard got == count else {
+            throw SeparationError.invalidInput("lectura incompleta: \(got) de \(count) muestras")
         }
-        let ch = buf.floatChannelData!
-        return (UnsafePointer(ch[0]), UnsafePointer(ch[1]))
+        return (UnsafePointer(inL), UnsafePointer(inR))
     }
 
     /// `guideMask` = 1 en f0 y armónicos (± `guideWidthCents`, mínimo `guideMinHalfBins`) de las notas que
     /// suenan en cada trama del bloque.
     private func fillGuide(frames: Int, firstGlobalFrame: Int) {
-        vDSP_vclr(guideMask, 1, vDSP_Length(bins * frames))
+        DSP.vclr(guideMask, 1, DSPLength(bins * frames))
         let sr = params.sampleRate
         let binHz = sr / Double(RoformerContract.nFFT)
         let t0 = Double(firstGlobalFrame * hop) / sr
@@ -687,10 +680,10 @@ final class PanBlockEngine {
             let binSpans = spanGains.isEmpty ? [] : spanGains.filter { $0.span.binLow <= f && f <= $0.span.binHigh }
             let rowL = spec + st.specIndex(bin: f, channel: 0, frame: 0)
             let rowR = spec + st.specIndex(bin: f, channel: 1, frame: 0)
-            var zl = DSPSplitComplex(realp: rowL, imagp: rowL + 1)
-            var zr = DSPSplitComplex(realp: rowR, imagp: rowR + 1)
-            vDSP_zvabs(&zl, 2, magL, 1, vDSP_Length(frames))
-            vDSP_zvabs(&zr, 2, magR, 1, vDSP_Length(frames))
+            var zl = SplitComplex(realp: rowL, imagp: rowL + 1)
+            var zr = SplitComplex(realp: rowR, imagp: rowR + 1)
+            DSP.zvabs(&zl, 2, magL, 1, DSPLength(frames))
+            DSP.zvabs(&zr, 2, magR, 1, DSPLength(frames))
             let maskL = centerL + f * frames
             let maskR = centerR + f * frames
             let envBase = PanSplitStats.bandOfBin[f] * groups
@@ -803,7 +796,7 @@ final class PanBlockEngine {
     /// `work[canal] = spec[canal] · (1 − center)`.
     private func applyMask(_ st: SpectralTransform, sideOf center: UnsafeMutablePointer<Float>, channel c: Int) {
         var minusOne: Float = -1, one: Float = 1
-        vDSP_vsmsa(center, 1, &minusOne, &one, trackMask, 1, vDSP_Length(bins * st.frames))
+        DSP.vsmsa(center, 1, &minusOne, &one, trackMask, 1, DSPLength(bins * st.frames))
         applyMask(st, trackMask, channel: c)
     }
 
@@ -813,8 +806,8 @@ final class PanBlockEngine {
         for f in 0..<bins {
             let row = mask + f * frames
             let i = st.specIndex(bin: f, channel: c, frame: 0)
-            vDSP_vmul(spec + i, 2, row, 1, work + i, 2, vDSP_Length(frames))
-            vDSP_vmul(spec + i + 1, 2, row, 1, work + i + 1, 2, vDSP_Length(frames))
+            DSP.vmul(spec + i, 2, row, 1, work + i, 2, DSPLength(frames))
+            DSP.vmul(spec + i + 1, 2, row, 1, work + i + 1, 2, DSPLength(frames))
         }
     }
 }

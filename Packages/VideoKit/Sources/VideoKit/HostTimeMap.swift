@@ -1,35 +1,38 @@
+#if canImport(CoreMedia)
 import CoreMedia
-import Darwin
+#endif
 import Foundation
+import NativePlatform
 
 /// Reloj de host en segundos (mini-spec Fase 6, «Cámara y sincronía»): la escala común de cámara y audio.
 ///
-/// Segundos = ticks de `mach_absolute_time` × base de tiempos / 10⁹: la misma cuenta que AudioKit usa para
-/// `AudioIOBuffer.hostSeconds` (`HostTimeLog.seconds`). Las marcas de la cámara llegan como `CMTime` del reloj
-/// de host de CoreMedia (`CMClockGetHostTimeClock`), que se pasan a ticks con
-/// `CMClockConvertHostTimeToSystemUnits` y de ahí a segundos con la misma fórmula, de modo que las dos marcas
-/// son comparables sin suponer nada sobre la escala del `CMTime`.
+/// Segundos = ticks del reloj de host × base de tiempos / 10⁹: la misma cuenta que AudioKit usa para
+/// `AudioIOBuffer.hostSeconds` (`HostTimeLog.seconds`). Los ticks y la base salen de `NativePlatform.HostClock`
+/// (plan, «Fase 7c», paso 6): `mach_absolute_time` y `mach_timebase_info` en el Mac (la misma cuenta, bit a bit,
+/// que había aquí antes; `HostTimeMapTests.testHostClockIsTheNativePlatformClock`) y `QueryPerformanceCounter`
+/// en Windows. Las marcas de la cámara del Mac llegan como `CMTime` del reloj de host de CoreMedia
+/// (`CMClockGetHostTimeClock`), que se pasan a ticks con `CMClockConvertHostTimeToSystemUnits` y de ahí a
+/// segundos con la misma fórmula, de modo que las dos marcas son comparables sin suponer nada sobre la escala
+/// del `CMTime`.
 public enum HostClock {
-    static let timebase: Double = {
-        var tb = mach_timebase_info_data_t()
-        mach_timebase_info(&tb)
-        return Double(tb.numer) / Double(max(1, tb.denom))
-    }()
+    static var timebase: Double { NativePlatform.HostClock.timebase }
 
-    /// Segundos de host de `ticks` de `mach_absolute_time`.
-    public static func seconds(ticks: UInt64) -> Double { Double(ticks) * timebase / 1e9 }
+    /// Segundos de host de `ticks` del reloj de host (`mach_absolute_time` en el Mac, QPC en Windows).
+    public static func seconds(ticks: UInt64) -> Double { NativePlatform.HostClock.seconds(ticks: ticks) }
 
-    /// Ticks de `mach_absolute_time` de unos segundos de host (redondeado).
-    public static func ticks(seconds: Double) -> UInt64 { UInt64((seconds * 1e9 / timebase).rounded()) }
+    /// Ticks del reloj de host de unos segundos de host (redondeado).
+    public static func ticks(seconds: Double) -> UInt64 { NativePlatform.HostClock.ticks(seconds: seconds) }
 
+    #if canImport(CoreMedia)
     /// Segundos de host de un `CMTime` del reloj de host de CoreMedia.
     public static func seconds(hostTime: CMTime) -> Double { seconds(ticks: CMClockConvertHostTimeToSystemUnits(hostTime)) }
 
     /// `CMTime` del reloj de host de CoreMedia de unos segundos de host.
     public static func hostTime(seconds s: Double) -> CMTime { CMClockMakeHostTimeFromSystemUnits(ticks(seconds: s)) }
+    #endif
 
     /// Hora de host ahora.
-    public static var nowSeconds: Double { seconds(ticks: mach_absolute_time()) }
+    public static var nowSeconds: Double { NativePlatform.HostClock.nowSeconds }
 }
 
 /// Host ↔ tiempo del tema (mini-spec Fase 6, «Cámara y sincronía»).

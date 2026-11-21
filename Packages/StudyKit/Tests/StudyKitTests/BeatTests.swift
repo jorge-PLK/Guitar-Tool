@@ -64,6 +64,15 @@ final class BeatTests: XCTestCase {
     /// la rejilla de salida (t0 = 1 s + 0,37 muestras de 22 050) debe salir con su centroide en t0.
     /// Tolerancia 0,05 muestras (2,3 µs); un retardo del filtro daría muestras enteras.
     func testResamplerKeepsPulseTime() throws {
+        try checkPulseTime(label: "plataforma")
+    }
+
+    /// Lo mismo con r8brain (el motor de Windows) forzado también en el Mac (plan, «Corte del paso 7», parte 7.1).
+    func testResamplerKeepsPulseTimeWithR8brain() throws {
+        try MonoResampler.$forcePortable.withValue(true) { try checkPulseTime(label: "r8brain") }
+    }
+
+    func checkPulseTime(label: String) throws {
         let out = 22_050.0
         for rate in [44_100.0, 48_000.0, 96_000.0] {
             let n = Int(rate * 2.5), t0 = 1.0 + 0.37 / out, sigma = 0.0002
@@ -77,7 +86,7 @@ final class BeatTests: XCTestCase {
             var num = 0.0, den = 0.0
             for i in (k - 30)...(k + 30) { num += Double(i) * Double(y[i]); den += Double(y[i]) }
             let offset = num / den - t0 * out
-            print("remuestreo \(Int(rate)) → 22050: desvío del centroide \(offset) muestras = \(offset / out * 1000) ms, pico \(y[k])")
+            print("remuestreo (\(label)) \(Int(rate)) → 22050: desvío del centroide \(offset) muestras = \(offset / out * 1000) ms, pico \(y[k])")
             XCTAssertEqual(offset, 0, accuracy: 0.05)
             XCTAssertEqual(Double(y.max()!), 0.8, accuracy: 0.8 * 0.02)
         }

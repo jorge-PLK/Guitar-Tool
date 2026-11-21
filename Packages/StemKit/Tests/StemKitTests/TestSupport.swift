@@ -90,14 +90,26 @@ func makeTempDir(_ name: String) throws -> URL {
 }
 
 /// Directorio de los productos compilados (junto al bundle .xctest): ahí están tf-separate y tf-memhog.
+/// Windows: `<name>.exe` junto al ejecutable de los tests (`.build/<triple>/debug`).
 func builtProduct(_ name: String) -> URL {
+    #if os(Windows)
+    let candidates = [Bundle.main.executableURL, Bundle(for: BundleLocator.self).executableURL,
+                      URL(fileURLWithPath: CommandLine.arguments[0])]
+        .compactMap { $0?.deletingLastPathComponent().appendingPathComponent(name + ".exe") }
+    return candidates.first { FileManager.default.fileExists(atPath: $0.path) } ?? candidates[0]
+    #else
     let bundle = Bundle(for: BundleLocator.self).bundleURL
     return bundle.deletingLastPathComponent().appendingPathComponent(name)
+    #endif
 }
 
 private final class BundleLocator {}
 
 /// `true` mientras exista un proceso con ese pid.
-func processAlive(_ pid: pid_t) -> Bool {
+func processAlive(_ pid: Int32) -> Bool {
+    #if os(Windows)
+    WindowsProcess.isAlive(pid: pid)
+    #else
     kill(pid, 0) == 0 || errno == EPERM
+    #endif
 }

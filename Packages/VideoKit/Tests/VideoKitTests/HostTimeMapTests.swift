@@ -1,4 +1,6 @@
+#if canImport(CoreMedia)
 import CoreMedia
+#endif
 import XCTest
 @testable import VideoKit
 
@@ -78,6 +80,7 @@ final class HostTimeMapTests: XCTestCase {
     }
 
     /// Las marcas de host de cámara (CMTime del reloj de host) y de audio (ticks de mach) se pasan a la misma escala.
+    #if canImport(CoreMedia)
     func testHostClockMatchesCoreMediaHostClock() {
         let now = mach_absolute_time()
         let cm = CMClockMakeHostTimeFromSystemUnits(now)
@@ -90,6 +93,9 @@ final class HostTimeMapTests: XCTestCase {
         XCTAssertEqual(HostClock.seconds(hostTime: HostClock.hostTime(seconds: s)), s, accuracy: 1e-7)
         XCTAssertEqual(CMTimeGetSeconds(CMClockGetTime(CMClockGetHostTimeClock())), HostClock.nowSeconds, accuracy: 0.01)
     }
+    #else
+    func testHostClockMatchesCoreMediaHostClock() throws { throw XCTSkip("[windows] CoreMedia no existe") }
+    #endif
 
     /// Análisis de marcas de la cámara: fotogramas perdidos, fps y jitter.
     func testFrameTimingFindsDropsRateAndJitter() {

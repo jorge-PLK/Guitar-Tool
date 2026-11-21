@@ -1,4 +1,8 @@
+#if canImport(AVFoundation)
 import AVFoundation
+#else
+import NativeAudioFile
+#endif
 import Foundation
 
 // Mezcla fuera de línea del montaje (mini-spec Fase 7, «Exportación»). AudioKit no depende de Store ni de
@@ -565,7 +569,11 @@ public enum MontageMixer {
         let job: MontageMixJob
         let totalFrames: Int
         private let segs: [Seg]
+        #if canImport(AVFoundation)
         private var files: [AVAudioFile]
+        #else
+        private var files: [AudioFileReader]
+        #endif
         private let gains: [Float]
 
         init(job: MontageMixJob, sources: [URL]) throws {
@@ -580,11 +588,18 @@ public enum MontageMixer {
                 return Seg(start: s.start, frames: frames, fadeInFrames: din, fadeOutFrames: dout)
             }
             totalFrames = segs.reduce(0) { $0 + $1.frames }
+            #if canImport(AVFoundation)
             var opened: [AVAudioFile] = []
             for url in sources {
                 do { opened.append(try AVAudioFile(forReading: url, commonFormat: .pcmFormatFloat32, interleaved: false)) }
                 catch { throw MontageMixError.unreadable(url) }
             }
+            #else
+            var opened: [AudioFileReader] = []
+            for url in sources {
+                do { opened.append(try AudioFileReader(url: url)) } catch { throw MontageMixError.unreadable(url) }
+            }
+            #endif
             files = opened
             gains = job.tracks.map { Float(pow(10, $0.gainDB / 20)) }
         }
@@ -679,6 +694,24 @@ public enum MontageMixer {
         /// `count` fotogramas estéreo del fichero `k` desde `from` (puede ser negativo o pasar del final: ceros).
         private mutating func read(_ k: Int, from: Int, count: Int) throws -> [[Float]] {
             var out = [[Float]](repeating: [Float](repeating: 0, count: count), count: 2)
+            #if !canImport(AVFoundation)
+            let reader = files[k]
+            let ra = max(from, 0), rb = min(from + count, reader.frameCount)
+            guard rb > ra else { return out }
+            try reader.seek(toFrame: ra)
+            var rdone = 0
+            while rdone < rb - ra {
+                let chunk = try reader.read(maxFrames: min(16_384, rb - ra - rdone))
+                let got = chunk.first?.count ?? 0
+                if got == 0 { break }
+                for c in 0..<2 {
+                    let src = chunk[min(c, chunk.count - 1)]    // mono: el mismo canal a los dos lados
+                    for i in 0..<got { out[c][ra - from + rdone + i] = src[i] }
+                }
+                rdone += got
+            }
+            return out
+            #else
             let file = files[k]
             let length = Int(file.length)
             let a = max(from, 0), b = min(from + count, length)
@@ -700,6 +733,7 @@ public enum MontageMixer {
                 done += got
             }
             return out
+            #endif
         }
     }
 }

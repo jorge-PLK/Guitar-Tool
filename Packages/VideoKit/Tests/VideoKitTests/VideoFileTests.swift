@@ -1,3 +1,4 @@
+#if canImport(AVFoundation)
 import AVFoundation
 import XCTest
 @testable import VideoKit
@@ -143,3 +144,128 @@ final class VideoFileTests: XCTestCase {
         XCTAssertLessThan(each, 0.005)
     }
 }
+#else
+import Foundation
+import XCTest
+
+@testable import VideoKit
+
+/// Windows: el escritor con Media Foundation (parte 7.2). La vista previa de la toma (`TakePreview`) es de la parte 7.9.
+final class VideoFileTests: XCTestCase {
+    static let format = VideoFormat(cameraID: "sim-camera", cameraName: "Cámara simulada", width: 320, height: 180, fps: 30)
+
+    /// PTS en tiempo de la película: el lector de Media Foundation da el tiempo de los medios (desde 0, no lee la lista
+    /// de ediciones), al que se suma el tramo vacío de la lista.
+    static func ptsOf(_ url: URL) throws -> [Double] {
+        let video = try XCTUnwrap(MP4EditList.tracks(in: url).first { $0.handler == "vide" })
+        let empty = video.edits.filter { $0.mediaTime < 0 }.reduce(0) { $0 + Double($1.segmentDuration) } / Double(video.movieTimescale)
+        let start = Double(video.edits.first { $0.mediaTime >= 0 }?.mediaTime ?? 0) / Double(video.mediaTimescale)
+        var pts: [Double] = []
+        try MediaFoundationReader.forEachFrame(url) { t, _, _ in pts.append(t - start + empty); return true }
+        return pts.sorted()
+    }
+
+    /// Lo mismo que en el Mac: solo vídeo, formato real, PTS = tiempo del tema (empezando a mitad: 12,345 s) con error de
+    /// la escala del fichero como mucho y huecos sin desplazar los siguientes. Códec: HEVC si hay codificador.
+    func testWriterKeepsSongTimePTSAndGapsForDroppedFrames() async throws {
+        let dir = try TestWav.tempDir("VideoFileTests")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let url = dir.appendingPathComponent("video.mov")
+        let cam = SimulatedCameraCapture(camera: CameraDevice(id: "sim-camera", name: "Cámara simulada", kind: .simulated,
+                                                              formats: [CameraFormat(width: 320, height: 180, frameRates: [.init(min: 30, max: 30)])]),
+                                         config: .init(delaySeconds: 0, jitterSeconds: 0, dropFrames: [10, 11, 12, 30], pixels: true, color: (0, 0, 255)),
+                                         originHostSeconds: 0)
+        let writer = try VideoTakeWriter(url: url, format: Self.format, realTime: false)
+        final class Times: @unchecked Sendable { let lock = NSLock(); var list: [Double] = [] }
+        let times = Times()
+        _ = try cam.start(CameraRequest(width: 320, height: 180, fps: 30)) { f in
+            let song = 12.345 + f.hostSeconds
+            if writer.append(f, songTime: song) { times.lock.withLock { times.list.append(song) } }
+        }
+        cam.advance(toHostSeconds: 1.5 - 1e-9)
+        cam.stop()
+        let summary = try await writer.finish()
+        let sent = times.lock.withLock { times.list }
+        XCTAssertEqual(summary.framesWritten, 45 - 4)
+        XCTAssertEqual(summary.format, Self.format)
+        let info = try MediaFoundationReader.info(url)
+        XCTAssertTrue(info.hasVideo)
+        XCTAssertFalse(info.hasAudio)
+        XCTAssertEqual(info.videoCodec, writer.codec == .hevc ? "HEVC" : "H264")
+        XCTAssertEqual(writer.codec, MediaFoundationEncoders.hasHEVC ? .hevc : .h264)
+        XCTAssertEqual(info.width, 320)
+        XCTAssertEqual(info.height, 180)
+        let read = try Self.ptsOf(url)
+        XCTAssertEqual(read.count, sent.count)
+        let worst = zip(read, sent).map { abs($0 - $1) }.max() ?? .nan
+        let gap = read[10] - read[9]
+        let video = try XCTUnwrap(MP4EditList.tracks(in: url).first { $0.handler == "vide" })
+        print(String(format: "7.2 escritor: %@, %d fotogramas, primer PTS %.6f s, máx |PTS leído − tema| %.2e s, hueco %.4f s, escala %u",
+                     writer.codec.rawValue, read.count, read.first ?? .nan, worst, gap, video.mediaTimescale))
+        XCTAssertLessThanOrEqual(worst, 1.0 / 90_000)
+        XCTAssertEqual(read.first!, 12.345, accuracy: 1.0 / 90_000)
+        XCTAssertEqual(gap, 4.0 / 30, accuracy: 1.0 / 90_000)
+    }
+
+    /// Igual que en el Mac: vídeo de color liso de `seconds` desde el tiempo del tema `start`, sin los fotogramas `drop`.
+    static func writeVideo(_ url: URL, start: Double, seconds: Double, color: (b: UInt8, g: UInt8, r: UInt8),
+                           drop: Set<Int> = []) async throws -> (VideoTakeSummary, [Double]) {
+        let cam = SimulatedCameraCapture(camera: CameraDevice(id: "sim-camera", name: "Cámara simulada", kind: .simulated,
+                                                              formats: [CameraFormat(width: 320, height: 180, frameRates: [.init(min: 30, max: 30)])]),
+                                         config: .init(delaySeconds: 0, jitterSeconds: 0, dropFrames: drop, pixels: true, color: color),
+                                         originHostSeconds: 0)
+        let writer = try VideoTakeWriter(url: url, format: format, realTime: false)
+        final class Times: @unchecked Sendable { let lock = NSLock(); var list: [Double] = [] }
+        let times = Times()
+        _ = try cam.start(CameraRequest(width: 320, height: 180, fps: 30)) { f in
+            let song = start + f.hostSeconds
+            if writer.append(f, songTime: song) { times.lock.withLock { times.list.append(song) } }
+        }
+        cam.advance(toHostSeconds: seconds - 1e-9)
+        cam.stop()
+        return (try await writer.finish(), times.lock.withLock { times.list })
+    }
+
+    /// Vista previa con punch (parte 7.9): mismos tramos que en el Mac y la imagen de cada tramo leída con Media
+    /// Foundation; rehacer el plan al cambiar el desfase es barato.
+    func testPreviewUsesPunchInsideItsSpanAndBaseOutside() async throws {
+        let dir = try TestWav.tempDir("VideoFileTests")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let fs = 48_000.0
+        let audio = dir.appendingPathComponent("processed.wav")
+        try TestWav.write([[Float](repeating: 0.1, count: Int(3 * fs))], sampleRate: fs, to: audio)
+        let base = dir.appendingPathComponent("video.mov"), p1 = dir.appendingPathComponent("p1.mov"), p2 = dir.appendingPathComponent("p2.mov")
+        _ = try await Self.writeVideo(base, start: 9.9, seconds: 3.4, color: (0, 0, 255))
+        _ = try await Self.writeVideo(p1, start: 10.5, seconds: 1.6, color: (0, 255, 0))
+        _ = try await Self.writeVideo(p2, start: 11.2, seconds: 1.3, color: (255, 0, 0))
+        let preview = try await TakePreview.load(audioURL: audio, songStart: 10, videoURL: base, punches: [
+            PreviewPunch(start: 10.8, end: 11.8, videoURL: p1, videoOffset: 0.02),
+            PreviewPunch(start: 11.5, end: 12.2, videoURL: p2, videoOffset: -0.01)
+        ])
+        XCTAssertEqual(preview.duration, 3, accuracy: 1e-6)
+        let offset = 0.0333
+        let plan = preview.pieces(videoOffset: offset)
+        XCTAssertEqual(plan.map(\.source), [.base, .punch(0), .punch(1), .base])
+        // Los ficheros tienen imagen hasta su último fotograma + 1/30 s (como en el Mac).
+        let expect: [(Double, Double, Double)] = [(0, 0.8, 10 + offset), (0.8, 1.5, 10.8 + 0.02), (1.5, 2.2, 11.5 - 0.01), (2.2, 3.0, 12.2 + offset)]
+        for (p, e) in zip(plan, expect) {
+            XCTAssertEqual(p.start, e.0, accuracy: 1e-6)
+            XCTAssertEqual(p.end, e.1, accuracy: 1e-6)
+            XCTAssertEqual(p.sourceStart, e.2, accuracy: 1e-6)
+        }
+        func dominant(_ pb: FramePixelBuffer?) -> String {
+            guard let pb else { return "vacío" }
+            let c = pb.pixel(x: pb.width / 2, y: pb.height / 2)
+            return c.r > max(c.g, c.b) ? "rojo" : c.g > max(c.r, c.b) ? "verde" : "azul"
+        }
+        var seen: [String] = []
+        for t in [0.4, 1.1, 1.9, 2.6] { seen.append(dominant(try preview.frame(at: t, videoOffset: offset))) }
+        XCTAssertEqual(seen, ["rojo", "verde", "azul", "rojo"])
+        let t0 = Date()
+        for i in 0..<200 { _ = preview.pieces(videoOffset: Double(i - 100) / 1000) }
+        let each = Date().timeIntervalSince(t0) / 200
+        print(String(format: "7.9 vista previa de toma: tramos %@; imagen %@; rehacer el plan %.4f ms", "\(plan.map(\.source))", "\(seen)", each * 1000))
+        XCTAssertLessThan(each, 0.005)
+    }
+}
+#endif // canImport(AVFoundation)

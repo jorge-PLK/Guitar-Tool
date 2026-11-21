@@ -34,8 +34,9 @@ public enum AudioIOClock: String, Sendable, Equatable, Codable {
 /// que mide `LatencyCalibrator` y lo que estima `AudioIO.declaredLatencySamples`.
 ///
 /// `hostSeconds` es el instante de host de esa primera muestra (mini-spec Fase 6, «Cámara y sincronía»), en
-/// segundos de `mach_absolute_time` (la escala de `CoreAudioIO.hostNowSeconds` y del reloj de host de
-/// CoreMedia): en `CoreAudioIO`, el `mHostTime` del HAL; en `SimulatedAudioIO`, el de su reloj simulado. 0 = el
+/// segundos de `HostClock` (`mach_absolute_time` en el Mac, la escala de `CoreAudioIO.hostNowSeconds` y del reloj de
+/// host de CoreMedia; QPC en Windows): en `CoreAudioIO`, el `mHostTime` del HAL; en `WASAPIAudioIO` (paso 7), el
+/// QPC de `DuplexClockSync`; en `SimulatedAudioIO`, el de su reloj simulado. 0 = el
 /// dispositivo no dio marca válida. El de la muestra `sampleTime + i` es `hostSeconds + i / frecuencia` salvo
 /// la deriva del reloj del dispositivo frente al de host (de ahí que `HostTimeMap` ajuste una recta).
 public struct AudioIOBuffer {
@@ -123,7 +124,7 @@ public extension AudioIO {
 public struct HostClockPoint: Sendable, Equatable {
     /// Muestra de salida en la línea común de la sesión.
     public var sampleTime: Int64
-    /// Segundos de host (`mach_absolute_time`) de esa muestra.
+    /// Segundos de host (`HostClock`) de esa muestra.
     public var hostSeconds: Double
 
     public init(sampleTime: Int64, hostSeconds: Double) {

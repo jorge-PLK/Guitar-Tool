@@ -1,7 +1,11 @@
-import Accelerate
+import NativeDSP
+#if canImport(CoreAudio)
 import CoreAudio
+#endif
 import Foundation
+#if canImport(os)
 import os
+#endif
 import Synchronization
 
 // MARK: - Configuración y errores
@@ -131,6 +135,7 @@ public enum AudioSessionEvent: Sendable, Equatable {
 public final class AudioSession: @unchecked Sendable {
     public typealias IOFactory = @Sendable (AudioSetup) throws -> any AudioIO
 
+    #if canImport(CoreAudio)
     /// `CoreAudioIO` sobre los dispositivos del `AudioSetup` (salida vacía = la de defecto del sistema).
     public static let coreAudio: IOFactory = { setup in
         var out = setup.outputDeviceUID
@@ -141,6 +146,21 @@ public final class AudioSession: @unchecked Sendable {
         }
         return try CoreAudioIO(inputUID: setup.inputDeviceUID, outputUID: out, sampleRate: setup.sampleRate,
                                bufferFrames: setup.bufferFrames)
+    }
+    #endif
+
+    #if os(Windows)
+    /// `WASAPIAudioIO` sobre los dispositivos del `AudioSetup` (paso 7: wasapi; hoy lanza `PlatformError.unsupported`).
+    public static let wasapi: IOFactory = { setup in try WASAPIAudioIO(setup: setup) }
+    #endif
+
+    /// E/S del sistema: `coreAudio` en el Mac, `wasapi` en Windows.
+    public static var systemIO: IOFactory {
+        #if canImport(CoreAudio)
+        coreAudio
+        #else
+        wasapi
+        #endif
     }
 
     /// Capacidad del búfer circular de captura (decisión propia: holgura de sobra para el consumidor).
@@ -188,7 +208,7 @@ public final class AudioSession: @unchecked Sendable {
         }
     }
 
-    public init(setup: AudioSetup, makeIO: @escaping IOFactory = AudioSession.coreAudio) {
+    public init(setup: AudioSetup, makeIO: @escaping IOFactory = AudioSession.systemIO) {
         self.setup = setup
         self.makeIO = makeIO
     }
@@ -303,7 +323,7 @@ public final class AudioSession: @unchecked Sendable {
     // MARK: Reproductor alojado
 
     /// Lo llama `StudyPlayer.attach`/`detach`. `onEnd` se llama si la sesión se cierra o se corta.
-    func setPlayer(_ renderer: HostedRenderer?, onEnd: (@Sendable () -> Void)?) {
+    func setPlayer(_ renderer: (any HostedPlayback)?, onEnd: (@Sendable () -> Void)?) {
         let rt = lock.withLock { () -> SessionRT? in
             playerEnd = onEnd
             return self.rt
@@ -545,7 +565,7 @@ final class SessionRT: @unchecked Sendable {
     let backingLeft: Int
     let backingRight: Int
     let probe: LatencyProbe
-    let player = OSAllocatedUnfairLock<HostedRenderer?>(initialState: nil)
+    let player = StateLock<(any HostedPlayback)?>(initialState: nil)
     let calibrating = Atomic<Bool>(false)
     /// Marcas de host de cada ciclo de salida (mini-spec Fase 6).
     let clockLog = HostClockLog()
@@ -657,8 +677,8 @@ struct LevelHistory {
         guard n > 0 else { return }
         for c in 0..<min(channels, b.channelCount) {
             var ms: Float = 0, p: Float = 0
-            vDSP_measqv(b[c].baseAddress!, 1, &ms, vDSP_Length(n))
-            vDSP_maxmgv(b[c].baseAddress!, 1, &p, vDSP_Length(n))
+            DSP.measqv(b[c].baseAddress!, 1, &ms, DSPLength(n))
+            DSP.maxmgv(b[c].baseAddress!, 1, &p, DSPLength(n))
             sumSq[c][head] = Double(ms) * Double(n)
             peak[c][head] = p
         }

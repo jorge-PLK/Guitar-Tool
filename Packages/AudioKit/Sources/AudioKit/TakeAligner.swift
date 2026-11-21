@@ -1,4 +1,4 @@
-import Accelerate
+import NativeDSP
 import Foundation
 
 /// Retardo del rig medido en una toma (mini-spec Fase 3, «Alineado con el backing» 3).
@@ -35,7 +35,7 @@ public enum TakeAligner {
     /// Envolvente derivada que se correlaciona.
     static func envelope(_ x: [Float], sampleRate: Double) -> [Float] {
         var a = [Float](repeating: 0, count: x.count)
-        vDSP_vabs(x, 1, &a, 1, vDSP_Length(x.count))
+        DSP.vabs(x, 1, &a, 1, DSPLength(x.count))
         let h = SignalMath.lowpass(cutoffHz: envelopeCutoffHz, sampleRate: sampleRate, half: envelopeFilterHalf)
         let e = SignalMath.filterSymmetric(a, h)
         var d = [Float](repeating: 0, count: e.count)
@@ -58,12 +58,12 @@ public enum TakeAligner {
         var r = [Float](repeating: 0, count: span + 1)
         eg.withUnsafeBufferPointer { g in
             ef.withUnsafeBufferPointer { f in
-                vDSP_conv(g.baseAddress!, 1, f.baseAddress! + m, 1, &r, 1, vDSP_Length(span + 1), vDSP_Length(p))
+                DSP.conv(g.baseAddress!, 1, f.baseAddress! + m, 1, &r, 1, DSPLength(span + 1), DSPLength(p))
             }
         }
         var eG: Float = 0, eF: Float = 0
-        eg.withUnsafeBufferPointer { vDSP_svesq($0.baseAddress! + m, 1, &eG, vDSP_Length(p)) }
-        ef.withUnsafeBufferPointer { vDSP_svesq($0.baseAddress! + m, 1, &eF, vDSP_Length(p)) }
+        eg.withUnsafeBufferPointer { DSP.svesq($0.baseAddress! + m, 1, &eG, DSPLength(p)) }
+        ef.withUnsafeBufferPointer { DSP.svesq($0.baseAddress! + m, 1, &eF, DSPLength(p)) }
         let norm = (Double(eG) * Double(eF)).squareRoot()
         guard norm > 0 else { return unreliable }
         let rd = r.map { Double($0) / norm }

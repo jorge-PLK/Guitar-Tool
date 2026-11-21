@@ -1,4 +1,4 @@
-- [Trampas de entorno Core ML/ONNX](coreml-env-traps.md) — torch 2.7.0 + coremltools 9.0 + numpy 2.3.5; rango ≤ 5; guard.py de 10 GB obligatorio; el ANE colgó el Mac
+- [Trampas de entorno Core ML/ONNX](coreml-env-traps.md) — torch 2.7.0 + coremltools 9.0 + numpy 2.3.5; rango ≤ 5; guard.py de 10 GB obligatorio; el ANE colgó el Mac; dynamo + ORT sin arena
 - [demucs / HTDemucs en el venv](htdemucs-env.md) — instalar con -c sin espacios en la ruta; TORCH_HOME; MPS va; semilla para shifts
 - [BTC acordes: trampas y contrato](btc-contract.md) — HParams/yaml, np.float, weights_only, máscaras -inf→-1e4; ANE seguro con ventana 108
 - [Beat This!: pesos, Core ML publicado y contrato](beat-this-contract.md) — servidor JKU caído→espejos; schism-audio no existe; supracut FP32 vale; tempo a 50 fps; log-mel /sqrt(n_fft), no Σw²
@@ -8,5 +8,5 @@
 - [ADTOF batería: GRU en Core ML y contrato](adtof-contract.md) — gru nativa iOS18 (salida reverse invertida), GPU la calcula mal→CPU; 84 bandas; pistas con puerta; package.py/fixture
 - [Guitab / MuScriptor (Fase 5b)](guitab-muscriptor-eval.md) — Guitab sin instalar (6 ficheros); registro 100 % por construcción; MuScriptor gated; BP y silencio
 - [Songsterr como referencia](songsterr-reference.md) — API de búsqueda; 103 Early Hints→curl; CDN en gzip; alinear con saliencia CQT, no con onsets/croma
-- [ONNX Runtime en Windows](ort-windows.md) — GitHub de ORT 404→NuGet; pragma comment(lib); DLL de System32; install.ps1 borra C:\ToneForge; VM sin Python
+- [ONNX Runtime en Windows](ort-windows.md) — NuGet; DLL de System32; ssh=PowerShell 5; Cast a float32; MoveNet; ejes dinámicos; VM pagina T≥575
 - [Lead/Rhythm Mel-Band anónimo](lead-rhythm-contract.md) — weights_only OK, casa estricto; YAML con tupla→SafeLoader; MPS falla→CPU; Core ML sin scatter (K gathers); contrato spec→mask hop 441

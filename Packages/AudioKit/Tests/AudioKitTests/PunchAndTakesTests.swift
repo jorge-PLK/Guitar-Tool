@@ -2,7 +2,9 @@ import XCTest
 @testable import AudioKit
 
 /// Punch-in y varias pistas de toma (mini-spec Fase 6, «Punch-in» y «Partes y tomas»).
-final class PunchAndTakesTests: XCTestCase {
+class PunchAndTakesTests: XCTestCase {
+    /// Motor del reproductor: el de la plataforma; el portátil en `PortablePunchAndTakesTests` (solo Mac).
+    var kind: PlayerKind { .platform }
     func tempDir() throws -> URL {
         let d = FileManager.default.temporaryDirectory.appendingPathComponent("PunchAndTakesTests-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
@@ -124,7 +126,7 @@ final class PunchAndTakesTests: XCTestCase {
         try TakeFile.write([Self.sine(Int(6 * fs), hz: 1_000, fs: fs)], sampleRate: fs, to: takeURL)
         let entry = 3.0, from = 2.0
 
-        let p = StudyPlayer(offlineWith: nil)
+        let p = kind.offline()
         try p.load(tracks: [Track(id: "backing", url: backing)])
         try p.setTakes([TakeTrack(id: "Tú", url: takeURL, songStart: 1, silencedFrom: entry)])
         p.seek(to: from)
@@ -158,7 +160,7 @@ final class PunchAndTakesTests: XCTestCase {
         try TakeFile.write([Self.sine(Int(5 * fs), hz: 1_000, fs: fs)], sampleRate: fs, to: a)
         try TakeFile.write([Self.sine(Int(5 * fs), hz: 1_500, fs: fs)], sampleRate: fs, to: b)
 
-        let p = StudyPlayer(offlineWith: nil)
+        let p = kind.offline()
         try p.load(tracks: [Track(id: "backing", url: backing)])
         XCTAssertThrowsError(try p.setTakes([TakeTrack(id: "backing", url: a, songStart: 0)]))
         XCTAssertThrowsError(try p.setTakes([TakeTrack(id: "x", url: a, songStart: 0), TakeTrack(id: "x", url: b, songStart: 0)]))
@@ -200,3 +202,10 @@ final class PunchAndTakesTests: XCTestCase {
         XCTAssertEqual(p.takes.count, 1)
     }
 }
+
+#if canImport(AVFoundation)
+/// Los mismos casos con el motor portátil (el de Windows) en el Mac.
+final class PortablePunchAndTakesTests: PunchAndTakesTests {
+    override var kind: PlayerKind { .portable }
+}
+#endif

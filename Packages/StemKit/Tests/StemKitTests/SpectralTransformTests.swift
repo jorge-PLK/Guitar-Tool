@@ -19,6 +19,41 @@ final class SpectralTransformTests: XCTestCase {
         }
     }
 
+    /// Hop 441 del modelo de solista (`MaskModelContract.leadRhythm`): misma tolerancia de ida y vuelta (< 1e-5),
+    /// y un impulso vuelve en su muestra exacta (alineación de 0 muestras, sin retardo del enventanado).
+    func testRoundTripHop441AndImpulseAlignment() {
+        let hop = MaskModelContract.leadRhythm.hop
+        var rng = SeededRandom(441)
+        for length in [1_025, 44_100, MaskModelContract.leadRhythm.chunk] {
+            let stft = SpectralTransform(length: length, hop: hop)
+            let x = (0..<length).map { _ in rng.unit() }
+            var spec = [Float](repeating: 0, count: stft.specCount)
+            var y = [Float](repeating: 0, count: length)
+            x.withUnsafeBufferPointer { stft.forward($0.baseAddress!, channel: 0, into: &spec) }
+            spec.withUnsafeBufferPointer { stft.inverse($0.baseAddress!, channel: 0, into: &y) }
+            var maxErr: Float = 0
+            for k in 0..<length { maxErr = max(maxErr, abs(x[k] - y[k])) }
+            XCTAssertLessThan(maxErr, 1e-5, "hop \(hop), longitud \(length): error máximo \(maxErr)")
+            print("STFT hop \(hop) ida y vuelta, longitud \(length): error máximo \(maxErr)")
+        }
+        let length = 10_000
+        let stft = SpectralTransform(length: length, hop: hop)
+        for p in [0, 1, 1_023, 4_567, length - 1] {
+            var x = [Float](repeating: 0, count: length)
+            x[p] = 1
+            var spec = [Float](repeating: 0, count: stft.specCount)
+            var y = [Float](repeating: 0, count: length)
+            x.withUnsafeBufferPointer { stft.forward($0.baseAddress!, channel: 1, into: &spec) }
+            spec.withUnsafeBufferPointer { stft.inverse($0.baseAddress!, channel: 1, into: &y) }
+            let peak = y.indices.max { abs(y[$0]) < abs(y[$1]) }!
+            var leak: Float = 0
+            for k in 0..<length where k != p { leak = max(leak, abs(y[k])) }
+            XCTAssertEqual(peak, p, "impulso en \(p) vuelve en \(peak)")
+            XCTAssertEqual(y[p], 1, accuracy: 1e-5)
+            XCTAssertLessThan(leak, 1e-5, "impulso en \(p): fuga máxima \(leak)")
+        }
+    }
+
     /// Cada trama coincide con la DFT directa (e^{-i}, como numpy.rfft/torch.stft) de la trama rellenada
     /// con reflect y enventanada con Hann periódica. Incluye DC y Nyquist (imaginaria 0).
     func testForwardMatchesDirectDFT() {

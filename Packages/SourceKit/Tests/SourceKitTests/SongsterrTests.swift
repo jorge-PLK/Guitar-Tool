@@ -1,4 +1,8 @@
+#if canImport(Compression)
 import Compression
+#else
+import CMiniz
+#endif
 import Foundation
 import XCTest
 @testable import SourceKit
@@ -219,7 +223,14 @@ final class SongsterrClientTests: XCTestCase {
 
     func testGunzipWithoutContentEncoding() throws {
         let json = Data(#"{"measures":[1,2,3]}"#.utf8)
+        #if canImport(Compression)
         let deflated = try (json as NSData).compressed(using: .zlib) as Data
+        #else
+        var outLen = 0
+        let heap = try XCTUnwrap(json.withUnsafeBytes { tdefl_compress_mem_to_heap($0.baseAddress, $0.count, &outLen, 0) })
+        defer { free(heap) }
+        let deflated = Data(bytes: heap, count: outLen)
+        #endif
         var gz = Data([0x1f, 0x8b, 8, 0, 0, 0, 0, 0, 0, 3])
         gz.append(deflated)
         gz.append(Data(repeating: 0, count: 8))  // CRC32 + ISIZE (no se verifican)

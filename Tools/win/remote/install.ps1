@@ -26,6 +26,7 @@ foreach ($a in (Get-Archs $Arch)) {
     Copy-Item $src $dest
     Get-ChildItem $bin -Filter "*.dll" | Copy-Item -Destination $dest
     Get-ChildItem $bin -Directory -Filter "*.resources" | Copy-Item -Destination $dest -Recurse
+    [void](Copy-OrtDlls $a $dest (Join-Path $dest "$Product.exe"))
 
     $exe = Join-Path $dest "$Product.exe"
     $bytes = [IO.File]::ReadAllBytes($exe)

@@ -1,4 +1,6 @@
+#if canImport(CoreML)
 import CoreML
+#endif
 import XCTest
 @testable import StudyKit
 
@@ -22,6 +24,7 @@ final class ChordHeavyModelTests: XCTestCase {
     nonisolated(unsafe) private static var compiled: URL?
 
     private func modelURL() throws -> URL {
+        #if canImport(CoreML)
         guard ProcessInfo.processInfo.environment["TF_MODEL_TESTS"] == "1" else {
             throw XCTSkip("tests del modelo real desactivados (TF_MODEL_TESTS != 1)")
         }
@@ -31,6 +34,15 @@ final class ChordHeavyModelTests: XCTestCase {
         let c = try MLModel.compileModel(at: pkg)
         Self.compiled = c
         return c
+        #else
+        // Windows (parte 7.8): ONNX de la parte 7.3 en `<TF_MODELS_DIR o C:\tf-models>\btc\model.onnx`.
+        guard ProcessInfo.processInfo.environment["TF_MODEL_TESTS"] == "1" else {
+            throw XCTSkip("tests del modelo real desactivados (TF_MODEL_TESTS != 1)")
+        }
+        let url = studyKitDevelopmentModel("btc")
+        guard FileManager.default.fileExists(atPath: url.path) else { throw XCTSkip("no está el modelo en \(url.path)") }
+        return url
+        #endif
     }
 
     /// Etiqueta por fotograma de un `.lab` (fotograma i ↦ el segmento que contiene (i + ½)·Δ).
@@ -72,7 +84,7 @@ final class ChordHeavyModelTests: XCTestCase {
 
     /// El modelo sobre las ventanas del fixture: logits frente a los de Python (Core ML ANE en coremltools).
     func testFixtureWindowsMatchPythonLogits() throws {
-        let predictor = try CoreMLChordPredictor(modelURL: try modelURL())
+        let predictor = try makeChordPredictor(modelURL: try modelURL())
         let input = try ChordRecognizerTests.f32("chord_input.f32")
         let ref = try ChordRecognizerTests.f32("chord_logits.f32")
         let labels = try ChordFeatures.predictLabels(input: input, frames: 130, with: predictor)

@@ -1,5 +1,5 @@
-import AVFoundation
 import Foundation
+import NativeAudioFile
 
 /// Nivel de un stem en dBFS (sobre todos los canales).
 public struct StemLevel: Sendable, Equatable {
@@ -19,24 +19,20 @@ public enum StemLevelMeter {
     public static let emptyPeakThresholdDB = -40.0
     /// Suelo para el silencio digital exacto.
     public static let floorDB = -200.0
-    static let blockFrames: AVAudioFrameCount = 1 << 16
+    static let blockFrames = 1 << 16
 
     /// Lee el fichero por bloques (sin cargarlo entero) y devuelve RMS y pico en dBFS de todos los canales.
     public static func measure(url: URL) throws -> StemLevel {
-        let file = try AVAudioFile(forReading: url, commonFormat: .pcmFormatFloat32, interleaved: false)
-        let fmt = file.processingFormat
-        let channels = Int(fmt.channelCount)
-        guard let buf = AVAudioPCMBuffer(pcmFormat: fmt, frameCapacity: blockFrames) else {
-            throw SeparationError.invalidInput("no hay memoria para medir \(url.lastPathComponent)")
-        }
+        let file = try AudioFileReader(url: url)
+        let channels = file.channelCount
+        let data = (0..<channels).map { _ in UnsafeMutablePointer<Float>.allocate(capacity: blockFrames) }
+        defer { data.forEach { $0.deallocate() } }
         var sumSquares = 0.0
         var peak: Float = 0
         var count = 0
-        while file.framePosition < file.length {
-            try file.read(into: buf, frameCount: blockFrames)
-            let n = Int(buf.frameLength)
+        while file.framePosition < file.frameCount {
+            let n = try file.read(into: data, maxFrames: blockFrames)
             if n == 0 { break }
-            let data = buf.floatChannelData!
             for c in 0..<channels {
                 let p = data[c]
                 var blockSum: Float = 0

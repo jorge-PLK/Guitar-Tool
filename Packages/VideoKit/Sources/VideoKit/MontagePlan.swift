@@ -1,5 +1,9 @@
+#if canImport(CoreGraphics)
 import CoreGraphics
+#endif
+#if canImport(CoreMedia)
 import CoreMedia
+#endif
 import Foundation
 
 // Entrada del montaje (mini-spec Fase 7, «Montaje»). VideoKit no depende de Store ni de AudioKit: la app traduce
@@ -442,7 +446,15 @@ public struct MontagePlan: Codable, Sendable, Equatable {
 
     /// Duración de un fotograma tal como la usa la composición (`AVVideoComposition.frameDuration`): `1/fps` en la
     /// escala de `VideoTakeWriter` (90 000). A 30 fps, 3000 ticks exactos; a 29,97, 3003 (= 1001/30000 s).
+    #if canImport(CoreMedia)
     static func frameTime(fps: Double) -> CMTime { VideoTakeWriter.time(1 / max(1, fps)) }
+    #endif
+
+    /// `frameTime(fps:)` sin CoreMedia (la misma cuenta que `VideoTakeWriter.time`): ticks y escala, para la
+    /// rejilla en las dos plataformas.
+    static func frameTicks(fps: Double) -> (value: Int64, timescale: Int32) {
+        (Int64((1 / max(1, fps) * Double(songTimescale)).rounded()), songTimescale)
+    }
 
     /// Tramos en la rejilla de fotogramas de `fps` (decisión de Jorge del 16/11/2026, tras la auditoría de la Fase 7:
     /// la spec, «Exportación», pide que los WAV duren lo que el vídeo, y el escritor solo escribe fotogramas enteros).
@@ -453,7 +465,7 @@ public struct MontagePlan: Codable, Sendable, Equatable {
     /// tras redondear se funden. El fotograma es el de `frameTime(fps:)`, el mismo que usa el compositor.
     public static func quantized(_ segments: [MontageSpan], fps: Double) -> [MontageSpan] {
         let sorted = segments.filter { $0.duration > 0 }.sorted { $0.start < $1.start }
-        let frame = frameTime(fps: fps)
+        let frame = frameTicks(fps: fps)
         guard fps.isFinite, fps > 0, frame.value > 0 else { return sorted }
         let ticks = Double(frame.value), scale = Double(frame.timescale)
         func index(_ t: Double, _ rule: FloatingPointRoundingRule) -> Int64 {

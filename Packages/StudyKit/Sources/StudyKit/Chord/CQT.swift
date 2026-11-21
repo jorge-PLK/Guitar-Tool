@@ -1,4 +1,4 @@
-import Accelerate
+import NativeDSP
 import Foundation
 
 /// Contrato ChordKit de P4 (mini-spec Fase 2 §1 `ChordRecognizer`; `docs/probes/P4-modelos.md` «Acordes (BTC)»;
@@ -29,7 +29,7 @@ enum ChordContract {
 /// recortadas al 1 % de magnitud acumulada), STFT con ventana rectangular centrada, una diezmación temprana y
 /// otra por octava (`resample(…, scale=True)` = × √2), compensación √(sr / sr_octava) en la base y división
 /// final por √longitud. Lo único que no es copia literal es el filtro de diezmación: librosa usa soxr HQ
-/// (FIR Kaiser de fase lineal, ~126 dB); aquí un FIR Kaiser equivalente con vDSP. Todas las bases quedan por
+/// (FIR Kaiser de fase lineal, ~126 dB); aquí un FIR Kaiser equivalente con NativeDSP. Todas las bases quedan por
 /// debajo del 40 % del Nyquist de su octava, donde ambos filtros son planos.
 final class LibrosaCQT: @unchecked Sendable {
     static let shared = LibrosaCQT()
@@ -49,7 +49,7 @@ final class LibrosaCQT: @unchecked Sendable {
         let rows: [Row]
         /// Diezmar ×2 la señal después de esta octava.
         let halveAfter: Bool
-        let dft: vDSP_DFT_Setup
+        let dft: DSP.ComplexDFT
     }
 
     let nBins: Int
@@ -114,14 +114,10 @@ final class LibrosaCQT: @unchecked Sendable {
                     mySr /= 2
                 }
             }
-            let setup = vDSP_DFT_zop_CreateSetup(nil, vDSP_Length(nfft), .FORWARD)!
+            let setup = DSP.ComplexDFT(count: nfft, direction: .forward)!
             octs.append(Octave(firstBin: lo, nfft: nfft, hop: octaveHop, rows: rows, halveAfter: halve, dft: setup))
         }
         octaves = octs
-    }
-
-    deinit {
-        for o in octaves { vDSP_DFT_DestroySetup(o.dft) }
     }
 
     // MARK: - Bases
@@ -132,8 +128,7 @@ final class LibrosaCQT: @unchecked Sendable {
         let lengths = zip(freqs, alpha).map { f, a in (1 / a) * sr / f }
         let nfft = Int(pow(2.0, ceil(log2(lengths.max()!))))
         let half = nfft / 2
-        let setup = vDSP_DFT_zop_CreateSetupD(nil, vDSP_Length(nfft), .FORWARD)!
-        defer { vDSP_DFT_DestroySetupD(setup) }
+        let setup = DSP.ComplexDFTD(count: nfft, direction: .forward)!
         var inR = [Double](repeating: 0, count: nfft), inI = inR, outR = inR, outI = inR
         var rows: [Row] = []
         for (ilen, f) in zip(lengths, freqs) {
@@ -159,7 +154,7 @@ final class LibrosaCQT: @unchecked Sendable {
                 inR[lpad + j] = re[j] * k
                 inI[lpad + j] = im[j] * k
             }
-            vDSP_DFT_ExecuteD(setup, inR, inI, &outR, &outI)
+            setup.execute(inR, inI, &outR, &outI)
 
             // sparsify_rows en float32, como librosa (la base es complex64).
             let fr = (0...half).map { Float(outR[$0]) }
@@ -232,9 +227,9 @@ final class LibrosaCQT: @unchecked Sendable {
             x.withUnsafeBufferPointer { src in (dst.baseAddress! + c).update(from: src.baseAddress!, count: n) }
         }
         var out = [Float](repeating: 0, count: m)
-        vDSP_desamp(padded, 2, halfband, &out, vDSP_Length(m), vDSP_Length(p))
+        DSP.desamp(padded, 2, halfband, &out, DSPLength(m), DSPLength(p))
         var s = Float(2.0.squareRoot())
-        vDSP_vsmul(out, 1, &s, &out, 1, vDSP_Length(m))
+        DSP.vsmul(out, 1, &s, &out, 1, DSPLength(m))
         return out
     }
 
@@ -278,7 +273,7 @@ final class LibrosaCQT: @unchecked Sendable {
         var mags = [Float](repeating: 0, count: o.rows.count * frames)
         padded.withUnsafeBufferPointer { p in
             for t in 0..<frames {
-                vDSP_DFT_Execute(o.dft, p.baseAddress! + t * o.hop, zeros, &xr, &xi)
+                o.dft.execute(p.baseAddress! + t * o.hop, zeros, &xr, &xi)
                 for (b, row) in o.rows.enumerated() {
                     var sr: Float = 0, si: Float = 0
                     for (j, k) in row.k.enumerated() {
@@ -303,8 +298,10 @@ final class LibrosaCQT: @unchecked Sendable {
         }
         ranges.append(cur..<wav.count)
         let parts = Slots<(values: [Float], frames: Int)>(count: ranges.count, initial: ([], 0))
-        DispatchQueue.concurrentPerform(iterations: ranges.count) { i in
-            let r = ranges[i]
+        // Copia inmutable: en Windows el cierre de concurrentPerform es @Sendable y no admite capturar un var.
+        let chunks = ranges
+        DispatchQueue.concurrentPerform(iterations: chunks.count) { i in
+            let r = chunks[i]
             parts[i] = r.isEmpty ? ([], 0) : magnitude(Array(wav[r]))
         }
         var values: [Float] = []

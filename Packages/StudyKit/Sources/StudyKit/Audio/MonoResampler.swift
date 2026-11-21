@@ -1,15 +1,40 @@
+#if canImport(AVFoundation)
 import AVFoundation
+#endif
+import Foundation
+import NativeResample
 
-/// Remuestreo mono en memoria con `AVAudioConverter` (calidad máxima, algoritmo Mastering), sin retardo
-/// (lo miden `BeatTests.testResamplerKeepsPulseTime` y `ChordAudioTests`). Lo comparten pulso y acordes; cada
-/// uno fija la longitud de salida de su referencia en Python.
+/// Remuestreo mono en memoria con `AVAudioConverter` (calidad máxima, algoritmo Mastering) en el Mac y r8brain
+/// (`NativeResample`) en Windows, sin retardo (lo miden `BeatTests.testResamplerKeepsPulseTime` y
+/// `ChordRecognizerTests.testResampleMatchesSoxrReference`, también con r8brain forzado en el Mac). Lo comparten
+/// pulso y acordes; cada uno fija la longitud de salida de su referencia en Python.
 enum MonoResampler {
     struct Failure: Error {
         let message: String
     }
 
+    /// Solo pruebas: fuerza en el Mac el motor de Windows (r8brain) para validarlo con los mismos fixtures (plan,
+    /// «Corte del paso 7», parte 7.1). En producción es falso y el Mac sigue con AVAudioConverter.
+    @TaskLocal static var forcePortable = false
+
     /// Devuelve exactamente `length` muestras (recorta la cola o rellena con ceros).
     static func resample(_ x: [Float], from sourceRate: Double, to targetRate: Double, length: Int) throws -> [Float] {
+        #if canImport(AVFoundation)
+        if !forcePortable { return try avResample(x, from: sourceRate, to: targetRate, length: length) }
+        #endif
+        var out: [Float]
+        do {
+            out = try Resampler.resample(x, from: sourceRate, to: targetRate)
+        } catch {
+            throw Failure(message: "r8brain no admite \(sourceRate) → \(targetRate) Hz: \(error)")
+        }
+        if out.count > length { out.removeLast(out.count - length) }
+        if out.count < length { out.append(contentsOf: repeatElement(0, count: length - out.count)) }
+        return out
+    }
+
+    #if canImport(AVFoundation)
+    private static func avResample(_ x: [Float], from sourceRate: Double, to targetRate: Double, length: Int) throws -> [Float] {
         guard let inFmt = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: sourceRate, channels: 1, interleaved: false),
               let outFmt = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: targetRate, channels: 1, interleaved: false),
               let converter = AVAudioConverter(from: inFmt, to: outFmt) else {
@@ -66,4 +91,5 @@ enum MonoResampler {
             return buffer
         }
     }
+    #endif
 }

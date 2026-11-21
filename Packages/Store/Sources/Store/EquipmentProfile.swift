@@ -45,7 +45,7 @@ public struct ProfileStore: Sendable {
     public let url: URL
 
     public static var defaultURL: URL {
-        URL.applicationSupportDirectory.appendingPathComponent("ToneForge/profile.json")
+        PlatformPaths.appSupport.appendingPathComponent("ToneForge/profile.json")
     }
 
     public init(url: URL = ProfileStore.defaultURL) { self.url = url }

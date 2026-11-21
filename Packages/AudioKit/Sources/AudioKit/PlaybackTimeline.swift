@@ -1,5 +1,7 @@
 import Foundation
+#if canImport(os)
 import os
+#endif
 
 // MARK: - TimePitch: cuantización de la velocidad y latencia
 
@@ -197,7 +199,7 @@ struct ClockState: Sendable {
 /// Envoltorio con cerrojo del `ClockState`. El hilo de render entra en secciones cortas y sin reservas
 /// de memoria (cerrojo injusto de Darwin, con donación de prioridad).
 final class PlaybackClock: Sendable {
-    private let state = OSAllocatedUnfairLock(initialState: ClockState())
+    private let state = StateLock(initialState: ClockState())
 
     func read<R>(_ body: (ClockState) -> R) -> R {
         state.withLockUnchecked { body($0) }

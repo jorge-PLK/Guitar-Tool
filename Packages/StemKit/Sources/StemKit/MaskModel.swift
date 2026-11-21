@@ -1,11 +1,18 @@
-import Accelerate
+#if canImport(CoreML)
 import CoreML
+#endif
 import Foundation
+import NativeDSP
+import NativePlatform
 
 /// El modelo de máscaras, detrás de un protocolo para poder simularlo en los tests.
 /// Contrato (docs/probes/P4-modelos.md): entrada `spec` `[1, 2·bins, frames, 2]` float32;
 /// salida `[1, stems, 2·bins, frames, 2]`: una máscara compleja por stem con el mismo layout que `spec`
 /// (6 stems en BS-RoFormer SW, 1 en el modelo de solista; ver `MaskModelContract`).
+///
+/// Es la costura con el motor de inferencia: el troceado, el solape (`ChunkPlan`, `OverlapAddAssembler`) y el
+/// DSP (`ChunkProcessor`, `SpectralTransform`) solo ven este protocolo. Core ML en el Mac (`CoreMLMaskModel`);
+/// en Windows, ONNX Runtime (paso 7) con el mismo contrato, que copiará su tensor de salida con `MaskTensor.copy`.
 protocol MaskModel: AnyObject {
     /// Hop, número de stems y nombres del modelo.
     var contract: MaskModelContract { get }
@@ -15,6 +22,68 @@ protocol MaskModel: AnyObject {
     func predict(spec: UnsafeMutablePointer<Float>, mask: UnsafeMutablePointer<Float>) throws
 }
 
+/// Carga del modelo de máscaras del sistema a partir del fichero que instala ModelStore.
+enum SystemMaskModel {
+    static func load(modelURL: URL, contract: MaskModelContract) throws -> MaskModel {
+        #if canImport(CoreML)
+        return try CoreMLMaskModel(compiledModelURL: modelURL, contract: contract)
+        #elseif os(Windows)
+        // ONNX Runtime (parte 7.8): `modelURL` es el `.onnx`; las tramas salen del modelo.
+        return try OnnxMaskModel(modelURL: modelURL, contract: contract)
+        #else
+        throw PlatformError.unsupported("sin motor de inferencia en esta plataforma")
+        #endif
+    }
+}
+
+/// Copia de la máscara de salida `[1, stems, rows, frames, 2]` (FP16 o FP32, con strides arbitrarios en
+/// elementos) a Float32 contiguo con el layout de `spec`. Independiente del motor: Core ML la llama con el
+/// `MLMultiArray`, ONNX Runtime la llamará con el puntero de su tensor.
+enum MaskTensor {
+    enum Scalar { case float16, float32 }
+
+    static func copy(_ base: UnsafeRawPointer, scalar: Scalar, shape: [Int], strides st: [Int],
+                     stems: Int, rows: Int, frames: Int, into mask: UnsafeMutablePointer<Float>) throws {
+        guard shape == [1, stems, rows, frames, 2] else {
+            throw SeparationError.invalidInput("máscara con forma \(shape), se esperaba [1, \(stems), \(rows), \(frames), 2]")
+        }
+        guard st.count == 5, st[4] == 1, st[3] >= 2, st[2] >= frames * st[3] else {
+            throw SeparationError.invalidInput("máscara con strides no soportados \(st)")
+        }
+        let rowLen = frames * 2
+        switch scalar {
+        case .float16:
+            // Cada par (re, im) es una "fila" de 2 píxeles con rowBytes = st[3]·2. Si los bins no tienen
+            // relleno extra (st[2] = frames·st[3]), un stem entero es una sola imagen.
+            let uniform = st[2] == frames * st[3]
+            for s in 0..<stems {
+                let blocks = uniform ? 1 : rows
+                let height = uniform ? rows * frames : frames
+                for r in 0..<blocks {
+                    var src = ImageBuffer(data: UnsafeMutableRawPointer(mutating: base + (s * st[1] + r * st[2]) * 2),
+                                          height: PixelCount(height), width: 2, rowBytes: st[3] * 2)
+                    var dst = ImageBuffer(data: mask + (s * rows + r) * rowLen,
+                                          height: PixelCount(height), width: 2, rowBytes: 2 * 4)
+                    let err = DSP.convertPlanar16FtoPlanarF(&src, &dst)
+                    if err != imageNoError { throw SeparationError.invalidInput("FP16→FP32 falló (\(err))") }
+                }
+            }
+        case .float32:
+            let f = base.assumingMemoryBound(to: Float.self)
+            for s in 0..<stems {
+                for r in 0..<rows {
+                    let p = UnsafeMutablePointer(mutating: f + s * st[1] + r * st[2])
+                    var src = SplitComplex(realp: p, imagp: p + 1)
+                    let d = mask + (s * rows + r) * rowLen
+                    var dst = SplitComplex(realp: d, imagp: d + 1)
+                    DSP.zvmov(&src, DSPStride(st[3]), &dst, 2, DSPLength(frames))
+                }
+            }
+        }
+    }
+}
+
+#if canImport(CoreML)
 /// Un modelo de máscaras RoFormer en Core ML (BS-RoFormer SW, ADR-004, o el de solista), siempre con `.cpuAndGPU`.
 final class CoreMLMaskModel: MaskModel {
     let contract: MaskModelContract
@@ -68,53 +137,22 @@ final class CoreMLMaskModel: MaskModel {
     /// `[453033600, 75505600, 36832, 32, 1]`, es decir, cada par (re, im) ocupa 32 FP16 (64 bytes).
     static func copyMask(_ m: MLMultiArray, stems: Int = RoformerContract.stemCount, rows: Int, frames: Int,
                          into mask: UnsafeMutablePointer<Float>) throws {
+        let scalar: MaskTensor.Scalar
+        switch m.dataType {
+        case .float16: scalar = .float16
+        case .float32: scalar = .float32
+        default: throw SeparationError.invalidInput("máscara de tipo no soportado \(m.dataType.rawValue)")
+        }
         let shape = m.shape.map(\.intValue)
         let st = m.strides.map(\.intValue)
-        guard shape == [1, stems, rows, frames, 2] else {
-            throw SeparationError.invalidInput("máscara con forma \(shape), se esperaba [1, \(stems), \(rows), \(frames), 2]")
-        }
-        guard st[4] == 1, st[3] >= 2, st[2] >= frames * st[3] else {
-            throw SeparationError.invalidInput("máscara con strides no soportados \(st)")
-        }
-        let rowLen = frames * 2
-        switch m.dataType {
-        case .float16:
-            try m.withUnsafeBytes { raw in
-                guard let base = raw.baseAddress else { return }
-                // Cada par (re, im) es una "fila" de 2 píxeles con rowBytes = st[3]·2. Si los bins no tienen
-                // relleno extra (st[2] = frames·st[3]), un stem entero es una sola imagen.
-                let uniform = st[2] == frames * st[3]
-                for s in 0..<stems {
-                    let blocks = uniform ? 1 : rows
-                    let height = uniform ? rows * frames : frames
-                    for r in 0..<blocks {
-                        var src = vImage_Buffer(data: UnsafeMutableRawPointer(mutating: base + (s * st[1] + r * st[2]) * 2),
-                                                height: vImagePixelCount(height), width: 2, rowBytes: st[3] * 2)
-                        var dst = vImage_Buffer(data: mask + (s * rows + r) * rowLen,
-                                                height: vImagePixelCount(height), width: 2, rowBytes: 2 * 4)
-                        let err = vImageConvert_Planar16FtoPlanarF(&src, &dst, vImage_Flags(kvImageNoFlags))
-                        if err != kvImageNoError { throw SeparationError.invalidInput("vImage FP16→FP32 falló (\(err))") }
-                    }
-                }
-            }
-        case .float32:
-            m.withUnsafeBytes { raw in
-                guard let base = raw.baseAddress?.assumingMemoryBound(to: Float.self) else { return }
-                for s in 0..<stems {
-                    for r in 0..<rows {
-                        var src = DSPSplitComplex(realp: UnsafeMutablePointer(mutating: base + s * st[1] + r * st[2]),
-                                                  imagp: UnsafeMutablePointer(mutating: base + s * st[1] + r * st[2] + 1))
-                        let d = mask + (s * rows + r) * rowLen
-                        var dst = DSPSplitComplex(realp: d, imagp: d + 1)
-                        vDSP_zvmov(&src, vDSP_Stride(st[3]), &dst, 2, vDSP_Length(frames))
-                    }
-                }
-            }
-        default:
-            throw SeparationError.invalidInput("máscara de tipo no soportado \(m.dataType.rawValue)")
+        try m.withUnsafeBytes { raw in
+            guard let base = raw.baseAddress else { return }
+            try MaskTensor.copy(base, scalar: scalar, shape: shape, strides: st,
+                                stems: stems, rows: rows, frames: frames, into: mask)
         }
     }
 }
+#endif
 
 /// Modelo simulado: una máscara compleja constante por stem (por defecto 1 + 0i en todos).
 /// Sirve a los tests y al modo oculto `--simulate` de tf-separate.
@@ -143,8 +181,8 @@ final class ConstantMaskModel: MaskModel {
         for (s, g) in gains.enumerated() {
             var re = g.re, im = g.im
             let base = mask + s * pairs * 2
-            vDSP_vfill(&re, base, 2, vDSP_Length(pairs))
-            vDSP_vfill(&im, base + 1, 2, vDSP_Length(pairs))
+            DSP.vfill(&re, base, 2, DSPLength(pairs))
+            DSP.vfill(&im, base + 1, 2, DSPLength(pairs))
         }
     }
 }

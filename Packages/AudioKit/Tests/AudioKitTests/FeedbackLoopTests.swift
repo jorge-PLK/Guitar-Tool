@@ -6,7 +6,9 @@ import XCTest
 /// plena banda de la ráfaga de 3 kHz) y hace recircular cada clic cada ~7,3 ms (352 muestras, el primer eco
 /// a 0,88). La sincronía estaba bien; la medida no: el máximo de la envolvente caía en cualquier sitio de los
 /// ±50 ms (error máximo 2267 muestras). Aquí se reproduce con el simulador y la toma completa por la fachada.
-final class FeedbackLoopTests: XCTestCase {
+class FeedbackLoopTests: XCTestCase {
+    /// Motor del reproductor: el de la plataforma; el portátil en `PortableFeedbackLoopTests` (solo Mac).
+    var kind: PlayerKind { .platform }
     static let fs = 48_000.0
     static let rig = 70.74
     static let loopSamples = 352.4
@@ -51,7 +53,7 @@ final class FeedbackLoopTests: XCTestCase {
         let song = 64.0
         let backing = try AudioSessionTests.writeBacking(seconds: song, fs: fs, in: dir)
         let url = dir.appendingPathComponent("verify.wav")
-        let (take, x, _) = try AudioSessionTests.playAndRecord(s, io, backing: backing, from: 0, seconds: 60, url: url)
+        let (take, x, _) = try AudioSessionTests.playAndRecord(s, io, backing: backing, from: 0, seconds: 60, url: url, kind: kind)
         for c in 0..<2 {
             let r = AlignmentCheck.measure(take: x[c], songStart: take.songStart, sampleRate: fs, songSeconds: song - 2)
             let floors = r.clicks.map(\.peakToFloorDB)
@@ -144,3 +146,10 @@ final class FeedbackLoopTests: XCTestCase {
         XCTAssertTrue(BackgroundTone(frequencyHz: 2255.4, peakDBFS: -18, prominenceDB: 70).isFeedback)
     }
 }
+
+#if canImport(AVFoundation)
+/// Los mismos casos con el motor portátil (el de Windows) en el Mac.
+final class PortableFeedbackLoopTests: FeedbackLoopTests {
+    override var kind: PlayerKind { .portable }
+}
+#endif

@@ -1,4 +1,3 @@
-import AVFoundation
 import Foundation
 
 /// Audio de un punch-in (mini-spec Fase 6, «Punch-in»): la toma del punch, ya alineada (su muestra 0 cae en
@@ -66,7 +65,7 @@ public enum PunchFlattener {
     }
 
     /// Peso del punch en la muestra `i` de un fundido de `n` (0 → 1).
-    public static func weight(_ i: Int, _ n: Int) -> Float { StemScheduler.crossfadeWeight(i, n) }
+    public static func weight(_ i: Int, _ n: Int) -> Float { Crossfade.weight(i, n) }
 
     /// Aplana `punches` (en orden; el último manda) sobre `base`, cuya muestra 0 cae en `baseStartFrame`.
     public static func flatten(base: [[Float]], baseStartFrame: Int64, punches: [PunchAudio], sampleRate: Double) -> [[Float]] {

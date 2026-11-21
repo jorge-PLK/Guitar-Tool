@@ -27,6 +27,7 @@ Decidir si ToneForge puede llevarse a Windows (ARM64 y x64) y con qué alcance. 
 - Swift 6.4.2-RELEASE (Asserts) con SDK de Windows para aarch64, x86_64 e i686.
 - Los `rtl.shared` y `rtl.static` `.msm` de amd64, arm64 y x86 están en `Redistributables\6.4.2`.
 - `vc_redist` arm64 y x64 instalados (no fueron la causa del error 14001, pero quedan).
+- Git for Windows 2.56.1 ARM64 (18/11/2026), instalador directo (última release de git-for-windows, `/VERYSILENT`), en el PATH de Machine. La VM no tenía git y SwiftPM lo necesita para las dependencias remotas (swift-crypto).
 
 ### Tropiezos y remedios
 
@@ -246,3 +247,27 @@ Todos en `Probes/P8-windows/`.
 ### Pendiente
 
 - Cuándo medir en un PC real, con la lista de pruebas anterior. Interfaz y alcance ya decididos: ADR-020 (aceptado).
+
+## Capa de plataforma (paso 6)
+
+Resultado (19/11/2026): los 13 paquetes compilan y pasan sus tests en la VM, ARM64 y x64, con 0 fallos; la suite entera del Mac y `App` en verde. Lo que queda para el paso 7 son 114 saltos `[paso 7]` y hay 5 saltos `[windows]` permanentes (ver `docs/plan.md`, «Corte del paso 6»).
+
+### Tests en la VM
+
+- `swift test` no admite `--static-swift-stdlib`. Sin él, el runner x64 moría con 0xC000007B porque cargaba `swiftCore` ARM64 (mismo origen que el error de «hola mundo»).
+- Remedio: `Tools/win/remote/x64-runtime.ps1` extrae las DLL x64 de `Redistributables\6.4.2\rtl.shared.amd64.msm` (cabinet por COM y `expand.exe`) a `C:\tf-rtl-x64`, que se antepone al PATH solo en x64. `--clean` no lo borra.
+- Backend `swiftbuild`. Formato de XCTest en Windows: saltos `ruta:N: Suite.test : Test skipped - msg`, fallos `ruta:N: error: ...`. El parseo de swift-testing está escrito sin probar con tests reales.
+
+### Trampas de Windows
+
+- `FileManager.replaceItemAt` no está implementado en Foundation de Windows y aborta el proceso. `Store` usa `MoveFileEx` con `MOVEFILE_REPLACE_EXISTING` (`WindowsFileMove.swift`); `YtDlpUpdater` borra y mueve (no atómico).
+- `import WinSDK` define un `UUID` que choca con el de Foundation: el código de WinSDK va en su propio fichero.
+- NTFS: `posixPermissions = 0` no impide leer. Los tests que fuerzan fallos con permisos se saltan con `[windows]`.
+- Foundation de Windows no da el tamaño asignado en disco: `DiskSize` devuelve el tamaño lógico.
+- `URLSession` de FoundationNetworking no admite `file://`; los tests con `URLRequest` necesitan `import FoundationNetworking`. `tar.exe -a -c -f x.zip` crea zips y `tar.exe -xf` los abre.
+- `Process`: una salida normal (p. ej. 3) llega con `terminationReason == .uncaughtSignal`; hay que usar el código tal cual. `isExecutableFile` es falso para un `.exe`.
+- `DispatchQueue.concurrentPerform`: capturar una `var` en el cierre `@Sendable` es error en Windows (solo aviso en Mac).
+- `DispatchSourceTimer` no puede cruzar un `Mutex` (aislamiento de región): se crea y se cancela dentro del cerrojo.
+- Si el stdout de un hijo va a `FileHandle.nullDevice`, el hijo salió con 29 hacia los 70 MB: hay que vaciar la tubería.
+- Código fuera de un `#if` que usa Foundation con los imports dentro del `#if`: poner `import Foundation` fuera.
+- Enlace estático con FoundationNetworking (`--static-swift-stdlib`): `lld-link: could not open 'curl.lib'`. El toolchain trae `Windows.sdk\usr\lib\swift_static\windows\<arch>\libcurl.lib`, con otro nombre. Afecta al ejecutable de la app y a `tf-fetch`; es tarea del paso 7.

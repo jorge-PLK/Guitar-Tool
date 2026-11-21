@@ -248,6 +248,9 @@ final class RelocateTests: XCTestCase {
     }
 
     func testMoveFailureMidwayKeepsOriginal() async throws {
+        #if os(Windows)
+        throw XCTSkip("[windows] posixPermissions no impide leer en NTFS: el fallo a mitad no se puede provocar así")
+        #endif
         let (env, _, _) = try await twoProjects()
         // Un fichero ilegible que se copia el último (orden alfabético) hace fallar la copia a mitad.
         let bad = env.root.appendingPathComponent("zzz/locked.bin")

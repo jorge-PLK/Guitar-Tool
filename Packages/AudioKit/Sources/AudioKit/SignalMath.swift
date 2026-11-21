@@ -1,4 +1,4 @@
-import Accelerate
+import NativeDSP
 import Foundation
 
 /// Cálculo interno de la Fase 3: interpolación sinc, correlación por FFT, filtros FIR y ruido.
@@ -90,21 +90,17 @@ enum SignalMath {
     /// la señal analítica de `c`). Doble precisión.
     static func analyticCorrelation(signal x: [Float], template s: [Float]) -> (real: [Double], envelope: [Double]) {
         let n = nextPow2(x.count + s.count)
-        guard let fwd = vDSP_DFT_zop_CreateSetupD(nil, vDSP_Length(n), .FORWARD),
-              let inv = vDSP_DFT_zop_CreateSetupD(fwd, vDSP_Length(n), .INVERSE) else {
+        guard let fwd = DSP.ComplexDFTD(count: n, direction: .forward),
+              let inv = DSP.ComplexDFTD(count: n, direction: .inverse) else {
             return ([Double](repeating: 0, count: x.count), [Double](repeating: 0, count: x.count))
-        }
-        defer {
-            vDSP_DFT_DestroySetupD(inv)
-            vDSP_DFT_DestroySetupD(fwd)
         }
         let zeros = [Double](repeating: 0, count: n)
         var xr = zeros, sr = zeros
-        vDSP_vspdp(x, 1, &xr, 1, vDSP_Length(x.count))
-        vDSP_vspdp(s, 1, &sr, 1, vDSP_Length(s.count))
+        DSP.vspdp(x, 1, &xr, 1, DSPLength(x.count))
+        DSP.vspdp(s, 1, &sr, 1, DSPLength(s.count))
         var xR = zeros, xI = zeros, sR = zeros, sI = zeros
-        vDSP_DFT_ExecuteD(fwd, xr, zeros, &xR, &xI)
-        vDSP_DFT_ExecuteD(fwd, sr, zeros, &sR, &sI)
+        fwd.execute(xr, zeros, &xR, &xI)
+        fwd.execute(sr, zeros, &sR, &sI)
         // X·conj(S), y señal analítica: positivas ×2, negativas a 0 (0 y n/2 intactas).
         var cR = zeros, cI = zeros
         for k in 0...(n / 2) {
@@ -113,7 +109,7 @@ enum SignalMath {
             cI[k] = w * (xI[k] * sR[k] - xR[k] * sI[k])
         }
         var oR = zeros, oI = zeros
-        vDSP_DFT_ExecuteD(inv, cR, cI, &oR, &oI)
+        inv.execute(cR, cI, &oR, &oI)
         let scale = 1 / Double(n)
         var real = [Double](repeating: 0, count: x.count)
         var env = [Double](repeating: 0, count: x.count)
@@ -129,14 +125,13 @@ enum SignalMath {
     /// Espectro de potencia de `x` con ventana de Hann, rellenado con ceros hasta `n` (potencia de 2, ≥ x.count);
     /// bins `0...n/2`.
     static func powerSpectrum(_ x: ArraySlice<Float>, n: Int) -> [Double] {
-        guard let fwd = vDSP_DFT_zop_CreateSetupD(nil, vDSP_Length(n), .FORWARD) else { return [] }
-        defer { vDSP_DFT_DestroySetupD(fwd) }
+        guard let fwd = DSP.ComplexDFTD(count: n, direction: .forward) else { return [] }
         let zeros = [Double](repeating: 0, count: n)
         var re = zeros
         let m = x.count
         for (i, v) in x.enumerated() { re[i] = Double(v) * (0.5 - 0.5 * cos(2 * Double.pi * Double(i) / Double(m))) }
         var oR = zeros, oI = zeros
-        vDSP_DFT_ExecuteD(fwd, re, zeros, &oR, &oI)
+        fwd.execute(re, zeros, &oR, &oI)
         return (0...(n / 2)).map { oR[$0] * oR[$0] + oI[$0] * oI[$0] }
     }
 
@@ -169,24 +164,20 @@ enum SignalMath {
     static func zeroPhaseFilter(_ x: [Float], weight: [Double]) -> [Float] {
         let n = 2 * (weight.count - 1)
         guard n >= x.count,
-              let fwd = vDSP_DFT_zop_CreateSetupD(nil, vDSP_Length(n), .FORWARD),
-              let inv = vDSP_DFT_zop_CreateSetupD(fwd, vDSP_Length(n), .INVERSE) else { return x }
-        defer {
-            vDSP_DFT_DestroySetupD(inv)
-            vDSP_DFT_DestroySetupD(fwd)
-        }
+              let fwd = DSP.ComplexDFTD(count: n, direction: .forward),
+              let inv = DSP.ComplexDFTD(count: n, direction: .inverse) else { return x }
         let zeros = [Double](repeating: 0, count: n)
         var re = zeros
-        vDSP_vspdp(x, 1, &re, 1, vDSP_Length(x.count))
+        DSP.vspdp(x, 1, &re, 1, DSPLength(x.count))
         var fR = zeros, fI = zeros
-        vDSP_DFT_ExecuteD(fwd, re, zeros, &fR, &fI)
+        fwd.execute(re, zeros, &fR, &fI)
         for k in 0..<n {
             let g = weight[k <= n / 2 ? k : n - k]
             fR[k] *= g
             fI[k] *= g
         }
         var oR = zeros, oI = zeros
-        vDSP_DFT_ExecuteD(inv, fR, fI, &oR, &oI)
+        inv.execute(fR, fI, &oR, &oI)
         let scale = 1 / Double(n)
         return (0..<x.count).map { Float(oR[$0] * scale) }
     }
@@ -211,7 +202,7 @@ enum SignalMath {
         let half = h.count / 2
         let padded = [Float](repeating: 0, count: half) + x + [Float](repeating: 0, count: half)
         var y = [Float](repeating: 0, count: x.count)
-        vDSP_conv(padded, 1, h, 1, &y, 1, vDSP_Length(x.count), vDSP_Length(h.count))
+        DSP.conv(padded, 1, h, 1, &y, 1, DSPLength(x.count), DSPLength(h.count))
         return y
     }
 

@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 public protocol ModelDownloading: Sendable {
     func download(from: URL, to: URL, progress: @escaping @Sendable (Double) -> Void) async throws

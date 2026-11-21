@@ -1,45 +1,30 @@
+#if canImport(AVFoundation)
 import AVFoundation
-import Accelerate
+#else
+import NativeResample
+#endif
+import Foundation
+import NativeAudioFile
+import NativePlatform
 
 /// Entrada de Basic Pitch: `librosa.load(sr=22 050, mono=True)`, media de canales y remuestreo (soxr HQ en
 /// librosa; aquí `AVAudioConverter` a calidad máxima, como `MonoResampler` de StudyKit) con la longitud de
-/// librosa, ceil(n · destino / origen).
+/// librosa, ceil(n · destino / origen). La lectura y la mezcla van por `NativeAudioFile.readMono` (`AVAudioFile` y
+/// `vsma` canal a canal en el Mac, las mismas muestras de antes); el remuestreo, en Windows, con r8brain (paso 7).
 enum MonoAudio {
     static func load(_ url: URL, sampleRate target: Double) throws -> [Float] {
-        let file: AVAudioFile
+        let mono: [Float], rate: Double
         do {
-            file = try AVAudioFile(forReading: url, commonFormat: .pcmFormatFloat32, interleaved: false)
+            (mono, rate) = try NativeAudioFile.readMono(url)
         } catch {
             throw TranscriptionError.unreadableAudio("\(url.lastPathComponent): \(error.localizedDescription)")
         }
-        let fmt = file.processingFormat
-        let channels = Int(fmt.channelCount)
-        let total = Int(file.length)
-        var mono = [Float](repeating: 0, count: total)
-        let block: AVAudioFrameCount = 1 << 16
-        guard let buf = AVAudioPCMBuffer(pcmFormat: fmt, frameCapacity: block) else {
-            throw TranscriptionError.unreadableAudio("sin búfer para \(fmt)")
-        }
-        var k = 1 / Float(max(channels, 1))
-        var pos = 0
-        while pos < total {
-            try file.read(into: buf, frameCount: min(block, AVAudioFrameCount(total - pos)))
-            let n = Int(buf.frameLength)
-            if n == 0 { break }
-            let ch = buf.floatChannelData!
-            mono.withUnsafeMutableBufferPointer { m in
-                let dst = m.baseAddress! + pos
-                for c in 0..<channels { vDSP_vsma(ch[c], 1, &k, dst, 1, dst, 1, vDSP_Length(n)) }
-            }
-            pos += n
-        }
-        if pos < total { mono.removeLast(total - pos) }
-        let rate = fmt.sampleRate
         if rate == target { return mono }
         let length = Int((Double(mono.count) * target / rate).rounded(.up))
         return try resample(mono, from: rate, to: target, length: length)
     }
 
+    #if canImport(AVFoundation)
     /// Devuelve exactamente `length` muestras (recorta la cola o rellena con ceros).
     static func resample(_ x: [Float], from sourceRate: Double, to targetRate: Double, length: Int) throws -> [Float] {
         guard let inFmt = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: sourceRate, channels: 1, interleaved: false),
@@ -97,4 +82,19 @@ enum MonoAudio {
             return buffer
         }
     }
+    #else
+    /// Windows (paso 7, parte 7.4): r8brain por `NativeResample`, sin retardo (la latencia del filtro va compensada).
+    /// Devuelve exactamente `length` muestras (recorta la cola o rellena con ceros).
+    static func resample(_ x: [Float], from sourceRate: Double, to targetRate: Double, length: Int) throws -> [Float] {
+        var out: [Float]
+        do {
+            out = try Resampler.resample(x, from: sourceRate, to: targetRate)
+        } catch {
+            throw TranscriptionError.unreadableAudio("remuestreo \(sourceRate) → \(targetRate) Hz: \(error)")
+        }
+        if out.count > length { out.removeLast(out.count - length) }
+        if out.count < length { out.append(contentsOf: repeatElement(0, count: length - out.count)) }
+        return out
+    }
+    #endif
 }

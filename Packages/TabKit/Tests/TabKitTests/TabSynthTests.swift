@@ -1,4 +1,7 @@
+#if canImport(AVFoundation)
 import AVFoundation
+#endif
+import NativeAudioFile
 import XCTest
 @testable import TabKit
 
@@ -26,16 +29,20 @@ final class TabSynthTests: XCTestCase {
 
     // MARK: Ayudas
 
-    /// Canales del WAV y su formato.
-    static func read(_ url: URL) throws -> (channels: [[Float]], format: AVAudioFormat, fileFormat: AVAudioFormat) {
-        let file = try AVAudioFile(forReading: url, commonFormat: .pcmFormatFloat32, interleaved: false)
-        let n = AVAudioFrameCount(file.length)
-        let buf = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: max(n, 1)))
-        try file.read(into: buf, frameCount: n)
-        let chans = (0..<Int(file.processingFormat.channelCount)).map {
-            Array(UnsafeBufferPointer(start: buf.floatChannelData![$0], count: Int(buf.frameLength)))
-        }
-        return (chans, file.processingFormat, file.fileFormat)
+    /// Canales del WAV y su frecuencia de muestreo.
+    static func read(_ url: URL) throws -> (channels: [[Float]], sampleRate: Double) {
+        let audio = try NativeAudioFile.read(url)
+        return (audio.channels, audio.sampleRate)
+    }
+
+    /// Los bancos GM con nombre propio valen lo mismo que las constantes de AudioToolbox que sustituyen.
+    func testBankConstantsMatchAudioToolbox() throws {
+        #if canImport(AudioToolbox)
+        XCTAssertEqual(TabSynthRenderer.melodicBankMSB, UInt8(kAUSampler_DefaultMelodicBankMSB))
+        XCTAssertEqual(TabSynthRenderer.percussionBankMSB, UInt8(kAUSampler_DefaultPercussionBankMSB))
+        #else
+        throw XCTSkip("[windows] sin AudioToolbox con qué comparar")
+        #endif
     }
 
     /// Rejilla a tempo constante de `bars` compases de 4/4 desde 0.
@@ -133,12 +140,15 @@ final class TabSynthTests: XCTestCase {
         for (rate, duration) in [(44_100.0, 7.123_456), (48_000.0, 5.000_01), (44_100.0, 0.05)] {
             let url = tmp.appendingPathComponent("len-\(Int(rate))-\(duration).wav")
             try await renderer.render(track: track, in: score, sampleRate: rate, duration: duration, to: url)
-            let (channels, format, fileFormat) = try Self.read(url)
+            let (channels, sampleRate) = try Self.read(url)
             XCTAssertEqual(channels.count, 2)
             XCTAssertEqual(channels[0].count, Int((duration * rate).rounded()))
-            XCTAssertEqual(format.sampleRate, rate)
+            XCTAssertEqual(sampleRate, rate)
+            #if canImport(AVFoundation)
+            let fileFormat = try AVAudioFile(forReading: url).fileFormat
             XCTAssertEqual(fileFormat.commonFormat, .pcmFormatFloat32)
             XCTAssertEqual(fileFormat.settings[AVFormatIDKey] as? UInt32, kAudioFormatLinearPCM)
+            #endif
             if duration > 2 {
                 // Suena dentro de la nota (con la distorsión por defecto) y no antes.
                 let range = score.timeRange(of: note)
@@ -222,12 +232,9 @@ final class TabSynthTests: XCTestCase {
                          track.kind == .drums ? track.hits.count : track.notes.count * 2))
             XCTAssertLessThan(seconds, 20)
             // Longitud exacta y el último segundo suena (el render llega al final de verdad).
-            let file = try AVAudioFile(forReading: url, commonFormat: .pcmFormatFloat32, interleaved: false)
-            XCTAssertEqual(file.length, AVAudioFramePosition(duration * 44_100))
-            file.framePosition = file.length - 44_100
-            let tail = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: 44_100))
-            try file.read(into: tail, frameCount: 44_100)
-            let peak = UnsafeBufferPointer(start: tail.floatChannelData![0], count: Int(tail.frameLength)).map(abs).max()
+            let left = try Self.read(url).channels[0]
+            XCTAssertEqual(left.count, Int(duration * 44_100))
+            let peak = left.suffix(44_100).map(abs).max()
             XCTAssertGreaterThan(peak ?? 0, 0.01, track.id)
             try FileManager.default.removeItem(at: url)
         }

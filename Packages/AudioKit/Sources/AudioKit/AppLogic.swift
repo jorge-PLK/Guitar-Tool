@@ -1,6 +1,9 @@
+#if canImport(AVFoundation)
 import AVFoundation
-import Accelerate
+#endif
+import NativeDSP
 import Foundation
+import NativeAudioFile
 
 // Lógica sin vista que usa la app para grabar y comparar (mini-spec Fase 3, «Grabación», «A/B dentro de la
 // mezcla» y «Reglas propias»). Vive aquí, y no en App, para tener tests: la app no tiene destino de pruebas.
@@ -143,11 +146,24 @@ public enum MixCompare {
 public enum AudioSamples {
     /// Frecuencia del fichero.
     public static func sampleRate(of url: URL) throws -> Double {
+        #if canImport(AVFoundation)
         try AVAudioFile(forReading: url).processingFormat.sampleRate
+        #else
+        try AudioFileReader(url: url).sampleRate
+        #endif
     }
 
     /// Canales de `[from, from + seconds)` (s) del fichero; `seconds` nil = hasta el final. Recorta a lo que haya.
     public static func read(_ url: URL, from: Double = 0, seconds: Double? = nil) throws -> [[Float]] {
+        #if !canImport(AVFoundation)
+        let reader = try AudioFileReader(url: url)
+        let rfs = reader.sampleRate
+        let rstart = min(max(0, Int((from * rfs).rounded())), reader.frameCount)
+        let rend = seconds.map { min(reader.frameCount, rstart + Int(($0 * rfs).rounded())) } ?? reader.frameCount
+        guard rend > rstart else { return Array(repeating: [Float](), count: reader.channelCount) }
+        try reader.seek(toFrame: rstart)
+        return try FileChunks.readAll(reader, frames: rend - rstart)
+        #else
         let file = try AVAudioFile(forReading: url, commonFormat: .pcmFormatFloat32, interleaved: false)
         let fs = file.processingFormat.sampleRate
         let channels = Int(file.processingFormat.channelCount)
@@ -168,6 +184,7 @@ public enum AudioSamples {
             left -= n
         }
         return out
+        #endif
     }
 
     /// RMS en dBFS: potencia media de los canales (como `AudioSession.guitarLevelDB`). nil si es silencio o está vacío.
@@ -177,7 +194,7 @@ public enum AudioSamples {
         var sum = 0.0
         for ch in channels {
             var ms: Float = 0
-            vDSP_measqv(ch, 1, &ms, vDSP_Length(ch.count))
+            DSP.measqv(ch, 1, &ms, DSPLength(ch.count))
             sum += Double(ms) * Double(ch.count)
         }
         let p = sum / Double(n)

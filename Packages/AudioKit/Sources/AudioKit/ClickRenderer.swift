@@ -1,27 +1,8 @@
-import Accelerate
+// Reproductor sobre AVAudioEngine: solo macOS (paso 7: reproductor).
+#if canImport(AVFoundation)
+import NativeDSP
 import AVFoundation
-
-/// Clic sintetizado: ráfaga corta con caída exponencial; el acento, más agudo.
-enum ClickSynth {
-    static let durationSeconds = 0.015
-    static let normalHz = 1_000.0
-    static let accentHz = 2_000.0
-    static let decaySeconds = 0.004
-    static let releaseSeconds = 0.001
-    static let peak: Float = 0.5
-
-    static func template(accent: Bool, sampleRate: Double) -> [Float] {
-        let n = Int(durationSeconds * sampleRate)
-        let rel = Int(releaseSeconds * sampleRate)
-        let f = accent ? accentHz : normalHz
-        return (0..<n).map { i in
-            let t = Double(i) / sampleRate
-            var env = exp(-t / decaySeconds)
-            if i >= n - rel { env *= Double(n - i) / Double(rel) }
-            return Float(sin(2 * Double.pi * f * t) * env) * peak
-        }
-    }
-}
+import os
 
 /// Fuente del metrónomo, después del TimePitch. En cada ciclo de render calcula, con el reloj, qué
 /// clics empiezan en el bloque (también los que vienen de bloques anteriores) y los suma. No guarda
@@ -92,7 +73,7 @@ final class ClickRenderer: @unchecked Sendable {
             guard i1 > i0 else { continue }
             t.withUnsafeBufferPointer { tp in
                 var g = gain
-                vDSP_vsma(tp.baseAddress! + (i0 - start), 1, &g, first + i0, 1, first + i0, 1, vDSP_Length(i1 - i0))
+                DSP.vsma(tp.baseAddress! + (i0 - start), 1, &g, first + i0, 1, first + i0, 1, DSPLength(i1 - i0))
             }
         }
         for b in buffers.dropFirst() {
@@ -118,17 +99,44 @@ final class MeterStore: Sendable {
 
     static func measure(_ buffer: AVAudioPCMBuffer) -> ChannelMeter {
         guard let data = buffer.floatChannelData, buffer.frameLength > 0 else { return .silent }
-        let n = vDSP_Length(buffer.frameLength)
+        let n = DSPLength(buffer.frameLength)
         var peak: Float = 0, sumSq: Float = 0
         for ch in 0..<Int(buffer.format.channelCount) {
             var p: Float = 0, ms: Float = 0
-            vDSP_maxmgv(data[ch], 1, &p, n)
-            vDSP_measqv(data[ch], 1, &ms, n)
+            DSP.maxmgv(data[ch], 1, &p, n)
+            DSP.measqv(data[ch], 1, &ms, n)
             peak = max(peak, p)
             sumSq += ms
         }
         let rms = sqrt(sumSq / Float(buffer.format.channelCount))
         func db(_ x: Float) -> Float { x > 1e-6 ? 20 * log10(x) : -120 }
         return ChannelMeter(rmsDB: db(rms), peakDB: db(peak))
+    }
+}
+
+#endif // canImport(AVFoundation)
+
+import Foundation
+
+/// Clic sintetizado: ráfaga corta con caída exponencial; el acento, más agudo. Fuera del `#if`: también lo usa el
+/// motor portátil (`PortablePlaybackEngine`, paso 7c).
+enum ClickSynth {
+    static let durationSeconds = 0.015
+    static let normalHz = 1_000.0
+    static let accentHz = 2_000.0
+    static let decaySeconds = 0.004
+    static let releaseSeconds = 0.001
+    static let peak: Float = 0.5
+
+    static func template(accent: Bool, sampleRate: Double) -> [Float] {
+        let n = Int(durationSeconds * sampleRate)
+        let rel = Int(releaseSeconds * sampleRate)
+        let f = accent ? accentHz : normalHz
+        return (0..<n).map { i in
+            let t = Double(i) / sampleRate
+            var env = exp(-t / decaySeconds)
+            if i >= n - rel { env *= Double(n - i) / Double(rel) }
+            return Float(sin(2 * Double.pi * f * t) * env) * peak
+        }
     }
 }

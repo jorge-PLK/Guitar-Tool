@@ -1,5 +1,5 @@
-import AVFoundation
-import AudioToolbox
+import Foundation
+import NativePlatform
 
 public enum TabSynthError: Error, Equatable, Sendable {
     case invalidRequest(String)
@@ -81,7 +81,10 @@ public struct TabSynthRenderer: Sendable {
     static let drumChannel: UInt8 = 9
     /// Frames por bloque de render: los eventos se colocan dentro del bloque con su desfase, así que el tamaño no
     /// afecta a la precisión, solo al número de llamadas.
-    static let blockFrames: AVAudioFrameCount = 4096
+    static let blockFrames: UInt32 = 4096
+    /// Bancos MSB de un soundfont GM en el sampler: melódico 0x79 y percusión 0x78 (los valores de
+    /// `kAUSampler_DefaultMelodicBankMSB` y `kAUSampler_DefaultPercussionBankMSB`; `TabSynthTests` lo comprueba).
+    static let melodicBankMSB: UInt8 = 0x79, percussionBankMSB: UInt8 = 0x78
     /// Retardo fijo entre el evento MIDI y el ataque en la salida del sampler, en muestras; se compensa adelantando
     /// los eventos. Medido con `TabSynthTests.testSamplerAttackDelay` sobre las cinco piezas de batería y notas de
     /// guitarra y bajo a 44,1 y 48 kHz.
@@ -118,17 +121,17 @@ public struct TabSynthRenderer: Sendable {
             try fm.moveItem(at: partial, to: url)
         } catch {
             try? fm.removeItem(at: partial)
-            if error is CancellationError || error is TabSynthError { throw error }
+            if error is CancellationError || error is TabSynthError || error is PlatformError { throw error }
             throw TabSynthError.write(error.localizedDescription)
         }
     }
 
     func instrument(for kind: TabTrackKind) -> (program: UInt8, bankMSB: UInt8) {
         switch kind {
-        case .guitar: (guitarSound.program, UInt8(kAUSampler_DefaultMelodicBankMSB))
-        case .bass: (Self.bassProgram, UInt8(kAUSampler_DefaultMelodicBankMSB))
-        case .drums: (0, UInt8(kAUSampler_DefaultPercussionBankMSB))
-        case .vocal: (Self.vocalProgram, UInt8(kAUSampler_DefaultMelodicBankMSB))
+        case .guitar: (guitarSound.program, Self.melodicBankMSB)
+        case .bass: (Self.bassProgram, Self.melodicBankMSB)
+        case .drums: (0, Self.percussionBankMSB)
+        case .vocal: (Self.vocalProgram, Self.melodicBankMSB)
         }
     }
 
@@ -136,7 +139,7 @@ public struct TabSynthRenderer: Sendable {
     /// decisión 4) si es válido.
     func instrument(for track: TabTrack) -> (program: UInt8, bankMSB: UInt8) {
         if track.kind == .vocal, let p = track.program, (0...127).contains(p) {
-            return (UInt8(p), UInt8(kAUSampler_DefaultMelodicBankMSB))
+            return (UInt8(p), Self.melodicBankMSB)
         }
         return instrument(for: track.kind)
     }
@@ -645,83 +648,24 @@ public struct TabSynthRenderer: Sendable {
 
     // MARK: Render
 
+    /// El sintetizador: `AVAudioUnitSampler` en el Mac; TinySoundFont en Windows (paso 7, parte 7.4).
+    #if canImport(AVFoundation)
+    static let synth: any TabSynthBackend = SamplerTabSynth()
+    #else
+    static let synth: any TabSynthBackend = TinySoundFontTabSynth()
+    #endif
+
     static func renderFile(events: [Event], totalFrames: Int, sampleRate: Double, soundFontURL: URL,
                            program: UInt8, bankMSB: UInt8, to url: URL) throws {
-        guard let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 2) else {
-            throw TabSynthError.invalidRequest("formato estéreo a \(sampleRate) Hz")
-        }
-        // Un sampler por canal MIDI de los eventos (el sampler comparte rueda y controladores entre canales).
-        let channels = Array(Set(events.map { $0.status & 0x0F })).sorted()
-        let engine = AVAudioEngine()
-        let samplers = (channels.isEmpty ? [0] : channels).map { ($0, AVAudioUnitSampler()) }
-        for (_, sampler) in samplers {
-            engine.attach(sampler)
-            engine.connect(sampler, to: engine.mainMixerNode, format: format)
-        }
-        do {
-            try engine.enableManualRenderingMode(.offline, format: format, maximumFrameCount: blockFrames)
-        } catch {
-            throw TabSynthError.engine("modo de render manual: \(error.localizedDescription)")
-        }
-        for (_, sampler) in samplers {
-            do {
-                try sampler.loadSoundBankInstrument(at: soundFontURL, program: program, bankMSB: bankMSB,
-                                                    bankLSB: UInt8(kAUSampler_DefaultBankLSB))
-            } catch {
-                throw TabSynthError.soundFont("\(soundFontURL.lastPathComponent) programa \(program) banco \(bankMSB): "
-                                              + error.localizedDescription)
-            }
-        }
-        do { try engine.start() } catch { throw TabSynthError.engine("start: \(error.localizedDescription)") }
-        defer { engine.stop() }
-        var midiByChannel: [UInt8: AUScheduleMIDIEventBlock] = [:]
-        for (channel, sampler) in samplers {
-            guard let block = sampler.auAudioUnit.scheduleMIDIEventBlock else {
-                throw TabSynthError.engine("el sampler no acepta eventos MIDI programados")
-            }
-            midiByChannel[channel] = block
-        }
-
-        let settings: [String: Any] = [
-            AVFormatIDKey: kAudioFormatLinearPCM,
-            AVSampleRateKey: sampleRate,
-            AVNumberOfChannelsKey: 2,
-            AVLinearPCMBitDepthKey: 32,
-            AVLinearPCMIsFloatKey: true,
-            AVLinearPCMIsNonInterleaved: false,
-            AVLinearPCMIsBigEndianKey: false
-        ]
-        let file = try AVAudioFile(forWriting: url, settings: settings, commonFormat: .pcmFormatFloat32,
-                                   interleaved: false)
-        defer { file.close() }
-        guard let buffer = AVAudioPCMBuffer(pcmFormat: engine.manualRenderingFormat,
-                                            frameCapacity: engine.manualRenderingMaximumFrameCount) else {
-            throw TabSynthError.engine("sin búfer de render")
-        }
-
-        var done = 0
-        var next = 0
-        while done < totalFrames {
-            try Task.checkCancellation()
-            let n = min(Int(blockFrames), totalFrames - done)
-            // Eventos de este bloque con su desfase de muestra respecto al inicio del bloque.
-            while next < events.count, events[next].frame < done + n {
-                let e = events[next]
-                let offset = AUEventSampleTime(max(0, e.frame - done))
-                var bytes = (e.status, e.data1, e.data2)
-                if let midi = midiByChannel[e.status & 0x0F] {
-                    withUnsafeBytes(of: &bytes) { raw in
-                        midi(AUEventSampleTimeImmediate + offset, 0, 3, raw.bindMemory(to: UInt8.self).baseAddress!)
-                    }
-                }
-                next += 1
-            }
-            let status = try engine.renderOffline(AVAudioFrameCount(n), to: buffer)
-            guard status == .success, Int(buffer.frameLength) == n else {
-                throw TabSynthError.engine("renderOffline: estado \(status.rawValue), \(buffer.frameLength)/\(n) frames")
-            }
-            try file.write(from: buffer)
-            done += n
-        }
+        try synth.renderFile(events: events, totalFrames: totalFrames, sampleRate: sampleRate,
+                             soundFontURL: soundFontURL, program: program, bankMSB: bankMSB, to: url)
     }
+}
+
+/// Lo que depende del sintetizador: eventos MIDI con su frame (ordenados) → WAV estéreo float32 de `totalFrames`
+/// frames a `sampleRate`, con cada evento en su muestra exacta, un sampler por canal MIDI y el instrumento
+/// (`program`, `bankMSB`) del soundfont en todos. Cancelable con `Task.checkCancellation()` entre bloques.
+protocol TabSynthBackend: Sendable {
+    func renderFile(events: [TabSynthRenderer.Event], totalFrames: Int, sampleRate: Double, soundFontURL: URL,
+                    program: UInt8, bankMSB: UInt8, to url: URL) throws
 }

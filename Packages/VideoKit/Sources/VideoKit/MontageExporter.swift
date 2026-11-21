@@ -1,10 +1,16 @@
+#if canImport(AVFoundation)
 import AVFoundation
+#else
+import NativePlatform
+#endif
 import Foundation
 
 public enum MontageCodec: String, Codable, Sendable, CaseIterable {
     case hevc, h264
 
+    #if canImport(AVFoundation)
     var avCodec: AVVideoCodecType { self == .hevc ? .hevc : .h264 }
+    #endif
 }
 
 /// Contenedor del fichero exportado (Jorge, 17/11/2026: selector MOV / MP4 en Exportación). Mismo vídeo y mismo
@@ -14,7 +20,9 @@ public enum MontageVideoContainer: String, Codable, Sendable, CaseIterable {
 
     /// Extensión que debe llevar la URL de destino (sin punto).
     public var fileExtension: String { rawValue }
+    #if canImport(AVFoundation)
     public var fileType: AVFileType { self == .mov ? .mov : .mp4 }
+    #endif
 }
 
 /// Formato del vídeo exportado (mini-spec Fase 7, «Exportación»: HEVC o H.264, resolución y fps de Ajustes;
@@ -55,6 +63,52 @@ public struct MontageExportSummary: Sendable, Equatable {
     public var duration: Double
     public var hasAudio: Bool
 }
+
+#if !canImport(AVFoundation)
+/// Windows (plan, «Fase 7c», paso 7, parte 7.2): misma API que en el Mac. La escritura y el mux son de Media
+/// Foundation (`write(frames:…)`); los fotogramas compuestos los da el compositor Direct2D (parte 7.9) por
+/// `frameSource(for:settings:)`: el `MontagePreview` de Windows es la fuente.
+public enum MontageExporter {
+    /// AAC por canal (decisión propia).
+    public static let aacBitRatePerChannel = 128_000
+
+    public static func export(plan: MontagePlan, mixURL: URL?, settings: MontageExportSettings, to url: URL,
+                              progress: (@Sendable (Double) -> Void)? = nil) async throws -> MontageExportSummary {
+        guard url.pathExtension.lowercased() == settings.container.fileExtension else {
+            throw MontageError.containerMismatch(expected: settings.container.fileExtension, got: url.pathExtension)
+        }
+        var p = plan
+        p.fps = settings.fps
+        let frames = try await frameSource(for: p, settings: settings)
+        #if os(Windows)
+        return try await write(frames: frames, mixURL: mixURL, settings: settings, to: url, progress: progress)
+        #else
+        throw PlatformError.unsupported("sin Media Foundation")
+        #endif
+    }
+
+    /// Costura con el compositor (parte 7.9): fotogramas del plan ya compuestos al tamaño de `settings`.
+    static func frameSource(for plan: MontagePlan, settings: MontageExportSettings) async throws -> any MontageFrameSource {
+        #if os(Windows)
+        // Lector (Media Foundation) → compositor (Direct2D), fotograma a fotograma en la rejilla de `plan.fps`.
+        let builder = try await MontageBuilder.load(plan, includeAudio: false)
+        return try builder.make(renderSize: CGSize(width: settings.width, height: settings.height), includeAudio: false)
+        #else
+        throw PlatformError.unsupported("sin compositor")
+        #endif
+    }
+}
+
+/// Fotogramas compuestos de un montaje (los da el compositor; el exportador solo los codifica).
+protocol MontageFrameSource: Sendable {
+    /// Fotogramas del tramo (`duration · fps` cuantizado).
+    var frameCount: Int { get }
+    /// Duración del vídeo (s).
+    var duration: Double { get }
+    /// Fotograma `index` (0 en el principio del tramo), BGRA o NV12 del tamaño de exportación.
+    func frame(_ index: Int) throws -> FramePixelBuffer
+}
+#else
 
 /// Exporta el montaje (mini-spec Fase 7, «Exportación»): la composición con `MontageCompositor` leída con
 /// `AVAssetReaderVideoCompositionOutput` y codificada con `AVAssetWriter`; de audio, el WAV de la mezcla ya
@@ -325,3 +379,4 @@ public enum MontageExporter {
         }
     }
 }
+#endif

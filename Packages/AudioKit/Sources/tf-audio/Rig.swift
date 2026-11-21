@@ -1,5 +1,11 @@
+// tf-audio mide con el dispositivo y el reproductor. En Windows solo `--simulated` (dispositivos reales: paso 7: wasapi,
+// parte 7.10); el reproductor es el portátil (parte 7.6).
 import AudioKit
+#if canImport(AVFoundation)
 import AVFoundation
+#else
+import NativeAudioFile
+#endif
 import Foundation
 
 /// Dónde escribe la herramienta y por dónde habla.
@@ -84,6 +90,9 @@ enum WavFile {
     static func write(_ channels: [[Float]], sampleRate: Double, to url: URL) throws {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try? FileManager.default.removeItem(at: url)
+        #if !canImport(AVFoundation)
+        try NativeAudioFile.write(url, channels: channels, sampleRate: sampleRate, format: .float32)
+        #else
         let settings: [String: Any] = [
             AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: sampleRate, AVNumberOfChannelsKey: channels.count,
             AVLinearPCMBitDepthKey: 32, AVLinearPCMIsFloatKey: true, AVLinearPCMIsBigEndianKey: false,
@@ -103,10 +112,15 @@ enum WavFile {
             try file.write(from: buf)
             at += n
         }
+        #endif
     }
 
     /// Primer canal del WAV y su frecuencia.
     static func readFirstChannel(_ url: URL) throws -> (samples: [Float], sampleRate: Double) {
+        #if !canImport(AVFoundation)
+        let d = try NativeAudioFile.read(url)
+        return (d.channels.first ?? [], d.sampleRate)
+        #else
         let file = try AVAudioFile(forReading: url, commonFormat: .pcmFormatFloat32, interleaved: false)
         var out: [Float] = []
         out.reserveCapacity(Int(file.length))
@@ -117,10 +131,15 @@ enum WavFile {
             out.append(contentsOf: UnsafeBufferPointer(start: buf.floatChannelData![0], count: Int(buf.frameLength)))
         }
         return (out, file.processingFormat.sampleRate)
+        #endif
     }
 
     static func sampleRate(of url: URL) throws -> Double {
+        #if !canImport(AVFoundation)
+        try AudioFileReader(url: url).sampleRate
+        #else
         try AVAudioFile(forReading: url).processingFormat.sampleRate
+        #endif
     }
 }
 
@@ -195,6 +214,9 @@ final class Rig {
         guard let inQuery = o.input, let outQuery = o.output else {
             throw CLIError("Faltan --in y --out (UID o trozo del nombre; mira `tf-audio devices`).")
         }
+        #if !canImport(AVFoundation)
+        throw CLIError("Dispositivos reales (\(inQuery) → \(outQuery)) en Windows: pendiente (paso 7: wasapi, parte 7.10). Usa --simulated.")
+        #else
         guard await CoreAudioIO.ensureInputPermission() else {
             throw CLIError("Sin permiso de entrada de audio: concédelo a la terminal en Ajustes del Sistema > Privacidad > Micrófono.")
         }
@@ -213,6 +235,7 @@ final class Rig {
             box.set(io)
             return io
         })
+        #endif
     }
 
     func open() throws {
@@ -273,3 +296,4 @@ final class Rig {
         }
     }
 }
+

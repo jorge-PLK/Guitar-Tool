@@ -1,4 +1,4 @@
-import Accelerate
+import NativeDSP
 import Foundation
 
 /// Constantes del contrato BeatKit (mini-spec Fase 2 §1 StudyKit, `docs/probes/P4-modelos.md` «Pulso (Beat This!)»).
@@ -30,16 +30,14 @@ final class BeatLogMel: @unchecked Sendable {
     /// Banco mel [513 × 128] row-major (fila = bin de la STFT), calculado en doble y guardado en Float.
     let melBank: [Float]
     private let window: [Float]
-    private let dft: vDSP_DFT_Setup
+    private let dft: DSP.RealDFT
 
     init() {
         melBank = Self.slaneyMelBank().map(Float.init)
         let n = BeatContract.nFFT
         window = (0..<n).map { Float(0.5 - 0.5 * cos(2 * Double.pi * Double($0) / Double(n))) }
-        dft = vDSP_DFT_zrop_CreateSetup(nil, vDSP_Length(n), .FORWARD)!
+        dft = DSP.RealDFT(count: n, direction: .forward)!
     }
-
-    deinit { vDSP_DFT_DestroySetup(dft) }
 
     /// Tramas que salen de `sampleCount` muestras (STFT centrada): 1 + n / hop.
     static func frameCount(sampleCount: Int) -> Int { 1 + sampleCount / BeatContract.hop }
@@ -97,37 +95,37 @@ final class BeatLogMel: @unchecked Sendable {
         var frame = [Float](repeating: 0, count: BeatContract.nFFT)
         var inRe = [Float](repeating: 0, count: half), inIm = [Float](repeating: 0, count: half)
         var outRe = [Float](repeating: 0, count: half), outIm = [Float](repeating: 0, count: half)
-        // vDSP_DFT_zrop devuelve 2·X[k]; el contrato pide |X| / 32.
+        // RealDFT (zrop) devuelve 2·X[k]; el contrato pide |X| / 32.
         let scale = BeatContract.magnitudeScale / 2
 
         padded.withUnsafeBufferPointer { pad in
             mags.withUnsafeMutableBufferPointer { mag in
                 for t in 0..<frames {
-                    vDSP_vmul(pad.baseAddress! + t * BeatContract.hop, 1, window, 1, &frame, 1, vDSP_Length(BeatContract.nFFT))
+                    DSP.vmul(pad.baseAddress! + t * BeatContract.hop, 1, window, 1, &frame, 1, DSPLength(BeatContract.nFFT))
                     // Pares → parte real, impares → parte imaginaria (formato de entrada de zrop).
                     frame.withUnsafeBufferPointer { f in
-                        f.baseAddress!.withMemoryRebound(to: DSPComplex.self, capacity: half) { c in
+                        f.baseAddress!.withMemoryRebound(to: InterleavedComplex.self, capacity: half) { c in
                             inRe.withUnsafeMutableBufferPointer { re in
                                 inIm.withUnsafeMutableBufferPointer { im in
-                                    var split = DSPSplitComplex(realp: re.baseAddress!, imagp: im.baseAddress!)
-                                    vDSP_ctoz(c, 2, &split, 1, vDSP_Length(half))
+                                    var split = SplitComplex(realp: re.baseAddress!, imagp: im.baseAddress!)
+                                    DSP.ctoz(c, 2, &split, 1, DSPLength(half))
                                 }
                             }
                         }
                     }
-                    vDSP_DFT_Execute(dft, inRe, inIm, &outRe, &outIm)
+                    dft.execute(inRe, inIm, &outRe, &outIm)
                     let row = mag.baseAddress! + t * bins
                     row[0] = abs(outRe[0]) * scale          // DC
                     row[half] = abs(outIm[0]) * scale       // Nyquist, empaquetado en Im[0]
                     outRe.withUnsafeMutableBufferPointer { re in
                         outIm.withUnsafeMutableBufferPointer { im in
                             re[0] = 0; im[0] = 0
-                            var split = DSPSplitComplex(realp: re.baseAddress! + 1, imagp: im.baseAddress! + 1)
-                            vDSP_zvabs(&split, 1, row + 1, 1, vDSP_Length(half - 1))
+                            var split = SplitComplex(realp: re.baseAddress! + 1, imagp: im.baseAddress! + 1)
+                            DSP.zvabs(&split, 1, row + 1, 1, DSPLength(half - 1))
                         }
                     }
                     var s = scale
-                    vDSP_vsmul(row + 1, 1, &s, row + 1, 1, vDSP_Length(half - 1))
+                    DSP.vsmul(row + 1, 1, &s, row + 1, 1, DSPLength(half - 1))
                 }
             }
         }
@@ -135,11 +133,11 @@ final class BeatLogMel: @unchecked Sendable {
         // mel = |X| · banco ([T × 513] · [513 × 128]), luego log1p(1000 · mel).
         let nMels = BeatContract.nMels
         var mel = [Float](repeating: 0, count: frames * nMels)
-        vDSP_mmul(mags, 1, melBank, 1, &mel, 1, vDSP_Length(frames), vDSP_Length(nMels), vDSP_Length(bins))
+        DSP.mmul(mags, 1, melBank, 1, &mel, 1, DSPLength(frames), DSPLength(nMels), DSPLength(bins))
         var mult = BeatContract.logMultiplier
-        vDSP_vsmul(mel, 1, &mult, &mel, 1, vDSP_Length(mel.count))
+        DSP.vsmul(mel, 1, &mult, &mel, 1, DSPLength(mel.count))
         var count = Int32(mel.count)
-        mel.withUnsafeMutableBufferPointer { vvlog1pf($0.baseAddress!, $0.baseAddress!, &count) }
+        mel.withUnsafeMutableBufferPointer { DSP.vvlog1pf($0.baseAddress!, $0.baseAddress!, &count) }
         return (mel, frames)
     }
 }

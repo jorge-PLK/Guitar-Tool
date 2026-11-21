@@ -200,3 +200,30 @@ final class UpdateSongInfoTests: XCTestCase {
         catch { XCTAssertEqual(error as? LibraryError, .projectNotFound(bogus)) }
     }
 }
+
+#if os(Windows)
+/// Papelera de reciclaje real de Windows (SHFileOperationW). Usa nombres únicos en una carpeta temporal.
+final class WindowsRecycleBinTests: XCTestCase {
+    func testFileAndFolderLeaveTheirPath() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("tf-recycle-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let file = dir.appendingPathComponent("fichero-\(UUID().uuidString).txt")
+        try Data("x".utf8).write(to: file)
+        let folder = dir.appendingPathComponent("carpeta-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder.appendingPathComponent("sub"), withIntermediateDirectories: true)
+        try Data("y".utf8).write(to: folder.appendingPathComponent("sub/a.txt"))
+
+        try windowsMoveToRecycleBin(file)
+        try windowsMoveToRecycleBin(folder)
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: file.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: folder.path))
+    }
+
+    func testMissingItemThrows() {
+        let ghost = FileManager.default.temporaryDirectory.appendingPathComponent("tf-no-existe-\(UUID().uuidString)")
+        XCTAssertThrowsError(try windowsMoveToRecycleBin(ghost))
+    }
+}
+#endif

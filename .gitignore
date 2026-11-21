@@ -25,6 +25,9 @@ Probes/*/*/out/
 # Helpers embebidos (yt-dlp, Deno, ffmpeg): se regeneran con Tools/helpers/*.sh
 Vendor/helpers/
 
+# ONNX Runtime y DirectML para Windows (NuGet): se bajan con Tools/win/fetch-ort.sh
+Vendor/win/
+
 # Modelo lead/rhythm (149 MB, por encima del límite de 100 MB de GitHub): adjunto de la release
 # models-v1; se baja con Tools/models/fetch.sh
 App/Resources/Models/LeadRhythmMelRoformer_fp16.mlpackage.zip

@@ -1,7 +1,9 @@
+#if canImport(CoreImage)
 import CoreGraphics
 import CoreImage
-import Foundation
 import ImageIO
+#endif
+import Foundation
 
 /// Giro de la imagen de una toma en sentido horario (decisión de Jorge del 17/11/2026: vídeo vertical). Se aplica al
 /// leer, sin recodificar: `MontageCompositor` gira cada fotograma, `TakePreview` pone la transformación en la pista,
@@ -27,6 +29,7 @@ public enum VideoRotation: Int, Codable, Sendable, CaseIterable {
     /// Tamaño del fotograma ya girado.
     public func rotatedSize(_ s: CGSize) -> CGSize { swapsSize ? CGSize(width: s.height, height: s.width) : s }
 
+    #if canImport(CoreImage)
     /// Transformación de pista (`preferredTransform`, origen arriba a la izquierda) que gira un fotograma de tamaño
     /// natural `s` y lo deja en el primer cuadrante.
     public func transform(naturalSize s: CGSize) -> CGAffineTransform {
@@ -61,4 +64,5 @@ public enum VideoRotation: Int, Codable, Sendable, CaseIterable {
         let ci = apply(CIImage(cgImage: image))
         return CIContext(options: [.workingColorSpace: NSNull()]).createCGImage(ci, from: ci.extent)
     }
+    #endif
 }

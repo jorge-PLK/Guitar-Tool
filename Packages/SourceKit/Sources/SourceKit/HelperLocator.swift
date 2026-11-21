@@ -1,4 +1,5 @@
 import Foundation
+import NativePlatform
 
 /// Contenido de `yt-dlp.json`, junto a un yt-dlp actualizado (spec, «Helpers embebidos»).
 public struct YtDlpInstallInfo: Codable, Sendable, Equatable {
@@ -40,15 +41,24 @@ public struct HelperLocator: Sendable {
     }
 
     public static var defaultSupportDirectory: URL {
-        URL.applicationSupportDirectory.appendingPathComponent("ToneForge/Helpers", isDirectory: true)
+        SupportFolder.toneForge.appendingPathComponent("Helpers", isDirectory: true)
+    }
+
+    /// Nombre de fichero de un helper en esta plataforma: `yt-dlp` en el Mac, `yt-dlp.exe` en Windows.
+    public static func fileName(_ helper: String) -> String {
+        #if os(Windows)
+        helper + ".exe"
+        #else
+        helper
+        #endif
     }
 
     public func ytDlp() throws -> YtDlpChoice {
-        let bundled = bundleDirectory.appendingPathComponent("yt-dlp")
-        let updated = supportDirectory.appendingPathComponent("yt-dlp")
+        let bundled = bundleDirectory.appendingPathComponent(Self.fileName("yt-dlp"))
+        let updated = supportDirectory.appendingPathComponent(Self.fileName("yt-dlp"))
         let fm = FileManager.default
-        let hasBundled = fm.isExecutableFile(atPath: bundled.path)
-        let hasUpdated = fm.isExecutableFile(atPath: updated.path)
+        let hasBundled = Self.isRunnable(bundled.path)
+        let hasUpdated = Self.isRunnable(updated.path)
         let bundledVersion = bundleYtDlpVersion ?? Self.readInfo(in: bundleDirectory)?.version
         let updatedVersion = Self.readInfo(in: supportDirectory)?.version
         switch (hasBundled, hasUpdated) {
@@ -65,20 +75,31 @@ public struct HelperLocator: Sendable {
         }
     }
 
+    /// Mac: fichero ejecutable. Windows: no hay bit de ejecución (y `isExecutableFile` no lo resuelve); basta
+    /// con que exista el `.exe`.
+    static func isRunnable(_ path: String) -> Bool {
+        #if os(Windows)
+        var isDir: ObjCBool = false
+        return FileManager.default.fileExists(atPath: path, isDirectory: &isDir) && !isDir.boolValue
+        #else
+        return FileManager.default.isExecutableFile(atPath: path)
+        #endif
+    }
+
     public func deno() throws -> URL { try bundled("deno") }
     public func ffmpeg() throws -> URL { try bundled("ffmpeg") }
 
     /// Borra el yt-dlp actualizado («Volver a la embebida»).
     public func removeUpdate() throws {
-        for name in ["yt-dlp", Self.infoFileName] {
+        for name in [Self.fileName("yt-dlp"), Self.infoFileName] {
             let u = supportDirectory.appendingPathComponent(name)
             if FileManager.default.fileExists(atPath: u.path) { try FileManager.default.removeItem(at: u) }
         }
     }
 
     private func bundled(_ name: String) throws -> URL {
-        let u = bundleDirectory.appendingPathComponent(name)
-        guard FileManager.default.isExecutableFile(atPath: u.path) else { throw SourceError.helperMissing(name) }
+        let u = bundleDirectory.appendingPathComponent(Self.fileName(name))
+        guard Self.isRunnable(u.path) else { throw SourceError.helperMissing(name) }
         return u
     }
 

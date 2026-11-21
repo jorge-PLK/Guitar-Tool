@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// Token de client credentials, solo en memoria (spec Fase 7b, punto 4).
 public actor SpotifyTokenProvider {

@@ -1,4 +1,6 @@
+#if canImport(CoreML)
 import CoreML
+#endif
 import XCTest
 @testable import TabKit
 
@@ -23,6 +25,10 @@ final class DrumHeavyModelTests: XCTestCase {
     }
 
     static func compiledModel() throws -> URL {
+        #if !canImport(CoreML)
+        // Windows (parte 7.8): el ONNX de la parte 7.3, sin compilar.
+        return try tabKitDevelopmentModel("adtof")
+        #else
         if let c = compiled { return c }
         let zip = Fixture.repo.appendingPathComponent("App/Resources/Models/ADTOF_FrameRNN_fp32.mlpackage.zip")
         guard FileManager.default.fileExists(atPath: zip.path) else { throw XCTSkip("no está el modelo en \(zip.path)") }
@@ -36,6 +42,7 @@ final class DrumHeavyModelTests: XCTestCase {
         let c = try MLModel.compileModel(at: tmp.appendingPathComponent("ADTOF_FrameRNN_fp32.mlpackage"))
         compiled = c
         return c
+        #endif
     }
 
     /// Golpes por nota emparejados en orden: mismo número y |Δt| máximo.

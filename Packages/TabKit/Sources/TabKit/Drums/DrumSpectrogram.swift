@@ -1,5 +1,5 @@
-import Accelerate
 import Foundation
+import NativeDSP
 
 /// Entrada de ADTOF (`adtof_pytorch.audio.AudioProcessor.process_audio`): STFT 2048 / 441 con `np.hanning`,
 /// `center=True` y relleno de ceros, |X| de los bins 0..1023, banco logarítmico estilo madmom (84 bandas) y
@@ -71,10 +71,9 @@ enum DrumSpectrogram {
         let frames = C.frames(forSamples: audio.count)
         let bands = filterbank
         precondition(bands.count == nb, "banco de \(bands.count) bandas, se esperaban \(nb)")
-        guard let setup = vDSP_DFT_zrop_CreateSetup(nil, vDSP_Length(nfft), .FORWARD) else {
-            preconditionFailure("vDSP_DFT_zrop_CreateSetup(\(nfft))")
+        guard let setup = DSP.RealDFT(count: nfft, direction: .forward) else {
+            preconditionFailure("DSP.RealDFT(\(nfft))")
         }
-        defer { vDSP_DFT_DestroySetup(setup) }
 
         var out = [Float](repeating: 0, count: frames * nb)
         var frame = [Float](repeating: 0, count: nfft)
@@ -91,15 +90,15 @@ enum DrumSpectrogram {
                     frame.withUnsafeMutableBufferPointer { fr in
                         fr.update(repeating: 0)
                         if hi > lo { (fr.baseAddress! + (lo - s)).update(from: x.baseAddress! + lo, count: hi - lo) }
-                        vDSP_vmul(fr.baseAddress!, 1, w.baseAddress!, 1, fr.baseAddress!, 1, vDSP_Length(nfft))
+                        DSP.vmul(fr.baseAddress!, 1, w.baseAddress!, 1, fr.baseAddress!, 1, DSPLength(nfft))
                     }
                     inRe.withUnsafeMutableBufferPointer { ir in
                         inIm.withUnsafeMutableBufferPointer { ii in
-                            var split = DSPSplitComplex(realp: ir.baseAddress!, imagp: ii.baseAddress!)
+                            var split = SplitComplex(realp: ir.baseAddress!, imagp: ii.baseAddress!)
                             frame.withUnsafeBytes { raw in
-                                vDSP_ctoz(raw.bindMemory(to: DSPComplex.self).baseAddress!, 2, &split, 1, vDSP_Length(half))
+                                DSP.ctoz(raw.bindMemory(to: InterleavedComplex.self).baseAddress!, 2, &split, 1, DSPLength(half))
                             }
-                            vDSP_DFT_Execute(setup, ir.baseAddress!, ii.baseAddress!, &outRe, &outIm)
+                            setup.execute(ir.baseAddress!, ii.baseAddress!, &outRe, &outIm)
                         }
                     }
                     // Formato empaquetado de zrop, escalado por 2: re[0] = 2·X[0], im[0] = 2·X[1024] (Nyquist, fuera),
@@ -107,11 +106,11 @@ enum DrumSpectrogram {
                     outRe.withUnsafeMutableBufferPointer { orr in
                         outIm.withUnsafeMutableBufferPointer { oi in
                             mag.withUnsafeMutableBufferPointer { m in
-                                var split = DSPSplitComplex(realp: orr.baseAddress! + 1, imagp: oi.baseAddress! + 1)
-                                vDSP_zvabs(&split, 1, m.baseAddress! + 1, 1, vDSP_Length(half - 1))
+                                var split = SplitComplex(realp: orr.baseAddress! + 1, imagp: oi.baseAddress! + 1)
+                                DSP.zvabs(&split, 1, m.baseAddress! + 1, 1, DSPLength(half - 1))
                                 m[0] = abs(orr[0])
                                 var k: Float = 0.5
-                                vDSP_vsmul(m.baseAddress!, 1, &k, m.baseAddress!, 1, vDSP_Length(half))
+                                DSP.vsmul(m.baseAddress!, 1, &k, m.baseAddress!, 1, DSPLength(half))
                             }
                         }
                     }
@@ -119,7 +118,7 @@ enum DrumSpectrogram {
                         for (b, band) in bands.enumerated() {
                             var v: Float = 0
                             band.weights.withUnsafeBufferPointer { wt in
-                                vDSP_dotpr(m.baseAddress! + band.start, 1, wt.baseAddress!, 1, &v, vDSP_Length(wt.count))
+                                DSP.dotpr(m.baseAddress! + band.start, 1, wt.baseAddress!, 1, &v, DSPLength(wt.count))
                             }
                             out[t * nb + b] = v
                         }
@@ -131,8 +130,8 @@ enum DrumSpectrogram {
         var one: Float = 1
         var count = Int32(out.count)
         out.withUnsafeMutableBufferPointer { o in
-            vDSP_vsadd(o.baseAddress!, 1, &one, o.baseAddress!, 1, vDSP_Length(o.count))
-            vvlog10f(o.baseAddress!, o.baseAddress!, &count)
+            DSP.vsadd(o.baseAddress!, 1, &one, o.baseAddress!, 1, DSPLength(o.count))
+            DSP.vvlog10f(o.baseAddress!, o.baseAddress!, &count)
         }
         return out
     }

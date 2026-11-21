@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// Motivo de un vídeo no disponible (spec, «Fuentes externas» > Errores).
 public enum UnavailableReason: Sendable, Equatable {

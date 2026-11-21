@@ -1,4 +1,4 @@
-import AVFoundation
+import NativeAudioFile
 import XCTest
 @testable import TabKit
 
@@ -55,12 +55,7 @@ final class SilenceGateTests: XCTestCase {
 
     static func writeWAV(_ x: [Float]) throws -> URL {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("tabkit-gate-\(UUID().uuidString).wav")
-        let fmt = AVAudioFormat(standardFormatWithSampleRate: sr, channels: 1)!
-        let buf = AVAudioPCMBuffer(pcmFormat: fmt, frameCapacity: AVAudioFrameCount(max(x.count, 1)))!
-        buf.frameLength = AVAudioFrameCount(x.count)
-        x.withUnsafeBufferPointer { buf.floatChannelData![0].update(from: $0.baseAddress!, count: x.count) }
-        let file = try AVAudioFile(forWriting: url, settings: fmt.settings)
-        try file.write(from: buf)
+        try NativeAudioFile.write(url, channels: [x], sampleRate: sr, format: .float32)
         return url
     }
 
@@ -185,7 +180,11 @@ final class SilenceGateHeavyModelTests: XCTestCase {
     /// ventana de ceros, la causa de las notas fantasma.
     func testRealModelOnDigitalSilence() async throws {
         let url = try model()
+        #if canImport(CoreML)
         let raw = try CoreMLBasicPitchPredictor(modelURL: url, computeUnits: .cpuAndGPU)
+        #else
+        let raw = try OnnxBasicPitchPredictor(modelURL: url)   // Windows (parte 7.8)
+        #endif
         let zeros = [Float](repeating: 0, count: BasicPitchContract.windowSamples)
         let out = try zeros.withUnsafeBufferPointer { try raw.predict(window: $0) }
         let mean = out.note.reduce(0, +) / Float(out.note.count)

@@ -1,4 +1,7 @@
+#if canImport(AVFoundation)
 import AVFoundation
+#endif
+import NativeAudioFile
 import XCTest
 @testable import AudioKit
 
@@ -33,6 +36,9 @@ enum SynthWAV {
     }
 
     static func write(_ channels: [[Float]], rate: Double, to url: URL, float32: Bool = true) throws {
+        #if !canImport(AVFoundation)
+        try NativeAudioFile.write(url, channels: channels, sampleRate: rate, format: float32 ? .float32 : .int24)
+        #else
         let settings: [String: Any] = [
             AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: rate, AVNumberOfChannelsKey: channels.count,
             AVLinearPCMBitDepthKey: float32 ? 32 : 24, AVLinearPCMIsFloatKey: float32,
@@ -45,6 +51,7 @@ enum SynthWAV {
         for (c, ch) in channels.enumerated() { buf.floatChannelData![c].update(from: ch, count: n) }
         try file.write(from: buf)
         file.close()   // vuelca la cola ya; si no, depende de cuándo se libere
+        #endif
     }
 
     static func tempDir() throws -> URL {

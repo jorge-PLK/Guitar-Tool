@@ -1,4 +1,6 @@
+#if canImport(Darwin)
 import Darwin
+#endif
 import XCTest
 @testable import StudyKit
 
@@ -23,8 +25,13 @@ final class BeatHeavyModelTests: XCTestCase {
         guard ProcessInfo.processInfo.environment["TF_MODEL_TESTS"] == "1" else {
             throw XCTSkip("tests del modelo real desactivados (TF_MODEL_TESTS != 1)")
         }
-        let url = ProcessInfo.processInfo.environment["TF_BEAT_MODEL"].map { URL(fileURLWithPath: $0) }
-            ?? Self.repo.appendingPathComponent("Probes/P4-modelos/beat_this/out/hf_supracut/BeatThis.mlmodelc")
+        #if os(Windows)
+        // ONNX de la parte 7.3 (parte 7.8): `<TF_MODELS_DIR o C:\tf-models>\beat_this\model.onnx`.
+        let fallback = studyKitDevelopmentModel("beat_this")
+        #else
+        let fallback = Self.repo.appendingPathComponent("Probes/P4-modelos/beat_this/out/hf_supracut/BeatThis.mlmodelc")
+        #endif
+        let url = ProcessInfo.processInfo.environment["TF_BEAT_MODEL"].map { URL(fileURLWithPath: $0) } ?? fallback
         guard FileManager.default.fileExists(atPath: url.path) else { throw XCTSkip("no está el modelo en \(url.path)") }
         return url
     }
@@ -35,7 +42,7 @@ final class BeatHeavyModelTests: XCTestCase {
         let x = try BeatAudio.loadMono(BeatTests.fixtures.appendingPathComponent("mix_22k.wav"))
         let spect = try BeatLogMel.shared.compute(x)
         let logits = try BeatChunker.predict(spect: spect.values, frames: spect.frames,
-                                             with: try CoreMLBeatPredictor(modelURL: model))
+                                             with: try makeBeatPredictor(modelURL: model))
         let refB = try BeatTests.f32("beat_logits_beat.f32"), refD = try BeatTests.f32("beat_logits_downbeat.f32")
         let db = zip(logits.beat, refB).map { abs($0 - $1) }.max()!
         let dd = zip(logits.downbeat, refD).map { abs($0 - $1) }.max()!
@@ -94,10 +101,14 @@ final class BeatHeavyModelTests: XCTestCase {
 
     /// `phys_footprint` del proceso de test (incluye memoria Metal atribuida).
     static func footprint() -> UInt64 {
+        #if canImport(Darwin)
         var info = rusage_info_v4()
         let rc = withUnsafeMutablePointer(to: &info) {
             $0.withMemoryRebound(to: rusage_info_t?.self, capacity: 1) { proc_pid_rusage(getpid(), RUSAGE_INFO_V4, $0) }
         }
         return rc == 0 ? info.ri_phys_footprint : 0
+        #else
+        return 0
+        #endif
     }
 }

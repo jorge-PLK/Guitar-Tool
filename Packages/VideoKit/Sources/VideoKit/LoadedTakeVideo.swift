@@ -1,3 +1,5 @@
+// Solo Apple. En Windows no existe: paso 7: media-foundation.
+#if canImport(AVFoundation)
 import AVFoundation
 import Foundation
 
@@ -118,3 +120,4 @@ final class LoadedTakeVideo: @unchecked Sendable {
         return CMTimeMaximum(cursor, total)
     }
 }
+#endif

@@ -1,5 +1,10 @@
+// tf-audio mide con el dispositivo y el reproductor. En Windows solo `--simulated` (dispositivos reales: paso 7: wasapi,
+// parte 7.10).
 import AudioKit
 import Foundation
+#if !canImport(CoreAudio)
+import NativePlatform
+#endif
 
 /// Códigos de salida: 0 bien, 1 medida fuera de tolerancia, 2 error de uso o de dispositivo.
 enum Exit {
@@ -78,7 +83,11 @@ enum CLI {
     // MARK: devices
 
     static func devices(_ env: Env) -> Int32 {
+        #if canImport(CoreAudio)
         let p = CoreAudioDeviceProvider()
+        #else
+        let p = SimulatedDeviceProvider(devices: [], defaultID: nil)   // listado WASAPI: parte 7.10
+        #endif
         var byUID: [String: AudioDevice] = [:]
         for d in p.inputDevices() + p.outputDevices() { byUID[d.uid] = d }
         let list = byUID.values.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
@@ -254,7 +263,11 @@ enum CLI {
         try player.play()
         try await rig.settle()
         let wavURL = env.dir.appendingPathComponent("verify.wav")
+        #if canImport(CoreAudio)
         let recordHost = CoreAudioIO.hostNowSeconds
+        #else
+        let recordHost = HostClock.nowSeconds
+        #endif
         try rig.session.startRecording(to: wavURL)
         try await rig.advance(seconds: seconds)
         let take: RecordedTake
@@ -264,7 +277,11 @@ enum CLI {
         }
         let hosted = player.hostedDiagnostics
         let io = rig.session.ioDiagnostics
+        #if canImport(CoreAudio)
         let timing = (rig.ioBox.get() as? CoreAudioIO)?.hostTimingReport()
+        #else
+        let timing: HostTimingReport? = nil
+        #endif
         player.pause()
 
         let x = try WavFile.readFirstChannel(wavURL).samples
@@ -439,3 +456,4 @@ enum CLI {
         return Exit.ok
     }
 }
+

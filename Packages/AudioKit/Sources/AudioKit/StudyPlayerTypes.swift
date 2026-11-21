@@ -11,6 +11,37 @@ public struct Track: Sendable, Equatable, Identifiable {
     }
 }
 
+/// Pista de toma («Tú», mini-spec Fase 3, «A/B dentro de la mezcla»): una toma ya alineada cuya muestra 0
+/// cae en `songStart` del tema. Suena por la misma cadena que los stems (sigue velocidad, tono y bucle) y
+/// aparece en `tracks` como un canal más, con su ganancia (la de `LoudnessMatch`), su mute y su solo.
+///
+/// Fase 6: puede haber varias a la vez (`setTakes`): la mejor toma de cada una de las otras partes suena como
+/// canal «Tú · parte» (mini-spec Fase 6, «Partes y tomas»).
+public struct TakeTrack: Sendable, Equatable {
+    /// Id del canal en el mezclador (no debe coincidir con el de un stem ni con el de otra toma).
+    public var id: String
+    public var url: URL
+    public var songStart: Double
+    public var gainDB: Double
+    public var muted: Bool
+    public var solo: Bool
+    /// Punch-in (mini-spec Fase 6, «Punch-in»): desde este instante del tema la toma se silencia con un
+    /// fundido de `PunchFlattener.crossfadeSeconds` (el mismo que tendrá la original al aplanar el punch).
+    /// `nil` = suena entera.
+    public var silencedFrom: Double?
+
+    public init(id: String, url: URL, songStart: Double, gainDB: Double = 0, muted: Bool = false, solo: Bool = false,
+                silencedFrom: Double? = nil) {
+        self.id = id
+        self.url = url
+        self.songStart = songStart
+        self.gainDB = gainDB
+        self.muted = muted
+        self.solo = solo
+        self.silencedFrom = silencedFrom
+    }
+}
+
 /// Clic del metrónomo en tiempo de canción (segundos). StudyKit tiene su propio `Click`; la app convierte.
 public struct Click: Sendable, Equatable, Hashable {
     public var time: Double

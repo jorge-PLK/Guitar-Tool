@@ -1,4 +1,4 @@
-import AVFoundation
+import NativeAudioFile
 import XCTest
 @testable import TabKit
 
@@ -180,14 +180,8 @@ final class DrumCymbalSeriesSongTests: XCTestCase {
             return x.map { $0 * g }
         }
         let l = normalized(stem), r = normalized(Array(synth.prefix(n)) + [Float](repeating: 0, count: max(0, n - synth.count)))
-        let fmt = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: rate, channels: 2, interleaved: false)!
-        let buf = AVAudioPCMBuffer(pcmFormat: fmt, frameCapacity: AVAudioFrameCount(n))!
-        buf.frameLength = AVAudioFrameCount(n)
-        l.withUnsafeBufferPointer { buf.floatChannelData![0].update(from: $0.baseAddress!, count: n) }
-        r.withUnsafeBufferPointer { buf.floatChannelData![1].update(from: $0.baseAddress!, count: n) }
         try? FileManager.default.removeItem(at: url)
-        let file = try AVAudioFile(forWriting: url, settings: fmt.settings, commonFormat: .pcmFormatFloat32, interleaved: false)
-        try file.write(from: buf)
+        try NativeAudioFile.write(url, channels: [l, r], sampleRate: rate, format: .float32)
         print("CHECK escrito: \(url.path)")
     }
 }

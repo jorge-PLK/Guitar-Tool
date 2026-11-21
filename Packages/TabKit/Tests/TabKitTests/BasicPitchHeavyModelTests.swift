@@ -1,5 +1,6 @@
-import AVFoundation
+#if canImport(CoreML)
 import CoreML
+#endif
 import XCTest
 @testable import TabKit
 
@@ -26,6 +27,10 @@ final class BasicPitchHeavyModelTests: XCTestCase {
     }
 
     static func compiledModel() throws -> URL {
+        #if !canImport(CoreML)
+        // Windows (parte 7.8): el ONNX de la parte 7.3, sin compilar.
+        return try tabKitDevelopmentModel("basic_pitch")
+        #else
         if let c = compiled { return c }
         let zip = Fixture.repo.appendingPathComponent("App/Resources/Models/BasicPitch_nmp.mlpackage.zip")
         guard FileManager.default.fileExists(atPath: zip.path) else { throw XCTSkip("no está el modelo en \(zip.path)") }
@@ -40,6 +45,7 @@ final class BasicPitchHeavyModelTests: XCTestCase {
         let c = try MLModel.compileModel(at: pkg)
         compiled = c
         return c
+        #endif
     }
 
     private static func maxAbsDiff(_ a: [Float], _ b: [Float]) -> Float {

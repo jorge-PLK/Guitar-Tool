@@ -1,6 +1,6 @@
-import Accelerate
-import AVFoundation
 import Foundation
+import NativeAudioFile
+import NativeDSP
 
 /// Tramo de solo marcado a mano, en segundos desde el inicio de `stems/guitar.wav`
 /// (mini-spec Fase 4, «Opciones de guitarras y tramos de solo»). Store tiene su tipo espejo; la app traduce.
@@ -111,19 +111,13 @@ public struct GuitarStemComposer: Sendable {
             return []
         }
 
-        let file: AVAudioFile
-        do {
-            file = try AVAudioFile(forReading: input, commonFormat: .pcmFormatFloat32, interleaved: false)
-        } catch {
-            throw SeparationError.invalidInput("no se puede leer \(input.lastPathComponent): \(error.localizedDescription)")
+        let file = try AudioIO.openReader(input)
+        guard file.channelCount == 2 else {
+            throw SeparationError.invalidInput("se esperaba audio estéreo y tiene \(file.channelCount) canales")
         }
-        let fmt = file.processingFormat
-        guard fmt.channelCount == 2 else {
-            throw SeparationError.invalidInput("se esperaba audio estéreo y tiene \(fmt.channelCount) canales")
-        }
-        let n = Int(file.length)
+        let n = file.frameCount
         guard n > 0 else { throw SeparationError.invalidInput("el audio está vacío") }
-        let rate = fmt.sampleRate
+        let rate = file.sampleRate
 
         let windows = Self.plan(spans: soloSpans, sampleRate: rate, frameCount: n,
                                 fadeFrames: Self.frames(Self.fadeSeconds, rate),
@@ -151,7 +145,7 @@ public struct GuitarStemComposer: Sendable {
         let sink = TrackSink(writers: writers, blockFrames: blockFrames)
         defer { writers.values.forEach { $0.close() } }
 
-        let reader = BlockReader(file: file, format: fmt)
+        let reader = BlockReader(file: file)
         var pos = 0
         func report() { progress?(Double(pos) / Double(n)) }
         for w in windows {
@@ -165,8 +159,8 @@ public struct GuitarStemComposer: Sendable {
             }
             let g = w.gate()
             var gl = [Float](repeating: 0, count: g.count), gr = gl
-            vDSP_vmul(g, 1, lead.left, 1, &gl, 1, vDSP_Length(g.count))
-            vDSP_vmul(g, 1, lead.right, 1, &gr, 1, vDSP_Length(g.count))
+            DSP.vmul(g, 1, lead.left, 1, &gl, 1, DSPLength(g.count))
+            DSP.vmul(g, 1, lead.right, 1, &gr, 1, DSPLength(g.count))
             // Donde g = 0 la solista es 0 exacto aunque el separador dé otra cosa (o NaN).
             for k in 0..<g.count where g[k] == 0 {
                 gl[k] = 0
@@ -273,23 +267,22 @@ public struct GuitarStemComposer: Sendable {
     }
 }
 
-/// Lectura de rangos contiguos de un `AVAudioFile` estéreo.
+/// Lectura de rangos contiguos de un fichero estéreo.
 private struct BlockReader {
-    let file: AVAudioFile
-    let format: AVAudioFormat
+    let file: AudioFileReader
 
     func read(_ range: Range<Int>) throws -> (left: [Float], right: [Float]) {
-        guard let buf = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(range.count)) else {
-            throw SeparationError.invalidInput("no hay memoria para \(range.count) muestras")
+        var left = [Float](repeating: 0, count: range.count), right = left
+        let got = try left.withUnsafeMutableBufferPointer { l in
+            try right.withUnsafeMutableBufferPointer { r in
+                try AudioIO.read(file, from: range.lowerBound, count: range.count,
+                                 left: l.baseAddress!, right: r.baseAddress!)
+            }
         }
-        file.framePosition = AVAudioFramePosition(range.lowerBound)
-        try file.read(into: buf, frameCount: AVAudioFrameCount(range.count))
-        guard Int(buf.frameLength) == range.count else {
-            throw SeparationError.invalidInput("lectura corta: \(buf.frameLength) de \(range.count) muestras")
+        guard got == range.count else {
+            throw SeparationError.invalidInput("lectura corta: \(got) de \(range.count) muestras")
         }
-        let ch = buf.floatChannelData!
-        return (Array(UnsafeBufferPointer(start: ch[0], count: range.count)),
-                Array(UnsafeBufferPointer(start: ch[1], count: range.count)))
+        return (left, right)
     }
 }
 
@@ -308,9 +301,9 @@ private struct TrackSink {
         let count = left.count
         var rl = left, rr = right
         if let leadLeft, let leadRight {
-            // vDSP_vsub(B, A) = A − B.
-            vDSP_vsub(leadLeft, 1, left, 1, &rl, 1, vDSP_Length(count))
-            vDSP_vsub(leadRight, 1, right, 1, &rr, 1, vDSP_Length(count))
+            // DSP.vsub(B, A) = A − B.
+            DSP.vsub(leadLeft, 1, left, 1, &rl, 1, DSPLength(count))
+            DSP.vsub(leadRight, 1, right, 1, &rr, 1, DSPLength(count))
         }
         var done = 0
         while done < count {

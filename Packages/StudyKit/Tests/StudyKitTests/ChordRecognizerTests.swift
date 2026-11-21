@@ -124,9 +124,29 @@ final class ChordRecognizerTests: XCTestCase {
 
     // MARK: Remuestreo
 
-    /// 44,1 → 22,05 kHz con AVAudioConverter frente a soxr HQ (`harm_22k.wav`, primeros 2 s): sin retardo y
-    /// misma CQT.
+    /// 44,1 → 22,05 kHz con el conversor de la plataforma (AVAudioConverter en el Mac, r8brain en Windows) frente
+    /// a soxr HQ (`harm_22k.wav`, primeros 2 s): sin retardo y misma CQT.
     func testResampleMatchesSoxrReference() throws {
+        _ = try checkResampleAgainstSoxr(label: "plataforma")
+    }
+
+    /// Lo mismo con r8brain forzado también en el Mac (parte 7.1: validar el motor de Windows con los fixtures),
+    /// y croma y log-mel del tramo frente a soxr, que no deben empeorar respecto a AVAudioConverter.
+    func testResampleMatchesSoxrReferenceWithR8brain() throws {
+        let r8b = try MonoResampler.$forcePortable.withValue(true) { try checkResampleAgainstSoxr(label: "r8brain") }
+        #if canImport(AVFoundation)
+        let av = try checkResampleAgainstSoxr(label: "AVAudioConverter")
+        // Margen: 10 % del valor de AVAudioConverter (los dos WAV de referencia están cuantizados a 16 bits).
+        XCTAssertGreaterThanOrEqual(r8b.snr, av.snr - 1)
+        XCTAssertLessThanOrEqual(r8b.chromaRel, av.chromaRel * 1.1 + 1e-5)
+        XCTAssertLessThanOrEqual(r8b.logMelMax, av.logMelMax * 1.1 + 1e-4)
+        #endif
+        _ = r8b
+    }
+
+    struct SoxrComparison { var snr, cqtMean, cqtMax, chromaRel, logMelMax: Double }
+
+    func checkResampleAgainstSoxr(label: String, file: StaticString = #filePath, line: UInt = #line) throws -> SoxrComparison {
         let mine = try ChordAudio.loadMono([Self.url("harm_44k_stereo.wav")])
         XCTAssertEqual(mine.count, 44_100)
         let ref = Array(try ChordAudio.loadMono([Self.url("harm_22k.wav")])[0..<44_100])
@@ -137,7 +157,6 @@ final class ChordRecognizerTests: XCTestCase {
             for i in 2000..<42_000 { s += Double(mine[i + lag]) * Double(ref[i]) }
             if s > best { best = s; bestLag = lag }
         }
-        XCTAssertEqual(bestLag, 0)
         var err = 0.0, pow = 0.0
         for i in 2000..<42_000 {
             err += Double((mine[i] - ref[i]) * (mine[i] - ref[i]))
@@ -154,13 +173,26 @@ final class ChordRecognizerTests: XCTestCase {
             mx = max(mx, e)
         }
         mean /= Double(144 * 19)
-        print(String(format: "remuestreo frente a soxr: retardo %d, SNR %.1f dB; CQT normalizada medio %.2e, máx %.2e",
-                     bestLag, snr, mean, mx))
+        // Croma sumado de las mismas tramas (error relativo máximo por clase) y log-mel de BeatThis (máximo).
+        let qa = LibrosaCQT.shared.magnitude(mine), qb = LibrosaCQT.shared.magnitude(ref)
+        let ca = ChordFeatures.chroma(qa.values, frames: qa.frames), cb = ChordFeatures.chroma(qb.values, frames: qb.frames)
+        var chromaRel = 0.0
+        for c in 0..<12 {
+            let sa = ca[c][1..<20].reduce(0.0) { $0 + Double($1) }, sb = cb[c][1..<20].reduce(0.0) { $0 + Double($1) }
+            chromaRel = max(chromaRel, abs(sa - sb) / max(sb, 1e-9))
+        }
+        let (ma, fa) = try BeatLogMel.shared.compute(mine), (mb, _) = try BeatLogMel.shared.compute(ref)
+        var logMelMax = 0.0
+        for i in (128 * 2)..<(128 * (fa - 2)) { logMelMax = max(logMelMax, Double(abs(ma[i] - mb[i]))) }
+        print(String(format: "remuestreo (%@) frente a soxr: retardo %d, SNR %.1f dB; CQT normalizada medio %.2e, máx %.2e; croma rel. máx %.2e; log-mel máx %.2e",
+                     label, bestLag, snr, mean, mx, chromaRel, logMelMax))
         // Medido: SNR 73,6 dB, medio 1,9e-4, máx 9,1e-3. Ambos WAV están cuantizados a 16 bits por separado
         // (antes y después de remuestrear): en los bins más débiles ese ruido ya da ~1e-2, de ahí el máximo 2e-2.
-        XCTAssertGreaterThan(snr, 60)
-        XCTAssertLessThan(mean, 1e-3)
-        XCTAssertLessThan(mx, 2e-2)
+        XCTAssertEqual(bestLag, 0, label, file: file, line: line)
+        XCTAssertGreaterThan(snr, 60, label, file: file, line: line)
+        XCTAssertLessThan(mean, 1e-3, label, file: file, line: line)
+        XCTAssertLessThan(mx, 2e-2, label, file: file, line: line)
+        return SoxrComparison(snr: snr, cqtMean: mean, cqtMax: mx, chromaRel: chromaRel, logMelMax: logMelMax)
     }
 
     // MARK: Ventanas, argmax, fusión, .lab

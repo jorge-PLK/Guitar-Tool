@@ -6,12 +6,18 @@ enum FileOps {
     /// Sustituye `destination` por `temporary` (misma carpeta/volumen) de forma atómica; si no existía, lo mueve.
     static func atomicReplace(_ destination: URL, with temporary: URL) throws {
         let fm = FileManager.default
+        #if os(Windows)
+        // `replaceItemAt` no está implementado en Foundation para Windows: MoveFileEx con reemplazo es atómico en NTFS.
+        try fm.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try windowsMoveReplacing(temporary, to: destination)
+        #else
         if fm.fileExists(atPath: destination.path) {
             _ = try fm.replaceItemAt(destination, withItemAt: temporary)
         } else {
             try fm.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
             try fm.moveItem(at: temporary, to: destination)
         }
+        #endif
     }
 
     static func atomicWrite(_ data: Data, to destination: URL) throws {
@@ -39,7 +45,12 @@ public enum DiskSize {
         let keys: Set<URLResourceKey> = [.totalFileAllocatedSizeKey, .fileAllocatedSizeKey, .isDirectoryKey]
         func size(_ u: URL) -> Int64 {
             let v = try? u.resourceValues(forKeys: keys)
-            return Int64(v?.totalFileAllocatedSize ?? v?.fileAllocatedSize ?? 0)
+            if let a = v?.totalFileAllocatedSize ?? v?.fileAllocatedSize { return Int64(a) }
+            #if os(Windows)
+            // Foundation en Windows no da el tamaño asignado: se usa el lógico (los directorios cuentan 0).
+            if v?.isDirectory != true { return logicalBytes(of: u) }
+            #endif
+            return 0
         }
         guard fm.fileExists(atPath: url.path) else { return 0 }
         var total = size(url)

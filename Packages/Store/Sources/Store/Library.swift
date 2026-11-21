@@ -1,4 +1,8 @@
+#if canImport(CryptoKit)
 import CryptoKit
+#else
+import Crypto
+#endif
 import Foundation
 
 // MARK: - Protocolos que implementa la app (Store no depende de AudioKit ni StemKit)
@@ -191,7 +195,11 @@ public actor Library {
     }
     /// Movimiento a la Papelera; inyectable para que los tests no ensucien la Papelera real.
     var projectTrasher: @Sendable (URL) throws -> Void = { url in
+        #if os(Windows)
+        try windowsMoveToRecycleBin(url)
+        #else
         try FileManager.default.trashItem(at: url, resultingItemURL: nil)
+        #endif
     }
     /// Borrado definitivo de la carpeta de un proyecto; inyectable para simular fallos en tests.
     var projectDeleter: @Sendable (URL) throws -> Void = { url in try FileManager.default.removeItem(at: url) }

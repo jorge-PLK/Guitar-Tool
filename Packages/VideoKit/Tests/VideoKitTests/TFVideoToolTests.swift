@@ -1,3 +1,4 @@
+#if canImport(AVFoundation)
 import AVFoundation
 import XCTest
 @testable import tf_video
@@ -75,3 +76,14 @@ final class TFVideoToolTests: XCTestCase {
         XCTAssertEqual(missing, Exit.error)
     }
 }
+#else
+import Foundation
+import XCTest
+
+/// Windows: `tf-video` en Windows es de la parte 7.11 (encuadre); `frame` y `montage` necesitan además el detector de
+/// pose y el compositor.
+final class TFVideoToolTests: XCTestCase {
+    func testSimulatedCommands() throws { throw XCTSkip("[paso 7] encuadre") }
+    func testFrameAndMontageCommands() throws { throw XCTSkip("[paso 7] encuadre") }
+}
+#endif // canImport(AVFoundation)

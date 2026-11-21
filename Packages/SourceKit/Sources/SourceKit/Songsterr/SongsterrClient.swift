@@ -1,5 +1,12 @@
-import Compression
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
+#if canImport(Compression)
+import Compression
+#else
+import CMiniz
+#endif
 
 /// Carga una página de Songsterr como lo haría un navegador y devuelve su HTML ya cargado. La implementa la app con
 /// un `WKWebView` oculto; los tests, con un doble.
@@ -120,6 +127,20 @@ public struct SongsterrClient: Sendable {
         if flags & 2 != 0 { pos += 2 }
         guard pos < b.count - 8 else { return data }
         let body = Data(b[pos..<(b.count - 8)])
-        return (try? (body as NSData).decompressed(using: .zlib) as Data) ?? data
+        return inflateRaw(body) ?? data
+    }
+
+    /// Deflate crudo (RFC 1951): Compression `.zlib` en el Mac, miniz en Windows.
+    private static func inflateRaw(_ body: Data) -> Data? {
+        #if canImport(Compression)
+        return try? (body as NSData).decompressed(using: .zlib) as Data
+        #else
+        return body.withUnsafeBytes { raw -> Data? in
+            var outLen = 0
+            guard let heap = tinfl_decompress_mem_to_heap(raw.baseAddress, raw.count, &outLen, 0) else { return nil }
+            defer { free(heap) }
+            return Data(bytes: heap, count: outLen)
+        }
+        #endif
     }
 }

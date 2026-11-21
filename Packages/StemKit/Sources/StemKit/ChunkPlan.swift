@@ -1,4 +1,4 @@
-import Accelerate
+import NativeDSP
 
 /// Plan de trozos idéntico a `demix_np` de Probes/P4-modelos/bs_roformer_sw/sw_common.py
 /// (que reproduce `utils.model_utils.demix` de MSST en modo generic):
@@ -78,7 +78,7 @@ struct ChunkPlan: Equatable {
             case .reflect:
                 // np.pad(part, (0, pad), "reflect"): dst[n + j] = dst[n − 2 − j]
                 (dst + n).update(from: dst + (n - 1 - pad), count: pad)
-                vDSP_vrvrs(dst + n, 1, vDSP_Length(pad))
+                DSP.vrvrs(dst + n, 1, DSPLength(pad))
             }
         }
     }
@@ -125,20 +125,20 @@ final class OverlapAddAssembler {
         precondition(outputs.count == channelCount && nextChunk < plan.count)
         let k = nextChunk
         let i = plan.starts[k]
-        let n = vDSP_Length(plan.validCount(k))
+        let n = DSPLength(plan.validCount(k))
         let w = plan.weights(k)
         w.withUnsafeBufferPointer { wp in
             for ch in 0..<channelCount {
-                vDSP_vma(outputs[ch], 1, wp.baseAddress!, 1, accum[ch], 1, accum[ch], 1, n)
+                DSP.vma(outputs[ch], 1, wp.baseAddress!, 1, accum[ch], 1, accum[ch], 1, n)
             }
-            vDSP_vadd(counter, 1, wp.baseAddress!, 1, counter, 1, n)
+            DSP.vadd(counter, 1, wp.baseAddress!, 1, counter, 1, n)
         }
         let last = plan.isLast(k)
         let count = last ? plan.paddedLength - i : plan.step
         // result /= counter; nan_to_num. Donde counter = 0 todas las contribuciones pesaron 0 → salida 0.
         for j in 0..<count { divisor[j] = counter[j] == 0 ? 1 : counter[j] }
         for ch in 0..<channelCount {
-            vDSP_vdiv(divisor, 1, accum[ch], 1, finished[ch], 1, vDSP_Length(count))
+            DSP.vdiv(divisor, 1, accum[ch], 1, finished[ch], 1, DSPLength(count))
         }
         // Tramo [i, i+count) de la señal rellenada → coordenadas de salida, recortado a [0, inputLength).
         let offset = plan.padded ? plan.border : 0
