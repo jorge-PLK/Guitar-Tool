@@ -28,6 +28,10 @@ struct Options: Equatable {
     var simRig: Double?
     /// Solo para probar el fallo: suma estas muestras a la latencia con la que se alinea.
     var simMiscalibration: Double?
+    /// Solo Windows (WASAPI, parte 7.10b): modo de compartición (`nil` = compartido) y periodo pedido en fotogramas
+    /// (`nil` = `AudioSetup.bufferFrames`, 512; 0 = el mínimo del camino).
+    var mode: WASAPIShareMode?
+    var period: Int?
     var help = false
 }
 
@@ -55,6 +59,18 @@ enum Parse {
             throw CLIError("Valor no válido para \(name): «\(text)».")
         }
         return v
+    }
+
+    /// Tope de `--period` (decisión propia: 100 ms a 48 kHz; WASAPI no pasa de 2 s y por encima no sirve para medir).
+    static let maxPeriodFrames = 4_800
+
+    /// `shared`/`compartido` o `exclusive`/`exclusivo`.
+    static func mode(_ text: String) throws -> WASAPIShareMode {
+        switch text.lowercased() {
+        case "shared", "compartido": return .shared
+        case "exclusive", "exclusivo": return .exclusive
+        default: throw CLIError("--mode admite shared (compartido) o exclusive (exclusivo), no «\(text)».")
+        }
     }
 
     static func options(_ args: [String]) throws -> Options {
@@ -97,11 +113,20 @@ enum Parse {
                 guard r >= 0 else { throw CLIError("--sim-rig no puede ser negativo.") }
                 o.simRig = r
             case "--sim-miscalibrate": o.simMiscalibration = try number(try value(flag), flag)
+            case "--mode": o.mode = try mode(try value(flag))
+            case "--period":
+                guard let n = Int(try value(flag)), (0...maxPeriodFrames).contains(n) else {
+                    throw CLIError("--period necesita un entero de 0 (el mínimo) a \(maxPeriodFrames) fotogramas.")
+                }
+                o.period = n
             default: throw CLIError("Opción desconocida «\(flag)» (--help).")
             }
         }
         if o.simulated == nil, o.simRig != nil || o.simMiscalibration != nil {
             throw CLIError("--sim-rig y --sim-miscalibrate solo valen con --simulated.")
+        }
+        if o.simulated != nil, o.mode != nil || o.period != nil {
+            throw CLIError("--mode y --period son de los dispositivos WASAPI (Windows), no de --simulated.")
         }
         if command == .record, o.seconds == nil, !o.help { throw CLIError("record necesita --seconds N.") }
         return o

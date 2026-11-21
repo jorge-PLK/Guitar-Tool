@@ -12,19 +12,28 @@ typedef int CWASAPI_empty_translation_unit;
 #undef NTDDI_VERSION
 #define NTDDI_VERSION 0x0A000000
 #endif
+#if !defined(WINVER) || WINVER < 0x0A00
+#undef WINVER
+#define WINVER 0x0A00
+#endif
 #define COBJMACROS
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <mmreg.h>
 #include <mmdeviceapi.h>
 #include <audioclient.h>
+#include <devicetopology.h>
+#include <devpropdef.h>
+#include <cfgmgr32.h>
 #include <avrt.h>
 #include <stdlib.h>
 #include <string.h>
+#include <wchar.h>
 #include <math.h>
 #pragma comment(lib, "ole32.lib")
 #pragma comment(lib, "avrt.lib")
 #pragma comment(lib, "uuid.lib")
+#pragma comment(lib, "cfgmgr32.lib")   // driver del adaptador en el listado (parte 7.10b)
 
 int wasapi_shim_version(void) { return 1; }   // lo comprueba NativeSmokeTests
 
@@ -252,6 +261,71 @@ done:
     RELEASE(c);
 }
 
+// Driver del adaptador (parte 7.10b): saber si un aparato USB va con su driver propio o con el genérico de Windows
+// (servicio «usbaudio2»/«usbaudio», proveedor «Microsoft»).
+static const GUID TF_IID_IDeviceTopology = {0x2A07407E, 0x6497, 0x4A18, {0x97, 0x87, 0x32, 0xF7, 0x9B, 0xD0, 0xD9, 0x8F}};
+static const DEVPROPKEY TF_DEVPKEY_InstanceId = {{0x78C34FC8, 0x104A, 0x4ACA, {0x9E, 0xA4, 0x52, 0x4D, 0x52, 0x99, 0x6E, 0x57}}, 256};
+static const DEVPROPKEY TF_DEVPKEY_DeviceDesc = {{0xA45C254E, 0xDF1C, 0x4EFD, {0x80, 0x20, 0x67, 0xD1, 0x46, 0xA8, 0x50, 0xE0}}, 2};
+static const DEVPROPKEY TF_DEVPKEY_Service = {{0xA45C254E, 0xDF1C, 0x4EFD, {0x80, 0x20, 0x67, 0xD1, 0x46, 0xA8, 0x50, 0xE0}}, 6};
+static const DEVPROPKEY TF_DEVPKEY_DevFriendlyName = {{0xA45C254E, 0xDF1C, 0x4EFD, {0x80, 0x20, 0x67, 0xD1, 0x46, 0xA8, 0x50, 0xE0}}, 14};
+static const DEVPROPKEY TF_DEVPKEY_DriverVersion = {{0xA8B865DD, 0x2E3D, 0x4094, {0xAD, 0x97, 0xE5, 0x93, 0xA7, 0x0C, 0x75, 0xD6}}, 3};
+static const DEVPROPKEY TF_DEVPKEY_DriverDesc = {{0xA8B865DD, 0x2E3D, 0x4094, {0xAD, 0x97, 0xE5, 0x93, 0xA7, 0x0C, 0x75, 0xD6}}, 4};
+static const DEVPROPKEY TF_DEVPKEY_DriverInfPath = {{0xA8B865DD, 0x2E3D, 0x4094, {0xAD, 0x97, 0xE5, 0x93, 0xA7, 0x0C, 0x75, 0xD6}}, 5};
+static const DEVPROPKEY TF_DEVPKEY_DriverProvider = {{0xA8B865DD, 0x2E3D, 0x4094, {0xAD, 0x97, 0xE5, 0x93, 0xA7, 0x0C, 0x75, 0xD6}}, 9};
+
+/// Error de cfgmgr32 como HRESULT negativo (para `driver_hresult`).
+static HRESULT cr_hr(CONFIGRET cr) { return (HRESULT)(0x80000000u | (uint32_t)cr); }
+
+/// Propiedad de texto de un nodo PnP; vacía si no existe, no es texto o no cabe.
+static int devnode_string(DEVINST dn, const DEVPROPKEY *key, char *out, int cap) {
+    WCHAR buf[512];
+    ULONG size = sizeof(buf);
+    DEVPROPTYPE type = 0;
+    out[0] = 0;
+    if (CM_Get_DevNode_PropertyW(dn, key, &type, (PBYTE)buf, &size, 0) != CR_SUCCESS || type != DEVPROP_TYPE_STRING) return 0;
+    buf[511] = 0;
+    to_utf8(buf, out, cap);
+    return out[0] != 0;
+}
+
+/// Endpoint → su conector 0 → id del dispositivo (filtro KS del adaptador) al que está conectado → nodo PnP → driver.
+static void query_driver(IMMDevice *dev, wasapi_device_info *d) {
+    IDeviceTopology *topo = NULL;
+    IConnector *conn = NULL;
+    LPWSTR adapter = NULL;
+    const WCHAR *path;
+    WCHAR inst[WASAPI_ID_CAP];
+    ULONG size = sizeof(inst);
+    DEVPROPTYPE type = 0;
+    DEVINST dn = 0;
+    CONFIGRET cr;
+    HRESULT hr;
+    if (FAILED(hr = IMMDevice_Activate(dev, &TF_IID_IDeviceTopology, CLSCTX_ALL, NULL, (void **)&topo))) goto done;
+    if (FAILED(hr = IDeviceTopology_GetConnector(topo, 0, &conn))) goto done;
+    if (FAILED(hr = IConnector_GetDeviceIdConnectedTo(conn, &adapter))) goto done;
+    // El id del adaptador lleva delante un prefijo de MMDevice («{2}.») antes de la ruta de la interfaz «\\?\...».
+    path = wcsstr(adapter, L"\\\\?\\");
+    if (!path) path = adapter;
+    cr = CM_Get_Device_Interface_PropertyW(path, &TF_DEVPKEY_InstanceId, &type, (PBYTE)inst, &size, 0);
+    if (cr != CR_SUCCESS || type != DEVPROP_TYPE_STRING) { hr = cr_hr(cr != CR_SUCCESS ? cr : CR_FAILURE); goto done; }
+    inst[WASAPI_ID_CAP - 1] = 0;
+    to_utf8(inst, d->adapter_instance, WASAPI_ID_CAP);
+    if ((cr = CM_Locate_DevNodeW(&dn, inst, CM_LOCATE_DEVNODE_NORMAL)) != CR_SUCCESS) { hr = cr_hr(cr); goto done; }
+    if (!devnode_string(dn, &TF_DEVPKEY_DevFriendlyName, d->adapter_name, WASAPI_NAME_CAP))
+        devnode_string(dn, &TF_DEVPKEY_DeviceDesc, d->adapter_name, WASAPI_NAME_CAP);
+    devnode_string(dn, &TF_DEVPKEY_Service, d->driver_service, WASAPI_DRIVER_CAP);
+    devnode_string(dn, &TF_DEVPKEY_DriverProvider, d->driver_provider, WASAPI_DRIVER_CAP);
+    devnode_string(dn, &TF_DEVPKEY_DriverVersion, d->driver_version, WASAPI_DRIVER_CAP);
+    devnode_string(dn, &TF_DEVPKEY_DriverDesc, d->driver_desc, WASAPI_NAME_CAP);
+    devnode_string(dn, &TF_DEVPKEY_DriverInfPath, d->driver_inf, WASAPI_DRIVER_CAP);
+    hr = S_OK;
+done:
+    d->driver_hresult = hr;
+    if (adapter) CoTaskMemFree(adapter);
+    RELEASE(conn);
+    RELEASE(topo);
+}
+
 int32_t wasapi_enumerate(wasapi_device_info *out, int32_t capacity) {
     IMMDeviceEnumerator *e = NULL;
     int32_t total = 0;
@@ -286,6 +360,7 @@ int32_t wasapi_enumerate(wasapi_device_info *out, int32_t capacity) {
                 }
                 read_name(dev, d->name, WASAPI_NAME_CAP);
                 query_device(dev, d);
+                query_driver(dev, d);
                 RELEASE(dev);
             }
             RELEASE(coll);

@@ -1,5 +1,4 @@
-// tf-audio mide con el dispositivo y el reproductor. En Windows solo `--simulated` (dispositivos reales: paso 7: wasapi,
-// parte 7.10).
+// tf-audio mide con el dispositivo y el reproductor. En Windows, sobre `WASAPIAudioIO` (parte 7.10b) o `--simulated`.
 import AudioKit
 import Foundation
 #if !canImport(CoreAudio)
@@ -17,6 +16,17 @@ enum CLI {
     /// Variación máxima de la latencia entre reinicios del motor (mini-spec Fase 3, «Calibración de latencia»:
     /// «Pendiente de medir con hardware»); por encima, la regla pasa a calibrar por sesión.
     static let restartToleranceMs = 0.25
+    /// En Windows, sobre WASAPI: el mismo umbral que en el Mac (decisión de Jorge, 21/11/2026). El plan decía 0,2 ms,
+    /// pero la Flex Prime da escalones de 12 muestras (0,25 ms a 48 kHz) y el mismo aparato debe pasar en los dos sistemas.
+    static let windowsRestartToleranceMs = 0.25
+    /// La de la plataforma en la que corre.
+    static var platformRestartToleranceMs: Double {
+        #if os(Windows)
+        windowsRestartToleranceMs
+        #else
+        restartToleranceMs
+        #endif
+    }
     /// Dispersión máxima de la calibración, en ms (mini-spec Fase 3, «Resultado»).
     static let spreadLimitMs = LatencyProbe.maxSpreadSeconds * 1000
     /// Pausa entre cerrar y abrir al repetir con `--restarts` (decisión propia: dejar al driver asentarse).
@@ -56,7 +66,23 @@ enum CLI {
 
     Salida: 0 bien, 1 medida fuera de tolerancia, 2 error de uso o de dispositivo.
     Ejemplo sin hardware: tf-audio verify --simulated 2400.81 --seconds 20
+    """ + windowsHelp
+
+    #if os(Windows)
+    static let windowsHelp = """
+
+    En Windows (WASAPI):
+      devices         además: driver del adaptador (genérico de Windows o del fabricante) y periodos mínimos
+      --in, --out     id del endpoint o trozo de su nombre; entrada y salida del mismo aparato tienen ids distintos
+      --mode M        shared (compartido, por defecto) o exclusive (exclusivo)
+      --period N      periodo pedido en fotogramas (por defecto 512; 0 = el mínimo)
+      En compartido, entrada y salida deben estar ya a la frecuencia de trabajo (Panel de sonido).
+      La calibración en exclusivo se guarda aparte, en Temp/tf-audio/calibration-exclusive.json.
+      Ejemplo: tf-audio latency --in flex --out flex --guitar 1,2 --mode exclusive --restarts 10
     """
+    #else
+    static let windowsHelp = ""
+    #endif
 
     static func run(_ args: [String], env: Env) async -> Int32 {
         do {
@@ -83,10 +109,19 @@ enum CLI {
     // MARK: devices
 
     static func devices(_ env: Env) -> Int32 {
+        #if os(Windows)
+        let list: [WASAPIDeviceInfo]
+        do { list = try WASAPIAudioIO.devices() } catch {
+            env.line("Error: \((error as? LocalizedError)?.errorDescription ?? "\(error)")")
+            return Exit.error
+        }
+        for l in WASAPIListing.lines(list, requestedPeriod: AudioSetup.defaultBufferFrames) { env.line(l) }
+        return Exit.ok
+        #else
         #if canImport(CoreAudio)
         let p = CoreAudioDeviceProvider()
         #else
-        let p = SimulatedDeviceProvider(devices: [], defaultID: nil)   // listado WASAPI: parte 7.10
+        let p = SimulatedDeviceProvider(devices: [], defaultID: nil)
         #endif
         var byUID: [String: AudioDevice] = [:]
         for d in p.inputDevices() + p.outputDevices() { byUID[d.uid] = d }
@@ -102,6 +137,7 @@ enum CLI {
             env.line("  Frecuencias admitidas: \(d.sampleRates.isEmpty ? "no declaradas" : d.sampleRates.map { "\(Int($0))" }.joined(separator: ", ")) Hz")
         }
         return Exit.ok
+        #endif
     }
 
     // MARK: latency
@@ -129,6 +165,9 @@ enum CLI {
         let fs = rig.fs
         env.line("Frecuencia de trabajo: \(Int(fs)) Hz")
         env.line("Reloj: \(clockText(rig.session.clock))")
+        #if os(Windows)
+        if let w = rig.ioBox.get() as? WASAPIAudioIO { for l in WASAPIListing.streamLines(w.streamInfo) { env.line(l) } }
+        #endif
         if let io = rig.ioBox.get() {
             env.line("Latencia declarada por el dispositivo: \(io.declaredLatencySamples.fixed(1)) muestras (\(ms(io.declaredLatencySamples, fs)) ms)")
         }
@@ -161,6 +200,7 @@ enum CLI {
                 env.line("Entrada: \(rig.inputName)")
                 env.line("Salida: \(rig.outputName)")
                 env.line("Canales: guitarra \(rig.setup.guitarIn.map(String.init).joined(separator: ",")), backing \(rig.setup.backingLeft),\(rig.setup.backingRight)")
+                for n in rig.notes { env.line(n) }
             }
             try rig.open()
             defer { rig.close() }
@@ -170,8 +210,9 @@ enum CLI {
             report(r, rig: rig, env: env)
             if r.isValid {
                 lat.append(r.latencySamples)
-                try StoredCalibration.save(r, to: env.calibrationURL)
-                env.line("Calibración guardada en \(env.calibrationURL.path)")
+                let url = rig.calibrationURL(env)
+                try StoredCalibration.save(r, to: url)
+                env.line("Calibración guardada en \(url.path)")
             } else {
                 code = Exit.outOfTolerance
             }
@@ -180,18 +221,41 @@ enum CLI {
                 if rig.sim == nil { try await Task.sleep(for: .seconds(restartPauseSeconds)) }
             }
         }
-        if runs > 1, lat.count > 1 {
-            let spread = lat.max()! - lat.min()!
-            let spreadMs = spread / fs * 1000
-            env.line("Variación entre reinicios: \(spread.fixed(2)) muestras (\(spreadMs.fixed(3)) ms) en \(lat.count) reinicios válidos")
-            if spreadMs > restartToleranceMs {
-                env.line("Supera \(restartToleranceMs.fixed(2)) ms: la regla pasa a calibrar por sesión.")
-                code = Exit.outOfTolerance
-            } else {
-                env.line("No supera \(restartToleranceMs.fixed(2)) ms: la calibración vale entre reinicios.")
-            }
+        if runs > 1, let s = RestartSpread(lat, sampleRate: fs, toleranceMs: platformRestartToleranceMs) {
+            for l in s.lines { env.line(l) }
+            if !s.passes { code = Exit.outOfTolerance }
         }
         return code
+    }
+
+    /// Variación de la latencia entre reinicios: máximo − mínimo de los reinicios válidos frente a la tolerancia. Pasa
+    /// si no la supera (mismo criterio que antes de la parte 7.10b).
+    struct RestartSpread: Equatable {
+        var count: Int
+        var spreadSamples: Double
+        var spreadMs: Double
+        var minSamples: Double
+        var maxSamples: Double
+        var toleranceMs: Double
+        var passes: Bool { spreadMs <= toleranceMs }
+
+        /// `nil` con menos de dos reinicios válidos (no hay variación que medir).
+        init?(_ latencies: [Double], sampleRate fs: Double, toleranceMs: Double) {
+            guard latencies.count > 1, fs > 0, let lo = latencies.min(), let hi = latencies.max() else { return nil }
+            count = latencies.count
+            minSamples = lo
+            maxSamples = hi
+            spreadSamples = hi - lo
+            spreadMs = spreadSamples / fs * 1000
+            self.toleranceMs = toleranceMs
+        }
+
+        var lines: [String] {
+            var out = ["Variación entre reinicios: \(spreadSamples.fixed(2)) muestras (\(spreadMs.fixed(3)) ms) en \(count) reinicios válidos"]
+            out.append(passes ? "No supera \(toleranceMs.fixed(2)) ms: la calibración vale entre reinicios."
+                              : "Supera \(toleranceMs.fixed(2)) ms: la regla pasa a calibrar por sesión.")
+            return out
+        }
     }
 
     // MARK: calibración guardada
@@ -199,7 +263,7 @@ enum CLI {
     /// Calibración guardada si vale para la sesión abierta; si no, lo dice.
     @MainActor
     static func applySaved(to rig: Rig, env: Env) -> LatencyCalibrationResult? {
-        guard let saved = StoredCalibration.load(from: env.calibrationURL) else {
+        guard let saved = StoredCalibration.load(from: rig.calibrationURL(env)) else {
             env.line("Sin calibración guardada.")
             return nil
         }
@@ -231,9 +295,13 @@ enum CLI {
         let rig = try await Rig(o)
         env.line("Entrada: \(rig.inputName)")
         env.line("Salida: \(rig.outputName)")
+        for n in rig.notes { env.line(n) }
         try rig.open()
         defer { rig.close() }
         env.line("Frecuencia de trabajo: \(Int(rig.fs)) Hz · reloj: \(clockText(rig.session.clock))")
+        #if os(Windows)
+        if let w = rig.ioBox.get() as? WASAPIAudioIO { for l in WASAPIListing.streamLines(w.streamInfo) { env.line(l) } }
+        #endif
         var cal = applySaved(to: rig, env: env)
         if cal == nil {
             env.line("Calibrando antes (unos 6 s)…")
@@ -243,7 +311,7 @@ enum CLI {
                 env.line("NO PASA: la calibración no es válida, no se puede alinear.")
                 return Exit.outOfTolerance
             }
-            try StoredCalibration.save(r, to: env.calibrationURL)
+            try StoredCalibration.save(r, to: rig.calibrationURL(env))
             cal = r
         }
         if let d = o.simMiscalibration, let c = cal {
@@ -265,6 +333,8 @@ enum CLI {
         let wavURL = env.dir.appendingPathComponent("verify.wav")
         #if canImport(CoreAudio)
         let recordHost = CoreAudioIO.hostNowSeconds
+        #elseif os(Windows)
+        let recordHost = WASAPIAudioIO.hostNowSeconds   // la escala de `AudioIOBuffer.hostSeconds` de WASAPI
         #else
         let recordHost = HostClock.nowSeconds
         #endif
@@ -279,6 +349,10 @@ enum CLI {
         let io = rig.session.ioDiagnostics
         #if canImport(CoreAudio)
         let timing = (rig.ioBox.get() as? CoreAudioIO)?.hostTimingReport()
+        #elseif os(Windows)
+        let wasapi = rig.ioBox.get() as? WASAPIAudioIO
+        let timing = wasapi?.hostTimingReport()
+        let wasapiStatus = wasapi?.status
         #else
         let timing: HostTimingReport? = nil
         #endif
@@ -325,6 +399,9 @@ enum CLI {
                 env.line("HAL: sampleTime salida − entrada entre \(lo) y \(hi) muestras\(lo == hi ? " (constante)" : " (CAMBIÓ durante la sesión)")")
             }
         }
+        #if os(Windows)
+        if let st = wasapiStatus { env.line(WASAPIListing.statusLine(st)) }
+        #endif
         let clickSteps = clickErrorSteps(r)
         env.line("Escalones del error por clic: \(clickSteps.count)"
                  + (clickSteps.isEmpty ? "" : " (" + clickSteps.map { "\($0.0.fixed(2)) s: \(signed($0.1))" }.joined(separator: ", ") + ")"))
@@ -408,6 +485,7 @@ enum CLI {
         let rig = try await Rig(opts)
         env.line("Entrada: \(rig.inputName)")
         env.line("Salida: \(rig.outputName)")
+        for n in rig.notes { env.line(n) }
         try rig.open()
         defer { rig.close() }
         _ = applySaved(to: rig, env: env)

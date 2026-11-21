@@ -150,7 +150,7 @@ public final class AudioSession: @unchecked Sendable {
     #endif
 
     #if os(Windows)
-    /// `WASAPIAudioIO` sobre los dispositivos del `AudioSetup` (paso 7: wasapi; hoy lanza `PlatformError.unsupported`).
+    /// `WASAPIAudioIO` sobre los endpoints del `AudioSetup`, modo compartido (parte 7.10).
     public static let wasapi: IOFactory = { setup in try WASAPIAudioIO(setup: setup) }
     #endif
 

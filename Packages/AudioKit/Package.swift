@@ -30,6 +30,8 @@ let package = Package(
                 .product(name: "NativeResample", package: "NativeKit"),
                 // Signalsmith Stretch: velocidad y tono del reproductor portátil (plan, «Corte del paso 7», parte 7.6).
                 .product(name: "CSignalsmith", package: "NativeKit"),
+                // Shim WASAPI de `WASAPIAudioIO` (plan, «Corte del paso 7», partes 7.7 y 7.10); solo existe en Windows.
+                .product(name: "CWASAPI", package: "NativeKit", condition: .when(platforms: [.windows])),
                 .product(name: "Crypto", package: "swift-crypto", condition: .when(platforms: [.windows]))
             ],
             swiftSettings: [.unsafeFlags(["-O"], .when(configuration: .debug))]

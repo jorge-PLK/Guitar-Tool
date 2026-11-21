@@ -1,8 +1,13 @@
-#if canImport(AVFoundation)
+// Mac: CoreAudio, AVFoundation (cámara y WAV). Windows (parte 7.11b): WASAPI compartido (`AudioSession.systemIO`),
+// cámara de Media Foundation y WAV con dr_wav (`NativeAudioFile`).
 import AudioKit
-import AVFoundation
 import Foundation
 import VideoKit
+#if canImport(AVFoundation)
+import AVFoundation
+#else
+import NativeAudioFile
+#endif
 
 /// Dónde escribe la herramienta y por dónde habla.
 struct Env: Sendable {
@@ -102,8 +107,24 @@ final class Rig {
     let fs: Double
     let audioName: String
 
+    /// Escritura atómica de `frames.csv`: en Windows no (el reemplazo atómico de Foundation falla allí; brief, «Trampas»).
+    #if os(Windows)
+    static let atomicWrites = false
+    #else
+    static let atomicWrites = true
+    #endif
+
+    /// Cámaras del sistema: AVFoundation en el Mac, Media Foundation en Windows.
+    static func systemCameras() -> any CameraProviding {
+        #if canImport(AVFoundation)
+        AVCameraProvider()
+        #else
+        MediaFoundationCameraProvider()
+        #endif
+    }
+
     /// Cámara por `--camera` (UID o trozo del nombre) o la del sistema.
-    static func pickCamera(_ query: String?, in provider: AVCameraProvider) throws -> CameraDevice {
+    static func pickCamera(_ query: String?, in provider: any CameraProviding) throws -> CameraDevice {
         let all = provider.cameras()
         guard let query else {
             guard let d = provider.defaultCamera() ?? all.first else { throw CLIError("No hay cámaras.") }
@@ -145,6 +166,34 @@ final class Rig {
         guard let inQuery = o.input, let outQuery = o.output else {
             throw CLIError("Faltan --in y --out (UID o trozo del nombre; mira `tf-audio devices`).")
         }
+        #if !canImport(AVFoundation)
+        // Windows: endpoints WASAPI por id o trozo del nombre; la sesión abre WASAPI compartido (`systemIO`).
+        guard await MediaFoundationCameraProvider.ensureAccess() else {
+            throw CLIError("Sin permiso de cámara: concédelo en Configuración > Privacidad y seguridad > Cámara (aplicaciones de escritorio).")
+        }
+        let endpoints: [WASAPIDeviceInfo]
+        do { endpoints = try WASAPIAudioIO.devices() } catch { throw CLIError("No se pudieron listar los dispositivos WASAPI: \(error)") }
+        func endpoint(_ q: String, _ flow: WASAPIFlow, _ role: String) throws -> WASAPIDeviceInfo {
+            let list = endpoints.filter { $0.flow == flow }
+            if let d = list.first(where: { $0.id == q }) { return d }
+            let hits = list.filter { $0.name.localizedCaseInsensitiveContains(q) }
+            guard hits.count == 1 else {
+                let names = list.map { "  \($0.id)  \($0.name)" }.joined(separator: "\n")
+                throw CLIError("No hay un único dispositivo de \(role) que coincida con «\(q)». Dispositivos de \(role):\n\(names)")
+            }
+            return hits[0]
+        }
+        let inDev = try endpoint(inQuery, .capture, "entrada")
+        let outDev = try endpoint(outQuery, .render, "salida")
+        fs = o.rate ?? outDev.mix.sampleRate
+        sim = nil
+        audioName = "\(inDev.name) → \(outDev.name)"
+        session = AudioSession(setup: AudioSetup(inputDeviceUID: inDev.id, outputDeviceUID: outDev.id, sampleRate: fs,
+                                                 backingLeft: o.backing[0], backingRight: o.backing[1], guitarIn: guitar))
+        let cam = try Self.pickCamera(o.camera, in: MediaFoundationCameraProvider())
+        camera = try MediaFoundationCameraCapture(cameraID: cam.id)
+        simCameraConfig = nil
+        #else
         guard await CoreAudioIO.ensureInputPermission() else {
             throw CLIError("Sin permiso de entrada de audio: concédelo a la terminal en Ajustes del Sistema > Privacidad > Micrófono.")
         }
@@ -169,6 +218,7 @@ final class Rig {
         let cam = try Self.pickCamera(o.camera, in: AVCameraProvider())
         camera = try AVCameraCapture(cameraID: cam.id)
         simCameraConfig = nil
+        #endif
     }
 
     func open() throws {
@@ -287,6 +337,9 @@ final class FrameRelay: @unchecked Sendable {
 enum WavFile {
     static func write(_ channels: [[Float]], sampleRate: Double, to url: URL) throws {
         try? FileManager.default.removeItem(at: url)
+        #if !canImport(AVFoundation)
+        try NativeAudioFile.write(url, channels: channels, sampleRate: sampleRate, format: .float32)
+        #else
         let settings: [String: Any] = [
             AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: sampleRate, AVNumberOfChannelsKey: channels.count,
             AVLinearPCMBitDepthKey: 32, AVLinearPCMIsFloatKey: true, AVLinearPCMIsBigEndianKey: false,
@@ -306,6 +359,6 @@ enum WavFile {
             try file.write(from: buf)
             at += n
         }
+        #endif
     }
 }
-#endif

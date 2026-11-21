@@ -83,7 +83,12 @@ public final class PortableStudyPlayer {
                  outputRate: Double?) {
         self.offline = offline
         forcedOutputRate = outputRate
+        #if os(Windows)
+        // Salida propia por WASAPI a la frecuencia de mezcla del endpoint (parte 7.10); `nil` = render por defecto.
+        self.outputIO = outputIO ?? { route in try WASAPIAudioIO(outputUID: route?.device.uid ?? "") }
+        #else
         self.outputIO = outputIO ?? { _ in throw PlatformError.unsupported("paso 7: wasapi") }
+        #endif
         if let devices {
             let controller = OutputController(provider: devices, selection: selection)
             output = controller

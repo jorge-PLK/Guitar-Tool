@@ -1,8 +1,9 @@
-#if canImport(AVFoundation)
 import AudioKit
-import AVFoundation
+import Foundation
 import XCTest
 @testable import VideoKit
+#if canImport(AVFoundation)
+import AVFoundation
 
 /// WAV float32 y lectura del primer canal para los tests.
 enum TestWav {
@@ -46,6 +47,55 @@ enum TestWav {
         return d
     }
 }
+#else
+/// Carpeta temporal y WAV de los tests. Windows (parte 7.9): WAV float32 entrelazado escrito y leído a mano (lectura:
+/// PCM de 16, 24 y 32 bits o float32, también en WAVE_FORMAT_EXTENSIBLE).
+enum TestWav {
+    static func write(_ channels: [[Float]], sampleRate: Double, to url: URL) throws {
+        let nch = channels.count, frames = channels.first?.count ?? 0
+        var d = Data()
+        func u32(_ v: Int) { d.append(contentsOf: withUnsafeBytes(of: UInt32(v).littleEndian, Array.init)) }
+        func u16(_ v: Int) { d.append(contentsOf: withUnsafeBytes(of: UInt16(v).littleEndian, Array.init)) }
+        d.append(contentsOf: Array("RIFF".utf8)); u32(36 + frames * nch * 4); d.append(contentsOf: Array("WAVEfmt ".utf8))
+        u32(16); u16(3); u16(nch); u32(Int(sampleRate)); u32(Int(sampleRate) * nch * 4); u16(nch * 4); u16(32)
+        d.append(contentsOf: Array("data".utf8)); u32(frames * nch * 4)
+        var samples = [Float](repeating: 0, count: frames * nch)
+        for (c, ch) in channels.enumerated() { for i in 0..<frames { samples[i * nch + c] = ch[i] } }
+        samples.withUnsafeBytes { d.append(contentsOf: $0) }
+        try? FileManager.default.removeItem(at: url)
+        try d.write(to: url)
+    }
+
+    static func readFirst(_ url: URL) throws -> [Float] {
+        let d = try Data(contentsOf: url)
+        func le(_ o: Int, _ n: Int) -> Int { (0..<n).reduce(0) { $0 | Int(d[d.startIndex + o + $1]) << (8 * $1) } }
+        var pos = 12, format = 0, nch = 1, bits = 16
+        while pos + 8 <= d.count {
+            let id = String(decoding: d[(d.startIndex + pos)..<(d.startIndex + pos + 4)], as: UTF8.self), size = le(pos + 4, 4)
+            if id == "fmt " {
+                format = le(pos + 8, 2); nch = le(pos + 10, 2); bits = le(pos + 22, 2)
+                if format == 0xFFFE { format = le(pos + 32, 2) }
+            } else if id == "data" {
+                let bytes = bits / 8, frames = min(size, d.count - pos - 8) / (bytes * nch)
+                return (0..<frames).map { i in
+                    let o = pos + 8 + i * bytes * nch
+                    if format == 3 { return Float(bitPattern: UInt32(le(o, 4))) }
+                    let raw = le(o, bytes), sign = 1 << (bits - 1)
+                    return Float((raw & (sign - 1)) - (raw & sign)) / Float(sign)
+                }
+            }
+            pos += 8 + size + (size & 1)
+        }
+        throw CocoaError(.fileReadCorruptFile)
+    }
+
+    static func tempDir(_ name: String) throws -> URL {
+        let d = FileManager.default.temporaryDirectory.appendingPathComponent("\(name)-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
+        return d
+    }
+}
+#endif // canImport(AVFoundation)
 
 /// Puerta de la Fase 6 (mini-spec, «Pruebas»): cámara simulada con retardo conocido, jitter de ±2 ms y fotogramas
 /// perdidos, sobre el audio simulado de la Fase 3 (`AudioSession` + `SimulatedAudioIO` + `StudyPlayer` alojado).
@@ -260,60 +310,3 @@ final class SyncGateTests: XCTestCase {
         XCTAssertGreaterThan(takes[2].nominalClockDrift, 0.0025, "sin ajustar la deriva, 50 ppm en 60 s son ~3 ms")
     }
 }
-#else
-import Foundation
-import XCTest
-
-/// Windows: depende de piezas del paso 7; se listan los mismos tests como saltados.
-final class SyncGateTests: XCTestCase {
-    func testThreeTakesLandWithinHalfAFrameWithTheSameOffset() throws { throw XCTSkip("[paso 7] reproductor") }
-}
-
-/// Carpeta temporal y WAV de los tests. Windows (parte 7.9): WAV float32 entrelazado escrito y leído a mano (lectura:
-/// PCM de 16, 24 y 32 bits o float32, también en WAVE_FORMAT_EXTENSIBLE).
-enum TestWav {
-    static func write(_ channels: [[Float]], sampleRate: Double, to url: URL) throws {
-        let nch = channels.count, frames = channels.first?.count ?? 0
-        var d = Data()
-        func u32(_ v: Int) { d.append(contentsOf: withUnsafeBytes(of: UInt32(v).littleEndian, Array.init)) }
-        func u16(_ v: Int) { d.append(contentsOf: withUnsafeBytes(of: UInt16(v).littleEndian, Array.init)) }
-        d.append(contentsOf: Array("RIFF".utf8)); u32(36 + frames * nch * 4); d.append(contentsOf: Array("WAVEfmt ".utf8))
-        u32(16); u16(3); u16(nch); u32(Int(sampleRate)); u32(Int(sampleRate) * nch * 4); u16(nch * 4); u16(32)
-        d.append(contentsOf: Array("data".utf8)); u32(frames * nch * 4)
-        var samples = [Float](repeating: 0, count: frames * nch)
-        for (c, ch) in channels.enumerated() { for i in 0..<frames { samples[i * nch + c] = ch[i] } }
-        samples.withUnsafeBytes { d.append(contentsOf: $0) }
-        try? FileManager.default.removeItem(at: url)
-        try d.write(to: url)
-    }
-
-    static func readFirst(_ url: URL) throws -> [Float] {
-        let d = try Data(contentsOf: url)
-        func le(_ o: Int, _ n: Int) -> Int { (0..<n).reduce(0) { $0 | Int(d[d.startIndex + o + $1]) << (8 * $1) } }
-        var pos = 12, format = 0, nch = 1, bits = 16
-        while pos + 8 <= d.count {
-            let id = String(decoding: d[(d.startIndex + pos)..<(d.startIndex + pos + 4)], as: UTF8.self), size = le(pos + 4, 4)
-            if id == "fmt " {
-                format = le(pos + 8, 2); nch = le(pos + 10, 2); bits = le(pos + 22, 2)
-                if format == 0xFFFE { format = le(pos + 32, 2) }
-            } else if id == "data" {
-                let bytes = bits / 8, frames = min(size, d.count - pos - 8) / (bytes * nch)
-                return (0..<frames).map { i in
-                    let o = pos + 8 + i * bytes * nch
-                    if format == 3 { return Float(bitPattern: UInt32(le(o, 4))) }
-                    let raw = le(o, bytes), sign = 1 << (bits - 1)
-                    return Float((raw & (sign - 1)) - (raw & sign)) / Float(sign)
-                }
-            }
-            pos += 8 + size + (size & 1)
-        }
-        throw CocoaError(.fileReadCorruptFile)
-    }
-
-    static func tempDir(_ name: String) throws -> URL {
-        let d = FileManager.default.temporaryDirectory.appendingPathComponent("\(name)-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
-        return d
-    }
-}
-#endif // canImport(AVFoundation)

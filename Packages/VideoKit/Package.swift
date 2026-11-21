@@ -28,10 +28,18 @@ let package = Package(
                 .product(name: "CMediaFoundation", package: "NativeKit", condition: .when(platforms: [.windows])),
                 .product(name: "NativeAudioFile", package: "NativeKit", condition: .when(platforms: [.windows])),
                 // Parte 7.9: compositor del montaje con Direct2D + DirectWrite.
-                .product(name: "CDirect2D", package: "NativeKit", condition: .when(platforms: [.windows]))
+                .product(name: "CDirect2D", package: "NativeKit", condition: .when(platforms: [.windows])),
+                // Parte 7.11: pose del encuadre con MoveNet sobre ONNX Runtime (en el Mac sigue Vision).
+                .product(name: "NativeONNX", package: "NativeKit", condition: .when(platforms: [.windows]))
             ]
         ),
-        .executableTarget(name: "tf-video", dependencies: ["VideoKit", .product(name: "AudioKit", package: "AudioKit")]),
-        .testTarget(name: "VideoKitTests", dependencies: ["VideoKit", "tf-video", .product(name: "AudioKit", package: "AudioKit")])
+        // Parte 7.11b: en Windows, `tf-video` escribe el WAV de silencio con dr_wav (en el Mac, AVAudioFile).
+        .executableTarget(name: "tf-video", dependencies: [
+            "VideoKit", .product(name: "AudioKit", package: "AudioKit"),
+            .product(name: "NativeAudioFile", package: "NativeKit", condition: .when(platforms: [.windows]))
+        ]),
+        // CMiniz: lector de PNG de los tests de pose (mismo código en el Mac y en Windows).
+        .testTarget(name: "VideoKitTests", dependencies: ["VideoKit", "tf-video", .product(name: "AudioKit", package: "AudioKit"),
+                                                          .product(name: "CMiniz", package: "NativeKit")])
     ]
 )

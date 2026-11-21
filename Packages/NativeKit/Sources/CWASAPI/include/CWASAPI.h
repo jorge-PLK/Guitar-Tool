@@ -4,7 +4,7 @@
 //
 // Qué da (lo que pide el contrato de `WASAPIAudioIO` y `DuplexClockSync` en AudioKit):
 // - Enumeración de endpoints de render y captura: id, nombre, formato de mezcla, periodos de `GetDevicePeriod` y de
-//   `IAudioClient3::GetSharedModeEnginePeriod`.
+//   `IAudioClient3::GetSharedModeEnginePeriod`, y el driver del adaptador (nodo PnP vía cfgmgr32; parte 7.10b).
 // - Flujo dúplex por eventos en un único hilo de audio con MMCSS «Pro Audio»: compartido (`InitializeSharedAudioStream`
 //   con el periodo mínimo; respaldo `IAudioClient::Initialize`) o exclusivo (`Initialize` exclusivo con el periodo
 //   mínimo y alineado de búfer).
@@ -26,6 +26,7 @@ int wasapi_shim_version(void);
 
 #define WASAPI_ID_CAP 256
 #define WASAPI_NAME_CAP 256
+#define WASAPI_DRIVER_CAP 128
 
 /// Flujo del endpoint.
 enum { WASAPI_FLOW_RENDER = 0, WASAPI_FLOW_CAPTURE = 1 };
@@ -84,6 +85,17 @@ typedef struct wasapi_device_info {
     uint32_t engine_max_frames;         ///< ... máximo
     int32_t exclusive_float_ok;    ///< IsFormatSupported(EXCLUSIVE) con float32 al formato de mezcla
     int32_t hresult;               ///< 0 o el primer error al consultar el endpoint
+    // Driver del adaptador (parte 7.10b): endpoint → IDeviceTopology → filtro KS del adaptador → su nodo PnP
+    // (cfgmgr32, DEVPKEY_Device_*). Vacíos si el endpoint no tiene adaptador físico o la consulta falla.
+    char adapter_instance[WASAPI_ID_CAP];  ///< id de instancia PnP: «USB\VID_xxxx&PID_yyyy&MI_00\...»
+    char adapter_name[WASAPI_NAME_CAP];    ///< DEVPKEY_Device_FriendlyName (o DeviceDesc) del nodo
+    char driver_service[WASAPI_DRIVER_CAP];  ///< DEVPKEY_Device_Service: «usbaudio2», «usbaudio», «HdAudAddService»…
+    char driver_provider[WASAPI_DRIVER_CAP]; ///< DEVPKEY_Device_DriverProvider: «Microsoft» o el fabricante
+    char driver_version[WASAPI_DRIVER_CAP];  ///< DEVPKEY_Device_DriverVersion
+    char driver_desc[WASAPI_NAME_CAP];       ///< DEVPKEY_Device_DriverDesc
+    char driver_inf[WASAPI_DRIVER_CAP];      ///< DEVPKEY_Device_DriverInfPath: «usbaudio2.inf», «oem12.inf»…
+    int32_t driver_hresult;        ///< 0, el HRESULT del paso de topología que falló, o 0x80000000|CONFIGRET de cfgmgr32
+    int32_t reserved_driver;
 } wasapi_device_info;
 
 /// Escribe hasta `capacity` endpoints activos de render y captura en `out` y devuelve cuántos hay (puede ser mayor que

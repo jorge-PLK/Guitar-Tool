@@ -1,18 +1,30 @@
+import Foundation
+import VideoKit
 #if canImport(AVFoundation)
 import AVFoundation
-import Foundation
 import ImageIO
 import UniformTypeIdentifiers
-import VideoKit
+#endif
 
-/// `frame` y `montage` (Fase 7, desarrollo).
+/// `frame` y `montage` (Fase 7, desarrollo). Windows (parte 7.11b): pose con MoveNet y PNG propio (`FramePNG`).
 extension CLI {
     static func f(_ b: FramingBox) -> String { "x \(b.x.fixed(3)) y \(b.y.fixed(3)) ancho \(b.width.fixed(3)) alto \(b.height.fixed(3))" }
 
     /// Caja fija y resumen de la trayectoria de `GuitarFramer`; con `--png`, el fotograma central con las cajas.
     static func frame(_ o: Options, _ env: Env) async throws -> Int32 {
         let url = URL(fileURLWithPath: o.positional[0])
+        #if canImport(AVFoundation)
         let a = try await GuitarFramer.analyze(videoURL: url, interval: o.interval ?? GuitarFramer.defaultInterval)
+        #else
+        let a: FramingAnalysis
+        do {
+            a = try await GuitarFramer.analyze(videoURL: url, interval: o.interval ?? GuitarFramer.defaultInterval,
+                                               poseModel: o.poseModel.map { URL(fileURLWithPath: $0) })
+        } catch let GuitarFramerError.read(message) {
+            let model = message.contains("modelo") || message.contains("cargar")
+            throw CLIError("Encuadre: \(message)" + (model ? ". Indica el modelo con --pose-model <ruta.onnx>." : ""))
+        }
+        #endif
         env.line("Vídeo: \(url.path) (\(a.frameWidth)×\(a.frameHeight))")
         env.line("Muestras: \(a.samples), con pose: \(a.detected)")
         if let b = a.fixed { env.line("Caja fija (normalizada, origen arriba a la izquierda): \(f(b))") } else {
@@ -26,6 +38,9 @@ extension CLI {
             env.line("Trayectoria: vacía")
         }
         if let png = o.png {
+            #if !canImport(AVFoundation)
+            try writePNG(png, video: url, analysis: a, env)
+            #else
             let asset = AVURLAsset(url: url)
             let range = try await asset.loadTracks(withMediaType: .video).first!.load(.timeRange)
             let mid = CMTimeGetSeconds(range.start) + CMTimeGetSeconds(range.duration) / 2
@@ -51,9 +66,31 @@ extension CLI {
             CGImageDestinationAddImage(dest, image, nil)
             guard CGImageDestinationFinalize(dest) else { throw CLIError("No se pudo escribir \(png).") }
             env.line("PNG: \(out.path) (fotograma a \(mid.fixed(2)) s; rojo = caja fija, verde = trayectoria)")
+            #endif
         }
         return Exit.ok
     }
+
+    #if !canImport(AVFoundation)
+    /// Windows: el fotograma central (Media Foundation, `GuitarFramer.middleFrame`) con las cajas, en PNG.
+    static func writePNG(_ png: String, video url: URL, analysis a: FramingAnalysis, _ env: Env) throws {
+        let middle: (time: Double, image: FramePixelBuffer)?
+        do { middle = try GuitarFramer.middleFrame(videoURL: url) } catch { throw CLIError("No se pudo leer el fotograma central: \(error)") }
+        guard let middle else { throw CLIError("\(url.lastPathComponent) no tiene imagen.") }
+        let img = middle.image, lw = FramePNG.lineWidth(imageWidth: img.width)
+        func stroke(_ b: FramingBox, _ c: FramePNG.RGB) {
+            FramePNG.stroke(b, color: c, lineWidth: lw, pixels: img.baseAddress, width: img.width, height: img.height,
+                            bytesPerRow: img.bytesPerRow)
+        }
+        if let b = a.fixed { stroke(b, FramePNG.fixedColor) }
+        if let b = a.trackBox(at: middle.time) { stroke(b, FramePNG.trackColor) }
+        let out = URL(fileURLWithPath: png)
+        let data = FramePNG.encode(pixels: UnsafeRawPointer(img.baseAddress), width: img.width, height: img.height,
+                                   bytesPerRow: img.bytesPerRow)
+        do { try data.write(to: out) } catch { throw CLIError("No se pudo escribir \(png).") }
+        env.line("PNG: \(out.path) (fotograma a \(middle.time.fixed(2)) s; rojo = caja fija, verde = trayectoria)")
+    }
+    #endif
 
     /// Exporta un `MontagePlan` en JSON.
     static func montage(_ o: Options, _ env: Env) async throws -> Int32 {
@@ -85,4 +122,3 @@ extension CLI {
         return Exit.ok
     }
 }
-#endif

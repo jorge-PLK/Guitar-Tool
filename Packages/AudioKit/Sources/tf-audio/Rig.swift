@@ -1,5 +1,5 @@
-// tf-audio mide con el dispositivo y el reproductor. En Windows solo `--simulated` (dispositivos reales: paso 7: wasapi,
-// parte 7.10); el reproductor es el portátil (parte 7.6).
+// tf-audio mide con el dispositivo y el reproductor. En Windows, dispositivos WASAPI (parte 7.10b) o `--simulated`; el
+// reproductor es el portátil (parte 7.6).
 import AudioKit
 #if canImport(AVFoundation)
 import AVFoundation
@@ -148,6 +148,7 @@ final class IOBox: @unchecked Sendable {
     private var value: (any AudioIO)?
     func set(_ io: any AudioIO) { lock.withLock { value = io } }
     func get() -> (any AudioIO)? { lock.withLock { value } }
+    func clear() { lock.withLock { value = nil } }
 }
 
 final class ResultBox<T>: @unchecked Sendable {
@@ -167,6 +168,16 @@ final class Rig {
     let setup: AudioSetup
     let inputName: String
     let outputName: String
+    /// Modo WASAPI (solo Windows con dispositivos reales; `nil` en el Mac y con `--simulated`).
+    private(set) var mode: WASAPIShareMode?
+    /// Avisos sobre los dispositivos elegidos, para escribirlos tras «Entrada»/«Salida».
+    private(set) var notes: [String] = []
+
+    /// La calibración exclusiva va aparte: `LatencyCalibrationKey` no lleva el modo, y compartido y exclusivo pueden
+    /// dar el mismo periodo con latencias distintas (cómo lo guarda la app se decide en el paso 8).
+    func calibrationURL(_ env: Env) -> URL {
+        mode == .exclusive ? env.dir.appendingPathComponent("calibration-exclusive.json") : env.calibrationURL
+    }
 
     /// Mínimo que admite `SimulatedAudioIO` (semianchura del sinc, 32, más 1).
     static let minLoopSamples = 33.0
@@ -214,9 +225,51 @@ final class Rig {
         guard let inQuery = o.input, let outQuery = o.output else {
             throw CLIError("Faltan --in y --out (UID o trozo del nombre; mira `tf-audio devices`).")
         }
-        #if !canImport(AVFoundation)
-        throw CLIError("Dispositivos reales (\(inQuery) → \(outQuery)) en Windows: pendiente (paso 7: wasapi, parte 7.10). Usa --simulated.")
+        #if os(Windows)
+        // En Windows entrada y salida del mismo aparato son endpoints con ids distintos: se reciben los dos y se asume
+        // que son el mismo aparato (un reloj, `clock = .single`). Cómo lo marca `AudioSetup` en la app: paso 8.
+        let list: [WASAPIDeviceInfo]
+        do { list = try WASAPIAudioIO.devices() } catch {
+            throw CLIError(((error as? LocalizedError)?.errorDescription ?? "\(error)"))
+        }
+        let captures = list.filter { $0.flow == .capture }
+        let renders = list.filter { $0.flow == .render }
+        let inMatch = try Parse.device(inQuery, in: captures.enumerated().map { WASAPIListing.audioDevice($1, index: $0) },
+                                       role: "entrada")
+        let outMatch = try Parse.device(outQuery, in: renders.enumerated().map { WASAPIListing.audioDevice($1, index: $0) },
+                                        role: "salida")
+        let inDev = captures[Int(inMatch.id)]
+        let outDev = renders[Int(outMatch.id)]
+        let wasapiMode = o.mode ?? .shared
+        let fs = o.rate ?? outDev.mix.sampleRate
+        sim = nil
+        mode = wasapiMode
+        inputName = "\(inDev.name) (\(inDev.id)) · driver \(WASAPIListing.driverText(inDev.driver))"
+        outputName = "\(outDev.name) (\(outDev.id)) · driver \(WASAPIListing.driverText(outDev.driver))"
+        var warnings: [String] = []
+        if WASAPIListing.sameAdapter(inDev, outDev) == false {
+            warnings.append("AVISO: entrada y salida en adaptadores distintos (\(inDev.driver.adapterInstance) y "
+                            + "\(outDev.driver.adapterInstance)): dos relojes, WASAPI no corrige la deriva.")
+        }
+        if wasapiMode == .shared, abs(inDev.mix.sampleRate - fs) >= 0.5 || abs(outDev.mix.sampleRate - fs) >= 0.5 {
+            warnings.append("En compartido la entrada (\(Int(inDev.mix.sampleRate)) Hz) y la salida (\(Int(outDev.mix.sampleRate)) Hz) "
+                            + "tienen que estar a \(Int(fs)) Hz: cámbialo en Panel de sonido > Propiedades > Opciones avanzadas.")
+        }
+        notes = warnings
+        let options = WASAPIAudioIO.Options(mode: wasapiMode, periodFrames: o.period)
+        setup = AudioSetup(inputDeviceUID: inDev.id, outputDeviceUID: outDev.id, sampleRate: fs,
+                           backingLeft: o.backing[0], backingRight: o.backing[1], guitarIn: guitar)
+        session = AudioSession(setup: setup, makeIO: { s in
+            let io = try WASAPIAudioIO(setup: s, options: options)
+            box.set(io)
+            return io
+        })
+        #elseif !canImport(AVFoundation)
+        throw CLIError("Dispositivos reales (\(inQuery) → \(outQuery)): sin E/S de audio en esta plataforma. Usa --simulated.")
         #else
+        guard o.mode == nil, o.period == nil else {
+            throw CLIError("--mode y --period solo existen en Windows (WASAPI).")
+        }
         guard await CoreAudioIO.ensureInputPermission() else {
             throw CLIError("Sin permiso de entrada de audio: concédelo a la terminal en Ajustes del Sistema > Privacidad > Micrófono.")
         }
@@ -243,7 +296,13 @@ final class Rig {
         if let io = sim { ioBox.set(io) }
     }
 
-    func close() { session.close() }
+    func close() {
+        session.close()
+        #if os(Windows)
+        // Suelta también el flujo WASAPI (se cierra en su `deinit`): en exclusivo, el siguiente `--restarts` lo reabre.
+        if sim == nil { ioBox.clear() }
+        #endif
+    }
 
     var fs: Double { setup.sampleRate }
 

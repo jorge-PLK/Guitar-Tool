@@ -1,5 +1,5 @@
-// Solo Apple (cámara, CoreAudio y escritor reales). En Windows `tf-video` sale con un aviso (paso 7).
-#if canImport(AVFoundation)
+// Mac y Windows (parte 7.11b): lo propio de cada sistema (dispositivos, cámara, WAV, PNG) está en `Rig.swift` y
+// `MontageCommands.swift`.
 import AudioKit
 import Foundation
 import VideoKit
@@ -13,6 +13,23 @@ enum Exit {
 
 @MainActor
 enum CLI {
+    #if canImport(AVFoundation)
+    static let frameHelp = """
+          frame <video.mov> [--interval 0.25] [--png <ruta.png>]
+              Encuadre automático (Vision): caja fija y resumen de la trayectoria; con --png, el fotograma central con
+              la caja fija (rojo) y la de la trayectoria (verde).
+              Ejemplo: tf-video frame Temp/tf-video/take-x/video.mov --png Temp/tf-video/frame.png
+        """
+    #else
+    static let frameHelp = """
+          frame <video.mov> [--interval 0.25] [--png <ruta.png>] [--pose-model <model.onnx>]
+              Encuadre automático (MoveNet): caja fija y resumen de la trayectoria; con --png, el fotograma central con
+              la caja fija (rojo) y la de la trayectoria (verde). Modelo: --pose-model o, sin él,
+              <TF_MODELS_DIR o C:\\tf-models>\\pose\\model.onnx.
+              Ejemplo: tf-video frame Temp/tf-video/take-x/video.mov --png Temp/tf-video/frame.png
+        """
+    #endif
+
     static let help = """
     tf-video: cámaras, grabación con vídeo y sincronía (herramienta de desarrollo de ToneForge)
 
@@ -33,10 +50,7 @@ enum CLI {
           Igual sin escribir ficheros: informe de marcas (jitter, fotogramas perdidos, deriva cámara/audio,
           retardo de entrega).
 
-      frame <video.mov> [--interval 0.25] [--png <ruta.png>]
-          Encuadre automático (Vision): caja fija y resumen de la trayectoria; con --png, el fotograma central con
-          la caja fija (rojo) y la de la trayectoria (verde).
-          Ejemplo: tf-video frame Temp/tf-video/take-x/video.mov --png Temp/tf-video/frame.png
+    \(frameHelp)
 
       montage <plan.json> <salida.mov|.mp4> [--mix <wav>] [--codec hevc|h264] [--container mov|mp4] [--width W --height H] [--fps F]
           Exporta un MontagePlan en JSON (por defecto, lienzo y fps del plan, HEVC); --mix multiplexa el WAV.
@@ -77,7 +91,7 @@ enum CLI {
     }
 
     static func cameras(_ o: Options, _ env: Env) -> Int32 {
-        let provider: any CameraProviding = o.simulated != nil ? SimulatedCameraProvider() : AVCameraProvider()
+        let provider: any CameraProviding = o.simulated != nil ? SimulatedCameraProvider() : Rig.systemCameras()
         let list = provider.cameras()
         let def = provider.defaultCamera()?.id
         if list.isEmpty { env.line("No hay cámaras.") }
@@ -92,6 +106,18 @@ enum CLI {
     }
 
     static func ms(_ s: Double) -> String { (s * 1000).fixed(2) }
+
+    /// Carpeta de una toma que no pisa otra: `<name>` o, si ya existe (dos pasadas en el mismo segundo), `<name>-2`,
+    /// `<name>-3`…
+    nonisolated static func freeTakeDirectory(in base: URL, name: String, exists: (URL) -> Bool) -> URL {
+        var url = base.appendingPathComponent(name)
+        var n = 2
+        while exists(url) {
+            url = base.appendingPathComponent("\(name)-\(n)")
+            n += 1
+        }
+        return url
+    }
 
     /// `record` (escribe) y `sync` (solo informe).
     static func take(_ o: Options, _ env: Env, write: Bool) async throws -> Int32 {
@@ -109,11 +135,18 @@ enum CLI {
 
         let stamp = DateFormatter()
         stamp.dateFormat = "yyyyMMdd-HHmmss"
-        let dir = env.dir.appendingPathComponent("take-\(stamp.string(from: Date()))")
+        let dir = freeTakeDirectory(in: env.dir, name: "take-\(stamp.string(from: Date()))") {
+            FileManager.default.fileExists(atPath: $0.path)
+        }
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
 
         // Backing: el WAV dado o silencio (para que haya ancla).
         let player = rig.makePlayer()
+        #if os(Windows)
+        // El portátil suelta la sesión al cerrarla en un `Task` del actor principal (AudioKit), que retiene los stems:
+        // sin soltarlo aquí, `silence.wav` seguía abierto al volver y la siguiente pasada no podía reescribirlo.
+        defer { player.detach() }
+        #endif
         var song = o.song.map { URL(fileURLWithPath: $0) }
         if song == nil {
             let silence = [Float](repeating: 0, count: Int((seconds + 2) * rig.fs))
@@ -159,7 +192,7 @@ enum CLI {
             let csv = "sequence,host_s,arrival_s,song_s,written\n" + recorder.frames.map {
                 "\($0.sequence),\($0.hostSeconds.fixed(6)),\($0.arrivalHostSeconds.fixed(6)),\($0.songTime.map { $0.fixed(6) } ?? ""),\($0.written ? 1 : 0)"
             }.joined(separator: "\n") + "\n"
-            try csv.write(to: dir.appendingPathComponent("frames.csv"), atomically: true, encoding: .utf8)
+            try csv.write(to: dir.appendingPathComponent("frames.csv"), atomically: Rig.atomicWrites, encoding: .utf8)
             env.line("Vídeo: \(videoURL.path)")
             env.line("Audio: \(wavURL.path)")
             if let t = audioTake {
@@ -186,4 +219,3 @@ enum CLI {
         return code
     }
 }
-#endif

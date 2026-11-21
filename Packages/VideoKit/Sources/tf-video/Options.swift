@@ -36,6 +36,8 @@ struct Options {
     /// `frame`: PNG con la caja dibujada e intervalo de muestreo.
     var png: String?
     var interval: Double?
+    /// `frame` en Windows: `.onnx` de MoveNet (sin darlo, `<TF_MODELS_DIR o C:\tf-models>\pose\model.onnx`).
+    var poseModel: String?
     /// `montage`: WAV de la mezcla y códec; tamaño y fps solo si se dan.
     var mix: String?
     var codec: String = "hevc"
@@ -101,6 +103,10 @@ enum Parse {
                 let s = try number(try value(flag), flag)
                 guard s > 0 else { throw CLIError("--interval debe ser mayor que 0.") }
                 o.interval = s
+            #if !canImport(Vision)
+            // Solo fuera del Mac (parte 7.11b): allí la pose es de Vision y no hay modelo que elegir.
+            case "--pose-model": o.poseModel = try value(flag)
+            #endif
             case "--mix": o.mix = try value(flag)
             case "--codec":
                 let c = try value(flag)
