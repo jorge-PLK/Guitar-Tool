@@ -264,13 +264,16 @@ public final class AudioSession: @unchecked Sendable {
     }
 
     /// Cierra la sesión (si se grababa, la toma se descarta: usa antes `stopRecording`).
+    /// Suelta también el reproductor alojado (plan, «Pendiente tras el paso 7»): al volver la sesión ya no retiene su
+    /// render ni, con él, los stems; el reproductor vuelve a su salida con `onEnd`, como antes.
     public func close() {
-        let (io, end) = lock.withLock { () -> ((any AudioIO)?, (@Sendable () -> Void)?) in
+        let (io, end, rt) = lock.withLock { () -> ((any AudioIO)?, (@Sendable () -> Void)?, SessionRT?) in
             let io = self.io
             self.io = nil
             consumerRunning = false
             consumer = nil
-            return (io, playerEnd)
+            defer { playerEnd = nil }
+            return (io, playerEnd, self.rt)
         }
         io?.setInterruptionHandler(nil)
         io?.stop()
@@ -279,6 +282,8 @@ public final class AudioSession: @unchecked Sendable {
             calibrator = nil
         }
         rt?.calibrating.store(false, ordering: .sequentiallyConsistent)
+        // Tras `stop` el hilo de E/S ya no entra; si un bloque tenía aún el render, lo retiene él hasta acabarlo.
+        rt?.player.withLockUnchecked { $0 = nil }
         end?()
     }
 
@@ -551,7 +556,11 @@ public final class AudioSession: @unchecked Sendable {
             return recording
         }
         if let rec { saveCut(rec) }
-        let (handler, end) = lock.withLock { (eventHandler, playerEnd) }
+        let (handler, end) = lock.withLock { () -> ((@Sendable (AudioSessionEvent) -> Void)?, (@Sendable () -> Void)?) in
+            defer { playerEnd = nil }
+            return (eventHandler, playerEnd)
+        }
+        rt?.player.withLockUnchecked { $0 = nil }
         end?()
         handler?(.interrupted(reason))
     }

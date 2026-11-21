@@ -77,8 +77,8 @@ public struct SeparationRunner: Sendable {
                 let d = h.availableData
                 if d.isEmpty { h.readabilityHandler = nil; run.stderrClosed() } else { run.stderr(d) }
             }
-            process.terminationHandler = { p in
-                run.exited(reason: p.terminationReason, status: p.terminationStatus)
+            child.terminationHandler = { c in
+                run.exited(reason: c.terminationReason, status: c.terminationStatus)
             }
             #if os(Windows)
             // Parada ordenada (parte 7.8): el helper vigila este evento (ver `HelperStop`).

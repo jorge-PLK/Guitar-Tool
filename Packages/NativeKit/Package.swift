@@ -41,6 +41,8 @@ let package = Package(
         .target(name: "CWASAPI"),
         .target(name: "CMediaFoundation"),
         .target(name: "CDirect2D"),
+        // Paso 8: CreateProcessW con CREATE_NO_WINDOW para `ChildProcess` (los hijos de consola sin ventana).
+        .target(name: "CChildProcess"),
         // Cabeceras de la API C de ONNX Runtime 1.32.0; solo Windows. onnxruntime.dll se carga en ejecución (sin import lib).
         .target(name: "COnnxRuntime", exclude: ["LICENSE"]),
         .target(name: "NativeResample", dependencies: ["CResampler"]),
@@ -48,7 +50,8 @@ let package = Package(
                 dependencies: ["NativePlatform", .target(name: "COnnxRuntime", condition: .when(platforms: [.windows]))]),
         .target(name: "NativeDSP", dependencies: ["CPocketFFT"], exclude: ["README.md"]),
         .target(name: "NativeAudioFile", dependencies: ["CDrAudio", "NativeDSP"]),
-        .target(name: "NativePlatform"),
+        .target(name: "NativePlatform",
+                dependencies: [.target(name: "CChildProcess", condition: .when(platforms: [.windows]))]),
         .testTarget(name: "NativeKitTests",
                     dependencies: ["NativeDSP", "NativeAudioFile", "NativePlatform", "CMiniz", "NativeResample", "NativeONNX",
                                    "CSignalsmith", "CTinySoundFont", "CWASAPI", "CMediaFoundation", "CDirect2D"],

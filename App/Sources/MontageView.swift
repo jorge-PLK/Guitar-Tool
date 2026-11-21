@@ -89,6 +89,10 @@ private struct MontageBody: View {
     private static let previewMinHeight: CGFloat = 420
     /// Tope de la fila superior en portrait: el vídeo vertical se estrecha y la línea de tiempo cabe sin scroll.
     private static let portraitMaxHeight: CGFloat = 440
+    /// Por debajo de este ancho de contenido (ventana cerca del mínimo de 1100) las columnas laterales ceden sitio
+    /// a la vista previa, que si no quedaba en ~170 pt con el tiempo partido en tres líneas.
+    private static let compactWidth: CGFloat = 900
+    @State private var compact = false
 
     var body: some View {
         @Bindable var ctl = ctl
@@ -103,10 +107,11 @@ private struct MontageBody: View {
                 ScrollView(.vertical) {
                     VStack(alignment: .leading, spacing: 14) {
                         HStack(alignment: .top, spacing: 16) {
-                            LayoutColumn(ctl: ctl).frame(width: 270)
+                            LayoutColumn(ctl: ctl).frame(width: compact ? 252 : 270)
                             PreviewColumn(ctl: ctl).frame(maxWidth: .infinity)
-                            SettingsColumn(ctl: ctl).frame(width: 300)
+                            SettingsColumn(ctl: ctl).frame(width: compact ? 276 : 300)
                         }
+                        .onGeometryChange(for: Bool.self) { $0.size.width < Self.compactWidth } action: { compact = $0 }
                         .frame(minHeight: Self.previewMinHeight, maxHeight: ctl.isPortrait ? Self.portraitMaxHeight : nil)
                         MontageTimelineView(ctl: ctl)
                     }
@@ -255,7 +260,7 @@ private struct LayoutColumn: View {
                             LayoutThumb(kind: l.kind)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(l.name).font(TF.body(14, .semibold)).lineLimit(1)
-                                Text(l.desc).font(TF.body(11)).foregroundStyle(TF.muted).lineLimit(1).fixedSize()
+                                Text(l.desc).font(TF.body(11)).foregroundStyle(TF.muted).lineLimit(1).minimumScaleFactor(0.8)
                             }
                             Spacer(minLength: 0)
                         }
@@ -321,10 +326,10 @@ private struct PreviewColumn: View {
     var body: some View {
         Card {
             VStack(spacing: 10) {
-                HStack {
-                    Text("Vista previa · \(ctl.canvasLabel)")
-                    Spacer()
-                    Text([Fmt.duration(ctl.songTime), ctl.sectionName(at: ctl.songTime)].compactMap { $0 }.joined(separator: " · "))
+                // En una línea si cabe; si no, dos líneas enteras (nunca palabras partidas).
+                ViewThatFits(in: .horizontal) {
+                    HStack { headerTitle; Spacer(minLength: 12); headerTime }
+                    VStack(alignment: .leading, spacing: 2) { headerTitle; headerTime }.frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .font(TF.body(13)).foregroundStyle(TF.muted)
                 player.frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -333,6 +338,11 @@ private struct PreviewColumn: View {
             .padding(.horizontal, 20).padding(.vertical, 16)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+    }
+
+    private var headerTitle: some View { Text("Vista previa · \(ctl.canvasLabel)").lineLimit(1) }
+    private var headerTime: some View {
+        Text([Fmt.duration(ctl.songTime), ctl.sectionName(at: ctl.songTime)].compactMap { $0 }.joined(separator: " · ")).lineLimit(1)
     }
 
     private var player: some View {
@@ -360,7 +370,7 @@ private struct PreviewColumn: View {
                 Spacer()
             }
             (Text(Fmt.duration(ctl.songTime)) + Text(" / \(Fmt.duration(s.end))").foregroundStyle(TF.muted))
-                .font(TF.body(13)).monospacedDigit()
+                .font(TF.body(13)).monospacedDigit().lineLimit(1).fixedSize()
         }
     }
 }

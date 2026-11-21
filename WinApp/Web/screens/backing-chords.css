@@ -1,0 +1,31 @@
+/* Edición de acordes y tonalidad de Backing (backing/chord-editor.js). */
+.chord-edit-ctl { display: inline-flex; align-items: center; gap: 8px; }
+.btn.chord-edit-btn { gap: 6px; }
+.btn.chord-edit-btn.on { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.chords-area.editing { border-radius: 12px; box-shadow: inset 0 0 0 1.5px var(--accent); background: rgba(42, 33, 22, .4); }
+.grid-canvas.editing, .strip-canvas.editing { cursor: cell; }
+
+.popover { position: fixed; z-index: 60; padding: 14px; background: var(--field); border: 1px solid var(--field-line); border-radius: var(--radius-ctl);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .5);
+  max-height: calc(100vh - 16px); overflow-y: auto; }
+.pop-title { font-family: var(--font-display); font-size: 16px; font-weight: 600; margin-bottom: 10px; display: flex; align-items: baseline; gap: 8px; }
+.pgrid { display: grid; gap: 6px; margin-bottom: 10px; }
+.pgrid.roots { grid-template-columns: repeat(6, 44px); }
+.pgrid.qualities { grid-template-columns: repeat(4, 60px); }
+.pchip { height: 30px; min-width: 36px; padding: 0 4px; border: 0; border-radius: 6px; background: var(--neutral-bg); color: var(--text); font-size: 13px; font-weight: 600; }
+.pchip:hover { background: var(--line); }
+.pchip.on { background: var(--accent); color: var(--accent-ink); }
+.prow { display: flex; gap: 8px; }
+.prow.between { justify-content: space-between; }
+.psep { height: 1px; background: var(--line); margin: 10px 0; }
+
+.key-btn { display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 8px; margin-left: 2px; border: 0; border-radius: 6px; background: transparent; color: var(--text); }
+.key-btn b { font-weight: 600; }
+.key-btn:hover:not(:disabled) { background: var(--neutral-bg); }
+.key-btn:disabled { color: var(--muted); cursor: default; }
+.key-caret { font-size: 12px; color: var(--muted); }
+.key-menu { width: 150px; }
+.pitem { display: block; width: 100%; height: 26px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: var(--text); text-align: left; font-size: 13px; }
+.pitem:hover { background: var(--neutral-bg); }
+.pitem.on { background: var(--accent-bg); color: var(--accent); font-weight: 600; }
+.accent-text { color: var(--accent); }

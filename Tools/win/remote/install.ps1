@@ -11,6 +11,8 @@ $ErrorActionPreference = "Continue"
 $pkgPath = Join-Path $TfRoot ($Package -replace "/", "\")
 $expected = @{ "arm64" = 0xAA64; "x64" = 0x8664 }
 $bad = $false
+# Producto -> helpers que se instalan con el (tf-audio y tf-video se anaden aqui y en build.sh cuando toquen).
+$helpers = @{ "ToneForge" = @(@{ Package = "Packages\StemKit"; Exe = "tf-separate" }) }
 
 foreach ($a in (Get-Archs $Arch)) {
     $bin = (& swift build --package-path $pkgPath @(Get-SwiftArgs $a) --show-bin-path 2>$null | Select-Object -Last 1)
@@ -26,7 +28,31 @@ foreach ($a in (Get-Archs $Arch)) {
     Copy-Item $src $dest
     Get-ChildItem $bin -Filter "*.dll" | Copy-Item -Destination $dest
     Get-ChildItem $bin -Directory -Filter "*.resources" | Copy-Item -Destination $dest -Recurse
+    # Paquetes con interfaz web (WinApp): la carpeta Web del paquete va como Web\ junto al .exe.
+    $web = Join-Path $pkgPath "Web"
+    if (Test-Path $web) { Copy-Item $web (Join-Path $dest "Web") -Recurse -Force }
+    # alphaTab (pantalla Tablatura): se sirve como Web\alphaTab\ desde los recursos del Mac, sin duplicarlos en WinApp.
+    $alpha = Join-Path $TfRoot "App\Resources\alphaTab"
+    if ((Test-Path $web) -and (Test-Path $alpha)) {
+        $alphaDest = Join-Path $dest "Web\alphaTab"
+        New-Item -ItemType Directory -Force $alphaDest | Out-Null
+        Copy-Item (Join-Path $alpha "*") $alphaDest -Recurse -Force
+    }
     [void](Copy-OrtDlls $a $dest (Join-Path $dest "$Product.exe"))
+    # Helpers de la app: ejecutables de otros paquetes que ToneForge lanza como procesos hijo y busca junto a su .exe.
+    # build.sh compila antes esos paquetes. Los DLL del helper solo se copian si no estan ya (mandan los de la app).
+    foreach ($h in $helpers[$Product]) {
+        $hbin = (& swift build --package-path (Join-Path $TfRoot $h.Package) @(Get-SwiftArgs $a) --show-bin-path 2>$null | Select-Object -Last 1)
+        $hsrc = Join-Path $hbin "$($h.Exe).exe"
+        if (-not (Test-Path $hsrc)) {
+            Write-Output "TF:HELPER $a $($h.Exe) FALTA"
+            $bad = $true
+            continue
+        }
+        Copy-Item $hsrc $dest -Force
+        Get-ChildItem $hbin -Filter "*.dll" | Where-Object { -not (Test-Path (Join-Path $dest $_.Name)) } | Copy-Item -Destination $dest
+        Write-Output "TF:HELPER $a $($h.Exe) ok"
+    }
 
     $exe = Join-Path $dest "$Product.exe"
     $bytes = [IO.File]::ReadAllBytes($exe)

@@ -276,6 +276,17 @@ public final class WASAPIAudioIO: AudioIO, @unchecked Sendable {
         }
     }
 
+    /// Nombre amigable del endpoint de render `outputUID` (vacío = el de consola por defecto, el que abriría
+    /// `init(outputUID:)`), sin abrir flujo ni activar el cliente de audio (parte 8.6d-A: el nombre de la salida antes
+    /// del primer play). `nil` si no hay tal endpoint o no tiene nombre.
+    public static func renderName(outputUID: String = "") -> String? {
+        var buf = [CChar](repeating: 0, count: Int(WASAPI_NAME_CAP))
+        let hr = wasapi_render_name(outputUID, &buf, WASAPI_NAME_CAP)
+        guard hr >= 0 else { return nil }
+        let name = String(decoding: buf.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
+        return name.isEmpty ? nil : name
+    }
+
     /// Abre sin arrancar. Los punteros de id solo valen durante `wasapi_open` (el shim no los guarda).
     private static func open(renderID: String, captureID: String?, mode: WASAPIShareMode, rate: Double,
                              periodFrames: Int, bridge: WASAPIBridge) throws -> (OpaquePointer, wasapi_stream_info) {

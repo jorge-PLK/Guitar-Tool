@@ -106,8 +106,8 @@ private final class ProcessSession: @unchecked Sendable {
             let d = h.availableData
             if d.isEmpty { h.readabilityHandler = nil; closed(stdout: false) } else { received(stderr: d) }
         }
-        process.terminationHandler = { [self] p in
-            lock.withLock { exit = (p.terminationReason, p.terminationStatus) }
+        child.terminationHandler = { [self] c in
+            lock.withLock { exit = (c.terminationReason, c.terminationStatus) }
             tryComplete()
         }
         do {

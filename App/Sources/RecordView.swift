@@ -292,31 +292,38 @@ private struct RecordBody: View {
     }
 }
 
-/// Envuelve sus hijos en filas (los botones de toma).
-private struct FlowRow: Layout {
+/// Envuelve sus hijos en filas (los botones de toma, las opciones de la barra de grabación y las filas de Backing).
+struct FlowRow: Layout {
     var spacing: CGFloat = 6
 
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let w = proposal.width ?? .infinity
-        var x: CGFloat = 0, y: CGFloat = 0, rowH: CGFloat = 0, maxX: CGFloat = 0
-        for s in subviews {
+    /// Reparte los hijos en filas de ancho máximo `width`; cada fila es una lista de (índice, tamaño) y su alto.
+    private func rows(_ subviews: Subviews, width: CGFloat) -> [(items: [(Int, CGSize)], height: CGFloat)] {
+        var rows: [(items: [(Int, CGSize)], height: CGFloat)] = []
+        var cur: [(Int, CGSize)] = [], x: CGFloat = 0, h: CGFloat = 0
+        for (i, s) in subviews.enumerated() {
             let sz = s.sizeThatFits(.unspecified)
-            if x > 0, x + sz.width > w { x = 0; y += rowH + spacing; rowH = 0 }
-            x += sz.width + spacing
-            rowH = max(rowH, sz.height)
-            maxX = max(maxX, x - spacing)
+            if x > 0, x + sz.width > width { rows.append((cur, h)); cur = []; x = 0; h = 0 }
+            cur.append((i, sz)); x += sz.width + spacing; h = max(h, sz.height)
         }
-        return CGSize(width: maxX, height: y + rowH)
+        if !cur.isEmpty { rows.append((cur, h)) }
+        return rows
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let rs = rows(subviews, width: proposal.width ?? .infinity)
+        let w = rs.map { $0.items.reduce(0) { $0 + $1.1.width } + spacing * CGFloat(max($0.items.count - 1, 0)) }.max() ?? 0
+        return CGSize(width: w, height: rs.reduce(0) { $0 + $1.height } + spacing * CGFloat(max(rs.count - 1, 0)))
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        var x = bounds.minX, y = bounds.minY, rowH: CGFloat = 0
-        for s in subviews {
-            let sz = s.sizeThatFits(.unspecified)
-            if x > bounds.minX, x + sz.width > bounds.maxX { x = bounds.minX; y += rowH + spacing; rowH = 0 }
-            s.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(sz))
-            x += sz.width + spacing
-            rowH = max(rowH, sz.height)
+        var y = bounds.minY
+        for row in rows(subviews, width: bounds.width) {
+            var x = bounds.minX
+            for (i, sz) in row.items {
+                subviews[i].place(at: CGPoint(x: x, y: y + (row.height - sz.height) / 2), proposal: ProposedViewSize(sz))
+                x += sz.width + spacing
+            }
+            y += row.height + spacing
         }
     }
 }
@@ -360,11 +367,14 @@ struct RecordPreview: View {
                                      startRadius: 0, endRadius: 520))
             content
             VStack {
-                HStack(alignment: .top) {
-                    recPill
-                    Spacer()
-                    if let f = ctl.cameraLabel { pill(Text(f).foregroundStyle(TF.text2)) }
-                    if ctl.cameraLabel != nil { rotateButton }
+                // Una fila si cabe; con la vista previa estrecha (ventana al mínimo), la cámara baja a una segunda fila
+                // antes que partir o recortar el nombre de la parte.
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .top) { recPill.fixedSize(); Spacer(minLength: 8); cameraPills }
+                    VStack(alignment: .leading, spacing: 8) {
+                        recPill
+                        HStack { Spacer(minLength: 0); cameraPills }
+                    }
                 }
                 Spacer()
                 if case .counting(let n) = ctl.phase {
@@ -401,6 +411,13 @@ struct RecordPreview: View {
         .foregroundStyle(TF.muted)
     }
 
+    @ViewBuilder private var cameraPills: some View {
+        if let f = ctl.cameraLabel {
+            pill(Text(f).foregroundStyle(TF.text2)).fixedSize()
+            rotateButton.fixedSize()
+        }
+    }
+
     private var recPill: some View {
         let recording = ctl.phase != .idle && ctl.phase != .adjusting
         let part = ctl.activePart?.name ?? ""
@@ -426,7 +443,8 @@ struct RecordPreview: View {
     }
 
     private func pill<C: View>(_ c: C) -> some View {
-        c.font(TF.body(14)).padding(.horizontal, 12).padding(.vertical, 6)
+        // Una sola línea: la píldora de la toma se recorta con «…» antes que partirse en dos.
+        c.font(TF.body(14)).lineLimit(1).padding(.horizontal, 12).padding(.vertical, 6)
             .background(Color(hex: 0x0F1113).opacity(0.75), in: Capsule())
     }
 }
@@ -469,7 +487,8 @@ struct RecordBar: View {
             Spacer(minLength: 0)
             offsetLabel
         }
-        HStack(spacing: 18) {
+        // Las opciones envuelven en varias líneas si no caben (ventana mínima 1100×680).
+        FlowRow(spacing: 18) {
             Picker("Empezar en", selection: Binding(get: { ctl.startSectionID }, set: { ctl.setStartSection($0) })) {
                 Text("Principio").tag(UUID?.none)
                 ForEach(ctl.sections, id: \.id) { s in Text(s.name).tag(UUID?.some(s.id)) }
@@ -492,7 +511,6 @@ struct RecordBar: View {
             }))
             .toggleStyle(.checkbox).disabled(ctl.isBusy || (ctl.activePart?.takeIDs.isEmpty ?? true)).fixedSize()
             .help("Vuelve a grabar un tramo de una toma")
-            Spacer(minLength: 0)
         }
         }
         .font(TF.body(14)).foregroundStyle(TF.text2)
@@ -506,6 +524,7 @@ struct RecordBar: View {
             let ms = Int((off * 1000).rounded())
             Text(ms == 0 ? "Desfase de la cámara: sin ajustar" : "Desfase de la cámara: \(ms > 0 ? "+" : "")\(ms) ms")
                 .font(TF.body(13, .semibold)).foregroundStyle(ms == 0 ? TF.muted : TF.ok)
+                .lineLimit(1).minimumScaleFactor(0.75)
         }
     }
 }

@@ -4,6 +4,7 @@ import Foundation
 import ModelKit
 import Observation
 import SourceKit
+import StudyKit
 import Store
 import TabKit
 import UniformTypeIdentifiers
@@ -358,6 +359,15 @@ final class TabController {
         if let terminateToken { NotificationCenter.default.removeObserver(terminateToken) }
         terminateToken = nil
         if dirty { saveNow() }
+        // El reproductor es el de Backing y sigue vivo: sin esto la síntesis seguía sonando allí y el stem quedaba
+        // silenciado sin que nada lo mostrara (misma limpieza que `TabService.close()` de AppCore).
+        ctl.onMixChanged = nil
+        let hadSynth = !ctl.extraTracks.isEmpty
+        ctl.extraTracks = []
+        for s in sources { ctl.setSubstituted(s.playerTrackID, false) }
+        if let vocalSource { ctl.setSubstituted(vocalSource.playerTrackID, false) }
+        if ctl.loopName == Self.spanLoopName { ctl.setLoop(nil) }
+        if hadSynth { let t = ctl.player.currentTime; ctl.loadTracks(); ctl.seek(to: t) }
     }
 
     // MARK: Fuente de la tablatura (mini-spec Fase 5b)

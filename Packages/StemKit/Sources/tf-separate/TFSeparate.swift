@@ -56,14 +56,20 @@ struct TFSeparate {
         let source = installSigtermHandler(cancel)
 
         emit(#"{"stage":"loading"}"#)
+        // TF_SEPARATE_TIMING=1: desglose por etapa en stderr al terminar (apagado no hace nada).
+        SeparationTiming.start()
         let separator: RoformerSeparator
         if simulate {
             let frames = Int(opts["--sim-frames"] ?? "") ?? 1151
             let delay = (Double(opts["--sim-delay-ms"] ?? "") ?? 0) / 1000
-            separator = RoformerSeparator(simulatedFrames: frames, delayPerChunk: delay)
+            separator = SeparationTiming.measureModelLoad {
+                RoformerSeparator(simulatedFrames: frames, delayPerChunk: delay)
+            }
         } else {
             do {
-                separator = try RoformerSeparator(compiledModelURL: URL(fileURLWithPath: opts["--model"]!))
+                separator = try SeparationTiming.measureModelLoad {
+                    try RoformerSeparator(compiledModelURL: URL(fileURLWithPath: opts["--model"]!))
+                }
             } catch {
                 fail("no se pudo cargar el modelo: \(describe(error))", code: exitFailure)
             }
@@ -86,6 +92,7 @@ struct TFSeparate {
             fail(describe(error), code: exitFailure)
         }
         let seconds = Date().timeIntervalSince(start)
+        SeparationTiming.printReport()
         emit(#"{"stage":"done","seconds":\#(String(format: "%.3f", seconds))}"#)
         withExtendedLifetime(source) {}
         exit(0)

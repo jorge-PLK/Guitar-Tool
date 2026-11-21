@@ -21,6 +21,8 @@ struct BackingTimelineCard: View {
     @State private var spaceMonitor = SpaceKeyMonitor()
     @State private var stripFrames: [Int: CGRect] = [:]
     @State private var stripDrag: ClosedRange<Int>?
+    /// Inicio de bucle marcado con «Inicio» a la espera del fin (como en la interfaz de Windows).
+    @State private var pendingLoopStart: Double?
 
     private var settings: PlayerSettings { ctl.settings }
     private var duration: Double { max(ctl.duration, 0.001) }
@@ -76,6 +78,19 @@ struct BackingTimelineCard: View {
             }
             .buttonStyle(.plain)
             .accessibilityAddTraits(edit ? .isSelected : [])
+            // Solo en edición y con correcciones del usuario (como «Quitar todas (n)» de Windows).
+            let overrides = session.study.chordOverrides.count
+            if edit, overrides > 0 {
+                Button { session.clearChordOverrides() } label: {
+                    Text("Quitar todas (\(overrides))")
+                        .font(TF.body(12, .medium)).foregroundStyle(TF.text2)
+                        .padding(.horizontal, 10).frame(height: 28)
+                        .background(TF.field, in: RoundedRectangle(cornerRadius: 8))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(TF.fieldLine))
+                }
+                .buttonStyle(.plain)
+                .help("Quita todas las correcciones de acordes de este tema")
+            }
             Text(edit ? "Modo edición: clic en un acorde para cambiarlo o partirlo. No se marcan bucles."
                       : "Clic: saltar · arrastrar: bucle (⌥ = compases)")
                 .font(TF.body(12)).foregroundStyle(edit ? TF.accent : TF.muted).lineLimit(1)
@@ -161,6 +176,8 @@ struct BackingTimelineCard: View {
     private func chordStrip(_ chords: [ChordSegment], current: Int?) -> some View {
         let edit = editMode.wrappedValue
         let l = (stripDrag.map { chords[$0.lowerBound].start...chords[$0.upperBound].end }) ?? ctl.loop
+        let bars = Self.barNumbers(chords, downbeats: session.beats?.downbeats ?? [],
+                                   tolerance: session.beats?.bpm.map { 30 / $0 } ?? Self.barMatchTolerance)
         return ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 3) {
@@ -170,14 +187,14 @@ struct BackingTimelineCard: View {
                         ForEach(Array(chords.enumerated()), id: \.offset) { i, seg in
                             let inLoop = l.map { ($0.lowerBound...$0.upperBound).contains((seg.start + seg.end) / 2) } ?? false
                             if edit {
-                                Button { chordEditing = i } label: { chip(i, seg, current: current, inLoop: inLoop) }
+                                Button { chordEditing = i } label: { chip(i, seg, current: current, inLoop: inLoop, bar: bars[i]) }
                                     .buttonStyle(.plain)
                                     .popover(isPresented: Binding(get: { chordEditing == i }, set: { if !$0 { chordEditing = nil } })) {
                                         ChordEditor(session: session, ctl: ctl, segment: seg, time: time)
                                     }
                                     .id(i)
                             } else {
-                                chip(i, seg, current: current, inLoop: inLoop).id(i)
+                                chip(i, seg, current: current, inLoop: inLoop, bar: bars[i]).id(i)
                                     .contextMenu { chipMenu(seg) }
                             }
                         }
@@ -192,7 +209,7 @@ struct BackingTimelineCard: View {
                 .gesture(stripGesture(chords), including: edit ? .subviews : .all)
             }
             .onPreferenceChange(StripFrames.self) { stripFrames = $0 }
-            .frame(height: 40 + SectionBoxes.headerHeight + 3 + SectionBoxes.inset)
+            .frame(height: 40 + SectionBoxes.headerHeight + 3 + SectionBoxes.inset + Self.barNumberRow)
             .onChange(of: current) { _, c in
                 if let c { withAnimation { proxy.scrollTo(c, anchor: .center) } }
             }
@@ -226,17 +243,39 @@ struct BackingTimelineCard: View {
         }
     }
 
-    private func chip(_ i: Int, _ seg: ChordSegment, current: Int?, inLoop: Bool) -> some View {
+    /// Tolerancia por defecto al emparejar el inicio de un acorde con un primer tiempo (sin BPM). Con BPM se usa medio pulso:
+    /// los cambios de acorde detectados no caen exactamente en el primer tiempo (ver `ChordGridLayout.probeFraction`).
+    private static let barMatchTolerance = 0.05
+    /// Alto reservado bajo los acordes para el número de compás.
+    private static let barNumberRow: CGFloat = 12
+
+    /// Número de compás (1 = primer primer-tiempo del análisis) de los acordes que abren un compás. Sin análisis, vacío.
+    static func barNumbers(_ chords: [ChordSegment], downbeats: [Double], tolerance: Double) -> [Int: Int] {
+        var out: [Int: Int] = [:]
+        var d = 0
+        for (i, c) in chords.enumerated() {
+            while d < downbeats.count, downbeats[d] < c.start - tolerance { d += 1 }
+            if d < downbeats.count, abs(downbeats[d] - c.start) <= tolerance { out[i] = d + 1; d += 1 }
+        }
+        return out
+    }
+
+    private func chip(_ i: Int, _ seg: ChordSegment, current: Int?, inLoop: Bool, bar: Int?) -> some View {
         let on = i == current
-        return Text(shown(seg.index).name)
-            .font(TF.body(14, .bold))
-            .foregroundStyle(on ? TF.accentInk : (current.map { i < $0 } == true ? TF.muted.opacity(0.7) : TF.text))
-            .frame(minWidth: 52).frame(height: 36).padding(.horizontal, 6)
-            .background(on ? TF.accent : (inLoop ? TF.accent.opacity(0.22) : TF.field), in: RoundedRectangle(cornerRadius: 8))
-            .overlay(RoundedRectangle(cornerRadius: 8).stroke(on ? .clear : (inLoop ? TF.accent : TF.fieldLine)))
-            .background(GeometryReader { g in
-                Color.clear.preference(key: StripFrames.self, value: [i: g.frame(in: .named(SectionBoxes.space))])
-            })
+        return VStack(alignment: .leading, spacing: 0) {
+            Text(shown(seg.index).name)
+                .font(TF.body(14, .bold))
+                .foregroundStyle(on ? TF.accentInk : (current.map { i < $0 } == true ? TF.muted.opacity(0.7) : TF.text))
+                .frame(minWidth: 52).frame(height: 36).padding(.horizontal, 6)
+                .background(on ? TF.accent : (inLoop ? TF.accent.opacity(0.22) : TF.field), in: RoundedRectangle(cornerRadius: 8))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(on ? .clear : (inLoop ? TF.accent : TF.fieldLine)))
+                .background(GeometryReader { g in
+                    Color.clear.preference(key: StripFrames.self, value: [i: g.frame(in: .named(SectionBoxes.space))])
+                })
+            // Número de compás bajo el acorde que abre un compás (hueco fijo para que la tira no cambie de alto).
+            Text(bar.map { "\($0)" } ?? " ").font(TF.body(10)).foregroundStyle(TF.muted)
+                .padding(.leading, 2).frame(height: Self.barNumberRow, alignment: .center)
+        }
     }
 
     private func stripIndex(at x: CGFloat) -> Int? {
@@ -301,7 +340,8 @@ struct BackingTimelineCard: View {
     }
 
     private var infoRow: some View {
-        HStack(spacing: 16) {
+        // Envuelve en varias líneas si no caben (ventana mínima 1100×680); a 1280 caben en una.
+        FlowRow(spacing: 10) {
             stat("Tempo detectado", session.beats?.bpm.map { "\(Int($0.rounded())) BPM" } ?? "—")
             HStack(spacing: 6) {
                 Text("Tonalidad:").foregroundStyle(TF.text2).fixedSize()
@@ -335,13 +375,13 @@ struct BackingTimelineCard: View {
             }
             labeled("Afinación fina") {
                 Slider(value: Binding(get: { settings.fineCents }, set: { ctl.setFineCents($0.rounded()) }),
-                       in: StudySession.fineCentsRange).frame(width: 90).tint(TF.accent)
-                Text("\(Int(settings.fineCents)) cents").frame(width: 62, alignment: .leading)
+                       in: StudySession.fineCentsRange).frame(width: 70).tint(TF.accent)
+                Text("\(Int(settings.fineCents)) cents").frame(width: 56, alignment: .leading)
                     .font(TF.body(13)).monospacedDigit()
             }
-            Spacer(minLength: 0)
         }
         .font(TF.body(13)).foregroundStyle(TF.text2)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func stat(_ title: String, _ value: String) -> some View {
@@ -354,8 +394,38 @@ struct BackingTimelineCard: View {
 
     // MARK: Transporte
 
+    /// Marca inicio / fin del bucle en la posición actual. «Fin» solo está activo con un inicio pendiente o un bucle.
+    private var loopMarks: some View {
+        HStack(spacing: 6) {
+            Button(pendingLoopStart.map { "Inicio \(Fmt.clock($0))" } ?? "Inicio") { markLoopStart() }
+                .buttonStyle(SecondaryButton(height: 30))
+                .foregroundStyle(pendingLoopStart == nil ? TF.text : TF.accent)
+                .help("Marca el inicio del bucle en la posición actual")
+            Button("Fin") { markLoopEnd() }
+                .buttonStyle(SecondaryButton(height: 30))
+                .disabled(pendingLoopStart == nil && ctl.loop == nil)
+                .help("Marca el final del bucle en la posición actual")
+        }
+        .fixedSize()
+    }
+
+    private func markLoopStart() {
+        if let loop = ctl.loop, time < loop.upperBound {
+            pendingLoopStart = nil
+            ctl.setLoop(time...loop.upperBound, name: ctl.loopName)
+        } else { pendingLoopStart = time }
+    }
+
+    private func markLoopEnd() {
+        if let a = pendingLoopStart, time > a {
+            ctl.setLoop(a...time, name: nil); pendingLoopStart = nil
+        } else if let loop = ctl.loop, time > loop.lowerBound {
+            ctl.setLoop(loop.lowerBound...time, name: ctl.loopName)
+        }
+    }
+
     private var transport: some View {
-        HStack(spacing: 14) {
+        FlowRow(spacing: 14) {
             Button { ctl.togglePlay() } label: {
                 Image(systemName: ctl.isPlaying ? "pause.fill" : "play.fill")
                     .font(.system(size: 20)).foregroundStyle(TF.accentInk)
@@ -366,6 +436,8 @@ struct BackingTimelineCard: View {
 
             (Text(Fmt.clock(time)).foregroundStyle(TF.text) + Text(" / \(Fmt.clock(ctl.duration))").foregroundStyle(TF.muted))
                 .font(TF.display(20)).monospacedDigit()
+
+            loopMarks
 
             if let loop = ctl.loop {
                 HStack(spacing: 6) {
@@ -391,8 +463,8 @@ struct BackingTimelineCard: View {
             Toggle("Metrónomo", isOn: Binding(get: { settings.metronomeOn }, set: { ctl.setMetronome($0) }))
                 .toggleStyle(.checkbox).font(TF.body(13)).foregroundStyle(TF.text2)
                 .disabled(session.beats == nil)
-            Spacer(minLength: 0)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

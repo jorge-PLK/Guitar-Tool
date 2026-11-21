@@ -1,4 +1,6 @@
 import SwiftUI
+import AppKit
+import ImageIO
 import Store
 
 struct LibraryView: View {
@@ -106,7 +108,7 @@ struct LibraryView: View {
         HStack(alignment: .center) {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Biblioteca").font(TF.display(32))
-                Text("Tus temas y sus guitarras separadas.").foregroundStyle(TF.muted)
+                Text("Tus temas.").foregroundStyle(TF.muted)
             }
             Spacer()
             if let p = model.playlistImport, let text = p.indicator {
@@ -148,7 +150,7 @@ struct LibraryView: View {
     }
 
     private enum Col {
-        static let guitars: CGFloat = 150, takes: CGFloat = 70, state: CGFloat = 150, actions: CGFloat = 170
+        static let takes: CGFloat = 70, state: CGFloat = 150, actions: CGFloat = 170
     }
 
     private func headCell(_ t: String, _ w: CGFloat? = nil) -> some View {
@@ -161,7 +163,6 @@ struct LibraryView: View {
             VStack(spacing: 0) {
                 HStack(spacing: 0) {
                     headCell("Tema / Artista")
-                    headCell("Guitarras", Col.guitars)
                     headCell("Tomas", Col.takes)
                     headCell("Estado", Col.state)
                     Color.clear.frame(width: Col.actions, height: 1).accessibilityHidden(true)
@@ -206,17 +207,17 @@ struct LibraryView: View {
 
     private func row(_ e: LibraryEntryInfo, showArtist: Bool = true) -> some View {
         HStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(e.title).font(TF.body(14, .semibold))
-                if showArtist, let a = e.artist { Text(a).font(TF.body(13)).foregroundStyle(TF.muted) }
+            HStack(spacing: 14) {
+                SongCover(folder: model.folder(of: e))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(e.title).font(TF.body(14, .semibold))
+                    if showArtist, let a = e.artist { Text(a).font(TF.body(13)).foregroundStyle(TF.muted) }
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            Text(model.isSeparating(e) ? "Separando…" : "—").foregroundStyle(TF.text2)
-                .frame(width: Col.guitars, alignment: .leading)
             Text(e.takeCount == 0 ? "—" : "\(e.takeCount)").foregroundStyle(TF.text2).frame(width: Col.takes, alignment: .leading)
             chip(e).frame(width: Col.state, alignment: .leading)
             HStack(spacing: 8) {
-                TrashRowButton { model.requestTrash(e) }
                 Button { if let f = model.folder(of: e) { model.showInFinder(f) } } label: {
                     Image(systemName: "folder")
                 }
@@ -225,6 +226,7 @@ struct LibraryView: View {
                     Image(systemName: "pencil")
                 }
                 .buttonStyle(SecondaryButton(height: 36)).help("Editar título y artista").accessibilityLabel("Editar título y artista")
+                TrashRowButton { model.requestTrash(e) }
             }
             .frame(width: Col.actions, alignment: .trailing)
         }
@@ -383,7 +385,7 @@ struct ProjectDetailView: View {
     }
 }
 
-/// Botón cuadrado solo con icono, junto a «Abrir»: gris discreto y rojo al pasar el ratón.
+/// Botón cuadrado solo con icono, el último de la fila (carpeta, lápiz, papelera; mismo orden que Windows): gris discreto y rojo al pasar el ratón.
 private struct TrashRowButton: View {
     let action: () -> Void
     @State private var hovering = false
@@ -402,3 +404,63 @@ private struct TrashRowButton: View {
         .accessibilityLabel("Eliminar")
     }
 }
+
+/// Carátula del tema en su fila (`source/cover.jpg`, `ProjectLayout.coverFile`): miniatura de 44 pt con caché.
+/// Sin carátula: recuadro con `music.note`. No es la foto del artista (`ArtistTile`).
+private struct SongCover: View {
+    let folder: URL?
+    @State private var image: NSImage?
+
+    static let side: CGFloat = 44
+    private static let radius: CGFloat = 8
+    /// Píxeles del lado mayor de la miniatura (44 pt a 2x).
+    private static let thumbPixels = 88
+    /// Caja para cachear también la ausencia de carátula.
+    private final class Box { let image: NSImage?; init(_ i: NSImage?) { image = i } }
+    private static let cache = NSCache<NSString, Box>()
+
+    init(folder: URL?) {
+        self.folder = folder
+        // Desde la caché de entrada: sin parpadeo al reaparecer la fila.
+        _image = State(initialValue: folder.flatMap { Self.cache.object(forKey: ProjectLayout(folder: $0).coverFile.path as NSString)?.image })
+    }
+
+    var body: some View {
+        ZStack {
+            if let image {
+                Image(nsImage: image).resizable().aspectRatio(contentMode: .fill)
+            } else {
+                TF.field
+                Image(systemName: "music.note").font(.system(size: 18)).foregroundStyle(TF.muted)
+            }
+        }
+        .frame(width: Self.side, height: Self.side)
+        .clipShape(RoundedRectangle(cornerRadius: Self.radius))
+        .overlay(RoundedRectangle(cornerRadius: Self.radius).stroke(TF.line))
+        .accessibilityHidden(true)
+        .task(id: folder) { await load() }
+    }
+
+    private func load() async {
+        guard let folder else { image = nil; return }
+        let path = ProjectLayout(folder: folder).coverFile.path
+        if let hit = Self.cache.object(forKey: path as NSString) { image = hit.image; return }
+        let px = Self.thumbPixels
+        let thumb = await Task.detached(priority: .utility) { Self.thumbnail(path: path, pixels: px) }.value
+        guard !Task.isCancelled else { return }
+        Self.cache.setObject(Box(thumb), forKey: path as NSString)
+        image = thumb
+    }
+
+    private nonisolated static func thumbnail(path: String, pixels: Int) -> NSImage? {
+        guard let src = CGImageSourceCreateWithURL(URL(fileURLWithPath: path) as CFURL, nil) else { return nil }
+        let opts: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: pixels,
+        ]
+        guard let cg = CGImageSourceCreateThumbnailAtIndex(src, 0, opts as CFDictionary) else { return nil }
+        return NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height))
+    }
+}
+

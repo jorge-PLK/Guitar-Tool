@@ -102,6 +102,11 @@ typedef struct wasapi_device_info {
 /// `capacity`), o un HRESULT negativo.
 int32_t wasapi_enumerate(wasapi_device_info *out, int32_t capacity);
 
+/// Nombre amigable (PKEY_Device_FriendlyName, UTF-8) del endpoint de render `id` o, con `id` NULL o vacío, del de
+/// consola por defecto (parte 8.6d-A). Solo lee el almacén de propiedades: no activa ningún cliente de audio ni abre
+/// flujo. Devuelve 0 (con `out` vacío si no tiene nombre) o un HRESULT negativo (`out` vacío).
+int32_t wasapi_render_name(const char *id, char *out, int32_t cap);
+
 /// Marcas de un búfer de salida.
 typedef struct wasapi_render_info {
     uint64_t frames_written;    ///< fotogramas escritos antes de este búfer (sampleTime del búfer)

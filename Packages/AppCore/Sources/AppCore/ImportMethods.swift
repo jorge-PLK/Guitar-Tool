@@ -1,0 +1,220 @@
+import Foundation
+import Store
+
+/// Diálogos nativos que pone el anfitrión Swift de Windows (otra parte del paso 8); el núcleo no los implementa.
+public protocol HostServices: Sendable {
+    /// Selector de fichero; `types` son extensiones sin punto (`["wav","flac","mp3"]`). `nil` si se cancela.
+    func pickFile(types: [String]) async -> URL?
+    /// Selector de varios ficheros; `[]` si se cancela. Tiene versión por omisión (uno solo) en la extensión.
+    func pickFiles(types: [String]) async -> [URL]
+    /// Selector de carpeta. `nil` si se cancela.
+    func pickFolder() async -> URL?
+    /// Diálogo de guardar (8.7: exportar a Guitar Pro); `types` son extensiones sin punto. `nil` si se cancela.
+    func saveFile(suggestedName: String, types: [String]) async -> URL?
+    /// Abre una URL con la aplicación del sistema para su esquema. `false` si nada la abre (p. ej. `spotify:` sin la app).
+    func openURL(_ url: URL) async -> Bool
+}
+
+public extension HostServices {
+    /// Selector de varios ficheros (L-F5: el del Mac permite selección múltiple). Por omisión, uno solo.
+    func pickFiles(types: [String]) async -> [URL] { await pickFile(types: types).map { [$0] } ?? [] }
+    func saveFile(suggestedName: String, types: [String]) async -> URL? { nil }
+    func openURL(_ url: URL) async -> Bool { false }
+}
+
+struct ImportFileParams: Codable, Sendable { var path: String }
+struct RenameParams: Codable, Sendable { var id: String; var title: String; var artist: String? }
+struct RenameResult: Codable, Sendable {
+    var id: String
+    var title: String
+    var artist: String?
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(title, forKey: .title)
+        try c.encode(artist, forKey: .artist)
+    }
+}
+struct CancelResult: Codable, Sendable { var cancelled: Bool }
+struct QueuedResult: Codable, Sendable { var queued: Bool }
+struct RemovedResult: Codable, Sendable { var removed: Bool }
+struct DeleteTakeParams: Decodable, Sendable { var id: String; var takeId: String }
+struct CleanupInfoResult: Codable, Sendable { var bytes: Int64 }
+struct CleanupResult: Codable, Sendable { var cleaned: Bool; var bytes: Int64 }
+struct PickedFileResult: Codable, Sendable {
+    var path: String?
+    // `nil` se codifica como ausente; la página lo trata como null.
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(path, forKey: .path)
+    }
+}
+struct PickedFilesResult: Codable, Sendable { var paths: [String] }
+struct OpenURLParams: Codable, Sendable { var urls: [String] }
+struct OpenURLResult: Codable, Sendable { var opened: String? }
+struct PickedFolderResult: Codable, Sendable {
+    var path: String?
+    var restartRequired: Bool
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(path, forKey: .path)
+        try c.encode(restartRequired, forKey: .restartRequired)
+    }
+}
+
+extension JobEngine {
+    /// Motor con el perfil, el índice y los servicios que toca según `options` (`--support-dir` o los del sistema).
+    static func make(options: LaunchOptions, root: URL?, services: JobServices?) -> JobEngine {
+        let support = options.supportDir
+        let profile = support.map { ProfileStore(url: $0.appendingPathComponent("profile.json")) } ?? ProfileStore()
+        #if os(Windows)
+        let indexName = "Library.json"
+        #else
+        let indexName = "Library.store"
+        #endif
+        return JobEngine(root: root, profileStore: profile, indexURL: support?.appendingPathComponent(indexName),
+                         services: { services ?? JobServices.production(supportDir: support) })
+    }
+}
+
+extension Bridge {
+    /// Detiene la cola y cancela lo que corre, con tope de 3 s (cierre de la app). Se puede llamar desde cualquier hilo
+    /// que no sea el de la interfaz si hay que esperar; mejor usar `shutdownAsync()` desde código async.
+    /// Primero cierra la tablatura y el estudio (guarda `project.json` y suelta el reproductor, en el hilo principal) y luego cancela la cola.
+    /// Si se llama desde el hilo principal, el cierre del estudio no puede avanzar hasta que la espera acabe: usa `shutdownAsync()`.
+    public func shutdown() {
+        let box = ShutdownWaiter()
+        Task.detached {
+            await self.shutdownAsync()
+            box.signal()
+        }
+        box.wait(timeout: JobEngine.shutdownBudget + 0.5)
+    }
+
+    public func shutdownAsync() async {
+        await closeTab()
+        await closeStudy()
+        await jobs.shutdown()
+    }
+
+    /// Abre la biblioteca y re-encola lo que quedó `queued`/`running` en la sesión anterior. El anfitrión puede llamarlo
+    /// al arrancar; si no, se hace con el primer método de trabajo.
+    public func start() { Task { [jobs] in await jobs.start() } }
+
+    func registerImportMethods(root: URL?, options: LaunchOptions) {
+        let jobs = self.jobs
+        jobs.setSinks(
+            job: { [weak self] j in self?.emit("jobs.progress", j) },
+            changed: { [weak self] in self?.emit("library.changed", Empty()) })
+
+        @Sendable func uuid(_ s: String) throws -> UUID {
+            guard let id = UUID(uuidString: s) else {
+                throw RPCError(code: "bad-params", message: "«id» no es un UUID.")
+            }
+            return id
+        }
+
+        router.register("import.file") { (p: ImportFileParams) in try await jobs.importFile(path: p.path) }
+        router.register("jobs.list") { (_: Empty) in JobsListResult(jobs: jobs.list()) }
+        router.register("jobs.cancel") { (p: ProjectIDParams) in
+            CancelResult(cancelled: try await jobs.cancel(id: try uuid(p.id)))
+        }
+        router.register("library.separate") { (p: ProjectIDParams) in
+            try await jobs.separate(id: try uuid(p.id))
+            return QueuedResult(queued: true)
+        }
+        router.register("library.rename") { (p: RenameParams) in
+            let r = try await jobs.rename(id: try uuid(p.id), title: p.title, artist: p.artist)
+            return RenameResult(id: p.id, title: r.title, artist: r.artist)
+        }
+        router.register("library.cleanupInfo") { (p: ProjectIDParams) in
+            CleanupInfoResult(bytes: try await jobs.cleanupBytes(id: try uuid(p.id)))
+        }
+        router.register("library.cleanup") { (p: ProjectIDParams) in
+            CleanupResult(cleaned: true, bytes: try await jobs.cleanup(id: try uuid(p.id)))
+        }
+        router.register("library.deleteTake") { [weak self] (p: DeleteTakeParams) in
+            let id = try uuid(p.id)
+            try await jobs.deleteTake(id: id, takeID: try uuid(p.takeId))
+            await self?.studyService.reloadIfOpen(id)
+            return RemovedResult(removed: true)
+        }
+        router.register("library.trash") { (p: ProjectIDParams) in
+            try await jobs.remove(id: try uuid(p.id), permanently: false)
+            return RemovedResult(removed: true)
+        }
+        router.register("library.delete") { (p: ProjectIDParams) in
+            try await jobs.remove(id: try uuid(p.id), permanently: true)
+            return RemovedResult(removed: true)
+        }
+
+        router.register("host.pickAudioFile") { [weak self] (_: Empty) in
+            guard let host = self?.host else { throw Bridge.noHost }
+            let url = await host.pickFile(types: Array(JobEngine.importExtensions).sorted())
+            return PickedFileResult(path: url?.path)
+        }
+        router.register("host.pickAudioFiles") { [weak self] (_: Empty) in
+            guard let host = self?.host else { throw Bridge.noHost }
+            let urls = await host.pickFiles(types: Array(JobEngine.importExtensions).sorted())
+            return PickedFilesResult(paths: urls.map(\.path))
+        }
+        // «Oír en Spotify» (L-F3): como `listen` del Mac, se prueba cada URL en orden (`spotify:track:<id>` y luego la web)
+        // y se queda con la primera que abre. Solo esquemas spotify, http y https.
+        router.register("host.openURL") { [weak self] (p: OpenURLParams) in
+            guard let host = self?.host else { throw Bridge.noHost }
+            for text in p.urls {
+                guard let url = URL(string: text), let scheme = url.scheme?.lowercased(),
+                      Bridge.openableSchemes.contains(scheme) else { continue }
+                if await host.openURL(url) { return OpenURLResult(opened: text) }
+            }
+            return OpenURLResult(opened: nil)
+        }
+        let profile = options.supportDir.map { ProfileStore(url: $0.appendingPathComponent("profile.json")) } ?? ProfileStore()
+        router.register("host.pickProjectsFolder") { [weak self] (_: Empty) in
+            guard let host = self?.host else { throw Bridge.noHost }
+            guard let url = await host.pickFolder() else { return PickedFolderResult(path: nil, restartRequired: false) }
+            return try Bridge.saveProjectsFolder(url, profile: profile)
+        }
+    }
+
+    /// Esquemas que `host.openURL` deja abrir fuera de la aplicación.
+    static let openableSchemes: Set<String> = ["spotify", "http", "https"]
+
+    static var noHost: RPCError {
+        RPCError(code: "unsupported", message: "El anfitrión no ofrece diálogos nativos.")
+    }
+
+    /// Como el Mac en la primera ejecución: crea la carpeta y la guarda en `profile.json` (el resto del perfil se conserva).
+    static func saveProjectsFolder(_ url: URL, profile store: ProfileStore) throws -> PickedFolderResult {
+        do {
+            try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+            var profile = (try? store.load()) ?? EquipmentProfile()
+            profile.projectsFolder = url
+            try store.save(profile)
+        } catch {
+            throw RPCError(code: "internal", message: "No se pudo guardar la carpeta de proyectos: \(error)")
+        }
+        return PickedFolderResult(path: url.path, restartRequired: true)
+    }
+}
+
+/// Espera síncrona acotada a que termine el cierre.
+private final class ShutdownWaiter: @unchecked Sendable {
+    private let semaphore = DispatchSemaphore(value: 0)
+    func signal() { semaphore.signal() }
+    func wait(timeout: TimeInterval) { _ = semaphore.wait(timeout: .now() + timeout) }
+}
+
+/// Guardado del estudio por la `Library` de la cola (la abre si hace falta): se serializa con las escrituras de la cola.
+struct QueueStudyStore: StudyStoring {
+    let jobs: JobEngine
+    func saveStudy(id: UUID, study: StudyState, sections: [Section]) async throws {
+        try await jobs.library().saveStudy(id: id, study: study, sections: sections)
+    }
+    func saveGuitarNames(id: UUID, names: [GuitarRole: String]) async throws {
+        try await jobs.library().saveGuitarNames(id: id, names: names)
+    }
+    func saveGuitarStereoSplit(id: UUID, _ on: Bool) async throws -> GuitarOptions {
+        try await jobs.library().saveGuitarStereoSplit(id: id, on)
+    }
+}

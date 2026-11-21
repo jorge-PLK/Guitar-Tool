@@ -43,8 +43,12 @@ final class StemLevelMeterTests: XCTestCase {
         // Ejemplos reales de la spec: other −84/−44 y piano −91/−72 → vacíos.
         XCTAssertTrue(StemLevelMeter.isEmpty(StemLevel(rmsDB: -84, peakDB: -44)))
         XCTAssertTrue(StemLevelMeter.isEmpty(StemLevel(rmsDB: -91, peakDB: -72)))
-        // RMS bajo pero con un pico fuerte (un golpe suelto): no es vacío.
+        // «Tornado Of Souls - 2004 Remix» separado con ONNX (21/11/2026): chasquidos aislados sobre silencio → vacíos.
+        XCTAssertTrue(StemLevelMeter.isEmpty(StemLevel(rmsDB: -77.3, peakDB: -31.0)))
+        XCTAssertTrue(StemLevelMeter.isEmpty(StemLevel(rmsDB: -75.3, peakDB: -36.6)))
+        // RMS bajo pero con un pico fuerte (un golpe suelto): no es vacío. El umbral de pico (−30) es estricto.
         XCTAssertFalse(StemLevelMeter.isEmpty(StemLevel(rmsDB: -65, peakDB: -30)))
+        XCTAssertFalse(StemLevelMeter.isEmpty(StemLevel(rmsDB: -65, peakDB: -25)))
         XCTAssertFalse(StemLevelMeter.isEmpty(StemLevel(rmsDB: -55, peakDB: -45)))
     }
 

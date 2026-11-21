@@ -45,14 +45,28 @@ final class ChunkProcessor {
     ///   - outputs: `2·stemCount` búferes de `chunk` muestras, índice `2·stem + canal`.
     func process(input: [UnsafePointer<Float>], outputs: [UnsafeMutablePointer<Float>]) throws {
         precondition(input.count == RoformerContract.channels && outputs.count == 2 * stemCount)
-        for c in 0..<RoformerContract.channels {
-            analysis.forward(input[c], channel: c, into: spec)
+        SeparationTiming.measure(.stft) {
+            for c in 0..<RoformerContract.channels {
+                analysis.forward(input[c], channel: c, into: spec)
+            }
         }
+        // Las etapas del modelo (preparar, Run, leer salida) las mide cada `MaskModel` por dentro.
         try model.predict(spec: spec, mask: mask)
         let job = PostprocessJob(spec: spec, mask: mask, pairs: pairsPerStem, frames: frames,
                                  synthesis: synthesis, outputs: outputs)
-        DispatchQueue.concurrentPerform(iterations: stemCount) { s in
-            job.run(stem: s)
+        if SeparationTiming.isEnabled {
+            // Con TF_SEPARATE_TIMING: dos pasadas paralelas para medir cada etapa en pared. Mismas operaciones por
+            // stem y en el mismo orden dentro de cada stem: la salida es idéntica bit a bit.
+            SeparationTiming.measure(.applyMask) {
+                DispatchQueue.concurrentPerform(iterations: stemCount) { s in job.applyMask(stem: s) }
+            }
+            SeparationTiming.measure(.istft) {
+                DispatchQueue.concurrentPerform(iterations: stemCount) { s in job.synthesize(stem: s) }
+            }
+        } else {
+            DispatchQueue.concurrentPerform(iterations: stemCount) { s in
+                job.run(stem: s)
+            }
         }
     }
 }
@@ -68,6 +82,12 @@ private struct PostprocessJob: @unchecked Sendable {
     let outputs: [UnsafeMutablePointer<Float>]
 
     func run(stem s: Int) {
+        applyMask(stem: s)
+        synthesize(stem: s)
+    }
+
+    /// Máscara · espectro en el sitio (sobre el bloque del stem en `mask`) y bin 0 a cero.
+    func applyMask(stem s: Int) {
         let m = mask + s * pairs * 2
         // Producto complejo intercalado (re, im): stride 2 sobre los mismos punteros.
         var a = SplitComplex(realp: spec, imagp: spec + 1)
@@ -75,6 +95,11 @@ private struct PostprocessJob: @unchecked Sendable {
         DSP.zvmul(&a, 2, &b, 2, &b, 2, DSPLength(pairs), 1)
         // Bin 0 (DC) a cero en los dos canales: filas 2·0 + 0 y 2·0 + 1, `frames · 2` floats cada una.
         m.update(repeating: 0, count: 2 * frames * 2)
+    }
+
+    /// iSTFT de los dos canales del stem.
+    func synthesize(stem s: Int) {
+        let m = mask + s * pairs * 2
         for c in 0..<RoformerContract.channels {
             synthesis[s].inverse(m, channel: c, into: outputs[2 * s + c])
         }

@@ -4,7 +4,7 @@ App de escritorio para macOS (Swift/SwiftUI) que iguala el tono de un tema reamp
 
 ## Estado actual
 
-Fases 5 (ADR-016), 5b (ADR-017), 5c (ADR-019, sin prueba manual de Jorge), 6 (ADR-015) y 7 · Montaje (ADR-018) cerradas en `main` (18/11/2026). Fase 7c (port a Windows, ADR-020, solo x64) en la rama `fase-7c`: pasos 6 y 7 cerrados (piezas de Windows, 21/11/2026); sigue la interfaz WebView2 y luego el instalador.
+Fases 5 (ADR-016), 5b (ADR-017), 5c (ADR-019, sin prueba manual de Jorge), 6 (ADR-015) y 7 · Montaje (ADR-018) cerradas en `main` (18/11/2026). Fase 7c (port a Windows, ADR-020, solo x64) en la rama `fase-7c`: pasos 6 y 7 cerrados (piezas de Windows) y paso 8 ola 1 cerrada (21/11/2026); sigue la ola 2 de la interfaz WebView2 y luego el instalador.
 Después: fase final de arreglos generales y Fase 7b · Retoques de interfaz (`docs/plan.md`). P1, P3 y P5 quedan para el comienzo de la Etapa 2.
 
 ## Contexto: leer solo lo que haga falta
@@ -51,6 +51,7 @@ Nunca `general-purpose`, `claude` ni un agente "Lead": el hook global `agent-rou
 
 ## Reglas
 
+- **Mac y Windows, misma interfaz.** Todo cambio de interfaz se aplica a la vez en `App/Sources` (SwiftUI) y en `WinApp/Web` (WebView2), en la misma tarea; no deben distinguirse. Lo que no pueda igualarse se lista a Jorge.
 - Fase a fase, una rama por fase (`fase-N`). Preguntar antes de inventar reglas que no estén en la spec.
 - Al cerrar una fase (`/phase-close`), en el mismo commit: `docs/CODEMAP.md`, "Estado actual" de este fichero (máximo 3 líneas: lo cargan todas las sesiones), casillas y condición de paso en `docs/plan.md`, lo aprendido en `docs/spec.md` y el ADR.
 - Commits en inglés, imperativo, estilo de `git log`; sin trailer `Co-Authored-By`. Sin push. Al cerrar cada fase, commit sin pedir confirmación; a mitad de fase, solo si Jorge lo pide.

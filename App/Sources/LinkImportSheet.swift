@@ -529,9 +529,10 @@ struct LinkImportSheet: View {
             }
             .frame(width: 36, height: 36).background(TF.card).clipShape(RoundedRectangle(cornerRadius: 4))
             VStack(alignment: .leading, spacing: 1) {
-                Text(t.name).font(TF.body(13, .semibold)).lineLimit(1)
-                Text(t.artistsText).font(TF.body(12)).foregroundStyle(TF.text2).lineLimit(1)
+                Text(t.name).font(TF.body(13, .semibold)).lineLimit(1).help(t.name)
+                Text(t.artistsText).font(TF.body(12)).foregroundStyle(TF.text2).lineLimit(1).help(t.artistsText)
                 Text(t.year.map { "\(t.album) · \($0)" } ?? t.album).font(TF.body(11)).foregroundStyle(TF.muted).lineLimit(1)
+                    .help(t.year.map { "\(t.album) · \($0)" } ?? t.album)
             }
             Spacer(minLength: 8)
             Text(t.durationText).font(TF.body(12)).foregroundStyle(TF.muted).monospacedDigit()
@@ -697,9 +698,10 @@ struct LinkImportSheet: View {
             Image(systemName: on ? "largecircle.fill.circle" : "circle").foregroundStyle(on ? TF.accent : TF.muted)
                 .opacity(inLib == nil ? 1 : 0.4)
             VStack(alignment: .leading, spacing: 2) {
-                Text(rc.candidate.title).font(TF.body(14, .semibold)).lineLimit(1)
+                Text(rc.candidate.title).font(TF.body(14, .semibold)).lineLimit(1).help(rc.candidate.title)
                 Text([rc.candidate.channel, rc.candidate.durationSeconds.map(Fmt.duration)].compactMap { $0 }.joined(separator: " · "))
                     .font(TF.body(12)).foregroundStyle(TF.muted).lineLimit(1)
+                    .help([rc.candidate.channel, rc.candidate.durationSeconds.map(Fmt.duration)].compactMap { $0 }.joined(separator: " · "))
             }
             Spacer(minLength: 8)
             if let d = rc.difference { Text(Self.signed(d)).font(TF.body(12, .medium)).foregroundStyle(TF.text2) }

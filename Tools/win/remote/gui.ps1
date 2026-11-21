@@ -1,10 +1,13 @@
 # Arranca el producto en la sesion interactiva del usuario tf (tarea programada /IT).
 # Si tf no tiene sesion grafica: "TF:GUI - SINSESION" y codigo 3.
+# -ArgsB64: argumentos del programa en base64 (UTF-8); sustituyen a "--wait N" y dan al programa hasta 75 s.
 # Salida: "TF:GUI <arch> <codigo>". Deja C:\ToneForge\gui-<arch>.txt y .png para traerlos por scp.
 param(
     [string]$Product = "tf-smoke",
     [string]$Arch = "both",
-    [int]$Wait = 8
+    [int]$Wait = 8,
+    [string]$ArgsB64 = "",
+    [string]$EnvB64 = ""
 )
 $ErrorActionPreference = "Continue"
 . "$PSScriptRoot\common.ps1"
@@ -28,9 +31,16 @@ foreach ($a in (Get-Archs $Arch)) {
     $task = "tf-gui-$a"
     $script = Join-Path $PSScriptRoot "gui-task.ps1"
     $tr = "powershell -NoProfile -ExecutionPolicy Bypass -File $script -Product $Product -Arch $a -Wait $Wait"
+    # schtasks /TR admite 261 caracteres: argumentos y entorno van por ficheros que lee gui-task.ps1.
+    $argsFile = Join-Path $InstallRoot "gui-$a.args"
+    $envFile = Join-Path $InstallRoot "gui-$a.env"
+    Remove-Item -Force $argsFile, $envFile -ErrorAction SilentlyContinue
+    if ($ArgsB64 -ne "") { [IO.File]::WriteAllText($argsFile, [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($ArgsB64))) }
+    if ($EnvB64 -ne "") { [IO.File]::WriteAllText($envFile, [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($EnvB64))) }
     & schtasks /Create /TN $task /TR $tr /SC ONCE /ST 00:00 /RU tf /IT /F | Out-Null
     & schtasks /Run /TN $task | Out-Null
-    $limit = (Get-Date).AddSeconds($Wait + 40)
+    $limitSec = if ($ArgsB64 -ne "") { 100 } else { $Wait + 40 }
+    $limit = (Get-Date).AddSeconds($limitSec)
     while (-not (Test-Path $done) -and (Get-Date) -lt $limit) { Start-Sleep -Milliseconds 500 }
     & schtasks /Delete /TN $task /F | Out-Null
     if (Test-Path $done) {

@@ -406,6 +406,21 @@ static HRESULT get_device(IMMDeviceEnumerator *e, EDataFlow flow, const char *id
     return IMMDeviceEnumerator_GetDefaultAudioEndpoint(e, flow, eConsole, dev);
 }
 
+int32_t wasapi_render_name(const char *id, char *out, int32_t cap) {
+    IMMDeviceEnumerator *e = NULL;
+    IMMDevice *dev = NULL;
+    HRESULT hr;
+    if (!out || cap <= 0) return E_INVALIDARG;
+    out[0] = 0;
+    ensure_com();
+    hr = CoCreateInstance(&TF_CLSID_MMDeviceEnumerator, NULL, CLSCTX_ALL, &TF_IID_IMMDeviceEnumerator, (void **)&e);
+    if (FAILED(hr)) return hr;
+    if (SUCCEEDED(hr = get_device(e, eRender, id, &dev))) read_name(dev, out, cap);
+    RELEASE(dev);
+    RELEASE(e);
+    return FAILED(hr) ? hr : 0;
+}
+
 static uint32_t hns_to_frames(REFERENCE_TIME t, uint32_t rate) { return (uint32_t)((double)t * rate / 1e7 + 0.5); }
 static REFERENCE_TIME frames_to_hns(uint32_t f, uint32_t rate) { return (REFERENCE_TIME)(1e7 * f / rate + 0.5); }
 

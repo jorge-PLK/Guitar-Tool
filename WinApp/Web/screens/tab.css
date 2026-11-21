@@ -1,0 +1,100 @@
+/* Pantalla Tablatura (App/Sources/TabScreen.swift). Valores de tokens.css. */
+.screen.tab { padding: 20px 36px; gap: 14px; overflow: hidden; }
+.tab .grow { flex: 1; }
+.tab .btn.xs { height: 28px; padding: 0 10px; font-size: 12px; gap: 6px; border-radius: var(--radius-sm); }
+.tab .spinner { flex: none; display: inline-block; width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--field-line);
+  border-top-color: var(--accent); animation: tab-spin .9s linear infinite; vertical-align: -2px; }
+@keyframes tab-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .tab .spinner { animation-duration: 2.4s; } }
+
+.tab-chooser { display: flex; flex-direction: column; gap: 16px; align-items: flex-start; }
+.tab-chooser-list { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 640px; }
+.tab-chooser-item { display: flex; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 0; border-radius: var(--radius-ctl);
+  background: var(--field); text-align: left; }
+.tab-chooser-item:hover { background: var(--neutral-bg); }
+
+/* Cabecera */
+.tab-head { flex: none; display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.tab-head .song { font-size: 13px; }
+.tab-title { font-size: 26px; margin-top: 2px; }
+.tab-head-actions { display: flex; align-items: center; gap: 10px; }
+.tab-menu-btn { height: 34px; padding: 0 10px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text-2); font-weight: 500; font-size: 13px;
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.tab-menu-btn:hover:not(:disabled) { background: var(--field); }
+.tab-menu-btn:disabled { color: var(--muted); opacity: .6; }
+.tab-menu-btn .caret { font-size: 10px; color: var(--muted); }
+.tab-menu-btn.loop { font-weight: 600; }
+.tab-menu-btn.loop.on { color: var(--accent); }
+.tab-toggle { height: 34px; padding: 0 14px; border-radius: var(--radius-sm); border: 1px solid var(--field-line); background: var(--field); color: var(--text);
+  font-size: 13px; font-weight: 500; }
+.tab-toggle:disabled { opacity: .6; color: var(--muted); }
+.tab-toggle.on { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.tab-head .btn.sm { height: 34px; font-size: 13px; }
+
+.tab-notice { flex: none; display: flex; gap: 12px; align-items: flex-start; padding: 12px 16px; border-radius: var(--radius-ctl); background: var(--field);
+  border: 1px solid var(--field-line); font-size: 13px; color: var(--text-2); }
+.tab-notice-text { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.tab-x { border: 0; background: none; color: var(--muted); padding: 0; display: flex; }
+.tab-x:hover { color: var(--text); }
+
+/* Tarjeta */
+.tab-card { flex: 1; min-height: 0; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+.tab-listen { flex: none; display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.tab-seg { height: 30px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--field-line); background: var(--field); color: var(--text-2); font-size: 13px; font-weight: 500; }
+.tab-seg.on { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.tab-synth { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+.tab-synth.err, .tab .err { color: var(--danger); }
+
+.tab-tracks { flex: none; display: flex; align-items: center; gap: 8px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+.tab-track { flex: none; display: flex; align-items: center; gap: 4px; }
+.tab-pill { flex: none; height: 34px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--field-line); background: var(--field); color: var(--text-2);
+  font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.tab-pill.active { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.tab-pill.pending { border-style: dashed; background: transparent; color: var(--muted); cursor: default; }
+.tab-pill.pending.failed { color: var(--danger); }
+.tab-ms { width: 28px; height: 28px; border-radius: 7px; border: 1px solid var(--field-line); background: var(--field); color: var(--text-2); font-size: 11px; font-weight: 700; padding: 0; }
+.tab-ms.on { background: var(--accent); border-color: transparent; color: var(--accent-ink); }
+
+.tab-controls { flex: none; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--text-2); }
+.tab-field { display: inline-flex; align-items: center; gap: 8px; }
+.tab-select { height: 32px; min-width: 170px; padding: 0 8px; background: var(--field); color: var(--text); border: 1px solid var(--field-line); border-radius: var(--radius-sm); font-size: 13px; }
+.tab-check { display: inline-flex; align-items: center; gap: 8px; color: var(--text-2); font-size: 13px; }
+.tab-check.disabled { opacity: .55; }
+
+/* Lienzo */
+.tab-view { position: relative; flex: 1; min-height: 320px; border-radius: 10px; background: rgba(15, 17, 19, .4); overflow: hidden; }
+.tab-canvas, .tab-frame { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: transparent; }
+.tab-cover { position: absolute; inset: 0; background: var(--card); display: flex; overflow: auto; }
+.tab-cover.clear { background: transparent; pointer-events: none; overflow: visible; }
+.tab-weberr { padding: 16px; color: var(--danger); font-size: 13px; }
+.tab-message { flex: 1; padding: 24px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.tab-message h2, .tab-transcribe h2 { font-family: var(--font-display); font-size: 18px; font-weight: 700; }
+.tab-message p { max-width: 560px; }
+.tab-message .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.tab-transcribe { flex: none; display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-radius: 10px; background: var(--field); }
+.tab-transcribe.overlay { flex: 1; padding: 24px; background: transparent; gap: 12px; }
+.tab-transcribe-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.tab-trow { display: flex; align-items: center; gap: 12px; font-size: 13px; }
+.tab-trow .name { width: 150px; flex: none; }
+.tab-trow .bar { width: 220px; flex: none; background: var(--bg); }
+.tab-trow .pct { min-width: 56px; }
+.tab-footer { flex: none; height: 18px; font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tab-footer.flash { color: var(--accent); }
+
+/* Edición */
+.tab-editbar { flex: none; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12px; }
+.tab-editbar .btn.xs { height: 32px; }
+.tab-editbar .nowrap { white-space: nowrap; }
+
+/* Transporte */
+.tab-transport { flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: 10px 14px; }
+.tab-round { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--field-line); background: var(--field); color: var(--text); display: flex; align-items: center; justify-content: center; padding: 0; }
+.tab-round:hover { background: var(--neutral-bg); }
+.tab-play { width: 52px; height: 52px; border-radius: 50%; border: 0; background: var(--accent); color: var(--accent-ink); display: flex; align-items: center; justify-content: center; padding: 0; }
+.tab-play:hover { background: var(--accent-hover); }
+.tab-clock { font-family: var(--font-display); font-size: 20px; font-weight: 500; font-variant-numeric: tabular-nums; min-width: 96px; }
+.tab-field.tempo { color: var(--text-2); font-size: 13px; }
+.tab-range { appearance: none; -webkit-appearance: none; height: 4px; border-radius: 2px; background: var(--field-line); outline-offset: 6px; margin: 0; width: 120px; }
+.tab-range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: 0; cursor: pointer; }
+.tab-range::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: 0; }
+.tempo-val { color: var(--text); min-width: 48px; font-variant-numeric: tabular-nums; }

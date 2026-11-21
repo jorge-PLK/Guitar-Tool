@@ -20,6 +20,8 @@ protocol MaskModel: AnyObject {
     var frames: Int { get }
     /// `spec`: `2·bins·frames·2` floats. `mask`: `stems · 2·bins·frames·2` floats (Float32) a rellenar.
     func predict(spec: UnsafeMutablePointer<Float>, mask: UnsafeMutablePointer<Float>) throws
+    /// Motor y opciones, solo para la cabecera de `SeparationTiming` (solo lectura).
+    var engineSummary: String { get }
 }
 
 /// Carga del modelo de máscaras del sistema a partir del fichero que instala ModelStore.
@@ -121,16 +123,22 @@ final class CoreMLMaskModel: MaskModel {
         let shape: [NSNumber] = [1, NSNumber(value: rows), NSNumber(value: frames), 2]
         let strides: [NSNumber] = [NSNumber(value: rows * frames * 2), NSNumber(value: frames * 2), 2, 1]
         try autoreleasepool {
-            let input = try MLMultiArray(dataPointer: spec, shape: shape, dataType: .float32,
-                                         strides: strides, deallocator: nil)
-            let provider = try MLDictionaryFeatureProvider(dictionary: [contract.inputName: input])
-            let out = try model.prediction(from: provider)
-            guard let m = out.featureValue(for: outputName)?.multiArrayValue else {
-                throw SeparationError.invalidInput("el modelo no devolvió \(outputName)")
+            let provider = try SeparationTiming.measure(.prepareInput) {
+                let input = try MLMultiArray(dataPointer: spec, shape: shape, dataType: .float32,
+                                             strides: strides, deallocator: nil)
+                return try MLDictionaryFeatureProvider(dictionary: [contract.inputName: input])
             }
-            try Self.copyMask(m, stems: contract.stemCount, rows: rows, frames: frames, into: mask)
+            let out = try SeparationTiming.measureRun { try model.prediction(from: provider) }
+            try SeparationTiming.measure(.readOutput) {
+                guard let m = out.featureValue(for: outputName)?.multiArrayValue else {
+                    throw SeparationError.invalidInput("el modelo no devolvió \(outputName)")
+                }
+                try Self.copyMask(m, stems: contract.stemCount, rows: rows, frames: frames, into: mask)
+            }
         }
     }
+
+    var engineSummary: String { "Core ML, computeUnits .cpuAndGPU (ADR-004), \(frames) tramas" }
 
     /// Copia la máscara `[1, stems, rows, frames, 2]` (FP16 o FP32) a Float32 contiguo.
     /// Core ML con `.cpuAndGPU` la devuelve con el último eje rellenado: strides medidos en BS-RoFormer
@@ -176,13 +184,18 @@ final class ConstantMaskModel: MaskModel {
 
     func predict(spec: UnsafeMutablePointer<Float>, mask: UnsafeMutablePointer<Float>) throws {
         calls += 1
-        if delay > 0 { Thread.sleep(forTimeInterval: delay) }
-        let pairs = 2 * RoformerContract.bins * frames
-        for (s, g) in gains.enumerated() {
-            var re = g.re, im = g.im
-            let base = mask + s * pairs * 2
-            DSP.vfill(&re, base, 2, DSPLength(pairs))
-            DSP.vfill(&im, base + 1, 2, DSPLength(pairs))
+        // El retardo simulado hace de `Run`; rellenar la máscara, de leer la salida.
+        SeparationTiming.measureRun { if delay > 0 { Thread.sleep(forTimeInterval: delay) } }
+        SeparationTiming.measure(.readOutput) {
+            let pairs = 2 * RoformerContract.bins * frames
+            for (s, g) in gains.enumerated() {
+                var re = g.re, im = g.im
+                let base = mask + s * pairs * 2
+                DSP.vfill(&re, base, 2, DSPLength(pairs))
+                DSP.vfill(&im, base + 1, 2, DSPLength(pairs))
+            }
         }
     }
+
+    var engineSummary: String { "simulado (mascara constante), \(frames) tramas, retardo \(Int(delay * 1000)) ms" }
 }

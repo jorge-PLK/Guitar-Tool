@@ -1,0 +1,11 @@
+{
+ "version": "0.1.0",
+ "platform": "mock",
+ "mediaBase": "mock/media/",
+ "projectsFolder": "C:\\Users\\jorge\\ToneForge",
+ "launch": {
+  "screen": null,
+  "project": null,
+  "snapshot": false
+ }
+}

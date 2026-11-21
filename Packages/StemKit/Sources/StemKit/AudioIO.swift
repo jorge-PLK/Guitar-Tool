@@ -150,9 +150,13 @@ enum AudioIO {
             return n
         }, push: { sl, sr, n in
             let room = exactLength - writer.written
-            if room > 0 { try writer.write(left: sl, right: sr, count: min(n, room)) }
+            if room > 0 {
+                try SeparationTiming.measure(.write, counted: false) { try writer.write(left: sl, right: sr, count: min(n, room)) }
+            }
         })
-        if writer.written < exactLength { try writer.writeSilence(exactLength - writer.written) }
+        if writer.written < exactLength {
+            try SeparationTiming.measure(.write, counted: false) { try writer.writeSilence(exactLength - writer.written) }
+        }
     }
 
     #if canImport(AVFoundation)

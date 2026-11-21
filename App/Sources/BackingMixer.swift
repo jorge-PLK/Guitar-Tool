@@ -10,6 +10,14 @@ struct BackingMixer: View {
     let meters: [String: ChannelMeter]
     /// Con la rejilla de acordes expandida: solo master y M/S por stem, sin faders ni medidores de stems.
     var compact = false
+    /// Pantalla baja (< `BackingContent.lowHeight`): mínimo del mezclador más justo (236 en vez de 270 en Windows).
+    var low = false
+
+    /// Alto mínimo del cuerpo de canales: Windows fija la tarjeta en 270 px (236 en pantalla baja) menos cabecera y márgenes.
+    private static let bodyMin: CGFloat = 210
+    private static let bodyMinLow: CGFloat = 176
+    /// Alto a tamaño completo: canal de 276 + 10 de margen para la barra de scroll horizontal.
+    private static let bodyIdeal: CGFloat = MixerChannel.height + 10
 
     private static let order: [(StemKind, String)] = [
         (.vocals, "Voz"), (.drums, "Batería"), (.bass, "Bajo"), (.guitar, "Guitarra"), (.piano, "Piano"), (.other, "Resto"),
@@ -32,23 +40,29 @@ struct BackingMixer: View {
                 if compact {
                     compactBody
                 } else {
-                    // Master fijo a la izquierda; los canales con scroll horizontal propio si no caben.
-                    HStack(alignment: .top, spacing: 10) {
-                        MasterChannel(ctl: ctl)
-                        Divider().frame(height: 200).padding(.horizontal, 6)
-                        ScrollView(.horizontal, showsIndicators: true) {
-                            HStack(alignment: .top, spacing: 10) {
-                                ForEach(Self.order, id: \.0) { kind, name in
-                                    if kind == .guitar && session.usesSeparatedGuitars {
-                                        ForEach(session.guitarTracks, id: \.role) { g in guitarChannel(g) }
-                                    } else if session.audibleStems.contains(kind), !session.emptyStems.contains(kind) {
-                                        stemChannel(kind, name)
+                    // Master fijo a la izquierda; los canales con scroll horizontal propio si no caben. El canal se acorta
+                    // con el alto disponible (mínimo `bodyMin`).
+                    GeometryReader { g in
+                        let ch = min(max(g.size.height - 10, MixerChannel.minHeight), MixerChannel.height)
+                        HStack(alignment: .top, spacing: 10) {
+                            MasterChannel(ctl: ctl)
+                            Divider().frame(height: max(ch - 76, 40)).padding(.horizontal, 6)
+                            ScrollView(.horizontal, showsIndicators: true) {
+                                HStack(alignment: .top, spacing: 10) {
+                                    ForEach(Self.order, id: \.0) { kind, name in
+                                        if kind == .guitar && session.usesSeparatedGuitars {
+                                            ForEach(session.guitarTracks, id: \.role) { g in guitarChannel(g) }
+                                        } else if session.audibleStems.contains(kind), !session.emptyStems.contains(kind) {
+                                            stemChannel(kind, name)
+                                        }
                                     }
                                 }
+                                .padding(.bottom, 10)
                             }
-                            .padding(.bottom, 10)
                         }
+                        .environment(\.mixerChannelHeight, ch)
                     }
+                    .frame(minHeight: low ? Self.bodyMinLow : Self.bodyMin, idealHeight: Self.bodyIdeal, maxHeight: Self.bodyIdeal)
                 }
             }
             .padding(.horizontal, 20).padding(.vertical, 14)
@@ -115,6 +129,15 @@ struct BackingMixer: View {
     }
 }
 
+private struct MixerChannelHeightKey: EnvironmentKey { static let defaultValue: CGFloat = 276 }
+extension EnvironmentValues {
+    /// Alto del canal del mezclador (276 a tamaño completo; menor cuando el mezclador encoge).
+    var mixerChannelHeight: CGFloat {
+        get { self[MixerChannelHeightKey.self] }
+        set { self[MixerChannelHeightKey.self] = newValue }
+    }
+}
+
 /// Canal del mezclador: un stem o (Fase 4) una pista de guitarra. Con `rename` el nombre se edita con doble clic
 /// o desde el menú contextual. Sin insignia de confianza: no hay confianza L/R (mini-spec Fase 4).
 struct MixerChannel: View {
@@ -131,11 +154,15 @@ struct MixerChannel: View {
     @State private var draft = ""
     @FocusState private var focused: Bool
 
-    private static let faderHeight: CGFloat = 150
+    private static let baseFaderHeight: CGFloat = 150
     /// Alto de la franja del título y del canal entero: igual para todos (master, stems, vacíos y guitarras) para
     /// que los títulos queden a la misma altura.
     static let titleHeight: CGFloat = 22
     static let height: CGFloat = 276
+    /// Alto mínimo del canal (pantalla baja: fader de 40; normal: 74 con cuerpo de 210).
+    static let minHeight: CGFloat = 166
+    @Environment(\.mixerChannelHeight) private var channelHeight
+    private var faderHeight: CGFloat { max(Self.baseFaderHeight - (Self.height - channelHeight), 40) }
 
     var body: some View {
         let m = mix
@@ -144,8 +171,8 @@ struct MixerChannel: View {
             title
             HStack(spacing: 10) {
                 Fader(dB: m.gainDB) { setGain($0) }
-                    .frame(width: 28, height: Self.faderHeight)
-                levelBar(dim ? nil : meter).frame(width: 8, height: Self.faderHeight)
+                    .frame(width: 28, height: faderHeight)
+                levelBar(dim ? nil : meter).frame(width: 8, height: faderHeight)
             }
             .padding(.top, 4)
             Text(m.muted ? "Silenciado" : String(format: "%.1f dB", m.gainDB).replacingOccurrences(of: ".", with: ","))
@@ -156,7 +183,7 @@ struct MixerChannel: View {
             }
             .padding(.top, 4)
         }
-        .padding(.vertical, 12).frame(width: 96, height: Self.height, alignment: .top)
+        .padding(.vertical, 12).frame(width: 96, height: channelHeight, alignment: .top)
         .background(TF.field, in: RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(TF.fieldLine))
         .opacity(dim ? 0.55 : 1)
@@ -210,17 +237,18 @@ struct MixerChannel: View {
 /// Canal master: volumen global (stems + metrónomo), guardado en el perfil de equipo.
 struct MasterChannel: View {
     let ctl: BackingController
+    @Environment(\.mixerChannelHeight) private var channelHeight
 
     var body: some View {
         VStack(spacing: 6) {
             Text("Master").font(TF.body(12, .semibold)).frame(height: MixerChannel.titleHeight)
             Fader(dB: ctl.masterGainDB) { ctl.setMaster($0) }
-                .frame(width: 28, height: 150)
+                .frame(width: 28, height: max(150 - (MixerChannel.height - channelHeight), 40))
                 .padding(.horizontal, 18).padding(.top, 4)
             Text(Fmt.db(ctl.masterGainDB)).font(TF.body(12)).foregroundStyle(TF.text2)
             Color.clear.frame(height: 40)
         }
-        .padding(.vertical, 12).frame(width: 96, height: MixerChannel.height, alignment: .top)
+        .padding(.vertical, 12).frame(width: 96, height: channelHeight, alignment: .top)
         .background(TF.accentBg.opacity(0.5), in: RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(TF.accent.opacity(0.6)))
     }

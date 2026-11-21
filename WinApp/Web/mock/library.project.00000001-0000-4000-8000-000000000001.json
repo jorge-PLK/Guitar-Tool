@@ -1,0 +1,95 @@
+{
+ "id": "00000001-0000-4000-8000-000000000001",
+ "title": "So payaso",
+ "artist": "Extremoduro",
+ "folderName": "Extremoduro - So payaso",
+ "duration": 262.4,
+ "sampleRate": 44100,
+ "cover": "c1/cover.svg",
+ "createdAt": "2026-01-02T03:04:05Z",
+ "updatedAt": "2026-01-05T03:04:05Z",
+ "separationState": "done",
+ "stemCount": 4,
+ "takeCount": 3,
+ "rigCount": 3,
+ "hasAnalysis": true,
+ "origin": "youtube",
+ "separationError": null,
+ "stems": [
+  {
+   "kind": "vocals",
+   "bytes": 31200000,
+   "isEmpty": false
+  },
+  {
+   "kind": "drums",
+   "bytes": 31200000,
+   "isEmpty": false
+  },
+  {
+   "kind": "bass",
+   "bytes": 31200000,
+   "isEmpty": false
+  },
+  {
+   "kind": "other",
+   "bytes": 31200000,
+   "isEmpty": false
+  }
+ ],
+ "parts": [
+  {
+   "id": "000000C9-0000-4000-8000-0000000000C9",
+   "name": "Rítmica",
+   "isLead": false,
+   "takes": [
+    {
+     "id": "00000065-0000-4000-8000-000000000065",
+     "number": 1,
+     "createdAt": "2026-01-03T10:00:00Z",
+     "discarded": false,
+     "isBest": true,
+     "hasVideo": true,
+     "punchCount": 0,
+     "audio": null,
+     "video": null
+    },
+    {
+     "id": "00000066-0000-4000-8000-000000000066",
+     "number": 2,
+     "createdAt": "2026-01-03T10:00:00Z",
+     "discarded": false,
+     "isBest": false,
+     "hasVideo": false,
+     "punchCount": 0,
+     "audio": null,
+     "video": null
+    }
+   ]
+  },
+  {
+   "id": "000000CA-0000-4000-8000-0000000000CA",
+   "name": "Solo",
+   "isLead": true,
+   "takes": [
+    {
+     "id": "00000067-0000-4000-8000-000000000067",
+     "number": 1,
+     "createdAt": "2026-01-03T10:00:00Z",
+     "discarded": false,
+     "isBest": true,
+     "hasVideo": true,
+     "punchCount": 0,
+     "audio": null,
+     "video": null
+    }
+   ]
+  }
+ ],
+ "videoCount": 1,
+ "guitars": [
+  "Robe",
+  "Uoho",
+  "Solo"
+ ]
+}

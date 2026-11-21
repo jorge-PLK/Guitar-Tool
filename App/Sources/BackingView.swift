@@ -71,24 +71,31 @@ struct BackingContent: View {
     @State private var meters: [String: ChannelMeter] = [:]
     private let tick = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
 
+    /// Adaptación (paridad con `WinApp/Web/screens/backing.css`): la pantalla ocupa exactamente el alto disponible; el
+    /// mezclador encoge (faders más cortos) hasta su mínimo y solo por debajo hace scroll el contenido.
+    static let verticalPadding: CGFloat = 20
+    /// Por debajo de este alto de pantalla se usa el mínimo bajo del mezclador (`@media (max-height: 780px)`).
+    static let lowHeight: CGFloat = 780
+
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                header
-                if session.project.separation.state != .done || (session.audibleStems.isEmpty && session.emptyStems.isEmpty) {
-                    notSeparated
-                } else {
-                    banner
-                    BackingTimelineCard(session: session, ctl: ctl, time: time,
-                                        expanded: $chordsExpanded, editMode: $chordsEdit)
-                    HStack(alignment: .top, spacing: 20) {
-                        BackingMixer(session: session, ctl: ctl, meters: meters, compact: chordsExpanded)
+        GeometryReader { geo in
+            ScrollView {
+                FillLastLayout(available: geo.size.height - 2 * Self.verticalPadding, spacing: 14) {
+                    header
+                    if session.project.separation.state != .done || (session.audibleStems.isEmpty && session.emptyStems.isEmpty) {
+                        notSeparated
+                    } else {
+                        banner
+                        BackingTimelineCard(session: session, ctl: ctl, time: time,
+                                            expanded: $chordsExpanded, editMode: $chordsEdit)
+                        BackingMixer(session: session, ctl: ctl, meters: meters, compact: chordsExpanded,
+                                     low: geo.size.height < Self.lowHeight)
                             .frame(maxWidth: .infinity)
                     }
                 }
+                .padding(.horizontal, 36).padding(.vertical, Self.verticalPadding)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(.horizontal, 36).padding(.vertical, 20)
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .onReceive(tick) { _ in
             let t = ctl.player.currentTime
@@ -116,6 +123,7 @@ struct BackingContent: View {
                 Text("Backing track").font(TF.display(26))
             }
             Spacer()
+            HStack(spacing: 10) {
             if ctl.hasGuitar {
                 Button { ctl.toggleWithoutGuitars() } label: {
                     Text("Sin guitarras")
@@ -127,6 +135,12 @@ struct BackingContent: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(ctl.guitarsOff ? .isSelected : [])
+            }
+            Button { model.section = .tab } label: {
+                Label("Tablatura", systemImage: "music.quarternote.3")
+            }
+            .buttonStyle(SecondaryButton(height: 34))
+            .help("Abrir la tablatura de este tema")
             }
         }
     }
@@ -179,5 +193,38 @@ struct BackingContent: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(TF.field, in: RoundedRectangle(cornerRadius: 10))
             .overlay(RoundedRectangle(cornerRadius: 10).stroke(TF.fieldLine))
+    }
+}
+
+/// Apila sus hijos con `spacing`; el último (el mezclador) recibe el alto que sobra hasta `available`, entre su mínimo
+/// (alto propuesto 0) y su ideal (alto propuesto nil). Si ni así cabe, el total supera `available` y lo absorbe el scroll.
+struct FillLastLayout: Layout {
+    var available: CGFloat
+    var spacing: CGFloat
+
+    private func heights(_ subviews: Subviews, width: CGFloat) -> (others: [CGFloat], last: CGFloat) {
+        guard let last = subviews.last else { return ([], 0) }
+        let others = subviews.dropLast().map { $0.sizeThatFits(ProposedViewSize(width: width, height: nil)).height }
+        let used = others.filter { $0 > 0.5 }.reduce(0, +) + spacing * CGFloat(others.filter { $0 > 0.5 }.count)
+        let minH = last.sizeThatFits(ProposedViewSize(width: width, height: 0)).height
+        let idealH = last.sizeThatFits(ProposedViewSize(width: width, height: nil)).height
+        return (others, min(max(available - used, minH), max(minH, idealH)))
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let w = proposal.width ?? 800
+        let (others, lastH) = heights(subviews, width: w)
+        let visible = others.filter { $0 > 0.5 }
+        return CGSize(width: w, height: visible.reduce(0, +) + spacing * CGFloat(visible.count) + lastH)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let (others, lastH) = heights(subviews, width: bounds.width)
+        var y = bounds.minY
+        for (i, s) in subviews.dropLast().enumerated() {
+            s.place(at: CGPoint(x: bounds.minX, y: y), anchor: .topLeading, proposal: ProposedViewSize(width: bounds.width, height: others[i]))
+            if others[i] > 0.5 { y += others[i] + spacing }
+        }
+        subviews.last?.place(at: CGPoint(x: bounds.minX, y: y), anchor: .topLeading, proposal: ProposedViewSize(width: bounds.width, height: lastH))
     }
 }

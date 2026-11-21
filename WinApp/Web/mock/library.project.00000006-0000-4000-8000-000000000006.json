@@ -1,0 +1,22 @@
+{
+ "id": "00000006-0000-4000-8000-000000000006",
+ "title": "Tema con fallo",
+ "artist": "Grupo Roto",
+ "folderName": "Grupo Roto - Tema con fallo",
+ "duration": 120.5,
+ "sampleRate": 44100,
+ "cover": null,
+ "createdAt": "2026-01-02T03:04:05Z",
+ "updatedAt": "2026-01-05T03:04:05Z",
+ "separationState": "failed",
+ "stemCount": 0,
+ "takeCount": 0,
+ "rigCount": 0,
+ "hasAnalysis": false,
+ "origin": null,
+ "separationError": "Modelo no disponible",
+ "stems": [],
+ "parts": [],
+ "videoCount": 0,
+ "guitars": []
+}

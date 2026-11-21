@@ -140,6 +140,22 @@ public final class OnnxSession: @unchecked Sendable {
         #endif
     }
 
+    /// Lo que fija `tf_ort_session_create` sin opción (COnnxRuntime.c: `SetSessionGraphOptimizationLevel`,
+    /// `SetSessionExecutionMode`; sin `SetInterOpNumThreads`). Solo para informes: cambiarlo aquí no cambia la sesión.
+    public static let fixedGraphOptimization = "ORT_ENABLE_ALL"
+    public static let fixedExecutionMode = "ORT_SEQUENTIAL"
+
+    /// Configuración de la sesión en una línea ASCII (proveedor, hilos, reserva, patrón, grafo, versión), solo lectura.
+    public var configurationSummary: String {
+        let threads = options.threads.map { "\($0)" } ?? "auto (0: uno por nucleo fisico)"
+        let pattern = provider == .directML ? false : options.memoryPattern   // el C lo apaga con DirectML
+        let version = (try? OnnxRuntime.version) ?? "?"
+        return "proveedor \(provider.rawValue), device \(options.deviceID), intra_op_threads \(threads), "
+            + "inter_op_threads por defecto, cpu_mem_arena \(options.memoryArena ? "on" : "off"), "
+            + "mem_pattern \(pattern ? "on" : "off"), graph_opt \(Self.fixedGraphOptimization), "
+            + "exec_mode \(Self.fixedExecutionMode), ORT \(version)"
+    }
+
     /// Ejecuta el modelo. Las entradas no se copian (ORT lee los arrays); cada salida se copia una vez a su array.
     /// Para no copiar las salidas grandes, `run(inputs:outputs:)`.
     public func run(_ inputs: [String: OnnxTensor]) throws -> [String: OnnxTensor] {

@@ -65,7 +65,7 @@ struct RecordMixer: View {
     private var compactBody: some View {
         let session = ctl.session
         let dB = ctl.model.profile.masterGainDB
-        return HStack(alignment: .center, spacing: 10) {
+        let head = HStack(alignment: .center, spacing: 10) {
             HStack(spacing: 8) {
                 Text("Master").font(TF.body(12, .semibold)).fixedSize()
                 Slider(value: Binding(get: { dB }, set: { ctl.setMaster(abs($0) < 1.5 ? 0 : $0) }),
@@ -84,7 +84,8 @@ struct RecordMixer: View {
                 .frame(width: 22, height: 8)
             }
             .accessibilityElement(children: .ignore).accessibilityLabel("Nivel de la entrada de guitarra")
-            Divider().frame(height: 28)
+        }
+        let channels = ScrollView(.horizontal, showsIndicators: false) {
             HStack(alignment: .top, spacing: 6) {
                 Group {
                     ForEach(Self.order, id: \.0) { kind, name in
@@ -110,6 +111,12 @@ struct RecordMixer: View {
                     }
                 }
             }
+        }
+        // Adaptación (mínimo de ventana 1100×680): los canales M/S hacen scroll horizontal dentro de la tarjeta; si no
+        // caben junto a Master y la entrada, pasan a una segunda línea. Nunca fijan un ancho mínimo a la pantalla.
+        return ViewThatFits(in: .horizontal) {
+            HStack(alignment: .center, spacing: 10) { head; Divider().frame(height: 28); channels.fixedSize(horizontal: true, vertical: false) }
+            VStack(alignment: .leading, spacing: 8) { head; channels }
         }
     }
 

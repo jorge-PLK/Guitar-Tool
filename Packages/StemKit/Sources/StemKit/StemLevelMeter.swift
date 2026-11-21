@@ -15,8 +15,8 @@ public struct StemLevel: Sendable, Equatable {
 public enum StemLevelMeter {
     /// Mini-spec Fase 2, «Stems vacíos»: vacío si RMS < −60 dBFS …
     public static let emptyRMSThresholdDB = -60.0
-    /// … y pico < −40 dBFS.
-    public static let emptyPeakThresholdDB = -40.0
+    /// … y pico < −30 dBFS.
+    public static let emptyPeakThresholdDB = -30.0
     /// Suelo para el silencio digital exacto.
     public static let floorDB = -200.0
     static let blockFrames = 1 << 16
@@ -51,7 +51,7 @@ public enum StemLevelMeter {
         return StemLevel(rmsDB: db(sqrt(sumSquares / Double(count))), peakDB: db(Double(peak)))
     }
 
-    /// Regla de la spec: RMS < −60 dBFS y pico < −40 dBFS.
+    /// Regla de la spec: RMS < −60 dBFS y pico < −30 dBFS.
     public static func isEmpty(_ level: StemLevel) -> Bool {
         level.rmsDB < emptyRMSThresholdDB && level.peakDB < emptyPeakThresholdDB
     }

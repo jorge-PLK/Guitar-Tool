@@ -1,6 +1,12 @@
 import AppKit
 import SwiftUI
 
+/// Tamaño mínimo de la ventana de toda la app (banco de pruebas de la adaptación; las pantallas deben caber sin desbordar).
+enum WindowMetrics {
+    static let minWidth: CGFloat = 1100
+    static let minHeight: CGFloat = 680
+}
+
 @main
 struct ToneForgeApp: App {
     @State private var model = AppModel()
@@ -8,7 +14,11 @@ struct ToneForgeApp: App {
     init() {
         #if DEBUG
         // Las capturas no heredan el estado restaurado (SceneStorage: rejilla expandida, tamaño de ventana…).
-        if LaunchOptions().snapshot != nil { UserDefaults.standard.register(defaults: ["ApplePersistenceIgnoreState": true]) }
+        if LaunchOptions().snapshot != nil {
+            UserDefaults.standard.register(defaults: ["ApplePersistenceIgnoreState": true])
+            // Captura en segundo plano: sin Dock ni activación, para no robar la pantalla (`--foreground` lo desactiva).
+            if !CommandLine.arguments.contains("--foreground") { NSApplication.shared.setActivationPolicy(.accessory) }
+        }
         #endif
     }
 
@@ -17,7 +27,7 @@ struct ToneForgeApp: App {
             RootView()
                 .environment(model)
                 .preferredColorScheme(.dark)
-                .frame(minWidth: 1100, minHeight: 700)
+                .frame(minWidth: WindowMetrics.minWidth, minHeight: WindowMetrics.minHeight)
                 .task {
                     await model.start()
                     #if DEBUG

@@ -15,6 +15,8 @@ final class OnnxMaskModel: MaskModel {
     let frames: Int
     let interface: Interface
     let session: OnnxSession
+    /// Clave del recuerdo de proveedor (`OnnxModelLoader`).
+    private let modelKey: String
     private var real: [Float] = [], imag: [Float] = [], outReal: [Float] = [], outImag: [Float] = []
 
     /// `contract` aporta hop, solape y stems; las tramas y los nombres salen del modelo.
@@ -22,6 +24,7 @@ final class OnnxMaskModel: MaskModel {
         // Sin reserva ni patrón de memoria: el export con dynamo pasa de 10 GB si no (parte 7.3).
         let options = OnnxSessionOptions(memoryArena: false, memoryPattern: false)
         let key = "\(modelURL.deletingPathExtension().lastPathComponent)-\(Self.fileSize(modelURL))"
+        modelKey = key
         session = try OnnxModelLoader.session(modelURL: modelURL, model: key, options: options)
         let bins = RoformerContract.bins
         if session.inputNames.contains("spec_real"), session.inputNames.contains("spec_imag") {
@@ -57,29 +60,49 @@ final class OnnxMaskModel: MaskModel {
         let bins = RoformerContract.bins
         switch interface {
         case .mask:
-            try session.run(inputs: [OnnxBuffer(name: contract.inputName, shape: [1, 2 * bins, frames, 2], pointer: spec)],
-                            outputs: [OnnxBuffer(name: contract.outputName, shape: [1, contract.stemCount, 2 * bins, frames, 2],
-                                                 pointer: mask)])
+            // ORT escribe la máscara directamente: no hay etapas de preparar ni de leer salida.
+            try SeparationTiming.measureRun {
+                try session.run(inputs: [OnnxBuffer(name: contract.inputName, shape: [1, 2 * bins, frames, 2], pointer: spec)],
+                                outputs: [OnnxBuffer(name: contract.outputName, shape: [1, contract.stemCount, 2 * bins, frames, 2],
+                                                     pointer: mask)])
+            }
         case .maskedSpectrum:
             let stems = contract.stemCount, frames = self.frames
             try real.withUnsafeMutableBufferPointer { re in
                 try imag.withUnsafeMutableBufferPointer { im in
                     try outReal.withUnsafeMutableBufferPointer { ore in
                         try outImag.withUnsafeMutableBufferPointer { oim in
-                            SeparationSpectrumLayout.split(spec: spec, bins: bins, frames: frames,
-                                                           real: re.baseAddress!, imag: im.baseAddress!)
+                            SeparationTiming.measure(.prepareInput) {
+                                SeparationSpectrumLayout.split(spec: spec, bins: bins, frames: frames,
+                                                               real: re.baseAddress!, imag: im.baseAddress!)
+                            }
                             let inShape = [1, 2, bins, frames], outShape = [1, stems, 2, bins, frames]
-                            try session.run(inputs: [OnnxBuffer(name: "spec_real", shape: inShape, pointer: re.baseAddress!),
-                                                     OnnxBuffer(name: "spec_imag", shape: inShape, pointer: im.baseAddress!)],
-                                            outputs: [OnnxBuffer(name: "out_spec_real", shape: outShape, pointer: ore.baseAddress!),
-                                                      OnnxBuffer(name: "out_spec_imag", shape: outShape, pointer: oim.baseAddress!)])
-                            SeparationSpectrumLayout.mask(outReal: ore.baseAddress!, outImag: oim.baseAddress!, spec: spec,
-                                                          stems: stems, bins: bins, frames: frames, into: mask)
+                            try SeparationTiming.measureRun {
+                                try session.run(inputs: [OnnxBuffer(name: "spec_real", shape: inShape, pointer: re.baseAddress!),
+                                                         OnnxBuffer(name: "spec_imag", shape: inShape, pointer: im.baseAddress!)],
+                                                outputs: [OnnxBuffer(name: "out_spec_real", shape: outShape, pointer: ore.baseAddress!),
+                                                          OnnxBuffer(name: "out_spec_imag", shape: outShape, pointer: oim.baseAddress!)])
+                            }
+                            SeparationTiming.measure(.readOutput) {
+                                SeparationSpectrumLayout.mask(outReal: ore.baseAddress!, outImag: oim.baseAddress!, spec: spec,
+                                                              stems: stems, bins: bins, frames: frames, into: mask)
+                            }
                         }
                     }
                 }
             }
         }
+    }
+
+    /// Configuración de la sesión tal como se creó (solo lectura) y la elección de proveedor.
+    var engineSummary: String {
+        var text = "ONNX Runtime, interfaz \(interface == .maskedSpectrum ? "espectro enmascarado" : "mascara"), "
+            + "T=\(frames); \(session.configurationSummary)"
+        if let sel = OnnxModelLoader.lastSelection(model: modelKey) {
+            text += "; seleccion \(sel.candidate.provider.rawValue)\(sel.fromMemory ? " (recordada)" : "")"
+            if !sel.skipped.isEmpty { text += ", descartados: \(sel.skipped.joined(separator: " | "))" }
+        }
+        return text
     }
 
     private static func fileSize(_ url: URL) -> Int64 {

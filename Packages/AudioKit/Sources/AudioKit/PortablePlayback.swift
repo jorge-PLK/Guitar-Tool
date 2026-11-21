@@ -389,7 +389,9 @@ final class PortablePlaybackEngine: @unchecked Sendable {
 
     // Lector: todo bajo `readerLock` (el hilo de E/S nunca lo toma).
     private let readerLock = NSLock()
-    private let sources: [StemSource]
+    /// Vacío tras `shutdown()`: los lectores (y sus ficheros) se sueltan ahí, no cuando muera el motor.
+    private var sources: [StemSource]
+    private var closed = false
     private var resamplers: [StreamResampler?] = []
     private var planner: SchedulePlanner
     private var clock = ClockState()
@@ -461,11 +463,22 @@ final class PortablePlaybackEngine: @unchecked Sendable {
         voiceAccent.deallocate()
     }
 
-    /// Para el hilo lector (tiempo real). Llamar al dejar de usar el motor.
+    /// Para el render y el hilo lector y cierra los ficheros de los stems antes de volver (plan, «Pendiente tras el
+    /// paso 7»): aunque alguien retenga aún el motor (la sesión, el cierre de la salida propia), no queda ningún lector
+    /// abierto y en Windows los ficheros se pueden borrar o reescribir ya. El hilo de E/S nunca toca los lectores (solo
+    /// los anillos), y el lector solo bajo `readerLock`: soltarlos bajo el cerrojo no compite con nadie. Después el
+    /// motor ya no vuelve a sonar (`start` no hace nada). Llamar al dejar de usar el motor.
     func shutdown() {
         stop()
         alive.store(false, ordering: .relaxed)
+        readerLock.lock()
+        closed = true
+        sources = []
+        readerLock.unlock()
     }
+
+    /// Lectores abiertos (solo tests: comprueban con referencias débiles que `shutdown` los suelta).
+    var stemReadersForTests: [AudioFileReader] { readerLock.withLock { sources.map(\.reader) } }
 
     var clickFrames: Int { normalClick.count }
     var stretchInputLatency: Int { stretcher.inputLatency }
@@ -488,6 +501,7 @@ final class PortablePlaybackEngine: @unchecked Sendable {
         fadeFromR = lastR
         readerLock.lock()
         defer { readerLock.unlock() }
+        guard !closed else { return generation }
         generation += 1
         runActive = true
         // Antes de programar: la poda de tramos y los clics miran lo renderizado en esta pasada.
@@ -500,7 +514,7 @@ final class PortablePlaybackEngine: @unchecked Sendable {
         events.reset()
         owed.update(repeating: 0, count: stemCount)
         voiceCount = 0
-        resamplers = sources.map { _ in
+        resamplers = (0..<stemCount).map { _ in
             outputRate == songRate ? nil : try? StreamResampler(from: songRate, to: outputRate, channels: 2)
         }
         planner.songPos = songFrame
@@ -818,7 +832,7 @@ final class PortablePlaybackEngine: @unchecked Sendable {
     private func minReadable() -> Int { rings.reduce(Int.max) { min($0, $1.readable) } }
 
     private func topUpLocked() {
-        guard runActive else { return }
+        guard runActive, !closed else { return }
         while minReadable() < queueTarget {
             guard rings.allSatisfy({ $0.writable >= maxPieceRingFrames }) else { break }
             guard let piece = planner.next() else {

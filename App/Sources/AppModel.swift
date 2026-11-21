@@ -854,7 +854,7 @@ final class AppModel {
                 // Con una hoja abierta (--link-import-demo) se captura la hoja, que es otra ventana.
                 if window.attachedSheet == nil {
                     window.setContentSize(options.windowSize ?? CGSize(width: 1440, height: 900))
-                    window.orderFrontRegardless()
+                    if CommandLine.arguments.contains("--foreground") { window.orderFrontRegardless() } else { window.orderBack(nil) }
                     try? await Task.sleep(for: .milliseconds(600))
                 }
                 view.layoutSubtreeIfNeeded()

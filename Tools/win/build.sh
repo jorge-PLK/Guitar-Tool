@@ -2,7 +2,7 @@
 # Compila, instala y arranca un paquete SwiftPM en la VM de Windows, o le pasa sus tests (Fase 7c).
 #
 #   Tools/win/build.sh [--package <ruta en el repo>] [--product <nombre>] [--arch x64|arm64|both]
-#                      [--gui] [--no-run] [--clean] [--stop] [--release]
+#                      [--gui] [--gui-args "<args del programa>"] [--no-run] [--clean] [--stop] [--release]
 #   Tools/win/build.sh --test [--filter <X>] [--package <ruta>] [--arch x64|arm64|both] [--clean] [--stop] [--release]
 #
 # Por defecto: paquete Tools/win/smoke, producto tf-smoke, solo x64 (decision: Windows es solo x64;
@@ -14,6 +14,15 @@
 #   -Config release a test.ps1 (swift test -c release -Xswiftc -enable-testing) y la linea sale como
 #   "TEST  x64 release OK ...". La compilacion normal ya es release (Get-SwiftArgs), asi que solo cambia la
 #   etiqueta ("BUILD x64 release OK ...") y los topes por defecto: TF_VM_TIMEOUT 1500, TF_VM_BUILD_TIMEOUT 1800.
+# --gui-args: con --gui, argumentos que recibe el programa (sustituyen al "--wait N" del smoke), p. ej. para ToneForge:
+#   --package WinApp --product ToneForge --gui --gui-args "--projects-folder C:\tf-qa\projects --snapshot C:\ToneForge\snap.png"
+#   --gui-env "A=B;C=D": variables de entorno para el programa (p. ej. "TF_MODELS_DIR=C:\tf-models").
+#   Con --snapshot-hold <s> en --gui-args la app mantiene la ventana abierta s segundos tras guardar el PNG y la
+#   captura de escritorio (Temp/win/gui-x64.png) se hace entonces, con la ventana visible.
+#   Si trae --snapshot <ruta>, se borra antes de arrancar y se trae a Temp/win/<nombre>; el programa puede tardar hasta
+#   75 s (despues se mata y el codigo es 124). stderr del programa vuelve en Temp/win/gui-<arch>.err.
+#   WinApp: install.ps1 copia WinApp/Web como Web\ junto al .exe; las cabeceras y el loader de WebView2 salen de
+#   Vendor/win/webview2 (Tools/win/fetch-webview2.sh) y se copian a C:\tf-webview2 cuando cambia su VERSION.
 # Salida resumida (una linea por etapa); el log completo va a Temp/logs/win-<fecha>.log
 #   (win-test-<fecha>.log con --test). Con --gui el arranque es en la sesion interactiva de tf y trae
 #   salida y captura a Temp/win/.
@@ -46,6 +55,8 @@ package="Tools/win/smoke"
 product="tf-smoke"
 arch="x64"
 gui=0
+gui_args=""
+gui_env=""
 run=1
 clean=0
 stop=0
@@ -58,19 +69,23 @@ while [ $# -gt 0 ]; do
     --product) product="${2:-}"; shift ;;
     --arch)    arch="${2:-}"; shift ;;
     --gui)     gui=1 ;;
+    --gui-args) gui_args="${2:-}"; shift ;;
+    --gui-env)  gui_env="${2:-}"; shift ;;
     --no-run)  run=0 ;;
     --clean)   clean=1 ;;
     --stop)    stop=1 ;;
     --test)    test=1 ;;
     --release) release=1 ;;
     --filter)  filter="${2:-}"; shift ;;
-    -h|--help) sed -n '2,31p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,41p' "$0"; exit 0 ;;
     *) echo "Argumento desconocido: $1"; exit 3 ;;
   esac
   shift
 done
 case "$arch" in arm64|x64|both) ;; *) echo "--arch debe ser arm64, x64 o both"; exit 3 ;; esac
 [ -n "$filter" ] && [ "$test" -eq 0 ] && { echo "--filter solo se usa con --test"; exit 3; }
+[ -n "$gui_args" ] && [ "$gui" -eq 0 ] && { echo "--gui-args solo se usa con --gui"; exit 3; }
+[ -n "$gui_env" ] && [ "$gui" -eq 0 ] && { echo "--gui-env solo se usa con --gui"; exit 3; }
 package="${package#"$root"/}"   # ruta absoluta dentro del repo -> relativa
 package="${package%/}"
 
@@ -233,6 +248,28 @@ if [ -f Vendor/win/ort/VERSION ]; then
   fi
 fi
 
+# --- WebView2 (carpeta persistente C:\tf-webview2, fuera de git; solo para paquetes WinApp*) ---------------
+# Se rellena desde Vendor/win/webview2 (Tools/win/fetch-webview2.sh) solo cuando su VERSION no coincide con la de la VM.
+case "$package" in
+  WinApp*)
+    if [ ! -f Vendor/win/webview2/VERSION ]; then
+      echo "WEBV2 falta Vendor/win/webview2: ejecuta Tools/win/fetch-webview2.sh"
+      exit 3
+    fi
+    want="$(cat Vendor/win/webview2/VERSION)"
+    rcmd "if (Test-Path C:\\tf-webview2\\VERSION) { (Get-Content C:\\tf-webview2\\VERSION) } else { 'ninguna' }"
+    if [ "$out" != "$want" ]; then
+      t0=$SECONDS
+      rcmd "if (Test-Path C:\\tf-webview2) { Remove-Item -Recurse -Force C:\\tf-webview2 }; New-Item -ItemType Directory -Force C:\\tf-webview2 | Out-Null" \
+        || { echo "WEBV2 no se pudo preparar C:\\tf-webview2: $out"; exit 3; }
+      scp -q -r -o BatchMode=yes Vendor/win/webview2/include Vendor/win/webview2/x64 "$HOST:C:/tf-webview2/" >> "$log" 2>&1 \
+        && scp -q -o BatchMode=yes Vendor/win/webview2/VERSION "$HOST:C:/tf-webview2/VERSION" >> "$log" 2>&1 \
+        || { echo "WEBV2 scp a C:\\tf-webview2 fallo (ver $log)"; exit 3; }
+      echo "WEBV2 $want copiado a C:\\tf-webview2 ($((SECONDS - t0)) s)"
+    fi
+    ;;
+esac
+
 # --- Tests (--test) ---------------------------------------------------------------------------
 if [ "$test" -eq 1 ]; then
   fa=""
@@ -329,10 +366,38 @@ if [ "$rc" -ne 0 ]; then
   finish 2
 fi
 
+# --- Helpers de la app ------------------------------------------------------------------------
+# ToneForge lanza ejecutables hermanos (tf-separate, de StemKit) que viven en otros paquetes: se compilan
+# aqui e install.ps1 los copia junto al .exe (su tabla $helpers manda sobre que se copia). Sin esto cada
+# instalacion vaciaba C:\ToneForge\<arch> y dejaba la app sin separador.
+helper_pkgs=""
+[ "$product" = "ToneForge" ] && helper_pkgs="Packages/StemKit"
+for hp in $helper_pkgs; do
+  rcmd "$PS $REMOTE_SCRIPTS\\build.ps1 -Package $hp -Arch $arch -TimeoutSec $T_BUILD"
+  rc=$?
+  if [ "$RCMD_HUNG" -eq 1 ]; then
+    echo "BUILD $hp: el ssh no volvio en ${RCMD_LIMIT}s: lo mato e intento matar swift/xctest en la VM"
+    vm_kill_swift
+    echo "Log completo: $log"
+    finish 3
+  fi
+  tf_lines | while read -r kind a status secs; do
+    [ "$kind" = "BUILD" ] && echo "BUILD $a$rtag $status (${secs} s) [$hp]"
+  done
+  if [ "$rc" -ne 0 ]; then
+    errs="$(printf '%s\n' "$out" | grep -E 'error:' | sed -E 's/^ *\[[a-z0-9]+\] //' | sort -u | cut -c1-220 | head -15)"
+    [ -z "$errs" ] && errs="$(printf '%s\n' "$out" | tail -8)"
+    printf '%s\n' "$errs" | sed 's/^/      /'
+    echo "Log completo: $log"
+    finish 2
+  fi
+done
+
 # --- Instalacion ------------------------------------------------------------------------------
 rcmd "$PS $REMOTE_SCRIPTS\\install.ps1 -Package $package -Product $product -Arch $arch"
 rc=$?
 tf_lines | grep '^PE ' | while read -r _ a mach st rest; do echo "PE    $a $mach $st $rest"; done
+tf_lines | grep '^HELPER ' | while read -r _ a name st; do echo "HELPER $a $name $st"; done
 if [ "$rc" -ne 0 ]; then echo "Log completo: $log"; finish 2; fi
 
 # --- Arranque ---------------------------------------------------------------------------------
@@ -343,7 +408,19 @@ fi
 
 status=0
 if [ "$gui" -eq 1 ]; then
-  rcmd "$PS $REMOTE_SCRIPTS\\gui.ps1 -Product $product -Arch $arch -Wait $GUI_WAIT"
+  ga=""
+  snap_remote=""
+  if [ -n "$gui_args" ]; then
+    ga=" -ArgsB64 $(printf '%s' "$gui_args" | base64 | tr -d '\n')"
+    snap_remote="$(printf '%s\n' "$gui_args" | sed -nE 's/.*--snapshot[ =]+"?([^" ]+)"?.*/\1/p')"
+    if [ -n "$snap_remote" ]; then
+      rcmd "Remove-Item -Force -ErrorAction SilentlyContinue '${snap_remote//\'/\'\'}'"
+    fi
+  fi
+  if [ -n "$gui_env" ]; then
+    ga="$ga -EnvB64 $(printf '%s' "$gui_env" | base64 | tr -d '\n')"
+  fi
+  rcmd "$PS $REMOTE_SCRIPTS\\gui.ps1 -Product $product -Arch $arch -Wait $GUI_WAIT$ga"
   rc=$?
   if [ "$rc" -eq 3 ]; then
     echo "GUI   el usuario tf no tiene sesion grafica iniciada en la VM."
@@ -356,7 +433,21 @@ if [ "$gui" -eq 1 ]; then
     scp -q -o BatchMode=yes "$HOST:C:/ToneForge/gui-$a.png" "Temp/win/gui-$a.png" >> "$log" 2>&1 \
       && echo "      captura: Temp/win/gui-$a.png"
     scp -q -o BatchMode=yes "$HOST:C:/ToneForge/gui-$a.txt" "Temp/win/gui-$a.txt" >> "$log" 2>&1
+    if scp -q -o BatchMode=yes "$HOST:C:/ToneForge/toneforge-$a.log" "Temp/win/toneforge.log" >> "$log" 2>&1; then
+      echo "      log de la app: Temp/win/toneforge.log (ultimas lineas)"
+      tail -4 Temp/win/toneforge.log | tr -d '\r' | cut -c1-200 | sed 's/^/        /'
+    fi
+    if scp -q -o BatchMode=yes "$HOST:C:/ToneForge/gui-$a.err" "Temp/win/gui-$a.err" >> "$log" 2>&1 && [ -s "Temp/win/gui-$a.err" ]; then
+      echo "      stderr (Temp/win/gui-$a.err):"
+      tail -8 "Temp/win/gui-$a.err" | tr -d '\r' | cut -c1-240 | sed 's/^/        /'
+    fi
   done
+  if [ -n "$snap_remote" ]; then
+    snap_name="$(basename "${snap_remote//\\//}")"
+    scp -q -o BatchMode=yes "$HOST:${snap_remote//\\//}" "Temp/win/$snap_name" >> "$log" 2>&1 \
+      && echo "      snapshot: Temp/win/$snap_name" \
+      || { echo "      snapshot: no se genero $snap_remote"; status=1; }
+  fi
   [ "$rc" -ne 0 ] && status=1
 else
   rcmd "$PS $REMOTE_SCRIPTS\\run.ps1 -Product $product -Arch $arch"

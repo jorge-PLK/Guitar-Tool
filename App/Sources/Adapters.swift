@@ -80,7 +80,7 @@ struct AppStemSeparator: StemSeparating {
     }
 }
 
-/// Adaptador `StemLevelMeasuring` sobre `StemLevelMeter` (regla de «Stems vacíos»: RMS < −60 y pico < −40 dBFS).
+/// Adaptador `StemLevelMeasuring` sobre `StemLevelMeter` (regla de «Stems vacíos»: RMS < −60 y pico < −30 dBFS).
 struct AppStemLevelMeter: StemLevelMeasuring {
     func isSilent(stem: URL) async throws -> Bool {
         try await Task.detached(priority: .utility) { try StemLevelMeter.isEmpty(url: stem) }.value

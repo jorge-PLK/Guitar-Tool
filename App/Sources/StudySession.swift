@@ -28,6 +28,9 @@ final class StudySession {
     private var pendingNames: [GuitarRole: String] = [:] { didSet { if !pendingNames.isEmpty { scheduleSave() } } }
     /// Error al guardar las opciones o los nombres (se muestra junto al interruptor).
     private(set) var guitarOptionsError: String?
+    /// Error al guardar las ediciones del estudio (acordes, secciones, mezcla, bucles…). Se pone al fallar el guardado y
+    /// se limpia al siguiente correcto. Mismo nombre y literal que `AppCore.StudySession.saveError`.
+    private(set) var saveError: String?
 
     @ObservationIgnored private var simulated = false
     @ObservationIgnored private let library: Library
@@ -80,9 +83,9 @@ final class StudySession {
     /// Rejilla del metrónomo (Backing y Tablatura): la corregida desde Songsterr si la fuente de la tablatura es ese
     /// mismo tema y revisión; si no (automática, sin elegir), la del análisis.
     var metronomeBeats: BeatGrid? {
-        if case let .songsterr(songId, revisionId, _)? = project.tabSource, let g = songsterrGrid,
-           g.songId == songId, g.revisionId == revisionId, g.beats.count >= 2 {
-            return BeatGrid(beats: g.beats, downbeats: g.downbeats)
+        if case let .songsterr(songId, revisionId, _)? = project.tabSource,
+           let grid = songsterrGrid?.metronomeGrid(songId: songId, revisionId: revisionId) {
+            return grid
         }
         return beats
     }
@@ -330,7 +333,12 @@ final class StudySession {
     func flush() async {
         saveTask?.cancel()
         saveTask = nil
-        try? await library.saveStudy(id: projectID, study: study, sections: project.sections)
+        do {
+            try await library.saveStudy(id: projectID, study: study, sections: project.sections)
+            saveError = nil
+        } catch {
+            saveError = "No se pudo guardar el estudio: \(error.localizedDescription)"
+        }
         if !simulated, !pendingNames.isEmpty {
             let names = pendingNames
             pendingNames = [:]
@@ -403,24 +411,3 @@ extension StudySession {
     }
 }
 #endif
-
-/// Rejilla del metrónomo corregida desde Songsterr (`SongsterrBeatGrid.build`), en `tab/songsterr-grid.json`. Va con
-/// el tema y la revisión de los que salió: solo vale mientras `Project.tabSource` sea ese mismo.
-struct SongsterrGridFile: Codable, Equatable {
-    var songId: Int
-    var revisionId: Int
-    var beats: [Double]
-    var downbeats: [Double]
-    /// Tempo escrito principal de Songsterr (BPM de negra).
-    var writtenTempo: Double
-
-    func save(to url: URL) throws {
-        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try JSONEncoder().encode(self).write(to: url, options: .atomic)
-    }
-
-    static func load(_ url: URL) -> SongsterrGridFile? {
-        guard let data = try? Data(contentsOf: url) else { return nil }
-        return try? JSONDecoder().decode(SongsterrGridFile.self, from: data)
-    }
-}

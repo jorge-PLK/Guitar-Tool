@@ -1,0 +1,41 @@
+/* Tokens de ToneForge: boceto docs/design/Main.dc.html y App/Sources/Theme.swift (enum TF). */
+
+
+:root {
+  /* Colores */
+  --bg: #0F1113;
+  --sidebar: #15181B;
+  --card: #171A1D;
+  --field: #1C2024;
+  --line: #252A2F;
+  --field-line: #2A3036;
+  --text: #E8EAED;
+  --text-2: #C9CED4;
+  --muted: #9AA3AD;
+  --accent: #F2A33A;
+  --accent-hover: #FFC170;
+  --accent-bg: #2A2116;
+  --accent-ink: #1A1206;
+  --blue: #2F7CF6;           /* selección del control segmentado (azul del sistema en el Mac) */
+  --ok: #6FD99E;
+  --ok-bg: #16301F;
+  --neutral-bg: #1F242A;
+  --danger: #F07178;
+  --danger-bg: #331A1C;
+  --device-ok: #4CC38A;
+
+  /* Tipografía: cada plataforma usa la fuente del sistema (decisión de Jorge; el Mac usa SF). */
+  --font-body: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Segoe UI Variable Display", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --fs-body: 14px;
+
+  /* Medidas */
+  --sidebar-w: 240px;
+  --radius-card: 14px;
+  --radius-ctl: 10px;
+  --radius-sm: 8px;
+  --ctl-h: 44px;
+  --ctl-h-sm: 36px;
+  --pad-x: 40px;
+  --pad-y: 32px;
+}

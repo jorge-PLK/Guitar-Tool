@@ -414,8 +414,8 @@ private func unzip(_ archive: URL, to destination: URL) async throws {
     child.process.standardError = err
     child.process.standardOutput = FileHandle.nullDevice
     let status: Int32 = try await withCheckedThrowingContinuation { cont in
-        child.process.terminationHandler = { p in cont.resume(returning: p.terminationStatus) }
-        do { try child.run() } catch { child.process.terminationHandler = nil; cont.resume(throwing: error) }
+        child.terminationHandler = { c in cont.resume(returning: c.terminationStatus) }
+        do { try child.run() } catch { child.terminationHandler = nil; cont.resume(throwing: error) }
     }
     guard status == 0 else {
         let msg = String(data: err.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""

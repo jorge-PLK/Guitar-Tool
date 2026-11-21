@@ -95,7 +95,19 @@ public final class PortableStudyPlayer {
             controller.onRouteChange = { [weak self] route in self?.routeChanged(route) }
             applyRoute(controller.route)
         }
+        #if os(Windows)
+        // Sin proveedor de dispositivos: el nombre del endpoint que abrirá el primer play (el de la selección o el de
+        // consola por defecto), leído sin abrirlo (parte 8.6d-A). Al abrir la salida pasa a ser el del flujo (`startRun`).
+        if devices == nil, !offline {
+            outputDeviceName = WASAPIAudioIO.renderName(outputUID: selection.deviceUID ?? "") ?? ""
+        }
+        #endif
     }
+
+    /// Soltar el reproductor cierra sus stems antes de volver, aunque siga alojado o la sesión (o la salida propia)
+    /// retenga el motor un rato: en Windows un fichero abierto no se puede borrar ni reescribir (plan, «Pendiente tras
+    /// el paso 7»). `shutdown` espera al bloque de render en curso; el render no toca los lectores.
+    deinit { engine?.shutdown() }
 
     public func setOutput(_ selection: OutputSelection) { output?.select(selection) }
 
@@ -184,16 +196,24 @@ public final class PortableStudyPlayer {
     private func installEngine(outputRate: Double) throws {
         engine?.shutdown()
         engine = nil
+        // Los `Task` no retienen el reproductor ni el motor mientras esperan: soltar el reproductor cierra sus stems ya.
         let e = try PortablePlaybackEngine(stems: stems, songRate: sampleRate, length: lengthFrames, outputRate: outputRate,
                                            realtime: !offline) { [weak self] generation in
-            Task { @MainActor in await self?.reachedEnd(generation) }
+            Task { @MainActor [weak self] in
+                // Lo último entregado a Signalsmith tarda en sonar; se espera antes de parar (como en el Mac).
+                try? await Task.sleep(for: .milliseconds(300))
+                self?.reachedEnd(generation)
+            }
         }
         engine = e
         if let session = hostSession, host != nil {
             let renderer = PortableHostedRenderer(engine: e, presentationLatencyFrames: session.outputLatencyFrames)
             host = renderer
-            session.setPlayer(renderer) { [weak self] in
-                Task { @MainActor in self?.sessionEnded(renderer) }
+            session.setPlayer(renderer) { [weak self, weak renderer] in
+                Task { @MainActor [weak self, weak renderer] in
+                    guard let renderer else { return }
+                    self?.sessionEnded(renderer)
+                }
             }
         }
         applyMix()
@@ -244,6 +264,12 @@ public final class PortableStudyPlayer {
         let own = !offline && host == nil
         if own && ownIO == nil {
             do { ownIO = try outputIO(appliedRoute) } catch { throw StudyPlayerError.engine("\(error)") }
+            #if os(Windows)
+            // Sin ruta: el nombre pasa a ser el del endpoint que se abrió de verdad (parte 8.6d-A).
+            if output == nil, let w = ownIO as? WASAPIAudioIO, !w.streamInfo.renderName.isEmpty {
+                outputDeviceName = w.streamInfo.renderName
+            }
+            #endif
             if let io = ownIO, abs(io.format.sampleRate - e.outputRate) >= 0.5 {
                 try installEngine(outputRate: io.format.sampleRate)
                 e = engine!
@@ -290,9 +316,7 @@ public final class PortableStudyPlayer {
         }
     }
 
-    private func reachedEnd(_ generation: Int) async {
-        // Lo último entregado a Signalsmith tarda en sonar; se espera antes de parar (como en el Mac).
-        try? await Task.sleep(for: .milliseconds(300))
+    private func reachedEnd(_ generation: Int) {
         guard isPlaying, generation == runGeneration, loopRange() == nil else { return }
         pause()
         pausedTime = duration

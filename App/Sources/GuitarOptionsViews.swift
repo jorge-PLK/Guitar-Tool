@@ -15,7 +15,7 @@ struct GuitarStereoToggle: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            GuitarStatusView(process: process, error: session.guitarOptionsError)
+            GuitarStatusView(process: process, error: session.guitarOptionsError ?? session.saveError)
             Toggle("Guitarras en L y R", isOn: Binding(get: { session.guitarOptions.stereoSplit },
                                                        set: { session.setStereoSplit($0) }))
                 .toggleStyle(.switch).controlSize(.small).tint(TF.accent)

@@ -1,0 +1,125 @@
+{
+ "projects": [
+  {
+   "id": "00000001-0000-4000-8000-000000000001",
+   "title": "So payaso",
+   "artist": "Extremoduro",
+   "folderName": "Extremoduro - So payaso",
+   "duration": 262.4,
+   "sampleRate": 44100,
+   "cover": "c1/cover.svg",
+   "createdAt": "2026-01-02T03:04:05Z",
+   "updatedAt": "2026-01-05T03:04:05Z",
+   "separationState": "done",
+   "stemCount": 4,
+   "takeCount": 3,
+   "rigCount": 3,
+   "hasAnalysis": true,
+   "origin": "youtube",
+   "guitars": [
+    "Robe",
+    "Uoho",
+    "Solo"
+   ]
+  },
+  {
+   "id": "00000002-0000-4000-8000-000000000002",
+   "title": "Jesucristo García",
+   "artist": "Extremoduro",
+   "folderName": "Extremoduro - Jesucristo García",
+   "duration": 310.0,
+   "sampleRate": 44100,
+   "cover": "c2/cover.svg",
+   "createdAt": "2026-01-02T03:04:05Z",
+   "updatedAt": "2026-01-05T03:04:05Z",
+   "separationState": "done",
+   "stemCount": 4,
+   "takeCount": 4,
+   "rigCount": 2,
+   "hasAnalysis": true,
+   "origin": null,
+   "guitars": [
+    "Rítmica",
+    "Solo"
+   ]
+  },
+  {
+   "id": "00000003-0000-4000-8000-000000000003",
+   "title": "Hay poco rock & roll",
+   "artist": "Platero y Tú",
+   "folderName": "Platero y Tú - Hay poco rock & roll",
+   "duration": 228.7,
+   "sampleRate": 44100,
+   "cover": null,
+   "createdAt": "2026-01-02T03:04:05Z",
+   "updatedAt": "2026-01-05T03:04:05Z",
+   "separationState": "running",
+   "stemCount": 0,
+   "takeCount": 2,
+   "rigCount": 1,
+   "hasAnalysis": false,
+   "origin": null,
+   "guitars": []
+  },
+  {
+   "id": "00000004-0000-4000-8000-000000000004",
+   "title": "Juliette",
+   "artist": "Platero y Tú",
+   "folderName": "Platero y Tú - Juliette",
+   "duration": 201.2,
+   "sampleRate": 44100,
+   "cover": null,
+   "createdAt": "2026-01-02T03:04:05Z",
+   "updatedAt": "2026-01-05T03:04:05Z",
+   "separationState": "queued",
+   "stemCount": 0,
+   "takeCount": 3,
+   "rigCount": 1,
+   "hasAnalysis": false,
+   "origin": "spotify",
+   "guitars": []
+  },
+  {
+   "id": "00000005-0000-4000-8000-000000000005",
+   "title": "Dolores se llamaba Lola",
+   "artist": "Los Suaves",
+   "folderName": "Los Suaves - Dolores se llamaba Lola",
+   "duration": 245.0,
+   "sampleRate": 44100,
+   "cover": null,
+   "createdAt": "2026-01-02T03:04:05Z",
+   "updatedAt": "2026-01-05T03:04:05Z",
+   "separationState": "none",
+   "stemCount": 0,
+   "takeCount": 0,
+   "rigCount": 0,
+   "hasAnalysis": false,
+   "origin": null,
+   "guitars": []
+  },
+  {
+   "id": "00000006-0000-4000-8000-000000000006",
+   "title": "Tema con fallo",
+   "artist": "Grupo Roto",
+   "folderName": "Grupo Roto - Tema con fallo",
+   "duration": 120.5,
+   "sampleRate": 44100,
+   "cover": null,
+   "createdAt": "2026-01-02T03:04:05Z",
+   "updatedAt": "2026-01-05T03:04:05Z",
+   "separationState": "failed",
+   "stemCount": 0,
+   "takeCount": 0,
+   "rigCount": 0,
+   "hasAnalysis": false,
+   "origin": null,
+   "guitars": []
+  }
+ ],
+ "skipped": [
+  {
+   "folderName": "carpeta rara",
+   "reason": "sin project.json"
+  }
+ ]
+}
