@@ -8,6 +8,7 @@ let package = Package(
     products: [
         .library(name: "AppCoreFFI", type: .dynamic, targets: ["AppCoreFFI"]),
         .executable(name: "ffi-smoke", targets: ["ffi-smoke"]),
+        .executable(name: "ffi-smoke-win", targets: ["ffi-smoke-win"]),
     ],
     dependencies: [
         .package(path: "../../../Packages/AppCore"),
@@ -16,5 +17,7 @@ let package = Package(
         .target(name: "CAppCoreFFI", cSettings: [.headerSearchPath("dart")]),
         .target(name: "AppCoreFFI", dependencies: ["CAppCoreFFI", .product(name: "AppCore", package: "AppCore")]),
         .executableTarget(name: "ffi-smoke", dependencies: ["CAppCoreFFI", "AppCoreFFI"]),
+        // P9 7b: humo de Windows; carga la DLL por LoadLibrary (no depende de AppCoreFFI, así prueba la DLL real).
+        .executableTarget(name: "ffi-smoke-win"),
     ]
 )
