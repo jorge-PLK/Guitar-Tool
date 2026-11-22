@@ -4,14 +4,16 @@ App de escritorio para macOS (Swift/SwiftUI) que iguala el tono de un tema reamp
 
 ## Estado actual
 
-Fases 5 (ADR-016), 5b (ADR-017), 5c (ADR-019, sin prueba manual de Jorge), 6 (ADR-015) y 7 · Montaje (ADR-018) cerradas en `main` (18/11/2026). Fase 7c (port a Windows, ADR-020, solo x64) en la rama `fase-7c`: pasos 6 y 7 cerrados y paso 8 ola 2 cerrada (22/11/2026); la 7c NO se cierra hasta que el núcleo esté completo en Mac y Windows (lista en `docs/plan.md`).
-Después: migración de la interfaz a Flutter → actualizador → instalador de Windows; la 7b se hará sobre Flutter. P1, P3 y P5 quedan para el comienzo de la Etapa 2.
+Fases 5 (ADR-016), 5b (ADR-017), 5c (ADR-019, sin prueba manual de Jorge), 6 (ADR-015) y 7 · Montaje (ADR-018) cerradas en `main` (18/11/2026). Fase 7c (port a Windows, ADR-020, solo x64) en la rama `fase-7c`: pasos 6 y 7 cerrados y paso 8 ola 2 cerrada (22/11/2026); se valida y cierra desde el PC x64 en la rama `pcx64tests`.
+Fase 7f (interfaz única en Flutter, ADR-021) en la rama `fase-7f`: planificada (22/11/2026), siguiente paso P9 (`docs/probes/P9-flutter.md`) y después la ola 0; los desvíos de núcleo de la 7c se tratan aquí (`docs/flutter/desvios.md`).
+Después: actualizador (7d) → instalador de Windows → fase de cambios de UX (sustituye a la 7b). P1, P3 y P5 quedan para el comienzo de la Etapa 2.
 
 ## Contexto: leer solo lo que haga falta
 
 - **Spec `docs/spec.md` (~7k tokens) y plan `docs/plan.md` (~3k).** Mandan estas copias, no el doc de Claude Docs (ADR-002). Lee solo la sección que toque: `grep -n '^## ' docs/spec.md` y luego `offset`/`limit`.
 - **Bocetos `docs/design/<Pantalla>.dc.html`** (~3-4k tokens cada uno: Main, Tab, Edit, Backing, Record, Tone, Settings): solo el de la pantalla en la que se trabaja.
 - **Decisiones:** `docs/DECISIONS.md` es un índice de una línea por ADR; el texto está en `docs/adr/ADR-NNN.md`. Nuevo ADR = fichero nuevo + su línea en el índice.
+- **Fase 7f (Flutter): `docs/flutter/`.** Al empezar sesión: «Fase 7f» de `docs/plan.md`, `docs/flutter/orquestador.md` y `docs/flutter/arquitectura.md`; el índice del resto está en `docs/flutter/README.md`. Fichas (`pantallas/<pantalla>.md`) y contrato (`contrato*.md`), solo los de la ola en curso y por secciones. Decisiones cerradas de interfaz: `docs/flutter/decisiones-interfaz.md` (`grep` antes de preguntar).
 - **Resultados de la Fase 0:** `docs/probes/P<n>-<tema>.md`, uno por prueba.
 - **Mapa del código: `docs/CODEMAP.md`**, una sección por paquete. Consúltalo antes de explorar, por secciones (`grep -n '^## '`).
 - **Qué expone un fichero Swift, sin leerlo entero:** `grep -nE '^\s*(public|open)\b' <ruta.swift>` (la API entre paquetes es `public` por fuerza). Entero, solo el fichero que vas a editar, y una vez.
@@ -21,7 +23,8 @@ Después: migración de la interfaz a Flutter → actualizador → instalador de
 ## Estructura
 
 - `Packages/<Kit>/`: un paquete Swift por módulo con sus tests (nombres en `docs/plan.md`, «Forma de trabajo», incluido ModelKit). Lo que depende de la pedalera va detrás de un protocolo con versión simulada.
-- `App/`: proyecto Xcode generado con XcodeGen (`App/project.yml`; regenerar con `xcodegen generate --spec App/project.yml`), solo UI y cableado. Embebe el helper `tf-separate` (de StemKit). La lógica y sus tests viven en los paquetes.
+- `App/`: proyecto Xcode generado con XcodeGen (`App/project.yml`; regenerar con `xcodegen generate --spec App/project.yml`), solo UI y cableado. Embebe el helper `tf-separate` (de StemKit). La lógica y sus tests viven en los paquetes. **Congelado** desde la 7f, igual que `WinApp/Web` y `Tools/webdev`.
+- `FlutterApp/` (desde la ola 0 de la 7f): la interfaz única de Mac y Windows. Habla solo con `AppCore` por el puente FFI (`AppCoreFFI`, en `Packages/AppCore`); DTO generados contra `Contract/fixtures/`. Scripts en `Tools/flutter/`.
 - `Vendor/helpers/`: helpers embebidos (yt-dlp, Deno, ffmpeg), no se versiona; se generan con `Tools/helpers/fetch.sh` y `build-ffmpeg.sh`.
 - `Probes/P<n>-<tema>/`: scripts de la Fase 0 (Python o Swift). Fuera de la puerta de tests.
 - `Tools/`: scripts de desarrollo (`test.sh`; entorno Python en `Tools/py/.venv`). `Temp/`: informes y logs, no se versiona.
@@ -35,11 +38,13 @@ Después: migración de la interfaz a Flutter → actualizador → instalador de
 
 ## Subagentes: uno por trabajo
 
-Nunca `general-purpose`, `claude` ni un agente "Lead": el hook global `agent-route.js` los rechaza (en BeatBeat eran el 44 % del gasto de subagentes, ~830k ponderados por llamada). El hilo principal es el orquestador de la fase: escribe la mini-spec, la corta en partes, lanza un agente por parte (en paralelo si no se pisan), integra y comprueba la condición de paso; no programa las partes. Qué parte va a Opus y cuál a Sonnet lo dice `docs/plan.md`, «Modelos por fase». No pases `model` al lanzar: cada agente fija el suyo.
+Nunca `general-purpose`, `claude` ni un agente "Lead": el hook global `agent-route.js` los rechaza (en BeatBeat eran el 44 % del gasto de subagentes, ~830k ponderados por llamada). El hilo principal es el orquestador de la fase: escribe la mini-spec, la corta en partes, lanza un agente por parte (en paralelo si no se pisan), integra y comprueba la condición de paso; no programa las partes. Qué parte va a Opus y cuál a Sonnet lo dice `docs/plan.md`, «Modelos por fase». No pases `model` al lanzar: cada agente fija el suyo. En la 7f la mano de obra es solo Sonnet y Haiku (ADR-021, decisión 21): ni `tf-engineer` ni `tf-ml`; el Swift de `AppCore`/`AppCoreFFI` es de `tf-implementer`. Ciclo de ola, plantilla de encargo y lista de validación: `docs/flutter/orquestador.md`.
 
 | Trabajo | Agente |
 | --- | --- |
 | Implementar una parte que el plan asigna a Sonnet: pantallas, cableado, conectores, scripts de prueba | `tf-implementer` (Sonnet) |
+| Dart de la 7f que no sea mecánico: pantallas, stores Riverpod, `CustomPainter`, hojas, `core/`, DTO con lógica y sus tests | `tf-flutter` (Sonnet) |
+| Dart mecánico de la 7f: tokens, iconos, ARB y su traducción, DTO directos desde fixtures, retoques de 1-2 ficheros | `tf-flutter-mech` (Haiku) |
 | Implementar una parte que el plan asigna a Opus: señal, sincronía, integración de modelos, compositor, distancia, optimizador | `tf-engineer` (Opus) |
 | Convertir y validar modelos (Core ML, ONNX): separación, acordes, pulso, batería | `tf-ml` (Opus, con memoria) |
 | Edición mecánica de 1-2 ficheros (renombrar, retoque acotado) | `caveman:cavecrew-builder` |
@@ -51,7 +56,9 @@ Nunca `general-purpose`, `claude` ni un agente "Lead": el hook global `agent-rou
 
 ## Reglas
 
-- **Mac y Windows, paridad funcional (no visual).** Toda función nueva o cambio de comportamiento se aplica a la vez en `App/Sources` y en `WinApp/Web`, en la misma tarea; no se gasta trabajo en igualar el aspecto, porque Flutter sustituye ambas al cerrar la 7c. Lo que no pueda igualarse en función se lista a Jorge.
+- **UIs viejas congeladas (ADR-021, decisión 4).** En `fase-7f`, `App/Sources`, `WinApp/Web` y `Tools/webdev` no se tocan; se borran en el commit de cierre de la fase. La paridad Mac/Windows ya no se aplica a ellas.
+- **Mac y Windows, paridad sobre Flutter.** Toda función o cambio de comportamiento va a `AppCore` y a `FlutterApp/`, que es la misma en las dos plataformas, y se comprueba en el Mac y en el PC x64 (`Tools/flutter/pc.sh`). Flutter habla solo con `AppCore`; un hueco de núcleo se arregla en `AppCore` con test y se anota en `docs/flutter/desvios.md`. Lo que no pueda igualarse en función se lista a Jorge.
+- **Port 1:1 (ADR-021).** Aspecto e interacción = SwiftUI; comportamiento = `AppCore`. Robustez, fiabilidad y rendimiento mandan sobre el 1:1 y sobre cualquier ADR previo (Jorge, 22/11/2026). Añadir o cambiar un plugin, o tocar la ABI congelada, es una pregunta a Jorge.
 - Fase a fase, una rama por fase (`fase-N`). Preguntar antes de inventar reglas que no estén en la spec.
 - Al cerrar una fase (`/phase-close`), en el mismo commit: `docs/CODEMAP.md`, "Estado actual" de este fichero (máximo 3 líneas: lo cargan todas las sesiones), casillas y condición de paso en `docs/plan.md`, lo aprendido en `docs/spec.md` y el ADR.
 - Commits en inglés, imperativo, estilo de `git log`; sin trailer `Co-Authored-By`. Desde la Fase 7f (Jorge, 22/11/2026): commits pequeños y frecuentes con `git push` a la rama de la fase tras cada uno, sin pedir confirmación, para que Jorge valide en paralelo en el PC. Nunca push a `main` ni forzado.
