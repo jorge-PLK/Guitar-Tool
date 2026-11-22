@@ -9,13 +9,28 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 DIR="$ROOT/Probes/P9-flutter/webview/$CAND"
 OUT="$ROOT/Temp/p9-flutter"
 LOGS="$ROOT/Temp/logs"
-APP="$DIR/build/macos/Build/Products/Release/$CAND.app"
+BUILT="$DIR/build/macos/Build/Products/Release/$CAND.app"
+# La app se lanza desde /private/tmp (no desde /Volumes: evita el diálogo TCC de volumen extraíble).
+TMPD="/private/tmp/p9p4"
+APP="$TMPD/$CAND.app"
+TOUT="$TMPD/out"
 WINID="$ROOT/Temp/flutter-probe/tools/winid"
-mkdir -p "$OUT" "$LOGS"
+mkdir -p "$OUT" "$LOGS" "$TOUT"
 
 build() {
-  [ "${SKIP_BUILD:-0}" = "1" ] && return 0
-  (cd "$DIR" && fvm flutter build macos --release >"$LOGS/p9-p4-$CAND.log" 2>&1) || { echo "flutter build falló: $LOGS/p9-p4-$CAND.log"; exit 1; }
+  if [ "${SKIP_BUILD:-0}" != "1" ]; then
+    (cd "$DIR" && fvm flutter build macos --release >"$LOGS/p9-p4-$CAND.log" 2>&1) || { echo "flutter build falló: $LOGS/p9-p4-$CAND.log"; exit 1; }
+  fi
+  rm -rf "$APP"
+  ditto "$BUILT" "$APP" || { echo "ditto falló"; exit 1; }
+}
+
+# publish <nombre>: copia informe y capturas de /private/tmp/p9p4/out a Temp/p9-flutter
+publish() {
+  for ext in json png; do
+    [ -f "$TOUT/p4-$CAND-$1.$ext" ] && cp "$TOUT/p4-$CAND-$1.$ext" "$OUT/"
+  done
+  [ -f "$TOUT/p4-$CAND-$1-internal.png" ] && cp "$TOUT/p4-$CAND-$1-internal.png" "$OUT/"
 }
 
 summary() { # informe
@@ -33,7 +48,7 @@ EOF
 # run_one <caso> <nombre-salida> <exit-after> [args extra de la app] ; HIDE=1 oculta el proceso a los 4 s; SHOT=0 sin captura
 run_one() {
   local c="$1" name="$2" secs="$3"; shift 3
-  local report="$OUT/p4-$CAND-$name.json" png="$OUT/p4-$CAND-$name.png" snap="$OUT/p4-$CAND-$name-internal.png"
+  local report="$TOUT/p4-$CAND-$name.json" png="$TOUT/p4-$CAND-$name.png" snap="$TOUT/p4-$CAND-$name-internal.png"
   rm -f "$report" "$png" "$snap"
   open -g -n "$APP" --args --case "$c" --report "$report" --snapshot "$snap" --exit-after "$secs" "$@"
   if [ "${HIDE:-0}" = "1" ]; then
@@ -48,8 +63,24 @@ run_one() {
   fi
   pkill -f "MacOS/$CAND" 2>/dev/null
   sleep 1
+  publish "$name"
   if [ ! -f "$report" ]; then echo "[$name] SIN INFORME"; return 2; fi
   echo "[$name]"
+  summary "$report"
+}
+
+# keys: manual de Jorge, en primer plano (único caso con open -n sin -g)
+run_keys() {
+  local report="$TOUT/p4-$CAND-keys.json"
+  rm -f "$report"
+  open -n "$APP" --args --case keys --report "$report" --snapshot "$TOUT/p4-$CAND-keys-internal.png" --exit-after 60
+  local i=0
+  while [ ! -f "$report" ] && [ $i -lt 160 ]; do sleep 0.5; i=$((i + 1)); done
+  pkill -f "MacOS/$CAND" 2>/dev/null
+  sleep 1
+  publish keys
+  if [ ! -f "$report" ]; then echo "[keys] SIN INFORME"; return 2; fi
+  echo "[keys]"
   summary "$report"
 }
 
@@ -61,7 +92,7 @@ one() {
       run_one occluded occluded-visible 45 --occluded-delay 0; local a=$?
       HIDE=1 run_one occluded occluded-hidden 50 --occluded-delay 8; local b=$?
       return $((a + b)) ;;
-    keys) echo "keys es manual: open -n \"$APP\" --args --case keys --report $OUT/p4-$CAND-keys.json --exit-after 60"; return 0 ;;
+    keys) run_keys ;;
     *) run_one "$1" "$1" "$(secs_for "$1")" ;;
   esac
 }

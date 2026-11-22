@@ -136,7 +136,7 @@ Future<void> runOccluded(Ctx c) async {
     c.report['rafFps'] = ((b['raf'] as num) - (a['raf'] as num)) / dt;
     c.report['ticksPerSecond'] = ((b['ticks'] as num) - (a['ticks'] as num)) / dt;
     c.report['expectedTicksPerSecond'] = 10;
-    c.report['visibilityStates'] = {for (final s in arrivals) '${s['vis']}'};
+    c.report['visibilityStates'] = {for (final s in arrivals) '${s['vis']}'}.toList();
   } else {
     c.fail('menos de 2 muestras recibidas: la pagina quedo suspendida');
   }
