@@ -104,14 +104,14 @@ step_app() {
 
 # pc.sh run [--tag T] [--timeout S] -- <args de tf_probe>
 step_run() {
-  local tag="run1" timeout=240
+  local tag="run1" timeout=240 noredir=""
   while [ $# -gt 0 ] && [ "$1" != "--" ]; do
-    case "$1" in --tag) tag="$2"; shift 2 ;; --timeout) timeout="$2"; shift 2 ;; *) shift ;; esac
+    case "$1" in --tag) tag="$2"; shift 2 ;; --timeout) timeout="$2"; shift 2 ;; --noredir) noredir="-NoRedirect"; shift ;; *) shift ;; esac
   done
   [ "${1:-}" = "--" ] && shift
   local b64; b64="$(printf %s "$*" | base64 | tr -d '\n')"
   "${SSH[@]}" "mkdir -p $PC_ROOT/out/run"
-  "${SSH[@]}" "powershell -NoProfile -ExecutionPolicy Bypass -File '$WINDIR_REMOTE\\run.ps1' -Tag '$tag' -ArgsB64 '$b64' -Timeout $timeout" 2>&1 | tr -d '\r' >>"$LOG"
+  "${SSH[@]}" "powershell -NoProfile -ExecutionPolicy Bypass -File '$WINDIR_REMOTE\\run.ps1' -Tag '$tag' -ArgsB64 '$b64' -Timeout $timeout $noredir" 2>&1 | tr -d '\r' >>"$LOG"
   local rc=${PIPESTATUS[0]}
   grep -E '^TF:|^error:|^SUCCESS|ERROR' "$LOG" | tail -6
   return $rc
@@ -142,6 +142,41 @@ step_threads() {
   return 0
 }
 
+# pc.sh diag [extra]: P9.7d-diag. 6 ejecuciones intercaladas via1,via2 x3 (--sink port --no-fail-fast), carga CPU previa anotada.
+# `diag extra`: 2 ejecuciones de via1 con stdout/stderr SIN redirigir (separa el efecto del lanzador).
+step_diag() {
+  local dst="$ROOT/Temp/p9-flutter/pc" wav="$ROOT/Temp/p9-flutter/run/in.wav" mode="${1:-}"
+  [ -f "$wav" ] || { echo "falta $wav"; return 1; }
+  mkdir -p "$dst"
+  local alive; alive="$("${SSH[@]}" 'tasklist /FI "IMAGENAME eq tf_probe.exe" /NH' 2>&1 | tr -d '\r' | grep -c tf_probe)"
+  echo "tf_probe vivo antes: $alive"
+  [ "$alive" = "0" ] || { echo "hay tf_probe.exe vivo: no lanzo nada"; return 1; }
+  remote "mkdir -p $PC_ROOT/run $PC_ROOT/out/run" || return 1
+  scp -q -o BatchMode=yes "$wav" "$PC_HOST:$PC_ROOT_SCP/run/in.wav" >>"$LOG" 2>&1 || { echo "fallo scp in.wav"; return 1; }
+  local seq="via1:1 via2:1 via1:2 via2:2 via1:3 via2:3" extra="" item th n tag load rc
+  [ "$mode" = "extra" ] && { seq="via1:x1 via1:x2"; extra="--noredir"; }
+  local loadf="$dst/diag-load${mode:+-$mode}.txt"; : >"$loadf"
+  for item in $seq; do
+    th="${item%%:*}"; n="${item##*:}"; tag="diag-$th-$n"
+    load="$("${SSH[@]}" 'wmic cpu get loadpercentage' 2>/dev/null | tr -d '\r' | grep -E '^[0-9]+' | head -1 | tr -d ' ')"
+    echo "$tag $load" >>"$loadf"
+    echo "=== $tag (carga previa ${load}%) ===" | tee -a "$LOG"
+    rm -f "$dst/$tag.json" "$dst/$tag.code" "$dst/$tag.log" "$dst/$tag.err"
+    remote "rm -rf $PC_ROOT/run/projects $PC_ROOT/run/support $PC_ROOT/out/run/$tag.json && mkdir -p $PC_ROOT/run/projects $PC_ROOT/run/support"
+    step_run --tag "$tag" --timeout 240 $extra -- --probe ffi --sink port --threads "$th" --no-fail-fast \
+      --core-lib "$REL_WIN\\AppCoreFFI.dll" --projects-folder "$PC_ROOT_WIN\\run\\projects" \
+      --support-dir "$PC_ROOT_WIN\\run\\support" --wav "$PC_ROOT_WIN\\run\\in.wav" \
+      --report "$PC_ROOT_WIN\\out\\run\\$tag.json" >/dev/null
+    rc=$?
+    echo "$tag rc=$rc" | tee -a "$LOG"
+    for f in json code log err; do
+      scp -q -o BatchMode=yes "$PC_HOST:$PC_ROOT_SCP/out/run/$tag.$f" "$dst/$tag.$f" >>"$LOG" 2>&1
+    done
+  done
+  python3 -I "$ROOT/Probes/P9-flutter/pc-table.py" "$dst" diag 2>&1 | tee -a "$LOG"
+  return 0
+}
+
 # pc.sh webview [wv_all|wv_flutter|wv_inapp]: compila y arranca las candidatas de WebView (P9.7e). Sin argumento, las tres.
 step_webview() {
   local cand="${1:-}" t0
@@ -160,6 +195,7 @@ case "$STEP" in
   app) step_app; rc=$? ;;
   run) shift; step_run "$@"; rc=$? ;;
   threads) step_threads; rc=$? ;;
+  diag) shift; step_diag "$@"; rc=$? ;;
   sync) step_sync; rc=$?; ;;
   core) step_core; rc=$? ;;
   smoke) step_smoke; rc=$? ;;

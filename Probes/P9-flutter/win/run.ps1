@@ -2,7 +2,7 @@
 # Uso: run.ps1 -Tag <tag> -ArgsB64 <argumentos en base64 UTF-8> [-Timeout 240]
 # Escribe out\run\<tag>.log (stdout+stderr), out\run\<tag>.code (codigo; 124 si se mato por tope) y sale con ese codigo.
 # Se ejecuta EN EL PC. Todo fichero vive bajo $P9.
-param([string]$Tag, [string]$ArgsB64, [int]$Timeout = 240)
+param([string]$Tag, [string]$ArgsB64, [int]$Timeout = 240, [switch]$NoRedirect)
 . "$PSScriptRoot\common.ps1"
 $RunOut = Join-Path $Out "run"
 New-Item -ItemType Directory -Force $RunOut | Out-Null
@@ -16,9 +16,11 @@ $codeF = Join-Path $RunOut "$Tag.code"
 $inner = Join-Path $RunOut "task-$Tag.ps1"
 Remove-Item $logF, $errF, $codeF -ErrorAction SilentlyContinue
 
+$redir = "-RedirectStandardOutput '$logF' -RedirectStandardError '$errF'"
+if ($NoRedirect) { $redir = "" }
 # Script interno (se ejecuta en la sesion interactiva).
 @"
-`$p = Start-Process -FilePath '$exe' -ArgumentList '$($argLine -replace "'", "''")' -WorkingDirectory '$rel' -PassThru -RedirectStandardOutput '$logF' -RedirectStandardError '$errF'
+`$p = Start-Process -FilePath '$exe' -ArgumentList '$($argLine -replace "'", "''")' -WorkingDirectory '$rel' -PassThru $redir
 `$null = `$p.Handle
 if (`$p.WaitForExit($($Timeout * 1000))) { `$c = `$p.ExitCode } else { Stop-Process -Id `$p.Id -Force -ErrorAction SilentlyContinue; `$c = 124 }
 Set-Content -Path '$codeF' -Value `$c

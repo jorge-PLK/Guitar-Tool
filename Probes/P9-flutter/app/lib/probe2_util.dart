@@ -36,6 +36,31 @@ class Watchdog {
   int ticks = 0;
   Timer? _t;
 
+  // Diagnóstico por fase (P9.7d-diag). Fases que cargan el isolate a propósito:
+  // 'decode' = banco síncrono de jsonDecode (bloquea a propósito).
+  static const busyPhases = {'busy_60hz', 'burst_5000', 'decode'};
+  static const _startupMs = 1000; // primer segundo = fase 'startup'
+  String phase = 'startup';
+  final phaseMax = <String, double>{};
+  final peaks = <Map<String, Object>>[]; // 10 mayores retrasos > 8 ms
+  double globalMaxMs = 0; // no se reinicia con reset()
+
+  void setPhase(String p) => phase = p;
+
+  double get maxExclBusy => phaseMax.entries
+      .where((e) => !busyPhases.contains(e.key))
+      .fold(0.0, (a, e) => math.max(a, e.value));
+
+  Map<String, Object?> diagJson() => {
+        'watchdogGlobalMaxMs': round3(globalMaxMs),
+        'watchdogMaxExclBusy': round3(maxExclBusy),
+        'watchdogPhases': {
+          for (final e in phaseMax.entries)
+            e.key: {'maxMs': round3(e.value), 'expectedBusy': busyPhases.contains(e.key)},
+        },
+        'watchdogPeaks': peaks,
+      };
+
   void start() {
     _last = _sw.elapsedMicroseconds;
     _t = Timer.periodic(const Duration(milliseconds: 5), (_) {
@@ -44,6 +69,19 @@ class Watchdog {
       _last = now;
       ticks++;
       if (d > maxDelayMs) maxDelayMs = d;
+      final ph = now ~/ 1000 < _startupMs ? 'startup' : phase;
+      if (d > (phaseMax[ph] ?? -1)) phaseMax[ph] = d;
+      if (d > globalMaxMs) globalMaxMs = d;
+      if (d > 8 && (peaks.length < 10 || d > (peaks.last['ms'] as double))) {
+        peaks.add({
+          'ms': round3(d),
+          'phase': ph,
+          'tMs': now ~/ 1000,
+          if (busyPhases.contains(ph)) 'expectedBusy': true,
+        });
+        peaks.sort((a, b) => (b['ms'] as double).compareTo(a['ms'] as double));
+        if (peaks.length > 10) peaks.removeLast();
+      }
     });
   }
 

@@ -26,6 +26,7 @@ Future<void> runProbe2(List<String> args, Watchdog wd, FrameStats fs) async {
     'dart': Platform.version.split(' ').first,
     'threads': <String, Object?>{'requested': _opt(args, '--threads')},
     'failed': <String>[],
+    'noFailFast': args.contains('--no-fail-fast'),
   };
   final path = _opt(args, '--report');
   // Tope global: informe parcial y salida 3. Timer en el isolate de UI.
@@ -50,6 +51,11 @@ void _finalize(Map<String, Object?> report, Watchdog wd, FrameStats fs) {
   wd.stop();
   report['frames_total'] = fs.toJson();
   final failed = report['failed'] as List<String>;
+  report.addAll(wd.diagJson());
+  // Con --no-fail-fast, lo que se compara con 16 ms es el máximo fuera de fases expectedBusy.
+  if (report['noFailFast'] == true && wd.maxExclBusy > 16) {
+    failed.add('watchdogMaxExclBusy=${round3(wd.maxExclBusy)}>16ms');
+  }
   final th = report['threads'] as Map<String, Object?>;
   if (th['threadsOk'] != true) failed.add('threadsOk');
   final sd = report['h_shutdown'];
@@ -68,6 +74,8 @@ Future<void> _run(
   final sink = _opt(args, '--sink') ?? 'listener';
   final failed = report['failed'] as List<String>;
   final th = report['threads'] as Map<String, Object?>;
+  final noFailFast = args.contains('--no-fail-fast');
+  wd.setPhase('init');
 
   // a. Hilo y apartamento
   final core = TfCore.open(_opt(args, '--core-lib')!, sink);
@@ -115,6 +123,7 @@ Future<void> _run(
   await subMa.cancel();
 
   // b. Humo (cada método con tope de 5 s)
+  wd.setPhase('smoke');
   final smoke = <String, Object?>{};
   Object? libraryList;
   var methods = methods4;
@@ -149,13 +158,16 @@ Future<void> _run(
   report['startupFrames'] = fs.toJson(); // incluye primer fotograma (arranque en frío)
   wd.reset();
   fs.reset();
+  wd.setPhase('rounds1');
   final (a, errA) = await rounds(core, 1000, methods);
   rss['after4000'] = _rssMb();
   live['after4000'] = core.liveBuffers();
+  wd.setPhase('rounds2');
   final (b, errB) = await rounds(core, 1000, methods);
   rss['after8000'] = _rssMb();
   live['after8000'] = core.liveBuffers();
   final wdMax = wd.maxDelayMs;
+  wd.setPhase('idle');
   await Future<void>.delayed(const Duration(seconds: 1));
   live['plus1s'] = core.liveBuffers();
   report['c_roundtrip'] = {
@@ -182,18 +194,23 @@ Future<void> _run(
     if (growth > 8) 'RSS crece $growth MB entre 4000 y 8000',
   ];
   if (fails.isNotEmpty) {
-    report['STOPPED_threshold'] = fails;
+    report[noFailFast ? 'threshold_failures' : 'STOPPED_threshold'] = fails;
     failed.addAll(fails);
-  } else {
+  }
+  if (fails.isEmpty || noFailFast) {
     // e. Nativo -> Dart
     final e = <String, Object?>{};
     wd.reset();
     fs.reset();
+    wd.setPhase('free_60hz');
     e['free_60hz'] = await emitRun(core, 60, 600, 300);
     final busy = BusyLoad()..start();
+    wd.setPhase('busy_60hz');
     e['busy_60hz'] = await emitRun(core, 60, 600, 300);
     busy.stop();
+    wd.setPhase('burst_5000');
     e['burst_5000'] = await emitRun(core, 0, 5000, 300);
+    wd.setPhase('decode');
     e['watchdogMaxDelayMs'] = round3(wd.maxDelayMs);
     e['decodeErrors'] = core.decodeErrors;
     await Future<void>.delayed(const Duration(milliseconds: 500));
@@ -204,6 +221,9 @@ Future<void> _run(
     report['f_decode'] = decodeBench();
 
     // g. Eventos de fondo reales
+    // decodeBench es síncrono (bloquea el isolate a propósito): deja que su tick tardío caiga en 'decode'.
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+    wd.setPhase('import');
     report['g_background'] = await importWav(core, _opt(args, '--wav')!);
     report['liveBuffersEnd'] = core.liveBuffers();
   }
@@ -217,5 +237,6 @@ Future<void> _run(
   }
 
   // h. Cierre
+  wd.setPhase('shutdown');
   report['h_shutdown'] = await shutdownCore(core, wd);
 }

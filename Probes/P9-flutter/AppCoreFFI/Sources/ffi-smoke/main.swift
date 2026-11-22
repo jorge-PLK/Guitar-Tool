@@ -232,6 +232,7 @@ func run() {
     exit(ok ? 0 : 1)
 }
 
+#if canImport(Darwin)
 func cpuSeconds() -> Double {
     var u = rusage()
     getrusage(RUSAGE_SELF, &u)
@@ -287,9 +288,22 @@ func runFrames() {
     exit(ok ? 0 : 1)
 }
 
+#endif
+
+#if canImport(Darwin)
 if CommandLine.arguments.contains("--frames") {
     Thread.detachNewThread { runFrames() }
 } else {
     Thread.detachNewThread { run() }
 }
 dispatchMain()
+#else
+// El modo --frames solo existe en macOS.
+if CommandLine.arguments.contains("--frames") {
+    print("--frames no existe en esta plataforma")
+    exit(2)
+} else {
+    Thread.detachNewThread { run() }
+}
+dispatchMain()
+#endif
