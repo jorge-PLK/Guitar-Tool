@@ -107,3 +107,17 @@ Adelantada a la primera pasada del PC porque es Dart puro y no depende de la ví
 - **Golden** con `matchesGoldenFile`: estable en dos ejecuciones. Carga los TTF reales con `FontLoader` (sin ellos `flutter test` pinta cuadrados) y fija `devicePixelRatio` 1.0 y 1440×900. El render de test es por software, no depende del monitor. Sin probar en otra máquina; se generan solo en el Mac, como ya dice `arquitectura.md`.
 - **El golden y la captura de la app no son idénticos byte a byte** (hashes distintos: motor real frente a render de test), aunque a la vista coinciden. Son dos referencias distintas: los goldens protegen de regresiones en tests; las capturas `--snapshot` son las que se comparan con la referencia de SwiftUI.
 - **`test-probe.sh`** (lo que será el paso `FlutterApp` de `Tools/test.sh`): `flutter analyze` + `flutter test --reporter=json`, log completo a `Temp/logs/p9-flutter-test.log`, resumen de 3 líneas en verde (`analyze: 0 avisos` / `tests: 5 pasados, 0 fallados, 0 saltados`) y una línea `fichero:línea mensaje` por fallo. Códigos comprobados: 0 verde, 1 test fallado o avisos, 2 error de compilación. `flutter test`: ~3 s en caliente, 7,4 s la primera vez. Depende de `python3` para resumir el JSON.
+
+### Prueba 7 · PC x64 — primera pasada, en curso
+
+#### 7b · AppCoreFFI.dll y humo sin Flutter — PASA
+
+Código: `Probes/P9-flutter/pc.sh` (`sync`, `core`, `smoke`, `fetch`) y `Probes/P9-flutter/win/*.ps1` (`common.ps1`, `core.ps1`). Commits `765a251` (código de hilos de Windows escrito a ciegas en el Mac), `d2ed623` (Dart portable a Windows y medidas de hilos) y `1310404` (`pc.sh`). Repetir: `Probes/P9-flutter/pc.sh sync && Probes/P9-flutter/pc.sh core && Probes/P9-flutter/pc.sh smoke`.
+
+- **PC:** Swift 6.4.3, VS Build Tools 2022 17.14 (VCTools, CMake, SDK 26100; sin ATL), Flutter 3.50.1 en `Temp\p9\flutter` (sin PATH). Todo dentro de `D:\Personal\Guitar-Tool\Temp\p9\`; ningún git en ese checkout.
+- **Humo sin Flutter** (`ffi-smoke-win.exe`, hilo principal en `tf_core_run_main()` = vía 1 fuera de Flutter): 4000 idas y vueltas, 0 errores; mediana 0,15 ms, p99 0,22-0,24 ms, máx 0,33-0,38 ms; `probe.mainactor` con los dos `true`; cierre `clean:true` en 25-32 ms; búferes vivos 0.
+- **Compilación:** el código de Windows escrito a ciegas compiló sin cambios; la DLL exporta las 17 `tf_*`; los símbolos `_4CF` de la vía 2 enlazan.
+- **Salida:** `AppCoreFFI.dll` (47 MB) más 19 DLL (16 del runtime de Swift de `D:\tf-rtl-x64`, 3 de `D:\tf-ort\x64`) en `Temp\p9\out\core\`, calculadas por cierre de importaciones (`win/core.ps1`).
+- **Flags:** `-c release --arch x86_64` y `--cache-path`/`--config-path`/`--security-path` dentro de `Temp\p9\swiftpm`; `win/common.ps1` pone `USERPROFILE`/`HOME`/`TEMP`/`TMP` dentro de `Temp\p9`. Primera compilación 245 s, incremental 13-26 s.
+- **Sin medir todavía:** retraso del hilo principal y procesos hijos en Windows; `pc.sh fetch` sin probar; `P9_STATIC=1` sin probar; DLL cargada desde un hilo que no es el principal (el caso de Flutter; lo cubre 7d).
+- **Escape fuera de la carpeta:** `C:\Users\Jorge\.swiftpm\` (`configuration\` vacía, `security\fingerprints\` con 2 JSON, `cache` como enlace a `Temp\p9\tmp\org.swift.swiftpm`). Jorge (22/11): se deja como está.
