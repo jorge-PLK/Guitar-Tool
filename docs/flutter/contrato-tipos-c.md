@@ -212,7 +212,7 @@ Ningún DTO de `takeview` tiene `encode(to:)` a mano.
 
 ## montage
 
-Montaje del tema abierto (independiente de Backing). Los fotogramas de la vista previa van por el canal binario `frames.montage` (BGRA, ≤60 fps según `previewFps`, `latestWins`, lado mayor `preview.maxDimension` = 640 px; PTS en ms de vídeo; `AC/MontageMethods.swift:768-775`). El audio manda el reloj. Todos los métodos devuelven `MontageSnapshot` salvo los indicados.
+Montaje del tema abierto (independiente de Backing). Los fotogramas de la vista previa van por `frames.montage` (JPEG en base64 por defecto; BGRA solo si el anfitrión registra `setMontageFrameSink`, `AC/MontageMethods.swift:762-766`; ≤60 fps según `previewFps`, `latestWins`, lado mayor `preview.maxDimension` = 640 px; PTS en ms de vídeo; relé `AC/MontageMethods.swift:768-775`). El audio manda el reloj. Todos los métodos devuelven `MontageSnapshot` salvo los indicados.
 
 ### 1. Métodos y eventos
 

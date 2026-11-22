@@ -12,7 +12,7 @@ Conteos del barrido (hechos medidos con `grep` sobre `App/Sources`, 16 398 líne
 
 | Swift | Hex | Dart | Uso |
 | --- | --- | --- | --- |
-| `TF.bg` | `0F1113` | `TfColors.bg` | fondo de ventana (`RootView.swift:41`) |
+| `TF.bg` | `0F1113` | `TfColors.bg` | fondo de ventana (`RootView.swift:25`) |
 | `TF.sidebar` | `15181B` | `TfColors.sidebar` | barra lateral |
 | `TF.card` | `171A1D` | `TfColors.card` | `Card`, hojas |
 | `TF.field` | `1C2024` | `TfColors.field` | campos, botón secundario, fondos de fila |
@@ -49,10 +49,10 @@ Nota: `.bold` en `body` (p. ej. `TF.body(11, .bold)`, `MixerToggle` `BackingMixe
 **Tamaños que se usan** (recuento de `.font(...)`):
 - `body`: 10 (3), 11 (16), 12 (≈92: 63 regular, 14 semibold, 12 medium, 2 bold…), 13 (≈96: 69 regular, 16 semibold, 7 medium…), 14 (≈29), 15 semibold (8), 16 (2). Pasos: 10, 11, 12, 13, 14, 15, 16.
 - `display`: 16 (7), 18 (15 + 1 medium), 20 (6), 22 (8), 24 (1), 26 (5), 28 (1), 30 (5), 32 (2), 34 (1), 64 (1). Títulos de pantalla: 30 (`SettingsView.swift:13`) y 32 (`LibraryView.swift:110`); logo 22 (`RootView.swift:56`); contador de cuenta atrás 64 (`RecordView.swift:381`); iniciales de artista 34 (`ArtistGrid.swift:42`).
-- Tamaño por defecto de la vista raíz: `TF.body()` = Inter 14 (`RootView.swift:42`). Dart: `DefaultTextStyle` = `TfText.body(14)`.
-- `monospacedDigit()`: 28 usos (tiempos, dB, porcentajes). Inter con `FontFeature.tabularNums()`.
-- Pestañas/selección alternan peso con el estado: `TF.body(13, on ? .semibold : .medium)` (`TabScreen.swift:218`). El `TfText` debe aceptar peso variable.
-- Mayúsculas de cabecera de tabla: `.uppercased()` + `.tracking(0.7)`, body 12 medium (`LibraryView.swift:161-162`). Dart: `letterSpacing: 0.7`.
+- Tamaño por defecto de la vista raíz: `TF.body()` = Inter 14 (`RootView.swift:26-27`: `foregroundStyle(TF.text)` + `font(TF.body())`). El color de texto por defecto de toda la app es `TF.text`, no el del sistema. Dart: `DefaultTextStyle` = `TfText.body(14)` con color `text`.
+- `monospacedDigit()`: 38 líneas en `App/Sources/*.swift` (tiempos, dB, porcentajes). Inter con `FontFeature.tabularNums()`.
+- Pestañas/selección alternan peso con el estado: `TF.body(13, on ? .semibold : .medium)` (`TabScreen.swift:219`; pastilla de pista: body 13 semibold/medium, icono 12, gap 6, alto 34, h 14, borde `accent` activo completo, `fieldLine` inactivo). El `TfText` debe aceptar peso variable.
+- Mayúsculas de cabecera de tabla: `.uppercased()` + `.tracking(0.7)`, body 12 medium (`LibraryView.swift:156-159`). Dart: `letterSpacing: 0.7`.
 - Iconos con `.font(.system(size: N))` (tamaño del símbolo, no tipografía): 10, 11, 12, 13, 14, 15, 16, 18, 20, 28 (light), 40.
 
 ### 1.3 Escalas de formato (`Fmt`, `Theme.swift:138-147` y extensiones)
@@ -87,8 +87,8 @@ Fuera del barrido de vistas: `LinkImportDemo.swift:75` y `SpotifyDemo.swift:54-5
 
 | Valor | Usos | Ejemplos | Token |
 | --- | --- | --- | --- |
-| 10 | 60 | `Theme.swift:67`, `RootView.swift:99`, `TabSourceSheet.swift:54` | `TfRadius.control` |
-| 8 | 54 | `LibraryView.swift:152`, `MixerToggle` `BackingMixer.swift:267`, `TakeViewer.swift:353` | `TfRadius.field` |
+| 10 | 60 | `Theme.swift:67`, `RootView.swift:101`, `TabSourceSheet.swift:54` | `TfRadius.control` |
+| 8 | 54 | `LibraryView.swift:148`, `MixerToggle` `BackingMixer.swift:267`, `TakeViewer.swift:353` | `TfRadius.field` |
 | 12 | 20 | `RecordView.swift:225`, `MontageView.swift:268`, `BackingMixer.swift:177` | `TfRadius.tile` |
 | 6 | 15 | `MontageView.swift:316,566`, `SectionBoxes.swift:384` | `TfRadius.small` |
 | 4 | 15 | `ChordDiagram.swift:46`, `MontageView.swift:643`, `BackingMixer.swift:292` | `TfRadius.xs` |
@@ -105,7 +105,7 @@ Más `Capsule()` (22 usos, `Theme.swift:94,134`) → `TfRadius.pill` (radio = al
 
 - `.stroke(color)` sin ancho = 1 pt (≈60 usos; 35 con `TF.fieldLine`, 6 con `TF.line`, 8 con acento). `TfStroke.hairline = 1`.
 - `lineWidth: 1.5` (`BackingTimeline`, resalte de edición de acordes); `lineWidth: 2` (`TfStroke.thick`, 2 usos: `TF.accent` y `TF.text` en selección de color, `VideoSettingsView.swift:~390`). Trazo discontinuo `dash: [3]` con `TF.fieldLine` (1 uso).
-- Separador vertical de la barra lateral: `Rectangle().fill(TF.line).frame(width: 1)` (`RootView.swift:77`). Franja de fila seleccionada: ancho 3 (`LibraryView.swift:239`).
+- Separador vertical de la barra lateral: `Rectangle().fill(TF.line).frame(width: 1)` (`RootView.swift:77`). Franja de fila seleccionada: ancho 3 (`LibraryView.swift:238`).
 - Borde por estado: en reposo `fieldLine`; activo `accent` (4 + 2 + 2 + …); atenuado `accent @0.6` (`ArtistGrid.swift:23`, `BackingMixer.swift:254`); sin borde cuando está activo relleno (`.clear`).
 
 ### 2.4 Opacidades (literales)
@@ -135,17 +135,17 @@ Casi iguales: 0.4/0.45/0.5/0.55 (atenuado), 0.18/0.20/0.22 (tintes). Escala mín
 
 ### 2.6 Espaciado entre elementos (`HStack/VStack/LazyVGrid spacing`)
 
-Valores y recuento (todos los `spacing:`): 6 (54), 12 (49), 8 (47), 10 (42), 14 (32), 4 (20), 2 (17), 16 (14), 0 (14), 20 (8), 3 (6), 18 (4), 24 (3), 1 (1). Ejemplos: 12 `LibraryView.swift:176`; 14 `LibraryView.swift:239` y `SettingsGroup` `SettingsView.swift:~53`; 6 `BackingMixer.swift:166`; 20 `SettingsView.swift:11`.
+Valores y recuento (todos los `spacing:`): 6 (54), 12 (49), 8 (47), 10 (42), 14 (32), 4 (20), 2 (17), 16 (14), 0 (14), 20 (8), 3 (6), 18 (4), 24 (3), 1 (1). Ejemplos: 12 `LibraryView.swift:174`; 14 `LibraryView.swift:210` y `SettingsGroup` `SettingsView.swift:56`; 6 `BackingMixer.swift:166`; 20 `SettingsView.swift:11`.
 
 ### 2.7 Padding
 
-Horizontales más frecuentes: 12 (21), 10 (14), 20 (13), 14 (11), 18 (9), 16 (9), 40 (6), 36 (5), 6, 8, 4. Verticales: 10 (13), 12 (12), 6 (7), 32 (7), 14 (6), 18 (5), 3, 4, 16, 8, 20, 24, 28, 48, 64 (`.padding(.top, 64)`, 1). Uniformes: 24 (8), 12 (8), 20 (4), 28 (3), 16, 14, 8, 36, 18, 6, 4, 3. Medidas de pantalla: `padding(.horizontal, 36).padding(.vertical, 28)` Ajustes/Tab (`SettingsView.swift:40`, `TabScreen.swift:71`); `padding(.horizontal, 40).padding(.vertical, 32)` Grabar/Tab (`RecordView.swift:43`, `TabScreen.swift:44`). Hojas: `padding(24)` (`TabSourceSheet.swift:38`), `padding(28)` (`RootView.swift:131`, calibración).
+Horizontales más frecuentes: 12 (21), 10 (14), 20 (13), 14 (11), 18 (9), 16 (9), 40 (6), 36 (5), 6, 8, 4. Verticales: 10 (13), 12 (12), 6 (7), 32 (7), 14 (6), 18 (5), 3, 4, 16, 8, 20, 24, 28, 48, 64 (`.padding(.top, 64)`, 1). Uniformes: 24 (8), 12 (8), 20 (4), 28 (3), 16, 14, 8, 36, 18, 6, 4, 3. Medidas de pantalla: Ajustes `36/28` (`SettingsView.swift:40`); Tablatura `36/20` en una zona (`TabScreen.swift:71`) y `40/32` en otra (`TabScreen.swift:44`); Grabar `40/32` (`RecordView.swift:43`) y `36/20` (`RecordView.swift:117`). Hojas: `padding(24)` (`TabSourceSheet.swift:38`), `padding(28)` (`RootView.swift:133`, `CalibrationSheet.swift:28`).
 
 **Escala mínima de espaciado/padding** (`TfSpace`): `s1 1 · s2 2 · s3 3 · s4 4 · s6 6 · s8 8 · s10 10 · s12 12 · s14 14 · s16 16 · s18 18 · s20 20 · s24 24 · s28 28 · s32 32 · s36 36 · s40 40 · s48 48 · s64 64`. Casi iguales (no fundir sin decisión): 9 (2) y 22 (1) horizontal en `SectionBoxes`/`PlaylistImport`; 3 y 4; 18, 20 y 16.
 
 ### 2.8 Tamaños fijos de control (frame height, `Theme`/vistas)
 
-44 (11: `PrimaryButton`, `SecondaryButton` por defecto, `navRow`, pestañas), 36 (10: botones secundarios compactos, campo de búsqueda `LibraryView.swift:151`, `TrashRowButton`), 28 (11: `ApplyButton`, botones de cabecera de acordes, barras de nivel), 40 (9), 34 (4: pastilla de pista `TabScreen.swift:222`), 32 (4: campo de enlace `TabSourceSheet.swift:146`), 30, 24, 20. Token: `TfSize.controlLg 44`, `controlMd 36`, `controlSm 28`; resto como constante local de su widget, en `theme/` (regla 4).
+44 (11: `PrimaryButton`, `SecondaryButton` por defecto, `navRow`, pestañas), 36 (10: botones secundarios compactos, campo de búsqueda `LibraryView.swift:147`, `TrashRowButton`), 28 (11: `ApplyButton`, botones de cabecera de acordes, barras de nivel), 40 (9), 34 (4: pastilla de pista `TabScreen.swift:222`), 32 (4: campo de enlace `TabSourceSheet.swift:146`), 30, 24, 20. Token: `TfSize.controlLg 44`, `controlMd 36`, `controlSm 28`; resto como constante local de su widget, en `theme/` (regla 4).
 
 Diferencia con web (`tokens.css:38-49`): `--ctl-h 44`, `--ctl-h-sm 36`, `--radius-card 14`, `--radius-ctl 10`, `--radius-sm 8`, `--sidebar-w 240`, `--pad-x 40`, `--pad-y 32` coinciden. No tiene 28, 34, 32, 12, 6, 4, 3, 2, 16. Extras de la web ausentes en SwiftUI: `--accent-hover FFC170` (SwiftUI usa `accent @0.8` al pulsar), `--blue 2F7CF6` (azul del sistema).
 
@@ -158,33 +158,33 @@ Estados: en SwiftUI solo existe «pulsado» (`configuration.isPressed`) y «desh
 | Widget Flutter | Origen | Medidas / tokens / estados |
 | --- | --- | --- |
 | `TfPrimaryButton` | `PrimaryButton` `Theme.swift:60-70` | alto 44, padding h 20, radio 10, body 14 semibold. Normal: fondo `accent`, texto `accentInk`. Pulsado: fondo `accent @0.8`. Deshabilitado: fondo `neutralBg`, texto `muted`, borde `fieldLine` 1. |
-| `TfSecondaryButton({height=44})` | `SecondaryButton` `Theme.swift:72-83` | padding h 16, radio 10, body 14 medium, fondo `field` (pulsado `@0.7`), borde `fieldLine`, texto `text`. Deshabilitado: texto `muted` y todo `@0.6`. Alturas usadas: 36 (`LibraryView.swift:223`), 28 (`GuitarOptionsViews.swift:36`). |
-| `TfApplyButton` | `ApplyButton` `GuitarOptionsViews.swift:44-52` | alto 28, h 16, radio 10, body 13 semibold, `accent`/`accentInk`, pulsado `@0.8`. Sin estado deshabilitado propio. Candidato a `TfPrimaryButton(height: 28)`: **decisión de Jorge**. |
-| `TfIconButton` | `TrashRowButton` `LibraryView.swift:389-405`; `nudge` `SectionBoxes.swift:378-386`; `SecondaryButton` con icono | 36×36 (nudge 30×24, radio 6), radio 10, fondo `field`, borde `fieldLine`; icono 14 `muted`; hover (solo papelera): icono `danger`. |
+| `TfSecondaryButton({height=44})` | `SecondaryButton` `Theme.swift:72-83` | padding h 16, radio 10, body 14 medium, fondo `field` (pulsado `@0.7`), borde `fieldLine`, texto `text`. Deshabilitado: texto `muted` y todo `@0.6`. Alturas usadas: 36 (`LibraryView.swift:224`), 28 (`GuitarOptionsViews.swift:35`). |
+| `TfApplyButton` | `ApplyButton` `GuitarOptionsViews.swift:44-51` | alto 28, h 16, radio 10, body 13 semibold, `accent`/`accentInk`, pulsado `@0.8`. Sin estado deshabilitado propio. Candidato a `TfPrimaryButton(height: 28)`: **decisión de Jorge**. |
+| `TfIconButton` | `TrashRowButton` `LibraryView.swift:389-405`; `nudge` `SectionBoxes.swift:380-387`; `SecondaryButton` con icono | Tres variantes. (a) Papelera `TrashRowButton`: 36×36, radio 10, fondo `field`, borde `fieldLine`, icono 14 `muted`, hover `danger` (`LibraryView.swift:389-405`). (b) Carpeta y lápiz de fila: **no** son 36×36 sino `SecondaryButton(height: 36)`: ancho = icono + 2×16, icono con `TF.body(14,.medium)`, color `text` (no `muted`), sin hover (`LibraryView.swift:221-228`); el ancho exacto depende del símbolo SF (confirmar con la captura de referencia, ola 0). (c) `nudge`: 30×24, radio 6, icono 11 bold color `text` (no `muted`) (`SectionBoxes.swift:384-386`). |
 | `TfAccentBar({double? value, height=6})` | `AccentBar` `Theme.swift:87-110` | cápsula `field` de fondo, relleno `accent`; con valor: ancho `max(height, w·clamp(v))`; sin valor: tramo de 30 % del ancho que va y viene con `0.5−0.5·cos(2π t)`, periodo 1,6 s. Alturas usadas 5, 6 (def.), 8. Anchos externos 140, 220, 260, 320, expandido. Sin estados. |
 | `TfCard` | `Card` `Theme.swift:112-119` | fondo `card`, radio 14, borde `line` 1. Sin padding propio. |
 | `TfChip(kind)` | `Chip` `Theme.swift:121-136` | cápsula, padding h 10 v 4, body 12 semibold. ok `ok/okBg`, working `accent/accentBg`, neutral `text2/neutralBg`, error `danger/dangerBg`. Sin estados. |
 | `TfFmt` | `Fmt` | ver §1.3. |
 | `TfMarquee` | `MarqueeText.swift:5-38` | una línea; si no cabe, `…` al final; al pasar el ratón corre `overflow` px a 30 px/s (lineal) y vuelve en 0,2 s `easeOut`; alto fijo; cambia el texto → reinicia. Hover. |
-| `TfNavRow` + `TfSidebar` | `RootView.swift:51-120` | barra 240 de ancho, padding h 16 v 24, fondo `sidebar`, borde derecho `line` 1. Fila: alto 44, h 12, radio 10, icono 18 + hueco 10 + texto body 14 medium; activa: texto/icono `accent` fondo `accentBg`; inactiva: `text2`, sin fondo. Logo «Tone»+«Forge»(`accent`) display 22, pad abajo 20. Separación de filas 4. `Spacer` empuja Ajustes + tarjetas al fondo. |
-| `TfSelectedTrackCard` | `selectedCard` `RootView.swift:73-91` | padding 12, radio 10, fondo `field` (activa `accentBg` + borde `accent`), título `TfMarquee` body 14 semibold, artista body 12 `muted`. |
-| `TfDeviceCard` | `deviceCard` `RootView.swift:93-104` | padding 12, radio 10, fondo `field`; punto 8×8 `deviceOk` (o `muted` si desconectado) + título body 14 semibold + subtítulo body 12 `muted`. |
+| `TfNavRow` + `TfSidebar` | `RootView.swift:51-120` | barra 240 de ancho, padding h 16 v 24, fondo `sidebar`, borde derecho `line` 1. Fila: alto 44, h 12, radio 10, icono 18 + hueco 10 + texto body 14 medium; activa: texto/icono `accent` fondo `accentBg`; inactiva: `text2`, sin fondo. Logo «Tone»+«Forge»(`accent`) display 22, `padding(.horizontal, 12).padding(.bottom, 20)` (`RootView.swift:57`). Separación de filas 4. `Spacer` empuja Ajustes + tarjetas al fondo. |
+| `TfSelectedTrackCard` | `selectedCard` `RootView.swift:76-90` | padding 12 y `padding(.top, 8)` (`:88`), separación título/artista 2, borde `.clear` cuando no activa, radio 10, fondo `field` (activa `accentBg` + borde `accent`), título `TfMarquee` body 14 semibold, artista body 12 `muted`. |
+| `TfDeviceCard` | `deviceCard` `RootView.swift:92-103` | padding 12 y `padding(.top, 8)` (`:102`), separación 6, radio 10, fondo `field`; fila punto+título con separación 8: punto 8×8 `deviceOk` (o `muted` si desconectado) + título body 14 semibold + subtítulo body 12 `muted`. |
 | `TfTabBar` | pestañas `SettingsView.swift:17-32` | contenedor `field` radio 10 borde `fieldLine`, padding 3, separación 4; botón alto 44, h 18, radio 8; activo body 14 semibold `accent` en `accentBg`; inactivo medium `text2`. |
-| `TfPill` (pastilla de pista, de acción) | `TabScreen.swift:213-225`; `BackingTimeline.swift:122-130` | cápsula alto 34 (h 14) para pistas; botón compacto alto 28, radio 8, h 10 para cabeceras. Activo: texto `accent`, fondo `accentBg`; inactivo `text2`/`field`, borde `fieldLine` (activo `accent @0.6` en solos). |
-| `TfToggleButton` (M/S) | `MixerToggle` `BackingMixer.swift:257-272`; `trackToggle` `TabScreen.swift:245-253` | 36×36, radio 8, body 12 bold(→600). Off: `field`, texto `text2`, borde `fieldLine`; On: `accent`, texto `accentInk`, sin borde. |
+| `TfPill` (pastilla de pista, de acción) | `TabScreen.swift:213-225`; `BackingTimeline.swift:122-130` | cápsula alto 34 (h 14) para pistas; botón compacto alto 28, radio 8, h 10 para cabeceras. Pastilla de pista: icono 12, gap 6, body 13 semibold/medium, borde `accent` activo completo; pastilla «pendiente» de trazo discontinuo `dash [3]` (`TabScreen.swift:234-239`). Activo: texto `accent`, fondo `accentBg`; inactivo `text2`/`field`, borde `fieldLine` (activo `accent @0.6` en solos). |
+| `TfToggleButton` (M/S) | `MixerToggle` `BackingMixer.swift:257-272`; `trackToggle` `TabScreen.swift:245-253` | Dos tamaños: `MixerToggle` 36×36, radio 8, body 12 bold(→600) (`BackingMixer.swift:265-269`); `trackToggle` de Tablatura 28×28, radio 7, body 11 bold(→600) (`TabScreen.swift:247-251`). Colores iguales. Off: `field`, texto `text2`, borde `fieldLine`; On: `accent`, texto `accentInk`, sin borde. |
 | `TfFader` | `Fader` `BackingMixer.swift:281-311` | −60…+6 dB, imán ±1,5 dB a 0 dB, doble clic = 0 dB; carril 6 ancho radio 3 `bg`; pomo 28×18 radio 4 `text2` con sombra `knob`; el hueco útil es de 28 de ancho. Altura base 150, mínima 40. Arrastre sin tolerancia, accesible por incrementos de 1 dB. |
-| `TfLevelBar` | `levelBar` `BackingMixer.swift:~220-232` | 8 de ancho × alto del fader, radio 4, fondo `bg`, relleno degradado vertical `ok` hasta 70 %, `accent` desde 92 %; atenuado a nil si canal mute. |
+| `TfLevelBar` | `levelBar` `BackingMixer.swift:222-234` | 8 de ancho × alto del fader, radio 4, fondo `bg`; relleno desde abajo de alto `fader·f` (`f = clamp((rmsDB+60)/60, 0, 1)`), radio 4, degradado vertical **relativo al propio relleno, no a la barra**: `ok` hasta el 70 % del relleno, mezcla lineal hasta `accent` en el 92 %, `accent` por encima (`CustomPainter`: shader con `begin/end` sobre el rect del relleno). Nivel 0 si `dim` = canal en mute **o** solo ajeno. |
 | `TfInputMeters` | `InputMeters` `AudioSettingsView.swift:66-82` | por canal, 8×28 radio 2, fondo `field`, relleno `ok`, separación 4. |
 | `TfMixerChannel` | `MixerChannel` `BackingMixer.swift:143-236` | 96 de ancho × alto variable (276 normal, mín. 166), padding v 12, radio 12, fondo `field`, borde `fieldLine`, atenuado `@0.55` si mute o solo ajeno. Master: fondo `accentBg @0.5`, borde `accent @0.6`. Título alto 22 body 12 semibold. Edición de nombre con `TextField` nativo `roundedBorder`. |
-| `TfSettingsGroup` | `SettingsView.swift:44-66` | `TfCard` con padding h 20 v 18, título display 18 medium, nota body 13 `muted`, separación 14/6. |
-| `TfInfoRow` | `InfoRow` `SettingsView.swift:68-79` | h 12 v 10, radio 10, fondo `field`; etiqueta + `Spacer` + valor (body 14 semibold `text2`). |
-| `TfTableHeaderCell` | `headCell` `LibraryView.swift:158-162` | body 12 medium MAYÚSCULAS `letterSpacing 0.7` `muted`. |
-| `TfListRow` | `row` `LibraryView.swift:206-252` | padding h 20 v 14, separador `line` (`Divider().overlay(TF.line)`), reposo transparente; hover: `accent @0.07`; seleccionada: `ok @0.12` + franja izquierda 3 `ok`. Columnas 70/150/170. |
+| `TfSettingsGroup` | `SettingsView.swift:50-67` | `TfCard` con padding h 20 v 18, título display 18 medium, nota body 13 `muted`, separación 14/6; la separación 14 también va **entre cada fila del contenido** (el contenido es hijo directo del `VStack(spacing: 14)`, `:56-62`; si llega envuelto en un único contenedor no aplica; confirmar con la captura de referencia, ola 0). |
+| `TfInfoRow` | `InfoRow` `SettingsView.swift:69-81` | h 12 v 10, radio 10, fondo `field`, `HStack(spacing: 12)`; etiqueta = `Text(label)` sin fuente propia → Inter 14 regular `text` (heredado, `RootView.swift:26-27`) + `Spacer` + valor según cada llamada (p. ej. body 14 semibold `text2`; el peso semibold sobre fuente heredada: confirmar con la captura de referencia, ola 0). |
+| `TfTableHeaderCell` | `headCell` `LibraryView.swift:156-159` | body 12 medium MAYÚSCULAS `letterSpacing 0.7` `muted`. |
+| `TfListRow` | `row` `LibraryView.swift:208-254` | padding h 20 v 14, separador `line` (`Divider().overlay(TF.line)`), reposo transparente; hover: `accent @0.07`; seleccionada: `ok @0.12` + franja izquierda 3 `ok`. Columnas 70/150/170. |
 | `TfSongCover` | `SongCover` `LibraryView.swift:410-445` | 44×44, radio 8, borde `line`; sin carátula: fondo `field` + `music.note` 18 `muted`. Miniatura 88 px. |
-| `TfTextField` | `searchField` `LibraryView.swift:139-153`; `ArtistGrid.swift:88`; `LinkImportSheet.swift:813`; `TabSourceSheet.swift:145` | `.plain` dentro de contenedor propio: h 12 (campo de enlace h 10), alto 36 (enlace 32), radio 8 (enlace: ver `TabSourceSheet.swift:146`), fondo `field`, borde `fieldLine`. Icono `magnifyingglass` + botón de borrar `xmark.circle.fill` en `muted`. Foco: no se dibuja anillo propio. |
+| `TfTextField` | `searchField` `LibraryView.swift:138-150` (ancho fijo 240, separación icono-texto 8); `ArtistGrid.swift:88`; `LinkImportSheet.swift:813`; `TabSourceSheet.swift:145` | `.plain` dentro de contenedor propio: h 12 (campo de enlace h 10), alto 36 (enlace 32), radio 8 (enlace: ver `TabSourceSheet.swift:146`), fondo `field`, borde `fieldLine`. Icono `magnifyingglass` + botón de borrar `xmark.circle.fill` en `muted`. Foco: no se dibuja anillo propio. |
 | `TfStateMessage` (estado vacío/aviso) | `emptyLibrary`/`emptyMessage` `LibraryView.swift:~203-205`; `message` `VideoSettingsView.swift:310-316` | icono 18 `muted` + texto body 12 `text2` centrado, separación 6, padding 8; vista previa 16:9 radio 10 borde `fieldLine`. |
 | `TfNotice` | aviso descartable `TabScreen.swift:~170-180` | fila con icono `exclamationmark.triangle` (`accent`/`danger`) y botón `xmark` plain. Detalle de medidas por verificar en la pantalla de Tablatura. |
-| `TfSheet` | `FirstRunSheet` `RootView.swift:122-137`; `CalibrationSheet`; `SongInfoSheet` `ArtistGrid.swift:133`; `TabSourceSheet`; `LinkImportSheet`; `OffsetSheet`; `MontageFramingSheet`; `AddPartSheet` `RecordView.swift:332` | modal de macOS sobre `card` (`FirstRunSheet` fuerza `TF.card`), padding 24-28, título display 22-24, cuerpo `muted`, botones al pie alineados a la derecha (`Cancelar` Secondary 36 + acción Primary), atajos `Esc`/`Intro`. Anchos: 480 (primer arranque), 540 (calibración). Sin cabecera propia: la hoja de macOS no tiene barra de título. |
+| `TfSheet` | `FirstRunSheet` `RootView.swift:122-137`; `CalibrationSheet`; `SongInfoSheet` `ArtistGrid.swift:133`; `TabSourceSheet`; `LinkImportSheet`; `OffsetSheet`; `MontageFramingSheet`; `AddPartSheet` `RecordView.swift:332` | modal de macOS; fondo `card` en `FirstRunSheet`, `MontageFramingSheet`, `RecordView` (`AddPartSheet`) y `bg` en `CalibrationSheet`; padding real 24 (Tab, Montaje, Offset, LinkImport) o 28 (FirstRun, Calibración); título display 22-24, cuerpo `muted`, botones al pie alineados a la derecha: `Cancelar`/`Repetir` `SecondaryButton` de 44 por defecto (`CalibrationSheet.swift:51,83`) + acción `PrimaryButton`; comprobar la altura en el resto de hojas antes de fijarla en 36. Atajos `Esc`/`Intro`. Anchos: 420, 480 (primer arranque), 540 (calibración), 720, 760. Sin cabecera propia: la hoja de macOS no tiene barra de título. |
 | `TfPopover` | `.popover` `MontageView.swift:444,691`; `BackingTimeline.swift:192`; `ChordGrid.swift:251`; `SectionBoxes.swift:101` | popover nativo con flecha (`arrowEdge: .bottom`); contenido propio sobre el fondo del sistema. En Flutter: `OverlayPortal` con fondo `card`, borde `line`, radio 10 (**decisión de Jorge**: sin flecha). |
 
 ### 3.2 Controles nativos de macOS sin personalizar (hay que dibujarlos en Flutter)
@@ -195,7 +195,7 @@ Aspecto actual en macOS con tema oscuro forzado y sin `AccentColor` en el catál
 | --- | --- | --- | --- |
 | `TfDropdown<T>` | `Picker(...).pickerStyle(.menu)` | 21 `Picker`: `RecordView.swift:500,509`, `MontageView.swift:288,486`, `AudioSettingsView.swift:117,127`, `TabScreen.swift:299` | botón redondeado gris del sistema con etiqueta y chevrones arriba/abajo a la derecha; al pulsar, menú emergente del sistema. `fixedSize()`: ancho = contenido. Anchos fijos en Ajustes: 320 (salida/entrada), 280, 160. |
 | `TfSegmented` | `.pickerStyle(.segmented)` | `LibraryView.swift:133`, `AudioSettingsView.swift:141` (ancho 220), `VideoSettingsView.swift:362` (160) | control segmentado del sistema; segmento activo relleno con el acento del sistema; web lo imita con `--blue 2F7CF6` (`tokens.css:30`). |
-| `TfSwitch` | `Toggle` `.switch` (`.controlSize(.small)`, `.tint(TF.accent)`) | `GuitarOptionsViews.swift:21`, `SectionBoxes.swift:321`, `MontageFramingSheet.swift:34`, `VideoSettingsView.swift:375,380` (sin tint) | interruptor pequeño de macOS; encendido naranja `accent` salvo los de `VideoSettingsView`, que salen con el acento del sistema (discrepancia: **decisión de Jorge** si tinta a naranja). |
+| `TfSwitch` | `Toggle` `.switch` (`.controlSize(.small)`, `.tint(TF.accent)`) | `GuitarOptionsViews.swift:21`, `SectionBoxes.swift:321`, `MontageFramingSheet.swift:34`, `VideoSettingsView.swift:375,380` (sin tint ni `.controlSize(.small)`: tamaño normal, `.switch` + `labelsHidden`, acento del sistema; los de `GuitarOptionsViews.swift:21` sí son small + `accent`) | interruptor pequeño de macOS; encendido naranja `accent` salvo los de `VideoSettingsView`, que salen con el acento del sistema (discrepancia: **decisión de Jorge** si tinta a naranja). |
 | `TfCheckbox` | `Toggle` `.checkbox` | `RecordView.swift:507,520`, `TabScreen.swift:311,449`, `BackingTimeline.swift:464`, `MontageView.swift:493` (`.tint(accent)`), `OffsetSheet.swift:71` | casilla cuadrada del sistema con marca blanca sobre acento del sistema; con `tint` naranja solo en `MontageView.swift:493`. Etiqueta body 13 `text2`. |
 | `TfSlider` | `Slider(...).tint(TF.accent)` | `BackingMixer.swift:92` (150), `TabScreen.swift:441` (120), `BackingTimeline.swift:377` (70) y `:456` (120), `RecordMixer.swift:72` (40), `MontageFramingSheet.swift:41,209`, `MontageView.swift:367`, `TakeViewer.swift:343` (sin tint) | carril delgado con parte izquierda `accent` y pomo circular blanco del sistema. Pasos: velocidad 5 % (`(v/5).rounded()*0.05`), cents 1, dB con imán a 0 (±1,5). |
 | `TfStepper` | `Stepper(...).labelsHidden()` | `VideoSettingsView.swift:346` | par ▲▼ del sistema junto al campo de «ms». |
@@ -288,8 +288,8 @@ Otros recursos que la interfaz carga (`App/Resources`): `AppIcon.svg` (fuente) y
 
 ## 6. Ventana
 
-- Mínimo 1100×680 (`WindowMetrics`, `ToneForgeApp.swift:5-8,28`); inicial 1440×900 (`.defaultSize`, `ToneForgeApp.swift:41`). Tamaño restaurado por el sistema (`SceneStorage`).
-- Tema oscuro forzado: `.preferredColorScheme(.dark)` (`ToneForgeApp.swift:27`); no hay tema claro. Dart: un solo `ThemeData(brightness: dark)`.
+- Mínimo 1100×680 (`WindowMetrics`, `ToneForgeApp.swift:5-8,30`; mínimos en :6-7, aplicados en :30); inicial 1440×900 (`.defaultSize`, `ToneForgeApp.swift:41`). Tamaño restaurado por el sistema (`SceneStorage`).
+- Tema oscuro forzado: `.preferredColorScheme(.dark)` (`ToneForgeApp.swift:29`); no hay tema claro. Dart: un solo `ThemeData(brightness: dark)`.
 - Barra lateral: ancho fijo 240 (`RootView.swift:12`), siempre visible, sin colapsar ni arrastrar. Contenido a la derecha en `maxWidth/maxHeight: .infinity`. Mínimo de contenido = 1100−240 = 860.
 - Barra de título estándar del sistema; sin barra de herramientas. Sin multiventana efectiva (`WindowGroup` único).
 - Zona de soltar ficheros: toda la ventana (`RootView.swift:28`, `importFiles`).

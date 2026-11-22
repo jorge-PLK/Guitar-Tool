@@ -19,6 +19,7 @@ Rutas de código: `Packages/AppCore/Sources/AppCore/` (abreviado `AC/`).
 - `Empty` = `{}` (`AC/Router.swift:14`), parámetros y resultado vacíos.
 - Registro: `Router.register<P: Decodable&Sendable, R: Encodable&Sendable>(_ method, handler)` (`AC/Router.swift:41`); cada servicio expone `register(on: Router)` y `Bridge.registerMethods` los encadena (`AC/Bridge.swift:133-188`).
 - Codificación: encoder `iso8601` (sin fracciones: `2026-01-02T03:04:05Z`) y `withoutEscapingSlashes` (`AC/Router.swift:28-39`). `UUID` sale en mayúsculas. Un `Optional` nil de un DTO sintetizado **se omite** (clave ausente, no `null`); solo salen `null` los DTO con `encode(to:)` a mano (`encode` sobre el opcional) y los construidos con `SJ` (`AC/SettingsMethods.swift:155-181`). Dart debe tratar «ausente» y `null` igual al decodificar.
+- Regla general en los DTO de Dart: una clave ausente y un `null` se leen igual; al enviar, Dart omite la clave.
 - Rutas de medios (`cover`, `audio`, `video`, `path`...): relativas a la carpeta de proyectos con `/`.
 
 ### Códigos de `RPCError` que existen (literales `code:`)
@@ -57,7 +58,7 @@ Sin `bridge.host` todos dan `unsupported` (`ImportMethods.swift:311`). Las tabla
 | library.project | ProjectIDParams | ProjectDetailResult | Bridge.swift:176 | detalle de un tema |
 | library.reveal | ProjectIDParams | RevealResult | Bridge.swift:165 | abre la carpeta en el explorador |
 | library.takeBacking | TakeBackingParams | TakeBackingResult | Bridge.swift:182 | pistas de acompañamiento de Ver toma |
-| library.artistPhoto | ArtistPhotoParams | ArtistPhotoResult | ArtistPhotoMethods.swift:33 | foto como URL `data:` o ausente |
+| library.artistPhoto | ArtistPhotoParams | ArtistPhotoResult | ArtistPhotoMethods.swift:33 | foto como URL `data:` o `null` explícito (el DTO tiene `encode(to:)` a mano: la clave sale siempre) |
 | library.separate | ProjectIDParams | QueuedResult | ImportMethods.swift:180 | encola separación y análisis |
 | library.rename | RenameParams | RenameResult | ImportMethods.swift:184 | cambia título y artista |
 | library.deleteTake | DeleteTakeParams | RemovedResult | ImportMethods.swift:189 | borra una toma |
@@ -181,7 +182,7 @@ Métodos (`StudyMethods.swift`): open :233, close :234, play :235, pause :238, s
 - `PickedFileResult {path: String?}` (null explícito), `PickedFilesResult {paths: [String]}`, `ChosenFolderResult {path: String?}` (null explícito), `PickedFolderResult {path: String?, restartRequired: Bool}` (null explícito).
 - `OpenURLParams {urls: [String]}`, `OpenURLResult {opened: String?}` (ausente si nil). `PreviewShowParams {url, x, y, width, height}`; `PreviewShowResult {shown}`; `PreviewHideResult {hidden}`.
 - `RelocateParams {path, mode: "move"|"point"}`, `RelocateProgress {fraction}`, `RelocateResult {path, mediaRemapped: Bool}`.
-- `JobInfo` (`JobQueue.swift:6`): `id: String` (UUID del tema o `import-N`/`link-N`), `title`, `stage` (`import|separation|guitars|analysis|download`), `state` (`queued|running|done|failed|cancelled`), `fraction: Double?` (ausente si nil), `text: String`, `error: String?`. `JobsListResult {jobs}`.
+- `JobInfo` (`JobQueue.swift:6`): `id: String` (UUID del tema, `import-N`, `link-N` o `playlist-<id de tema de la lista>`), `title`, `stage` (`import|separation|guitars|analysis|download`), `state` (`queued|running|done|failed|cancelled`), `fraction: Double?` (ausente si nil), `text: String`, `error: String?`. `JobsListResult {jobs}`.
 
 ### settings / models / video
 Salen como objetos `SJ` con `null` explícito (`SettingsMethods.swift:314-473`); no hay DTO Codable. Claves:
