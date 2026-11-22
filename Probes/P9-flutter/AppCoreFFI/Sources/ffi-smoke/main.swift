@@ -1,5 +1,7 @@
 import CAppCoreFFI
+#if canImport(Darwin)
 import Darwin
+#endif
 import Foundation
 
 // Humo de P9 prueba 2: ejercita solo la ABI C de tf_core.h. Hilo principal en dispatchMain(); trabajo en otro hilo.
@@ -27,6 +29,10 @@ final class Inbox: @unchecked Sendable {
     var tickSizes: [Int] = []
     var doneCount: Int?
     let probeSem = DispatchSemaphore(value: 0)
+    let mainActorSem = DispatchSemaphore(value: 0)
+    var mainActorOK: Bool?
+    var dispatchMainOK: Bool?
+    var mainActorMs: Int?
 }
 let inbox = Inbox()
 
@@ -44,6 +50,15 @@ nonisolated(unsafe) let onMessage: tf_message_cb = { ptr, len in
             inbox.shutdownAt = t
             inbox.lock.unlock()
             inbox.shutdownSem.signal()
+        }
+        if event == "probe.mainactor" {
+            let p = obj["payload"] as? [String: Any]
+            inbox.lock.lock()
+            inbox.mainActorOK = p?["mainActor"] as? Bool
+            inbox.dispatchMainOK = p?["dispatchMain"] as? Bool
+            inbox.mainActorMs = p?["ms"] as? Int
+            inbox.lock.unlock()
+            inbox.mainActorSem.signal()
         }
         if event == "probe.tick" {
             inbox.lock.lock()
@@ -83,12 +98,16 @@ func call(_ method: String) -> (Double, String?) {
 }
 
 func rssMB() -> Double {
+#if canImport(Darwin)
     var info = mach_task_basic_info()
     var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size / MemoryLayout<natural_t>.size)
     let kr = withUnsafeMutablePointer(to: &info) {
         $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { task_info(mach_task_self_, task_flavor_t(MACH_TASK_BASIC_INFO), $0, &count) }
     }
     return kr == KERN_SUCCESS ? Double(info.resident_size) / 1_048_576 : -1
+#else
+    return -1
+#endif
 }
 
 func watchTick() {
@@ -186,6 +205,17 @@ func run() {
     check(emitDone, "probe.done recibido")
     check(emitOK, "120 ticks en orden, 300 bytes, done=120")
     check(tf_debug_live_buffers() == 0, "emisor: live_buffers == 0")
+
+    // P9 prueba 7: cola principal / @MainActor drenados y comprobación del hilo principal.
+    let maRC = tf_debug_mainactor_selftest(3000)
+    check(maRC == 0, "tf_debug_mainactor_selftest == 0")
+    let maGot = maRC == 0 && inbox.mainActorSem.wait(timeout: .now() + 5) == .success
+    inbox.lock.lock(); let maA = inbox.mainActorOK; let maD = inbox.dispatchMainOK; let maMs = inbox.mainActorMs; inbox.lock.unlock()
+    print("mainactor: evento \(maGot ? "recibido" : "NO recibido"), mainActor \(maA.map { "\($0)" } ?? "?"), dispatchMain \(maD.map { "\($0)" } ?? "?"), \(maMs.map { "\($0)" } ?? "?") ms")
+    check(maGot && maA == true && maD == true, "probe.mainactor con mainActor y dispatchMain a true")
+    let isMain = tf_debug_is_main_thread()
+    print("is_main_thread (hilo de trabajo): \(isMain)")
+    check(isMain == 0, "tf_debug_is_main_thread == 0 desde el hilo de trabajo")
 
     let tShutdown = nowMs()
     tf_core_shutdown(5000)

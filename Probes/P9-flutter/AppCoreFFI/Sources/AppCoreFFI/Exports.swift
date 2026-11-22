@@ -41,3 +41,19 @@ public func ffiCoreStartPort(_ optionsJSON: UnsafePointer<CChar>?, _ port: Int64
 public func ffiDebugEmit(_ hz: Int32, _ count: Int32, _ bytes: Int32) -> Int32 {
     coreState.debugEmit(hz: hz, count: count, bytes: bytes)
 }
+
+// P9 prueba 7 (hilos en Windows). `tf_core_main_queue_handle`, `tf_core_pump`, `tf_debug_apartment` y
+// `tf_debug_is_main_thread` están en C (tf_core.c). En Windows, `public` + `@_cdecl` en un producto `.dynamic`
+// exporta el símbolo de la DLL (Swift marca dllexport lo público); si falta algún símbolo: `dumpbin /exports`.
+
+/// Vía 1: el hilo principal se queda aquí sirviendo `DispatchQueue.main` / `@MainActor`. No vuelve.
+@_cdecl("tf_core_run_main")
+public func ffiCoreRunMain() {
+    tf_internal_mark_main_thread()
+    dispatchMain()
+}
+
+@_cdecl("tf_debug_mainactor_selftest")
+public func ffiDebugMainActorSelftest(_ timeoutMs: Int32) -> Int32 {
+    coreState.debugMainActorSelftest(timeoutMs: timeoutMs)
+}

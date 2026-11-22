@@ -42,6 +42,11 @@ final class CoreState: @unchecked Sendable {
         return 0
     }
 
+    var isStarted: Bool {
+        lock.lock(); defer { lock.unlock() }
+        return started
+    }
+
     func send(_ json: String) {
         lock.lock()
         let b = closed ? nil : bridge
@@ -88,8 +93,12 @@ final class CoreState: @unchecked Sendable {
                     // Temporización absoluta: el instante n es start + n * periodo (sin deriva).
                     let wait = start + Int64(n) * periodNs - tf_debug_now_ns()
                     if wait > 0 {
+                        #if os(Windows)
+                        Thread.sleep(forTimeInterval: Double(wait) / 1e9)  // Windows no tiene nanosleep
+                        #else
                         var ts = timespec(tv_sec: Int(wait / 1_000_000_000), tv_nsec: Int(wait % 1_000_000_000))
                         nanosleep(&ts, nil)
+                        #endif
                     }
                 }
                 let t = tf_debug_now_ns()
