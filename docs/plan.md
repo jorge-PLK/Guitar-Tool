@@ -165,6 +165,8 @@ Lista de Jorge del 17/11/2026, tras usar la app. La mini-spec se escribe al empe
 
 *Decisión de Jorge, 22/11/2026: la 7b se hará sobre la interfaz en Flutter (ver «Condición de cierre de la 7c»), no sobre SwiftUI ni sobre la página de WebView2.*
 
+***Descartada (Jorge, 22/11/2026, ADR-021):** la Fase 7b no se hace. La Fase 7f porta la interfaz 1:1 a Flutter y, terminado el port, los cambios de UX se decidirán sobre lo portado en una fase nueva. La lista de abajo queda como historia y como punto de partida de esa fase.*
+
 Biblioteca:
 
 - [ ] Quitar la cabecera de contadores (temas, tomas grabadas, vídeos exportados): no aporta
@@ -433,7 +435,7 @@ Núcleo pendiente (ids de `Temp/win/appcore-gap-audit.md`; entre paréntesis, ag
 - [ ] B4 · Fotos de artista por AppCore (`tf-implementer`).
 - [ ] B6 · Cierre ordenado: `terminateAll` y `flush` del estudio (`tf-implementer`).
 - [ ] A1 · Cámaras en Ajustes del Mac por AppCore: hoy `resolvedCameras` da `nil` con cámara real (`tf-implementer`).
-- [ ] M1 · Hoja «Encuadre» en el Mac: `takeFrame` devuelve `nil` fuera de Windows (`tf-engineer`).
+- [x] M1 · Hoja «Encuadre» en el Mac: `takeFrame` tiene rama Mac (`MontageServices.swift:73-78`, commit `a5f9eb6`). *Falta que Jorge compruebe `framingFrame` con vídeo real en el Mac.*
 - [ ] R3 y M2 · Medir en el Mac el rendimiento de la cámara y de la vista previa de Montaje por JPEG y `FrameRelay` (`tf-engineer`).
 - [ ] F3 · Arena de ONNX Runtime en la separación (desglose con `TF_SEPARATE_TIMING=1`): pendiente de decisión de Jorge con los números.
 - T3 (guardar fichero y abrir URL) y S4 (modelos embebidos en `Bundle.main`) son del anfitrión Flutter, no de la 7c.
@@ -485,6 +487,26 @@ Pedida por Jorge el 18/11/2026 (era la 7c hasta que el port a Windows tomó ese 
 - [ ] Fundidos al cambiar una guitarra de lado
 
 Condición de paso: por definir con Jorge.
+
+### Fase 7f · Interfaz única en Flutter (rama `fase-7f` desde `fase-7c`)
+
+Planificada el 22/11/2026 (ADR-021, 25 decisiones de Jorge). Sustituye SwiftUI (`App/Sources`) y la página de WebView2 (`WinApp/Web`) por una app Flutter en `FlutterApp/` que habla solo con `AppCore`. Port 1:1 con SwiftUI como base visual; únicas funciones nuevas: inglés y selector de idioma. La 7c se da por cerrada en funcionalidad: los desvíos de núcleo se tratan aquí (`docs/flutter/desvios.md`). Sin estimación.
+
+Documentación de la fase, por piezas: `docs/flutter/README.md` (índice). El orquestador empieza por `docs/flutter/orquestador.md`.
+
+- [ ] **P9 · Viabilidad** (`docs/probes/P9-flutter.md`): entorno FVM, FFI e hilos, píxeles crudos, WebView, vídeo, captura y tests en el Mac; después todo en el PC x64. Fallar rápido; un umbral incumplido es una pregunta a Jorge. Commit al cerrar.
+- [ ] **Ola 0 · Cimientos:** actualizar las reglas de `CLAUDE.md` (UIs viejas congeladas, paridad sobre Flutter, commit por ola, agentes nuevos); `AppCoreFFI` completo (ABI congelada, canal de píxeles, servicios de anfitrión por `hostRequest`); test que vuelca `Contract/fixtures/`; forma `{code, message, args}` de los errores del núcleo; `FlutterApp/` con `core/` (`CoreClient`, `FrameChannel`, `HostServices`, `MockCore`, `LaunchOptions`), `theme/`, kit de `widgets/`, ARB es/en, carcasa con barra lateral y `--snapshot`; `Tools/flutter/*.sh` y paso `FlutterApp` en `Tools/test.sh`; capturas de referencia de SwiftUI en `docs/flutter/ref/`.
+- [ ] **Ola 1 · Biblioteca:** Biblioteca, detalle de tema, grabaciones del tema, importación por fichero y por enlace, listas y álbumes, cola de trabajos, primer arranque, Ajustes · Biblioteca y selector de idioma (`pantallas/biblioteca.md`, `pantallas/ajustes.md`).
+- [ ] **Ola 2 · Estudio:** Backing (mezclador, rejilla de acordes, secciones, bucle, metrónomo) y Tablatura (WebView de alphaTab, edición, Songsterr, exportar `.gp`) (`pantallas/backing.md`, `pantallas/tablatura.md`).
+- [ ] **Ola 3 · Grabación:** Grabar, Ver toma, Ajustar desfase, Ajustes · Audio (calibración) y Ajustes · Cámara y vídeo (`pantallas/grabar.md`, `pantallas/ajustes.md`).
+- [ ] **Ola 4 · Montaje:** Montaje y hoja «Encuadre» (`pantallas/montaje.md`).
+- [ ] **Ola 5 · Cierre:** empaquetado de Mac y de Windows (recursos, DLL), mensajes del núcleo por código en todas las áreas que falten, pasada completa en el PC x64, borrado de `App/`, `WinApp/Web`, `Tools/webdev` y `FrameRelay` en JPEG, CODEMAP y `CLAUDE.md`.
+
+Cada ola: contrato del área (fixtures → DTO) antes que la pantalla; partes en paralelo si no se pisan; validación con la lista de `orquestador.md`; `tf-qa` una vez; compilación y prueba en el PC x64; visto bueno de Jorge sobre las parejas referencia/Flutter; commit sin preguntar.
+
+Condición de paso (Jorge, 22/11/2026): en el Mac y en el PC x64, con la app Flutter: importar un tema por enlace, separarlo, Backing en bucle al 70 %, tablatura con edición y exportación a `.gp`, grabar una toma con cámara y verla, montar y exportar un vídeo, y Ajustes completos; todas las pantallas y hojas comparadas con su captura de referencia y aceptadas por Jorge; puerta de tests verde; sin SwiftUI ni WebView2 en el repo.
+
+Después de la 7f: Fase 7d (actualizador), instalador de Windows y la fase de cambios de UX que sustituye a la 7b.
 
 ## Etapa 2 · Igualado de tono (fases 8a, 8 y 9)
 
@@ -550,7 +572,8 @@ Mismo número de orden: se pueden hacer en paralelo o en cualquier orden entre s
 | 6 | Fase 7 · Montaje | Fase 6 | No | Fable | Opus (compositor, encuadre) · Sonnet (layouts, exportación, pantalla) |
 | 6 | Fase 7b · Retoques de interfaz | Fase 7 (rama desde `fase-7`) | No | Opus | Sonnet (pantallas, buscador, Spotify) · Opus (arrastre de secciones) |
 | 6 | Fase 7c · Port a Windows | Fase 7b (rama desde `main`) | No | Opus | Sonnet (script de la VM, investigación) · Opus (audio, señal, vídeo; modelos con `tf-ml`) · Haiku (inventario de dependencias) |
-| 7 | Fase 7d · Actualizaciones automáticas | Migración de la interfaz a Flutter (rama desde `main`) | No | Opus | Sonnet (UpdateKit, diálogo, Ajustes, script de release, investigación) |
+| 6 | Fase 7f · Interfaz única en Flutter | Fase 7c (rama desde `fase-7c`) | Solo en la pasada de Jorge | Opus | Sonnet (`tf-flutter`: pantallas, stores, `core/`; `tf-implementer`: `AppCoreFFI`, fixtures, desvíos) · Haiku (`tf-flutter-mech`: tokens, ARB, DTO) |
+| 7 | Fase 7d · Actualizaciones automáticas | Fase 7f (rama desde `main`) | No | Opus | Sonnet (UpdateKit, diálogo, Ajustes, script de release, investigación) |
 | 7 | P1 · Remote Editor | Etapa 1 en uso | Sí | Fable | Opus (análisis del tráfico) · Sonnet (scripts) |
 | 7 | P3 · TONE3000 | Etapa 1 en uso | No | Fable | Sonnet |
 | 7 | P5 · Velocidad del bucle | P1 | Sí | Fable | Sonnet |
@@ -603,6 +626,7 @@ Cada fase la lleva una sesión orquestadora que escribe la mini-spec, reparte el
 | 7. Montaje | Fable | Opus para el compositor y el encuadre; Sonnet para layouts, exportación y pantalla | Compositor propio fotograma a fotograma, poco documentado |
 | 7b. Retoques de interfaz | Opus | Sonnet para pantallas, buscador, Spotify y Ajustes; Opus para el arrastre de secciones de Backing | Interfaz casi toda; el arrastre ya ha fallado más de una vez |
 | 7c. Port a Windows | Opus | VM y toolchain en el hilo principal con Jorge; Sonnet (`tf-implementer`) para el script de compilar, instalar y arrancar en la VM; prueba de viabilidad con Haiku (`cavecrew-investigator`, inventario de dependencias de Apple), Sonnet (`web-researcher`, interfaz, WASAPI/ASIO, helpers), Opus (`tf-engineer`, audio, señal y vídeo) y Opus (`tf-ml`, ONNX Runtime); `tf-docs` y `tf-qa` al final | Ida y vuelta con la VM y decisiones de plataforma; lo delicado es sustituir lo que da Apple |
+| 7f. Interfaz única en Flutter | Opus (orquesta y valida; no implementa) | Sonnet (`tf-flutter`) para pantallas, stores Riverpod, `CustomPainter`, `core/` y tests; Sonnet (`tf-implementer`) para `AppCoreFFI`, canal de píxeles, fixtures, códigos de mensaje y desvíos de núcleo; Haiku (`tf-flutter-mech`) para tokens, iconos, ARB y DTO desde fixtures; `tf-auditor` para revisar cada pantalla contra su ficha; `tf-qa` y `tf-docs` al cerrar cada ola. Ningún agente Opus como mano de obra (decisión de Jorge) | Trabajo guiado por fichas y por un contrato con fixtures; lo delicado (hilos FFI, reloj de vídeo, foco del WebView) se decide en P9 y lo corta el orquestador |
 | 7d. Actualizaciones automáticas | Opus | Sonnet (`tf-implementer`) para UpdateKit, diálogo, Ajustes, instalación en Windows y script de release; Sonnet (`web-researcher`) para Sparkle y el instalador | Librería conocida (Sparkle) y fontanería; lo delicado es la firma y no romper datos, no un modelo mayor |
 | Pruebas P1, P3 y P5 | Fable | Opus para analizar el tráfico capturado; Sonnet para los scripts | Ingeniería inversa de un protocolo sin documentar |
 | 8a. DI guiado | Opus | Sonnet para la grabación y la validación de la toma | Fase corta sobre el audio de la Fase 3 y la tablatura de la Fase 5 |
