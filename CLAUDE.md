@@ -51,7 +51,7 @@ Nunca `general-purpose`, `claude` ni un agente "Lead": el hook global `agent-rou
 
 ## Reglas
 
-- **Mac y Windows, misma interfaz.** Todo cambio de interfaz se aplica a la vez en `App/Sources` (SwiftUI) y en `WinApp/Web` (WebView2), en la misma tarea; no deben distinguirse. Lo que no pueda igualarse se lista a Jorge.
+- **Mac y Windows, paridad funcional (no visual).** Toda función nueva o cambio de comportamiento se aplica a la vez en `App/Sources` y en `WinApp/Web`, en la misma tarea; no se gasta trabajo en igualar el aspecto, porque Flutter sustituye ambas al cerrar la 7c. Lo que no pueda igualarse en función se lista a Jorge.
 - Fase a fase, una rama por fase (`fase-N`). Preguntar antes de inventar reglas que no estén en la spec.
 - Al cerrar una fase (`/phase-close`), en el mismo commit: `docs/CODEMAP.md`, "Estado actual" de este fichero (máximo 3 líneas: lo cargan todas las sesiones), casillas y condición de paso en `docs/plan.md`, lo aprendido en `docs/spec.md` y el ADR.
 - Commits en inglés, imperativo, estilo de `git log`; sin trailer `Co-Authored-By`. Sin push. Al cerrar cada fase, commit sin pedir confirmación; a mitad de fase, solo si Jorge lo pide.

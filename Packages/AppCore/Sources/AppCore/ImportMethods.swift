@@ -10,6 +10,12 @@ public protocol HostServices: Sendable, HiddenPageLoading {
     func pickFiles(types: [String]) async -> [URL]
     /// Selector de carpeta. `nil` si se cancela.
     func pickFolder() async -> URL?
+    /// Selector de carpeta que abre en `initial` (la carpeta de proyectos actual o la propuesta del primer arranque).
+    /// Por omisión, sin carpeta inicial.
+    func pickFolder(initial: URL?) async -> URL?
+    /// Aviso de que la carpeta de proyectos cambió en caliente: el anfitrión vuelve a servirla como `mediaBase`.
+    /// `false` si no pudo (la página recarga sus medios con la carpeta vieja).
+    func projectsFolderChanged(_ url: URL) async -> Bool
     /// Diálogo de guardar (8.7: exportar a Guitar Pro); `types` son extensiones sin punto. `nil` si se cancela.
     func saveFile(suggestedName: String, types: [String]) async -> URL?
     /// Abre una URL con la aplicación del sistema para su esquema. `false` si nada la abre (p. ej. `spotify:` sin la app).
@@ -36,6 +42,8 @@ public struct PreviewRect: Sendable, Equatable, Codable {
 public extension HostServices {
     /// Selector de varios ficheros (L-F5: el del Mac permite selección múltiple). Por omisión, uno solo.
     func pickFiles(types: [String]) async -> [URL] { await pickFile(types: types).map { [$0] } ?? [] }
+    func pickFolder(initial: URL?) async -> URL? { await pickFolder() }
+    func projectsFolderChanged(_ url: URL) async -> Bool { true }
     func saveFile(suggestedName: String, types: [String]) async -> URL? { nil }
     func openURL(_ url: URL) async -> Bool { false }
     func showPreview(url: URL, rect: PreviewRect) async -> Bool { false }
@@ -79,6 +87,16 @@ struct OpenURLResult: Codable, Sendable { var opened: String? }
 struct PreviewShowParams: Decodable, Sendable { var url: String; var x: Double; var y: Double; var width: Double; var height: Double }
 struct PreviewShowResult: Codable, Sendable { var shown: Bool }
 struct PreviewHideResult: Codable, Sendable { var hidden: Bool }
+struct ChosenFolderResult: Codable, Sendable {
+    var path: String?
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(path, forKey: .path)
+    }
+}
+struct RelocateParams: Codable, Sendable { var path: String; var mode: String }
+struct RelocateProgress: Codable, Sendable { var fraction: Double }
+struct RelocateResult: Codable, Sendable { var path: String; var mediaRemapped: Bool }
 struct PickedFolderResult: Codable, Sendable {
     var path: String?
     var restartRequired: Bool
@@ -91,7 +109,7 @@ struct PickedFolderResult: Codable, Sendable {
 
 extension JobEngine {
     /// Motor con el perfil, el índice y los servicios que toca según `options` (`--support-dir` o los del sistema).
-    static func make(options: LaunchOptions, root: URL?, services: JobServices?) -> JobEngine {
+    static func make(options: LaunchOptions, root: ProjectsRoot, services: JobServices?) -> JobEngine {
         let support = options.supportDir
         let profile = support.map { ProfileStore(url: $0.appendingPathComponent("profile.json")) } ?? ProfileStore()
         #if os(Windows)
@@ -118,6 +136,14 @@ extension Bridge {
         box.wait(timeout: JobEngine.shutdownBudget + 0.5)
     }
 
+    /// Cierra y suelta los ficheros de proyecto abiertos (Montaje, visor de tomas, tablatura, estudio y, con él, Grabar).
+    func closeProjectFiles() async {
+        await closeMontage()
+        await closeTakeView()
+        await closeTab()
+        await closeStudy()
+    }
+
     public func shutdownAsync() async {
         await closeMontage()   // W2-E2: guarda el montaje y para su relevo al cerrar la ventana (los dos anfitriones)
         await closeTakeView()   // W2-V: suelta la salida del visor de tomas
@@ -130,7 +156,7 @@ extension Bridge {
     /// al arrancar; si no, se hace con el primer método de trabajo.
     public func start() { Task { [jobs] in await jobs.start() } }
 
-    func registerImportMethods(root: URL?, options: LaunchOptions) {
+    func registerImportMethods(root: ProjectsRoot, options: LaunchOptions) {
         let jobs = self.jobs
         jobs.setSinks(
             job: { [weak self] j in self?.emit("jobs.progress", j) },
@@ -212,12 +238,58 @@ extension Bridge {
             await self?.host?.hidePreview()
             return PreviewHideResult(hidden: true)
         }
+        // B2: solo elegir la carpeta (abre en la actual); aplicarla es `library.relocate`.
+        router.register("host.chooseFolder") { [weak self] (_: Empty) in
+            guard let host = self?.host else { throw Bridge.noHost }
+            let picked = await host.pickFolder(initial: root.url)
+            return ChosenFolderResult(path: picked?.path)
+        }
+        // B2: cambiar la carpeta en caliente. `mode`: «move» (copia, verifica y borra el original) o «point» (solo apunta).
+        router.register("library.relocate") { [weak self] (p: RelocateParams) in
+            guard p.mode == "move" || p.mode == "point" else {
+                throw RPCError(code: "bad-params", message: "«mode» debe ser «move» o «point».")
+            }
+            guard !p.path.isEmpty else { throw RPCError(code: "bad-params", message: "«path» está vacío.") }
+            let url = URL(fileURLWithPath: p.path)
+            // Con trabajo o grabación en curso se rechaza sin cerrar nada; si no, se sueltan los ficheros del tema abierto
+            // (estudio, visor de tomas, Montaje, tablatura) ANTES de mover o reapuntar (decisión de Jorge).
+            let recording = await self?.recordService?.isBusy ?? false
+            guard jobs.list().isEmpty, !recording else { throw JobEngine.map(LibraryError.workInProgress) }
+            await self?.closeProjectFiles()
+            do {
+                try await jobs.relocate(to: url, move: p.mode == "move") { [weak self] f in
+                    self?.emit("library.relocateProgress", RelocateProgress(fraction: f))
+                }
+            } catch { throw JobEngine.map(error) }
+            // La página pide los medios por `mediaBase`: el anfitrión lo remapea a la carpeta nueva.
+            let remapped = await self?.host?.projectsFolderChanged(url) ?? true
+            self?.emit("library.relocated", RelocateResult(path: url.path, mediaRemapped: remapped))
+            return RelocateResult(path: url.path, mediaRemapped: remapped)
+        }
         let profile = options.supportDir.map { ProfileStore(url: $0.appendingPathComponent("profile.json")) } ?? ProfileStore()
         router.register("host.pickProjectsFolder") { [weak self] (_: Empty) in
             guard let host = self?.host else { throw Bridge.noHost }
-            guard let url = await host.pickFolder() else { return PickedFolderResult(path: nil, restartRequired: false) }
-            return try Bridge.saveProjectsFolder(url, profile: profile)
+            // Como `chooseFirstRunFolder` del Mac: abre en la propuesta (`~/Music/ToneForge`, creada antes).
+            let proposed = self?.proposedFolder
+            if let proposed { try? FileManager.default.createDirectory(at: proposed, withIntermediateDirectories: true) }
+            guard let url = await host.pickFolder(initial: root.url ?? proposed) else {
+                return PickedFolderResult(path: nil, restartRequired: false)
+            }
+            let firstRun = root.url == nil
+            let r = try Bridge.saveProjectsFolder(url, profile: profile)
+            guard firstRun else { return r }
+            // B3: primer arranque sin reiniciar: la carpeta se adopta, la biblioteca arranca y el anfitrión sirve los medios.
+            root.url = url
+            await jobs.start()
+            _ = await host.projectsFolderChanged(url)
+            return PickedFolderResult(path: url.path, restartRequired: false)
         }
+    }
+
+    /// Carpeta que se propone en el primer arranque (`AppModel.proposedFolder` del Mac: `~/Music/ToneForge`).
+    static var defaultProposedFolder: URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Music", isDirectory: true).appendingPathComponent("ToneForge", isDirectory: true)
     }
 
     /// Esquemas que `host.openURL` deja abrir fuera de la aplicación.

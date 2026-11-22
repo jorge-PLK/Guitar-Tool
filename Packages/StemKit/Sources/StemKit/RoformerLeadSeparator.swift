@@ -1,20 +1,21 @@
 import Foundation
 
-/// Separador de la guitarra solista con el Mel-Band RoFormer «Lead_Rhythm_Guitar» en Core ML
-/// (mini-spec Fase 4, «Opciones de guitarras y tramos de solo»; contrato en `MaskModelContract.leadRhythm` y
-/// ModelCatalog.leadRhythmMelRoformer).
+/// Separador de la guitarra solista con el Mel-Band RoFormer «Lead_Rhythm_Guitar»: Core ML en el Mac, ONNX Runtime
+/// en Windows (`SystemMaskModel`; mini-spec Fase 4, «Opciones de guitarras y tramos de solo»; contrato en
+/// `MaskModelContract.leadRhythm` y ModelCatalog.leadRhythmMelRoformer). Antes `CoreMLLeadSeparator`.
 ///
 /// Corre en el proceso que lo llama (la app), no en `tf-separate`: solo ve tramos de solo (decenas de segundos,
 /// nunca el tema entero), el trozo es de 3 s y la memoria medida es pequeña frente al límite del helper.
 ///
 /// El modelo se carga en la primera llamada a `separateLead` (que el compositor hace fuera del hilo principal) y se
 /// libera con la instancia: lo normal es crear uno por composición. Las llamadas se serializan.
-public final class CoreMLLeadSeparator: LeadGuitarSeparating, @unchecked Sendable {
+public final class RoformerLeadSeparator: LeadGuitarSeparating, @unchecked Sendable {
     private let lock = NSLock()
     private let loader: () throws -> MaskModel
     private var processor: ChunkProcessor?   // protegido por `lock`
 
-    /// `compiledModelURL`: el `.mlmodelc` que instala ModelStore para `ModelCatalog.leadRhythmMelRoformer`.
+    /// `compiledModelURL`: lo que instala ModelStore para `ModelCatalog.leadRhythmMelRoformer` (el `.mlmodelc` en el
+    /// Mac, el `.onnx` en Windows; misma etiqueta que `RoformerSeparator`).
     /// No carga nada todavía; si el modelo no se puede cargar, lo dirá `separateLead`.
     public convenience init(compiledModelURL: URL) {
         self.init(compiledModelURL: compiledModelURL, contract: .leadRhythm)
@@ -22,7 +23,7 @@ public final class CoreMLLeadSeparator: LeadGuitarSeparating, @unchecked Sendabl
 
     /// `contract`: `.leadRhythmMSST` para medir paridad con la referencia de MSST (num_overlap 1).
     convenience init(compiledModelURL: URL, contract: MaskModelContract) {
-        // Core ML en el Mac; en Windows lanza `PlatformError.unsupported("paso 7: onnx-runtime")` al cargar.
+        // Core ML en el Mac; ONNX Runtime en Windows (`OnnxMaskModel`, FP32, 301 tramas fijas, sin relleno a 32).
         self.init { try SystemMaskModel.load(modelURL: compiledModelURL, contract: contract) }
     }
 
@@ -58,7 +59,7 @@ public final class CoreMLLeadSeparator: LeadGuitarSeparating, @unchecked Sendabl
     private func loadedProcessor() throws -> ChunkProcessor {
         if let processor { return processor }
         let model = try loader()
-        precondition(model.contract.stemCount == 1, "CoreMLLeadSeparator: el modelo de solista tiene 1 stem")
+        precondition(model.contract.stemCount == 1, "RoformerLeadSeparator: el modelo de solista tiene 1 stem")
         let p = ChunkProcessor(model: model)
         processor = p
         return p

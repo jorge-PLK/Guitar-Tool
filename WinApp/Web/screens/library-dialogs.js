@@ -151,7 +151,7 @@ export function FirstRunSheet() {
   return html`<${Modal} title=${restart ? 'Reinicia ToneForge' : 'Elige tu carpeta de proyectos'} width=${480}>
     ${restart
       ? html`<p class="body-text">Carpeta guardada. Cierra ToneForge y vuelve a abrirlo para empezar a usarla.</p>`
-      : html`<p>Cada tema vive en su propia carpeta, con sus stems, tomas y vídeo. Puedes cambiarla más tarde en Ajustes.</p>`}
+      : html`<p>Cada tema vive en su propia carpeta, con sus stems, tomas y vídeo. Puedes cambiarla más tarde en Ajustes.</p><p class="snote">Propuesta: la carpeta Música\\ToneForge de tu usuario.</p>`}
     ${error ? html`<div class="modal-error" role="alert">${error}</div>` : null}
     ${restart ? null : html`<div class="modal-actions"><button class="btn primary" onClick=${choose} disabled=${busy}>Elegir carpeta…</button></div>`}
   </${Modal}>`;

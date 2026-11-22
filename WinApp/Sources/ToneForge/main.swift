@@ -115,6 +115,23 @@ final class WindowsHostServices: HostServices, @unchecked Sendable {
         }
     }
 
+    /// Cambio de carpeta de proyectos en caliente (B2): el shim reenvia al hilo de UI y vuelve a mapear `media.toneforge`.
+    func projectsFolderChanged(_ url: URL) async -> Bool {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+            Thread.detachNewThread { [weak self] in
+                guard let host = self?.app?.host else { continuation.resume(returning: false); return }
+                continuation.resume(returning: url.path.withCString { tfhost_map_folder(host, "media.toneforge", $0) } == 0)
+            }
+        }
+    }
+
+    func pickFolder(initial: URL?) async -> URL? {
+        let start = initial?.path ?? ""
+        return await pick { host, out, cap in
+            "Elegir carpeta".withCString { title in start.withCString { tfhost_pick_folder_at(host, title, $0, out, cap) } }
+        }
+    }
+
     func pickFolder() async -> URL? {
         await pick { host, out, cap in
             "Elegir carpeta".withCString { tfhost_pick_folder(host, $0, out, cap) }

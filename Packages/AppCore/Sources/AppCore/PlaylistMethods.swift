@@ -115,7 +115,7 @@ final class PlaylistEngine {
 
     private let jobs: JobEngine
     private let sources: ExternalSources
-    private let root: URL?
+    private let root: ProjectsRoot
     private var session: PlaylistImportSession?
     private var duplicates: Set<String> = []
     private var warnings: [String] = []
@@ -131,7 +131,7 @@ final class PlaylistEngine {
         func send(_ s: PlaylistSnapshot) { lock.withLock { f }(s) }
     }
 
-    nonisolated init(jobs: JobEngine, sources: ExternalSources, root: URL?) {
+    nonisolated init(jobs: JobEngine, sources: ExternalSources, root: ProjectsRoot) {
         self.jobs = jobs
         self.sources = sources
         self.root = root
@@ -177,7 +177,7 @@ final class PlaylistEngine {
     private func hooks() -> PlaylistImportSession.Hooks {
         let sources = self.sources, root = self.root
         return .init(updateYtDlp: { try await sources.updateYtDlp() },
-                     lookup: { await Task.detached { LibraryLookup.scan(root: root) }.value },
+                     lookup: { await Task.detached { LibraryLookup.scan(root: root.url) }.value },
                      duplicateVideoIDs: { [weak self] in self?.duplicates ?? [] })
     }
 
@@ -382,7 +382,7 @@ final class PlaylistEngine {
 
 extension Bridge {
     /// Se llama desde `registerLinkMethods` (el desvío de `link.resolve` necesita el `LinkEngine`).
-    func registerPlaylistMethods(link: LinkEngine, sources: ExternalSources, root: URL?) {
+    func registerPlaylistMethods(link: LinkEngine, sources: ExternalSources, root: ProjectsRoot) {
         let engine = PlaylistEngine(jobs: jobs, sources: sources, root: root)
         engine.setSink { [weak self] in self?.emit("playlist.changed", $0) }
         liveList = { await engine.liveSnapshot() }

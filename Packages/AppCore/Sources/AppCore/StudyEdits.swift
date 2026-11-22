@@ -359,18 +359,31 @@ extension StudyService {
             reloadTracksIfChanged(o)
             stateChanged()
         case .guitarSplitQueued(let id), .guitarSplitStarted(let id):
-            if id == s.projectID { edits.setProcess(id, "processing") }
+            if id == s.projectID { notifyGuitars(id, "processing") }
         case .guitarSplitFinished(let id):
             guard id == s.projectID else { return }
             edits.setProcess(id, "idle")
             s.reload()
             reloadTracksIfChanged(o)
+            emitGuitars("idle", nil)
             stateChanged()
         case .guitarSplitFailed(let id, let message):
-            if id == s.projectID { edits.setProcess(id, "failed", message); stateChanged() }
+            if id == s.projectID { notifyGuitars(id, "failed", message) }
         default:
             break
         }
+    }
+
+    /// Trabajo de guitarras: guarda el estado, avisa a la página (`study.guitars`: ella relee el snapshot, como el Mac
+    /// refresca la hoja al cambiar `guitarProcess`) y pide `study.state`.
+    func notifyGuitars(_ id: UUID, _ state: String, _ error: String? = nil) {
+        edits.setProcess(id, state, error)
+        emitGuitars(state, error)
+        stateChanged()
+    }
+
+    func emitGuitars(_ state: String, _ error: String?) {
+        emit("study.guitars", StudyAnalysisEvent(state: state, error: error))
     }
 
     // MARK: Tonalidad y acordes

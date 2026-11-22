@@ -2,7 +2,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { html } from '../html.js';
 import { call, on } from '../bridge.js';
 import { Modal, AccentBar } from '../ui.js';
-import { notify } from '../state.js';
+import { notify, go } from '../state.js';
 import { CleanupDialog } from '../screens/library-dialogs.js';
 import { Group, InfoRow, fmtBytes, fmtPercent, errText, fail } from './common.js';
 
@@ -17,17 +17,37 @@ function LibraryGroup() {
   const [folder, setFolder] = useState(undefined);   // undefined = cargando
   const [usage, setUsage] = useState(null);
   const [restart, setRestart] = useState(false);
+  const [pending, setPending] = useState(null);      // carpeta elegida a la espera de «mover» o «apuntar»
+  const [progress, setProgress] = useState(null);    // null | 0..1 mientras se mueven los temas
   const [cleanup, setCleanup] = useState(null);      // { bytes } | null
   const load = () => {
     call('settings.get').then(r => { setFolder(r.projectsFolder ?? null); setRestart(r.projectsFolder != null && r.projectsFolder !== r.activeProjectsFolder); }).catch(() => setFolder(null));
     call('library.usage').then(setUsage).catch(() => setUsage(null));
   };
   useEffect(() => { load(); return on('library.changed', load); }, []);
+  useEffect(() => on('library.relocateProgress', p => setProgress(p.fraction)), []);
+  // `AppModel.pickNewFolder` y `relocate` del Mac: se elige, se pregunta mover o apuntar, y se aplica sin reiniciar.
   const pick = async () => {
     try {
-      const r = await call('host.pickProjectsFolder');
-      if (r.path) { setFolder(r.path); setRestart(r.restartRequired !== false); }
+      const r = await call('host.chooseFolder', {}, { timeout: 10 * 60 * 1000 });
+      if (r.path && r.path !== folder) setPending(r.path);
     } catch (e) { fail('No se pudo cambiar la carpeta', e); }
+  };
+  const relocate = async move => {
+    const path = pending;
+    setPending(null);
+    if (move) setProgress(0);
+    try {
+      const r = await call('library.relocate', { path, mode: move ? 'move' : 'point' }, { timeout: 60 * 60 * 1000 });
+      setFolder(r.path);
+      if (!r.mediaRemapped) setRestart(true);
+      go('library');   // el tema abierto se cerró antes de mover: la app queda en la Biblioteca
+    } catch (e) {
+      if (e.code === 'work-in-progress') notify('error', 'Hay trabajo en curso. Espera a que terminen las separaciones y vuelve a cambiar la carpeta.');
+      else fail('No se pudo cambiar la carpeta', e);
+    }
+    setProgress(null);
+    load();
   };
   const askCleanup = async () => {
     try { const { bytes } = await call('library.cleanupInfo', {}); setCleanup({ bytes: fmtBytes(bytes) }); }
@@ -36,9 +56,16 @@ function LibraryGroup() {
   return html`<${Group} title="Biblioteca" note="Una carpeta por tema, con sus stems, tomas y vídeo.">
     <div class="sfield"><span class="sfield-label">Carpeta de proyectos</span><div class="pathbox" title=${folder ?? ''}>${folder ?? '—'}</div></div>
     <${InfoRow} label="Espacio usado"><b class="val">${usage ? fmtBytes(usage.totalBytes) : '—'}</b><//>
-    ${restart ? html`<p class="snote" role="status">La carpeta nueva se usará al reiniciar ToneForge.</p>` : null}
+    ${restart ? html`<p class="snote" role="status">Reinicia ToneForge para ver los medios de la carpeta nueva.</p>` : null}
+    ${progress != null ? html`<div class="srow"><${AccentBar} fraction=${progress} /><span class="val">Moviendo ${fmtPercent(progress)}</span></div>` : null}
+    ${pending ? html`<${Modal} title="Carpeta de proyectos" onClose=${() => setPending(null)} width=${480}>
+      <p>«${pending}»: ¿mover los temas existentes a la carpeta nueva o solo apuntar a ella?</p>
+      <div class="modal-actions">
+        <button class="btn secondary sm" onClick=${() => setPending(null)}>Cancelar</button>
+        <button class="btn secondary sm" onClick=${() => relocate(false)}>Solo apuntar a esta carpeta</button>
+        <button class="btn primary sm" onClick=${() => relocate(true)}>Mover los temas aquí</button></div></${Modal}>` : null}
     <div class="srow-btns">
-      <button class="btn secondary" onClick=${pick}>Cambiar carpeta</button>
+      <button class="btn secondary" onClick=${pick} disabled=${progress != null}>Cambiar carpeta</button>
       <button class="btn secondary" onClick=${askCleanup}>Limpiar tomas descartadas y stems</button></div>
     ${cleanup ? html`<${CleanupDialog} id=${undefined} title="Limpiar toda la biblioteca" bytes=${cleanup.bytes} onClose=${() => { setCleanup(null); load(); }} />` : null}
   <//>`;

@@ -1047,10 +1047,15 @@ public actor Library {
 
     // MARK: Reubicar
 
+    /// Hay separaciones, trabajos posteriores o migraciones en cola o en marcha (`relocate` los rechaza).
+    public var hasWorkInProgress: Bool {
+        !(queue.isEmpty && currentID == nil && postQueue.isEmpty && currentPostID == nil && migrations.isEmpty)
+    }
+
     public func relocate(to newRoot: URL, mode: RelocationMode) async throws {
         let oldRoot = root
         guard newRoot.standardizedFileURL != oldRoot.standardizedFileURL else { return }
-        guard queue.isEmpty, currentID == nil, postQueue.isEmpty, currentPostID == nil, migrations.isEmpty else { throw LibraryError.workInProgress }
+        guard !hasWorkInProgress else { throw LibraryError.workInProgress }
 
         var copied: [String] = []
         switch mode {

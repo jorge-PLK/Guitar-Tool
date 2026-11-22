@@ -168,6 +168,8 @@ final class MontageController {
     private(set) var exportPhase: ExportPhase = .idle
 
     private var previewTask: Task<Void, Never>?
+    /// Mezcla del WAV de la vista previa en curso (o la última): la siguiente espera a que acabe, aunque esté anulada.
+    private var previewMixTask: Task<MontageMixResult, Error>?
     private var frameTask: Task<Void, Never>?
     private var stillTask: Task<Void, Never>?
     private var analysisTask: Task<Void, Never>?
@@ -630,9 +632,17 @@ final class MontageController {
             audioProgress = 0
             audioError = nil
             notify()
-            let partial = dir.appendingPathComponent("preview-\(key).partial.wav")
+            // Un cambio que no toca la clave (el análisis de encuadre al acabar) anula esta tarea a mitad de mezcla, y la
+            // mezcla anulada sigue hasta su siguiente bloque. Dos reglas para que no se pisen: se espera a que la anterior
+            // acabe (en Windows su parcial sigue abierto) y cada intento escribe su propio parcial (la limpieza del anulado
+            // borraba por ruta el del siguiente y su `moveItem` fallaba: vista previa en `.error`).
+            if let previous = previewMixTask {
+                previous.cancel()
+                _ = await previous.result
+                guard !Task.isCancelled, !closed else { return }
+            }
+            let partial = dir.appendingPathComponent("preview-\(key).\(UUID().uuidString).partial.wav")
             try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
-            try? fm.removeItem(at: partial)
             let job = MontageMixJob(segments: draft.segments.map { MixSegment(start: $0.start, end: $0.end, fadeIn: $0.fadeIn, fadeOut: $0.fadeOut) },
                                     sampleRate: mixSampleRate, tracks: draft.mixTracks, fadeIn: draft.plan.barDuration,
                                     fadeOut: draft.plan.barDuration, normalization: MontageNormalization.none,
@@ -643,6 +653,7 @@ final class MontageController {
                 let mixing = Task.detached(priority: .userInitiated) {
                     try await mix(job) { [weak self] p in Task { @MainActor in self?.setAudioProgress(p) } }
                 }
+                previewMixTask = mixing
                 _ = try await withTaskCancellationHandler { try await mixing.value } onCancel: { mixing.cancel() }
                 try Task.checkCancellation()
                 try? fm.removeItem(at: url)

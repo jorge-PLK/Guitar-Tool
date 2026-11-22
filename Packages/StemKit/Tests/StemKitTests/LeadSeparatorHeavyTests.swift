@@ -56,7 +56,7 @@ final class LeadSeparatorHeavyTests: XCTestCase {
         XCTAssertLessThanOrEqual(worstMask, Self.maxMaskProbeError, "sondas de la máscara")
         let input = try AudioIO.readStereo(LeadSeparatorTests.fixtureDir.appendingPathComponent("input_2s_pcm16.wav"))
         let torch = try AudioIO.readStereo(LeadSeparatorTests.fixtureDir.appendingPathComponent("lead_torch_2s_f32.wav"))
-        let lead = try CoreMLLeadSeparator(compiledModelURL: url, contract: .leadRhythmMSST)
+        let lead = try RoformerLeadSeparator(compiledModelURL: url, contract: .leadRhythmMSST)
             .separateLead(left: input.left, right: input.right, sampleRate: 44_100)
         XCTAssertEqual(lead.left.count, torch.frameCount)
         let sdr = snrDB(torch.left + torch.right, lead.left + lead.right)
@@ -74,7 +74,7 @@ final class LeadSeparatorHeavyTests: XCTestCase {
         let out = try makeTempDir("platero-composer")
         let t0 = Date()
         let tracks = try GuitarStemComposer().compose(input: platero, outputDirectory: out, stereo: false,
-                                                      soloSpans: [span], separator: CoreMLLeadSeparator(compiledModelURL: url))
+                                                      soloSpans: [span], separator: RoformerLeadSeparator(compiledModelURL: url))
         print(String(format: "[7.8] Platero compositor mono: %.1f s", Date().timeIntervalSince(t0)))
         XCTAssertEqual(tracks.map(\.role), [.rhythm, .lead])
         let src = try AudioIO.readStereo(platero)
@@ -158,7 +158,7 @@ final class LeadSeparatorHeavyTests: XCTestCase {
         let input = try AudioIO.readStereo(LeadSeparatorTests.fixtureDir.appendingPathComponent("input_2s_pcm16.wav"))
         let torch = try AudioIO.readStereo(LeadSeparatorTests.fixtureDir.appendingPathComponent("lead_torch_2s_f32.wav"))
         // Paridad: el plan de la referencia (num_overlap 1 de MSST), con el mismo código que usa la app.
-        let sep = CoreMLLeadSeparator(compiledModelURL: url, contract: .leadRhythmMSST)
+        let sep = RoformerLeadSeparator(compiledModelURL: url, contract: .leadRhythmMSST)
         let t0 = Date()
         let lead = try sep.separateLead(left: input.left, right: input.right, sampleRate: 44_100)
         let seconds = Date().timeIntervalSince(t0)
@@ -169,7 +169,7 @@ final class LeadSeparatorHeavyTests: XCTestCase {
             maxAbs = max(maxAbs, abs(torch.left[k] - lead.left[k]), abs(torch.right[k] - lead.right[k]))
         }
         // Lo que usa la app (num_overlap 2): otro plan de trozos, así que no es paridad sino distancia informativa.
-        let app = try CoreMLLeadSeparator(compiledModelURL: url)
+        let app = try RoformerLeadSeparator(compiledModelURL: url)
             .separateLead(left: input.left, right: input.right, sampleRate: 44_100)
         let sdrApp = snrDB(torch.left + torch.right, app.left + app.right)
         // En [0, 1,5 s) solo pesa el primer trozo, idéntico en los dos planes: ahí num_overlap 2 = num_overlap 1.
@@ -208,7 +208,7 @@ final class LeadSeparatorHeavyTests: XCTestCase {
             // Un separador por composición, como AppGuitarSplitter: el tiempo incluye cargar el modelo.
             let tracks = try GuitarStemComposer().compose(input: Self.platero, outputDirectory: out, stereo: stereo,
                                                           soloSpans: [span],
-                                                          separator: CoreMLLeadSeparator(compiledModelURL: url))
+                                                          separator: RoformerLeadSeparator(compiledModelURL: url))
             let seconds = Date().timeIntervalSince(t0)
             guardian.stop()
             let peak = guardian.peakBytes

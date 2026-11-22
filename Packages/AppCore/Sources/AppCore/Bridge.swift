@@ -24,7 +24,7 @@ public final class Bridge: @unchecked Sendable {
     public let router = Router()
     private let options: LaunchOptions
     private let mediaBase: String
-    private let projects: URL?
+    private let projects: ProjectsRoot
     private let lock = NSLock()
     private var _send: @Sendable (String) -> Void = { _ in }
     /// Cola de trabajos y biblioteca viva (8.3a, `JobQueue.swift`).
@@ -37,6 +37,8 @@ public final class Bridge: @unchecked Sendable {
     let link: ExternalSources?
     /// Buscador de Spotify (`link.search`); nil = el real (clave en `.env`).
     let spotify: (any SpotifySearching)?
+    /// Fotos de artista (`library.artistPhoto`); nil = el servicio real.
+    let artistPhotos: (any ArtistPhotoProviding)?
     /// Tablatura (8.7, `TabService.swift`).
     let tabService: TabService
     /// Montaje (W2-M1, `MontageMethods.swift`).
@@ -44,6 +46,10 @@ public final class Bridge: @unchecked Sendable {
     /// Visor de tomas con el audio en el núcleo (W2-V, `TakeViewMethods.swift`).
     let takeViewService: TakeViewService
     private var _host: (any HostServices)?
+    /// Grabar (`RecordMethods.swift`); lo usa el cambio de carpeta para saber si hay una toma en curso.
+    nonisolated(unsafe) var recordService: RecordService?
+    /// Carpeta que propone el primer arranque; los tests la apuntan a un temporal.
+    nonisolated(unsafe) public var proposedFolder: URL = Bridge.defaultProposedFolder
 
     /// Diálogos nativos; los pone el anfitrión (8.3a, `ImportMethods.swift`). Sin él, `host.*` da `unsupported`.
     public var host: (any HostServices)? {
@@ -58,7 +64,7 @@ public final class Bridge: @unchecked Sendable {
     }
 
     /// Carpeta que el anfitrión sirve como `mediaBase` (la de proyectos).
-    public var mediaFolder: URL? { projects }
+    public var mediaFolder: URL? { projects.url }
 
     /// Solo tests: sustituye al explorador.
     private let revealOverride: (@Sendable (URL) throws -> Void)?
@@ -69,13 +75,14 @@ public final class Bridge: @unchecked Sendable {
 
     init(options: LaunchOptions, mediaBase: String, reveal: (@Sendable (URL) throws -> Void)?,
          services: JobServices? = nil, link: ExternalSources? = nil, tab: TabServices? = nil,
-         spotify: (any SpotifySearching)? = nil) throws {
+         spotify: (any SpotifySearching)? = nil, artistPhotos: (any ArtistPhotoProviding)? = nil) throws {
+        self.artistPhotos = artistPhotos
         self.link = link
         self.spotify = spotify
         self.revealOverride = reveal
         self.options = options
         self.mediaBase = mediaBase
-        let folder = Bridge.resolveProjectsFolder(options)
+        let folder = ProjectsRoot(Bridge.resolveProjectsFolder(options))
         self.projects = folder
         self.jobs = JobEngine.make(options: options, root: folder, services: services)
         // El estudio guarda por la misma `Library` que la cola: un solo escritor de `project.json` (8.3a).
@@ -117,10 +124,11 @@ public final class Bridge: @unchecked Sendable {
     private func registerMethods() {
         let info = AppInfo(
             version: Bridge.version, platform: Bridge.platform, mediaBase: mediaBase,
-            projectsFolder: projects?.path,
+            projectsFolder: nil,
             launch: .init(screen: options.screen, project: options.project, snapshot: options.snapshot != nil))
         router.register("app.info") { [weak self] (_: Empty) -> AppInfo in
             var i = info
+            i.projectsFolder = self?.projects.url?.path
             if let live = self?.liveList { i.playlist = await live() }
             return i
         }
@@ -132,6 +140,7 @@ public final class Bridge: @unchecked Sendable {
         }
         registerImportMethods(root: projects, options: options)
         registerLinkMethods(root: projects, options: options)
+        registerArtistPhotoMethods(options: options)   // B4, `ArtistPhotoMethods.swift`
         registerSettingsMethods(root: projects, options: options)
         studyService.setSink { [weak self] in self?.send($0) }
         studyService.register(on: router)
@@ -182,6 +191,8 @@ public final class Bridge: @unchecked Sendable {
             throw RPCError(code: "internal", message: "No se pudo abrir la carpeta: \(error)")
         }
     }
+
+    static func service(_ root: ProjectsRoot) throws -> LibraryService { try service(root.url) }
 
     static func service(_ root: URL?) throws -> LibraryService {
         guard let root else {

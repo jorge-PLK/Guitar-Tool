@@ -102,7 +102,7 @@ final class LeadSeparatorTests: XCTestCase {
         let left = ToneMix.standard(rate: 44_100, channel: 0).render(n)
         let right = ToneMix.standard(rate: 44_100, channel: 1).render(n)
         let model = ConstantMaskModel(frames: 301, contract: .leadRhythm)
-        let sep = CoreMLLeadSeparator(loader: { model })
+        let sep = RoformerLeadSeparator(loader: { model })
         let out = try sep.separateLead(left: left, right: right, sampleRate: 44_100)
         XCTAssertEqual(out.left.count, n)
         XCTAssertEqual(out.right.count, n)
@@ -129,7 +129,7 @@ final class LeadSeparatorTests: XCTestCase {
         let n = 4 * 48_000 + 17
         let left = ToneMix.standard(rate: 48_000, channel: 0).render(n)
         let right = ToneMix.standard(rate: 48_000, channel: 1).render(n)
-        let sep = CoreMLLeadSeparator(loader: { ConstantMaskModel(frames: 301, contract: .leadRhythm) })
+        let sep = RoformerLeadSeparator(loader: { ConstantMaskModel(frames: 301, contract: .leadRhythm) })
         let out = try sep.separateLead(left: left, right: right, sampleRate: 48_000)
         XCTAssertEqual(out.left.count, n)
         XCTAssertEqual(out.right.count, n)
@@ -146,7 +146,7 @@ final class LeadSeparatorTests: XCTestCase {
 
     func testLoaderErrorSurfacesOnFirstCall() {
         struct Boom: Error {}
-        let sep = CoreMLLeadSeparator(loader: { throw Boom() })
+        let sep = RoformerLeadSeparator(loader: { throw Boom() })
         XCTAssertThrowsError(try sep.separateLead(left: [0, 0], right: [0, 0], sampleRate: 44_100))
         XCTAssertThrowsError(try sep.separateLead(left: [0], right: [0, 0], sampleRate: 44_100))
     }

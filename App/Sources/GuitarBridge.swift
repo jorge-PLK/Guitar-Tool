@@ -9,7 +9,7 @@ import Store
 /// la primera vez que hace falta. Es el único sitio que lo construye.
 func makeLeadSeparator(modelStore: ModelStore) async throws -> any LeadGuitarSeparating {
     let url = try await modelStore.ensureInstalled(ModelCatalog.leadRhythmMelRoformer.id) { _ in }
-    return CoreMLLeadSeparator(compiledModelURL: url)
+    return RoformerLeadSeparator(compiledModelURL: url)
 }
 
 /// Adaptador `GuitarSplitting` sobre `GuitarStemComposer` (mini-spec Fase 4, «Opciones de guitarras y tramos de solo»),

@@ -4,7 +4,6 @@ description: Implementa en ToneForge una parte acotada de una fase (código Swif
 tools: Read, Edit, Write, Grep, Glob, Bash
 model: sonnet
 effort: medium
-maxTurns: 60
 omitClaudeMd: true
 ---
 

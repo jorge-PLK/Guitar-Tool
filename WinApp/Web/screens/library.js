@@ -230,13 +230,33 @@ function artistColor(name) {
   return `hsl(${Number(h % 360n)} 29% 38.75%)`;
 }
 
+// Fotos de artista (`ArtistGrid` + `ArtistPhotoService` del Mac): una petición por artista y sesión; sin foto, iniciales.
+const photoCache = new Map();   // clave plegada -> Promise<string|null>
+const artistPhoto = name => {
+  const key = fold(name);
+  if (!photoCache.has(key)) photoCache.set(key, call('library.artistPhoto', { name }).then(r => r.photo ?? null).catch(() => null));
+  return photoCache.get(key);
+};
+
+function ArtistTileCover({ name }) {
+  const [src, setSrc] = useState(null);
+  useEffect(() => {
+    let live = true;
+    setSrc(null);
+    if (name) artistPhoto(name).then(p => { if (live) setSrc(p); });
+    return () => { live = false; };
+  }, [name]);
+  if (src) return html`<div class="tile-cover"><img src=${src} alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit" /></div>`;
+  return html`<div class="tile-cover" style=${name ? `background:${artistColor(name)}` : undefined}>
+        ${name ? html`<span class="tile-initials">${initials(name)}</span>` : html`<span class="tile-person">${icon('person', 40)}</span>`}</div>`;
+}
+
 function ArtistGrid() {
   const groups = artistGroups.value;
   if (!groups.length) return html`${entries.value.length ? html`<${NoMatch} />` : html`<div class="card"><${EmptyLibrary} /></div>`}`;
   return html`<div class="tiles">${groups.map(g => html`<button key=${g.id} class="tile" onClick=${() => { openArtist.value = g.id; }}
       aria-label=${`${g.name || 'Sin artista'}, ${g.items.length} temas`}>
-      <div class="tile-cover" style=${g.name ? `background:${artistColor(g.name)}` : undefined}>
-        ${g.name ? html`<span class="tile-initials">${initials(g.name)}</span>` : html`<span class="tile-person">${icon('person', 40)}</span>`}</div>
+      <${ArtistTileCover} name=${g.name} />
       <div class="tile-name">${g.name || 'Sin artista'}</div>
       <div class="tile-count muted">${g.items.length === 1 ? '1 tema' : `${g.items.length} temas`}</div></button>`)}</div>`;
 }

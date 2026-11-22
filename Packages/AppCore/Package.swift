@@ -29,6 +29,8 @@ let package = Package(
         .target(name: "AppCore", dependencies: ["Store", "AudioKit", "ModelKit", "StemKit", "StudyKit", "SourceKit", "TabKit", "VideoKit",
                                           .product(name: "NativeAudioFile", package: "NativeKit")]),
         // W2-E2: los tests usan VideoKit y AudioKit directamente (FrameRelayTests, RecordTests): declarados, no transitivos.
-        .testTarget(name: "AppCoreTests", dependencies: ["AppCore", "Store", "SourceKit", "StudyKit", "TabKit", "VideoKit", "AudioKit"])
+        // B1: ModelKit y StemKit para GuitarSplitterTests (catálogo de prueba y separador simulado).
+        .testTarget(name: "AppCoreTests", dependencies: ["AppCore", "Store", "SourceKit", "StudyKit", "TabKit", "VideoKit", "AudioKit",
+                                                         "ModelKit", "StemKit"])
     ]
 )

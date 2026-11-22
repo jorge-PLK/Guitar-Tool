@@ -67,10 +67,10 @@ private struct SRig {
         try FileManager.default.createDirectory(at: projects, withIntermediateDirectories: true)
         let options = LaunchOptions(projectsFolder: projects, supportDir: support)
         let services = JobServices(importer: SImporter(), separator: SSeparator(), levelMeter: nil, analyzer: nil, guitarSplitter: nil)
-        jobs = JobEngine.make(options: options, root: projects, services: services)
+        jobs = JobEngine.make(options: options, root: ProjectsRoot(projects), services: services)
         cameras = SimulatedSettingsCameras(cameras: list)
         service = SettingsService(profile: ProfileStore(url: support.appendingPathComponent("profile.json")), jobs: jobs,
-                                  activeFolder: projects, modelsRoot: support.appendingPathComponent("Models"),
+                                  activeFolder: jobs.root, modelsRoot: support.appendingPathComponent("Models"),
                                   environment: environment, cameras: cameras, downloader: downloader)
         let sink = events
         service.setSink { sink.add($0) }

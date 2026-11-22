@@ -229,7 +229,7 @@ final class SettingsService: @unchecked Sendable {
 
     private let profile: ProfileStore
     private let jobs: JobEngine
-    private let activeFolder: URL?
+    private let activeFolder: ProjectsRoot
     private let store: ModelStore
     private let resolver: ModelResolver
     private let cameraOverride: (any SettingsCameraProviding)?
@@ -241,7 +241,7 @@ final class SettingsService: @unchecked Sendable {
     /// Nombres de cámara vistos en esta sesión, para nombrar la elegida que ya no está conectada (`CameraList.names` del Mac).
     private var knownCameraNames: [String: String] = [:]
 
-    init(profile: ProfileStore, jobs: JobEngine, activeFolder: URL?, modelsRoot: URL,
+    init(profile: ProfileStore, jobs: JobEngine, activeFolder: ProjectsRoot, modelsRoot: URL,
          environment: [String: String] = ProcessInfo.processInfo.environment,
          cameras: (any SettingsCameraProviding)? = nil, downloader: (any ModelDownloading)? = nil) {
         self.profile = profile
@@ -254,7 +254,7 @@ final class SettingsService: @unchecked Sendable {
         self.cameraOverride = cameras
     }
 
-    static func production(options: LaunchOptions, jobs: JobEngine, root: URL?) -> SettingsService {
+    static func production(options: LaunchOptions, jobs: JobEngine, root: ProjectsRoot) -> SettingsService {
         let profile = options.supportDir.map { ProfileStore(url: $0.appendingPathComponent("profile.json")) } ?? ProfileStore()
         let models = options.supportDir.map { $0.appendingPathComponent("Models", isDirectory: true) } ?? ModelStore.defaultRoot
         let s = SettingsService(profile: profile, jobs: jobs, activeFolder: root, modelsRoot: models)
@@ -314,7 +314,7 @@ final class SettingsService: @unchecked Sendable {
     private func settingsGet() throws -> SJ {
         let p = try loadProfile()
         return .obj(["projectsFolder": .opt(p.projectsFolder?.path),
-                     "activeProjectsFolder": .opt(activeFolder?.path),
+                     "activeProjectsFolder": .opt(activeFolder.url?.path),
                      "video": try videoSettings()])
     }
 
@@ -548,7 +548,7 @@ extension JobEngine {
 }
 
 extension Bridge {
-    func registerSettingsMethods(root: URL?, options: LaunchOptions) {
+    func registerSettingsMethods(root: ProjectsRoot, options: LaunchOptions) {
         let service = SettingsService.production(options: options, jobs: jobs, root: root)
         service.setSink { [weak self] in self?.send($0) }
         service.register(on: router)

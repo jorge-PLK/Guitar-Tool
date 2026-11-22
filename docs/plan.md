@@ -445,9 +445,9 @@ Pendiente de Jorge (hardware, pasada en un PC):
 - [ ] Cámara por Media Foundation y «Rotar»; `tf-webdev --camera real`.
 - [ ] Audio y cámara reales del Mac por el puente de `AppCore`.
 
-### Fase 7d · Actualizaciones automáticas (sin rama aún; rama `fase-7d` desde `main` al cerrar la 7c)
+### Fase 7d · Actualizaciones automáticas (sin rama aún; rama `fase-7d` desde `main` después de la migración de la interfaz a Flutter)
 
-Pedida por Jorge el 19/11/2026, solo planeada: la app busca versiones nuevas y ofrece actualizar o saltar esa versión, con el changelog, en macOS y en Windows. Orden nuevo (Jorge, 22/11/2026): va después de la 7c y de la migración de la interfaz a Flutter, y antes del instalador de Windows, que sale de la 7c; se prueba contra un feed local (`--update-feed`). Los requisitos que le pone al instalador (abajo) se mantienen para cuando se haga. Estimación: 4 a 6 horas (anterior a este cambio de orden; sin revisar).
+Pedida por Jorge el 19/11/2026, solo planeada: la app busca versiones nuevas y ofrece actualizar o saltar esa versión, con el changelog, en macOS y en Windows. Orden nuevo (Jorge, 22/11/2026): va después de la 7c y de la migración de la interfaz a Flutter, y antes del instalador de Windows, que sale de la 7c; se prueba contra un feed local (`--update-feed`). Los requisitos que le pone al instalador (abajo) se mantienen para cuando se haga. Estimación: pendiente de reestimar cuando exista el anfitrión Flutter (la cifra anterior, 4 a 6 horas, es previa al cambio de orden y ya no vale).
 
 Decisiones de Jorge (19/11/2026):
 
@@ -550,7 +550,7 @@ Mismo número de orden: se pueden hacer en paralelo o en cualquier orden entre s
 | 6 | Fase 7 · Montaje | Fase 6 | No | Fable | Opus (compositor, encuadre) · Sonnet (layouts, exportación, pantalla) |
 | 6 | Fase 7b · Retoques de interfaz | Fase 7 (rama desde `fase-7`) | No | Opus | Sonnet (pantallas, buscador, Spotify) · Opus (arrastre de secciones) |
 | 6 | Fase 7c · Port a Windows | Fase 7b (rama desde `main`) | No | Opus | Sonnet (script de la VM, investigación) · Opus (audio, señal, vídeo; modelos con `tf-ml`) · Haiku (inventario de dependencias) |
-| 7 | Fase 7d · Actualizaciones automáticas | Fase 7c (rama desde `main`) | No | Opus | Sonnet (UpdateKit, diálogo, Ajustes, script de release, investigación) |
+| 7 | Fase 7d · Actualizaciones automáticas | Migración de la interfaz a Flutter (rama desde `main`) | No | Opus | Sonnet (UpdateKit, diálogo, Ajustes, script de release, investigación) |
 | 7 | P1 · Remote Editor | Etapa 1 en uso | Sí | Fable | Opus (análisis del tráfico) · Sonnet (scripts) |
 | 7 | P3 · TONE3000 | Etapa 1 en uso | No | Fable | Sonnet |
 | 7 | P5 · Velocidad del bucle | P1 | Sí | Fable | Sonnet |

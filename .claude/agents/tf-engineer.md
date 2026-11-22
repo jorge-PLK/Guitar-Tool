@@ -4,7 +4,6 @@ description: Implementa en ToneForge una parte delicada que docs/plan.md («Mode
 tools: Read, Edit, Write, Grep, Glob, Bash
 model: opus
 effort: high
-maxTurns: 60
 omitClaudeMd: true
 ---
 

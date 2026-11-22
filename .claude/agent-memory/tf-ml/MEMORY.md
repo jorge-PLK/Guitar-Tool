@@ -9,4 +9,4 @@
 - [Guitab / MuScriptor (Fase 5b)](guitab-muscriptor-eval.md) — Guitab sin instalar (6 ficheros); registro 100 % por construcción; MuScriptor gated; BP y silencio
 - [Songsterr como referencia](songsterr-reference.md) — API de búsqueda; 103 Early Hints→curl; CDN en gzip; alinear con saliencia CQT, no con onsets/croma
 - [ONNX Runtime en Windows](ort-windows.md) — NuGet; DLL de System32; ssh=PowerShell 5; Cast a float32; MoveNet; ejes dinámicos; VM pagina T≥575
-- [Lead/Rhythm Mel-Band anónimo](lead-rhythm-contract.md) — weights_only OK, casa estricto; YAML con tupla→SafeLoader; MPS falla→CPU; Core ML sin scatter (K gathers); contrato spec→mask hop 441
+- [Lead/Rhythm Mel-Band anónimo](lead-rhythm-contract.md) — weights_only OK, casa estricto; YAML con tupla→SafeLoader; MPS falla→CPU; Core ML sin scatter (K gathers); contrato spec→mask hop 441; app overlap 2; ONNX ya hecho

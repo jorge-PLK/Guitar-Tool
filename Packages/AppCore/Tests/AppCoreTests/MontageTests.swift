@@ -334,7 +334,10 @@ final class MontageTests: XCTestCase {
         XCTAssertEqual(c.previewPhase, .none)
         c.open()
         // Mientras se mezcla el WAV, la vista previa está «preparando» con el audio en «preparing».
-        await waitUntil { c.previewPhase == .ready && c.audioPhase == .ready }
+        let t0 = ProcessInfo.processInfo.systemUptime
+        let ready = await waitUntil { c.previewPhase == .ready && c.audioPhase == .ready }
+        XCTAssertTrue(ready, "tras \(String(format: "%.2f", ProcessInfo.processInfo.systemUptime - t0)) s: previewPhase=\(c.previewPhase) "
+                      + "audioPhase=\(c.audioPhase) error=\(c.audioError ?? "-")")
         XCTAssertEqual(c.previewMixCount, 1)
         let key1 = try XCTUnwrap(c.previewAudioKey)
         XCTAssertEqual(previewWAVs(rig), ["preview-\(key1).wav"])
@@ -375,6 +378,54 @@ final class MontageTests: XCTestCase {
         XCTAssertEqual(again.previewMixCount, 0)
         XCTAssertEqual(again.previewAudioURL, c.previewAudioURL)
         again.close()
+    }
+
+    /// Lo que tarda la mezcla simulada en enterarse de que la anularon. En la VM de Windows la mezcla real solo mira la
+    /// cancelación cada bloque de 32 768 fotogramas (≈ 45 ms con la mezcla entera en ≈ 1,1 s): se exagera para que la carrera
+    /// salga siempre en el Mac.
+    nonisolated static let lateCancelSeconds = 0.3
+    nonisolated static func block(_ seconds: Double) { _ = DispatchSemaphore(value: 0).wait(timeout: .now() + seconds) }
+
+    /// Regresión (VM Windows): un cambio que anula la mezcla en curso sin cambiar su clave (el análisis de encuadre al acabar,
+    /// aquí `setLayout`) no debe dejar la vista previa en `.error`. Antes los dos intentos compartían `preview-<clave>.partial.wav`:
+    /// la limpieza del anulado borraba el parcial del siguiente (y en Windows el nuevo no podía ni crearlo, aún abierto).
+    /// La mezcla simulada es la real y luego tarda en volver sin mirar la cancelación: el 1.er intento `lateCancelSeconds`, los
+    /// siguientes el doble (siguen «escribiendo» cuando el anulado limpia, como en la VM).
+    func testCancelledPreviewMixDoesNotBreakTheNextOne() async throws {
+        let rig = try makeRig()
+        var services = MontageServices.simulated()
+        final class Attempts: @unchecked Sendable {
+            private let lock = NSLock()
+            private var files: [String] = []
+            func add(_ f: String) -> Int { lock.withLock { files.append(f); return files.count } }
+            var all: [String] { lock.withLock { files } }
+        }
+        let realMix = services.mix, attempts = Attempts()
+        services.mix = { job, progress in
+            let n = attempts.add(job.mixURL.lastPathComponent)
+            // Tarea suelta: la mezcla real no ve la cancelación y escribe el parcial entero (en la VM, el bloque en curso).
+            let r = try await Task.detached { try await realMix(job, progress) }.value
+            Self.block(Self.lateCancelSeconds * (n == 1 ? 1 : 2))    // espera sin mirar la cancelación
+            return r
+        }
+        let c = try makeController(rig, services: services)
+        c.open()
+        let began = await waitUntil { attempts.all.count >= 1 }
+        XCTAssertTrue(began)
+        c.setLayout(.stack)    // vídeo distinto, misma mezcla: anula el intento en curso
+        let t0 = ProcessInfo.processInfo.systemUptime
+        let ok = await waitUntil { c.previewPhase == .ready && c.audioPhase == .ready }
+        let elapsed = ProcessInfo.processInfo.systemUptime - t0
+        print("MONTAJE mezcla anulada: \(attempts.all.count) intentos \(attempts.all), lista=\(ok) en \(String(format: "%.2f", elapsed)) s")
+        XCTAssertTrue(ok, "tras \(String(format: "%.2f", elapsed)) s: previewPhase=\(c.previewPhase) audioPhase=\(c.audioPhase) "
+                      + "error=\(c.audioError ?? "-")")
+        XCTAssertGreaterThanOrEqual(attempts.all.count, 2)
+        XCTAssertEqual(Set(attempts.all).count, attempts.all.count, "cada intento escribe su propio parcial")
+        XCTAssertEqual(c.previewMixCount, 1)
+        let key = try XCTUnwrap(c.previewAudioKey)
+        await sleep(Self.lateCancelSeconds + 0.1)    // la limpieza del intento anulado ya pasó
+        XCTAssertEqual(previewWAVs(rig), ["preview-\(key).wav"])
+        c.close()
     }
 
     func testPreviewWithoutPlanIsNone() async throws {

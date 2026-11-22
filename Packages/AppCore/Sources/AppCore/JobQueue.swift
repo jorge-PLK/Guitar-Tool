@@ -28,7 +28,8 @@ final class JobEngine: @unchecked Sendable {
 
     static let importExtensions: Set<String> = ["wav", "flac", "mp3"]
 
-    private let root: URL?
+    let root: ProjectsRoot
+    private var relocating = false
     private let profileStore: ProfileStore
     private let indexURL: URL?
     private let services: @Sendable () -> JobServices
@@ -52,7 +53,7 @@ final class JobEngine: @unchecked Sendable {
         var expectsAnalysis: Bool
     }
 
-    init(root: URL?, profileStore: ProfileStore, indexURL: URL?,
+    init(root: ProjectsRoot, profileStore: ProfileStore, indexURL: URL?,
          services: @escaping @Sendable () -> JobServices, now: @escaping @Sendable () -> Date = { Date() }) {
         self.root = root
         self.profileStore = profileStore
@@ -364,10 +365,31 @@ final class JobEngine: @unchecked Sendable {
             case .emptyTitle: return RPCError(code: "empty-title", message: "El título no puede quedar vacío.")
             case .unsafeDeletion(let u):
                 return RPCError(code: "unsafe-deletion", message: "No se borra: no es un tema de la biblioteca (\(u.path)).")
+            case .workInProgress:
+                return RPCError(code: "work-in-progress",
+                                message: "Hay trabajo en curso. Espera a que terminen las separaciones y vuelve a cambiar la carpeta.")
             default: return RPCError(code: "internal", message: String(describing: l))
             }
         }
         return RPCError(code: "internal", message: describe(e))
+    }
+
+    // MARK: Carpeta de proyectos en caliente (B2)
+
+    /// Cambia la carpeta de proyectos sin reiniciar (`AppModel.relocate` del Mac): mover los temas o solo apuntar. `Library`
+    /// rechaza con `workInProgress` si hay cola; solo una reubicación a la vez. Al acabar, todos los servicios ven la nueva
+    /// carpeta (`root`) y el perfil ya la guarda `Library.relocate`.
+    func relocate(to url: URL, move: Bool, progress: @escaping @Sendable (Double) -> Void) async throws {
+        let free = lock.withLock { () -> Bool in
+            if relocating { return false }
+            relocating = true
+            return true
+        }
+        guard free else { throw RPCError(code: "busy", message: "Ya se está cambiando la carpeta.") }
+        defer { lock.withLock { relocating = false } }
+        let lib = try await library()
+        try await lib.relocate(to: url, mode: move ? .move(progress: progress) : .pointOnly)
+        root.url = url
     }
 
     // MARK: Cierre

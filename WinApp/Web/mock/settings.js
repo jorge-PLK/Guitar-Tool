@@ -70,6 +70,8 @@ setMockHandler((method, p) => {   // síncrono: devuelve undefined si no es suyo
     case 'library.usage': return { totalBytes: 3_412_000_000, regenerableBytes: 2_100_000_000, projects: [] };
     case 'library.cleanupInfo': if (p.id) return undefined; return { bytes: 2_100_000_000 };
     case 'library.cleanup': if (p.id) return undefined; return wait(400).then(() => ({ cleaned: true, bytes: 2_100_000_000 }));
+    case 'host.chooseFolder': return { path: 'D:\\Música\\ToneForge' };
+    case 'library.relocate': projectsFolder = p.path; return { path: p.path, mediaRemapped: true };
     case 'host.pickProjectsFolder': projectsFolder = 'D:\\Música\\ToneForge'; restart = true; return { path: projectsFolder, restartRequired: true };
     case 'models.list': return modelList();
     case 'models.download': {

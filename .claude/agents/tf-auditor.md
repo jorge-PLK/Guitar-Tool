@@ -4,7 +4,6 @@ description: Auditoría de solo lectura con criterio sobre ToneForge: coherencia
 tools: Read, Grep, Glob, Bash, Write
 model: sonnet
 effort: medium
-maxTurns: 30
 omitClaudeMd: true
 ---
 

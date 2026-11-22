@@ -2,8 +2,8 @@
 // Shim C/COM de Windows (CWebView2Host): ventana Win32 con un WebView2 a pantalla completa (plan, «Fase 7c», paso 8,
 // parte 8.0; ADR-020). Solo existe en Windows; en el resto de plataformas el objetivo compila vacío.
 //
-// Hilos: tfhost_create, tfhost_map_folder y tfhost_run van en el mismo hilo (el de UI, que queda en STA).
-// tfhost_post, tfhost_capture_png y tfhost_quit pueden llamarse desde cualquier hilo (se reenvían al de UI);
+// Hilos: tfhost_create y tfhost_run van en el mismo hilo (el de UI, que queda en STA).
+// tfhost_map_folder, tfhost_post, tfhost_capture_png y tfhost_quit pueden llamarse desde cualquier hilo (se reenvían al de UI);
 // los callbacks (on_ready, on_message, on_close, done) corren siempre en el hilo de UI.
 // La página envía con chrome.webview.postMessage(string) y recibe con chrome.webview.addEventListener('message', e => e.data).
 #include <stdint.h>
@@ -57,6 +57,8 @@ int tfhost_pick_files(tfhost* host, const char* title_utf8, const char* filter_s
 int tfhost_open_url(tfhost* host, const char* url_utf8);
 /// Igual para carpetas.
 int tfhost_pick_folder(tfhost* host, const char* title_utf8, char* out_utf8, int cap);
+/// Como tfhost_pick_folder, abriendo en `initial_utf8` (vacío o inexistente: la carpeta que elija Windows).
+int tfhost_pick_folder_at(tfhost* host, const char* title_utf8, const char* initial_utf8, char* out_utf8, int cap);
 
 /// Códigos de resultado de tfhost_hidden_load (primer argumento de `done`).
 enum {

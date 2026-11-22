@@ -4,7 +4,6 @@ description: Ingeniero de modelos de ToneForge. Convierte y valida modelos a Cor
 tools: Read, Write, Edit, Glob, Grep, Bash
 model: opus
 effort: high
-maxTurns: 70
 omitClaudeMd: true
 memory: project
 ---

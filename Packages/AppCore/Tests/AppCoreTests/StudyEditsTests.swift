@@ -485,6 +485,46 @@ final class StudyEditsTests: XCTestCase {
 
     // MARK: Guitarras
 
+    /// B1-UI: encolar, avanzar y fallar el trabajo de guitarras avisa a la página (`study.guitars` y `study.state`).
+    func testGuitarJobQueuedAndFailedNotifyThePage() async throws {
+        let r = try makeRig()
+        _ = try await open(r)
+        let id = r.project.id
+        let before = r.events.all("study.state").count
+        r.bridge.studyService.libraryEvent(.guitarSplitQueued(id))
+        XCTAssertEqual(r.events.all("study.guitars").last?["state"] as? String, "processing")
+        let stateEvent = await waitFor { r.events.all("study.state").count > before }
+        XCTAssertTrue(stateEvent, "encolar pide study.state")
+        var snap = try await ok(r, "study.snapshot")
+        XCTAssertEqual((snap["guitars"] as? [String: Any])?["process"] as? String, "processing")
+        let mid = r.events.all("study.state").count
+        r.bridge.studyService.libraryEvent(.guitarSplitFailed(id, "Modelo de solista no disponible"))
+        let last = r.events.all("study.guitars").last
+        XCTAssertEqual(last?["state"] as? String, "failed")
+        XCTAssertEqual(last?["error"] as? String, "Modelo de solista no disponible")
+        let failEvent = await waitFor { r.events.all("study.state").count > mid }
+        XCTAssertTrue(failEvent, "fallar pide study.state")
+        snap = try await ok(r, "study.snapshot")
+        XCTAssertEqual((snap["guitars"] as? [String: Any])?["process"] as? String, "failed")
+    }
+
+    /// B2 (decisión de Jorge): `library.relocate` cierra el estudio abierto y suelta sus ficheros antes de mover.
+    func testRelocateMoveClosesOpenStudyAndLeavesNothingBehind() async throws {
+        let r = try makeRig()
+        _ = try await open(r)
+        _ = try await ok(r, "study.play")
+        let oldRoot = r.folder.deletingLastPathComponent()
+        let dest = oldRoot.deletingLastPathComponent().appendingPathComponent("relocated-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: dest) }
+        let moved = try await ok(r, "library.relocate", "{\"path\":\"\(dest.path)\",\"mode\":\"move\"}")
+        XCTAssertEqual(moved["path"] as? String, dest.path)
+        let code = await errorCode(r, "study.snapshot")
+        XCTAssertEqual(code, "not-open", "el estudio se cerró")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: dest.appendingPathComponent(r.folder.lastPathComponent + "/project.json").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: r.folder.path), "nada queda en la carpeta vieja")
+        XCTAssertTrue(r.events.all("library.relocated").count == 1)
+    }
+
     func testGuitarRenameAndStereo() async throws {
         let r = try makeRig(guitars: true)
         let opened = try await open(r)

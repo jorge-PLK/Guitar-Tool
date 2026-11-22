@@ -14,7 +14,7 @@ struct JobServices: Sendable {
     var separator: any StemSeparating
     var levelMeter: (any StemLevelMeasuring)?
     var analyzer: (any StudyAnalyzing)?
-    /// Pistas de guitarra (L/R/solo): solo se usa si el tema lo pide; hoy el núcleo no lo cablea (parte 8.5).
+    /// Pistas de guitarra (L/R/solo): solo se usa si el tema lo pide (`GuitarOptions.needsProcessing`).
     var guitarSplitter: (any GuitarSplitting)?
 
     /// Servicios reales. `supportDir`: carpeta de soporte (`Models/` va dentro); sin ella, la del sistema.
@@ -27,7 +27,7 @@ struct JobServices: Sendable {
             separator: PortableStemSeparator(models: resolver, helperURL: HelperLocator.separateHelper(environment: environment)),
             levelMeter: PortableStemLevelMeter(),
             analyzer: PortableStudyAnalyzer(models: resolver),
-            guitarSplitter: nil)
+            guitarSplitter: PortableGuitarSplitter(models: resolver))
     }
 }
 
@@ -89,14 +89,20 @@ struct ModelResolver: Sendable {
         physicalMemory >= ModelCatalog.separationLargeChunkMemory ? ["bs_roformer_T575", "bs_roformer"] : ["bs_roformer"]
     }
 
+    /// `lead_rhythm`: misma carpeta que `LeadSeparatorHeavyTests` y que la salida de tf-ml (parte 7.3).
     private static let folders = [ModelCatalog.beatsBeatThis.id: "beat_this", ModelCatalog.chordsBTC.id: "btc",
-                                  ModelCatalog.transcriptionBasicPitch.id: "basic_pitch", ModelCatalog.drumsADTOF.id: "adtof"]
+                                  ModelCatalog.transcriptionBasicPitch.id: "basic_pitch", ModelCatalog.drumsADTOF.id: "adtof",
+                                  ModelCatalog.leadRhythmMelRoformer.id: "lead_rhythm"]
+
+    /// Carpetas de desarrollo de un modelo, en orden de preferencia (vacío: solo `ModelStore`).
+    static func developmentFolders(for id: String, physicalMemory: UInt64) -> [String] {
+        id == ModelCatalog.separatorBSRoformerSW.id
+            ? separatorFolders(physicalMemory: physicalMemory) : folders[id].map { [$0] } ?? []
+    }
 
     func resolve(_ id: String, progress: @escaping @Sendable (Double) -> Void) async throws -> URL {
         #if os(Windows)
-        let candidates = id == ModelCatalog.separatorBSRoformerSW.id
-            ? Self.separatorFolders(physicalMemory: physicalMemory) : Self.folders[id].map { [$0] } ?? []
-        for f in candidates {
+        for f in Self.developmentFolders(for: id, physicalMemory: physicalMemory) {
             if let url = Self.developmentModel(folder: f, environment: environment) { return url }
         }
         #endif
@@ -106,11 +112,8 @@ struct ModelResolver: Sendable {
     func isInstalled(_ id: String) async -> Bool {
         if case .installed = await store.state(id) { return true }
         #if os(Windows)
-        if id == ModelCatalog.separatorBSRoformerSW.id {
-            return Self.separatorFolders(physicalMemory: physicalMemory)
-                .contains { Self.developmentModel(folder: $0, environment: environment) != nil }
-        }
-        return Self.folders[id].flatMap { Self.developmentModel(folder: $0, environment: environment) } != nil
+        return Self.developmentFolders(for: id, physicalMemory: physicalMemory)
+            .contains { Self.developmentModel(folder: $0, environment: environment) != nil }
         #else
         return false
         #endif

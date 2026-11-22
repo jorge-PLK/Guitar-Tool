@@ -14,6 +14,8 @@ metadata:
 - Entrada `spec` [1, 2050, 301, 2] float32; fila 2·f + canal (L=0, R=1), (re, im) en el último eje. Mismo layout que la entrada del BS-RoFormer gridshift.
 - Salida `mask` [1, 1, 2050, 301, 2] float32 (FP16 por dentro): máscara compleja ya promediada de la solista, mismo layout.
 - Swift: 44,1 kHz estéreo; STFT n_fft 2048, **hop 441** (no 512), Hann periódica, center=True reflect, sin normalizar; producto complejo spec·mask; bin 0 a cero (zero_dc); iSTFT con Σw². Trozo 132300 muestras (3 s, 301 tramas), **num_overlap 1** (paso = trozo, borde 0 → sin relleno de la canción), fundido 13230 (casi no actúa: muestras con peso 0 en los cortes → salida 0, como MSST), último trozo con reflect si > medio trozo, si no ceros. Es `ChunkPlan(chunk: 132300, overlaps: 1)` + ChunkProcessor con 1 stem y hop 441. Rítmica = entrada − solista.
+- **La app usa hoy num_overlap 2** (`MaskModelContract.leadRhythm`, decisión de Jorge en Fase 4); el 1 de arriba es MSST (`leadRhythmMSST`, solo paridad). Validar siempre con 2 (42 trozos por minuto de audio).
+- **ONNX de Windows ya existe** (no reconvertir): `Probes/P8-windows/ort-models/out/lead_rhythm/model.onnx` (sha 8a42c4ec…, ya en `ModelCatalog.leadRhythmMelRoformer.onnxFiles`), validado con `lead_rhythm/onnx_check.py chunk|e2e`. En Windows `SystemMaskModel.load` → `OnnxMaskModel` interfaz `.mask`: `CoreMLLeadSeparator` sirve tal cual con la ruta del .onnx.
 - Fixture: `Packages/StemKit/Tests/StemKitTests/Fixtures/LeadRhythm/` (input_2s_pcm16.wav, lead_torch_2s_f32.wav de PyTorch, reference.json con sondas de spec/máscara y el SDR que logra el Core ML en Python).
 - ANE no probado (regla de [[coreml-env-traps]]).
 

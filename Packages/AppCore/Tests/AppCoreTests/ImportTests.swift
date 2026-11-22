@@ -65,6 +65,20 @@ private struct FakeHost: HostServices {
     func openURL(_ url: URL) async -> Bool { opens.contains(url.scheme ?? "") }
 }
 
+/// Anfitrión que apunta los avisos de cambio de carpeta (B2).
+private final class RemapHost: HostServices, @unchecked Sendable {
+    private let lock = NSLock()
+    private var _remapped: [URL] = []
+    var remapped: [URL] { lock.withLock { _remapped } }
+    func pickFile(types: [String]) async -> URL? { nil }
+    var folder: URL?
+    private var _initials: [URL?] = []
+    var initials: [URL?] { lock.withLock { _initials } }
+    func pickFolder() async -> URL? { folder }
+    func pickFolder(initial: URL?) async -> URL? { lock.withLock { _initials.append(initial) }; return folder }
+    func projectsFolderChanged(_ url: URL) async -> Bool { lock.withLock { _remapped.append(url) }; return true }
+}
+
 private final class Events: @unchecked Sendable {
     private let lock = NSLock()
     private var all: [String] = []
@@ -345,6 +359,109 @@ final class ImportTests: XCTestCase {
         let left = ((d2["parts"] as? [[String: Any]])?.first?["takes"] as? [[String: Any]]) ?? []
         XCTAssertEqual(left.count, 1)
         XCTAssertEqual(left.first?["isBest"] as? Bool, true, "al borrar la mejor se reasigna")
+    }
+
+    // MARK: B2: carpeta de proyectos en caliente
+
+    func testRelocateMoveSwitchesFolderWithoutRestart() async throws {
+        let host = RemapHost()
+        let rig = try Rig(analyzer: false)
+        rig.bridge.host = host
+        defer { rig.cleanup() }
+        let id = try await rig.importID()
+        let done = await eventually { (await rig.project(id))?["separationState"] as? String == "done" }
+        XCTAssertTrue(done)
+        let dest = rig.dir.appendingPathComponent("Nueva", isDirectory: true)
+        let r = await rig.result("library.relocate", "{\"path\":\(jsonString(dest.path)),\"mode\":\"move\"}")
+        XCTAssertEqual(r["path"] as? String, dest.path)
+        XCTAssertEqual(host.remapped.map(\.path), [dest.path])
+        // La lista sale ya de la carpeta nueva y el original quedó vacío.
+        let still = await rig.project(id)
+        XCTAssertNotNil(still)
+        XCTAssertEqual(try ProjectScanner.scan(root: dest).found.count, 1)
+        XCTAssertEqual(try ProjectScanner.scan(root: rig.projects).found.count, 0)
+        XCTAssertEqual(rig.bridge.mediaFolder?.standardizedFileURL.path, dest.standardizedFileURL.path)
+        let s = await rig.result("settings.get")
+        XCTAssertEqual(s["activeProjectsFolder"] as? String, dest.path)
+        XCTAssertEqual(s["projectsFolder"] as? String, dest.path)
+        let info = await rig.result("app.info")
+        XCTAssertEqual(info["projectsFolder"] as? String, dest.path)
+        XCTAssertFalse(rig.events.named("library.relocateProgress").isEmpty)
+        // Un tema nuevo se importa en la carpeta nueva.
+        let id2 = try await rig.importID()
+        let done2 = await eventually { (await rig.project(id2)) != nil }
+        XCTAssertTrue(done2)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: rig.projects.appendingPathComponent("Song").path))
+    }
+
+    func testRelocatePointOnlyKeepsOldFiles() async throws {
+        let rig = try Rig(analyzer: false)
+        defer { rig.cleanup() }
+        let id = try await rig.importID()
+        let done = await eventually { (await rig.project(id))?["separationState"] as? String == "done" }
+        XCTAssertTrue(done)
+        let dest = rig.dir.appendingPathComponent("Otra", isDirectory: true)
+        _ = await rig.result("library.relocate", "{\"path\":\(jsonString(dest.path)),\"mode\":\"point\"}")
+        XCTAssertEqual(try ProjectScanner.scan(root: rig.projects).found.count, 1, "solo apunta: lo viejo se queda")
+        let gone = await rig.project(id)
+        XCTAssertNil(gone, "la carpeta nueva está vacía")
+        XCTAssertEqual(rig.bridge.mediaFolder?.standardizedFileURL.path, dest.standardizedFileURL.path)
+    }
+
+    func testRelocateRefusedWhileJobsRun() async throws {
+        let rig = try Rig(hang: true, analyzer: false)
+        defer { rig.cleanup() }
+        let id = try await rig.importID()
+        let running = await eventually { (await rig.project(id))?["separationState"] as? String == "running" }
+        XCTAssertTrue(running)
+        let dest = rig.dir.appendingPathComponent("Nueva", isDirectory: true)
+        let e = await rig.call("library.relocate", "{\"path\":\(jsonString(dest.path)),\"mode\":\"move\"}")
+        XCTAssertEqual((e["error"] as? [String: Any])?["code"] as? String, "work-in-progress")
+        XCTAssertEqual(rig.bridge.mediaFolder?.standardizedFileURL.path, rig.projects.standardizedFileURL.path)
+        let bad = await rig.call("library.relocate", "{\"path\":\"x\",\"mode\":\"zip\"}")
+        XCTAssertEqual((bad["error"] as? [String: Any])?["code"] as? String, "bad-params")
+        await rig.bridge.shutdownAsync()
+    }
+
+    // MARK: B3: primer arranque sin reiniciar
+
+    func testFirstRunAdoptsFolderWithoutRestart() async throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("appcore-first-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let support = dir.appendingPathComponent("Support", isDirectory: true)
+        let chosen = dir.appendingPathComponent("Elegida", isDirectory: true)
+        let proposed = dir.appendingPathComponent("Music/ToneForge", isDirectory: true)
+        let services = JobServices(importer: FakeImporter(), separator: FakeSeparator(gate: Gate(), fail: false, hang: false),
+                                   levelMeter: nil, analyzer: nil, guitarSplitter: nil)
+        let bridge = try Bridge(options: LaunchOptions(projectsFolder: nil, supportDir: support),
+                                mediaBase: "https://tf.media/", reveal: nil, services: services)
+        bridge.proposedFolder = proposed
+        let host = RemapHost()
+        host.folder = chosen
+        bridge.host = host
+        func call(_ m: String) async -> [String: Any] {
+            let r = await bridge.router.handle("{\"id\":1,\"method\":\"\(m)\",\"params\":{}}")
+            return (try? JSONSerialization.jsonObject(with: Data(r.utf8))) as? [String: Any] ?? [:]
+        }
+        let before = await call("app.info")
+        XCTAssertTrue(((before["result"] as? [String: Any])?["projectsFolder"]) is NSNull || (before["result"] as? [String: Any])?["projectsFolder"] == nil)
+        let noList = await call("library.list")
+        XCTAssertEqual((noList["error"] as? [String: Any])?["code"] as? String, "no-projects-folder")
+
+        let r = (await call("host.pickProjectsFolder"))["result"] as? [String: Any]
+        XCTAssertEqual(r?["path"] as? String, chosen.path)
+        XCTAssertEqual(r?["restartRequired"] as? Bool, false)
+        XCTAssertEqual(host.initials.first??.path, proposed.path, "el selector abre en la propuesta")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: proposed.path), "la propuesta se crea antes de abrir el selector")
+        XCTAssertEqual(host.remapped.map(\.path), [chosen.path])
+        XCTAssertEqual(bridge.mediaFolder?.standardizedFileURL.path, chosen.standardizedFileURL.path)
+        let list = await call("library.list")
+        XCTAssertNotNil(list["result"], "\(list)")
+        let info = (await call("app.info"))["result"] as? [String: Any]
+        XCTAssertEqual(info?["projectsFolder"] as? String, chosen.path)
+        let profile = try ProfileStore(url: support.appendingPathComponent("profile.json")).load()
+        XCTAssertEqual(profile.projectsFolder?.standardizedFileURL.path, chosen.standardizedFileURL.path)
+        await bridge.shutdownAsync()
     }
 
     func testHostMethods() async throws {

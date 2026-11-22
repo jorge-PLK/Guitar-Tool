@@ -21,6 +21,7 @@ Entorno de conversión (Python 3.12, uv) — trampas que costaron intentos:
 - Ejecutar los procesos pesados de uno en uno: el límite de 3 intentos se gasta en fallos de memoria/entorno.
 - **Las trazas de error siempre a fichero** (`sys.excepthook` → log). Nunca filtrar con grep la salida de un intento: se perdió el error del último intento de ONNX.
 
+- Esperar a un proceso en segundo plano sin sondear: `caffeinate -w <pid del hijo>` (bloquea hasta que sale; el pid está en la línea «inicio pid» de guard.log).
 - guard.py no crea la carpeta de su `--log`: crearla antes (si no, FileNotFoundError antes de lanzar nada).
 - `ditto -c -k --keepParent` en este SSD mete ficheros AppleDouble `._*` (atributos extendidos) en el zip; solo se reintegran al extraer con ditto. Para un zip limpio: `--norsrc --noextattr`.
 - Fixtures versionados: 1 s mono 22 kHz float32 = 88 KB; 30 s = 2,6 MB. Con límite de ~2,5 MB usar WAV PCM 16 y calcular las referencias desde las muestras ya cuantizadas (x/32768, igual que AVAudioFile).

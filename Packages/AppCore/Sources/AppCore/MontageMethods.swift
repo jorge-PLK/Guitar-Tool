@@ -304,7 +304,7 @@ struct MontageFPSParams: Decodable, Sendable { var fps: Double }
 @MainActor
 final class MontageService {
     private let options: LaunchOptions
-    private let root: URL?
+    private let root: ProjectsRoot
     private let profileStore: ProfileStore?
     private let storeFactory: @Sendable (URL) -> any MontageStoring
     private let reveal: @Sendable (URL) throws -> Void
@@ -327,7 +327,7 @@ final class MontageService {
     /// Los fotogramas de la vista previa van a este receptor (`FrameRelay`, canal `frames.montage`).
     private var frameSink: (@Sendable (MontageFramePixels, Double) -> Void)?
 
-    nonisolated init(options: LaunchOptions, root: URL?, storeFactory: @escaping @Sendable (URL) -> any MontageStoring,
+    nonisolated init(options: LaunchOptions, root: ProjectsRoot, storeFactory: @escaping @Sendable (URL) -> any MontageStoring,
                      reveal: @escaping @Sendable (URL) throws -> Void, pauseOthers: @escaping @MainActor @Sendable () -> Void = {}) {
         self.pauseOthers = pauseOthers
         self.options = options

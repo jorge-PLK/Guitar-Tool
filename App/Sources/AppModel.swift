@@ -1032,6 +1032,12 @@ final class AppModel {
         guard let library else { return }
         Task {
             do {
+                // Sin trabajo en curso, se cierra el estudio (suelta sus ficheros) antes de mover y la app queda en la Biblioteca.
+                if !(await library.hasWorkInProgress) {
+                    await closeStudy()
+                    section = .library
+                    detail = nil
+                }
                 if move {
                     relocationProgress = 0
                     try await library.relocate(to: url, mode: .move(progress: { [weak self] p in

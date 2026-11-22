@@ -165,6 +165,9 @@ on('study.position', p => {
   if (status.value !== 'ready') return;
   setPos(p.seconds ?? 0, !!p.playing);
 });
+/// El trabajo de guitarras se encoló, avanzó o acabó (también con error): se relee el snapshot, que trae `guitars.process`.
+on('study.guitars', () => { if (status.value === 'ready' && study.value) syncEditState(); });
+
 on('study.state', t => { if (status.value === 'ready') applyTransport(t, { syncPos: false }); });
 on('study.levels', p => { levels.channels = p.channels ?? {}; fireLevels(); });
 on('study.error', p => { audioError.value = p.message || p.code || 'Error de audio'; });

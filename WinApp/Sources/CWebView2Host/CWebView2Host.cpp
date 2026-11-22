@@ -52,6 +52,7 @@ const UINT WM_TF_HIDDEN_LOAD = WM_APP + 6;     // lp = HiddenJob*
 const UINT WM_TF_HIDDEN_CANCEL = WM_APP + 7;   // wp = id de la carga
 const UINT WM_TF_PREVIEW_SHOW = WM_APP + 8;    // lp = PreviewRequest*
 const UINT WM_TF_PREVIEW_HIDE = WM_APP + 9;
+const UINT WM_TF_MAP = WM_APP + 10;            // lp = MapRequest*
 // Navegador oculto (W2-H; contrato W2-G, SongsterrHiddenPage.pollMillis = 250): cada cuánto se evalúa ready_script.
 const UINT_PTR kHiddenTimer = 1;
 const UINT kHiddenPollMs = 250;
@@ -125,6 +126,7 @@ struct PickRequest {
     int count = 0;
     std::wstring title;
     std::wstring filter;   // "wav;flac" -> "*.wav;*.flac"
+    std::wstring initial;  // carpeta en la que abre el diálogo (vacío = la de Windows)
     std::wstring result;
     int rc;                // 1 elegido, 0 cancelado, -1 error
 };
@@ -141,6 +143,10 @@ void runPick(HWND owner, PickRequest* r) {
     if (r->multi && !r->folder) opts |= FOS_ALLOWMULTISELECT;
     dlg->SetOptions(opts);
     if (!r->title.empty()) dlg->SetTitle(r->title.c_str());
+    if (!r->initial.empty()) {
+        ComPtr<IShellItem> start;
+        if (SUCCEEDED(SHCreateItemFromParsingName(r->initial.c_str(), nullptr, IID_PPV_ARGS(&start)))) dlg->SetFolder(start.Get());
+    }
     COMDLG_FILTERSPEC specs[2];
     std::wstring audio = L"Archivos admitidos";
     if (!r->folder && !r->filter.empty()) {
@@ -285,6 +291,25 @@ struct tfhost {
 };
 
 namespace {
+// Cuerpo de tfhost_map_folder; COM del WebView2, solo en el hilo de UI. Repetirlo con el mismo host virtual cambia la carpeta.
+struct MapRequest {
+    tfhost* h;
+    const char* host;
+    const char* folder;
+    int rc;
+};
+
+void runMap(MapRequest* r) {
+    ComPtr<ICoreWebView2_3> v3;
+    HRESULT hr = r->h->view.As(&v3);
+    if (SUCCEEDED(hr)) {
+        std::wstring host = widen(r->host), folder = widenPath(r->folder);
+        hr = v3->SetVirtualHostNameToFolderMapping(host.c_str(), folder.c_str(), COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_ALLOW);
+    }
+    if (FAILED(hr)) setError(hrString("SetVirtualHostNameToFolderMapping", hr));
+    r->rc = static_cast<int>(hr);
+}
+
 
 bool g_classRegistered = false;
 
@@ -742,6 +767,9 @@ LRESULT CALLBACK wndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     case WM_TF_PICK:
         runPick(hwnd, reinterpret_cast<PickRequest*>(lp));
         return 0;
+    case WM_TF_MAP:
+        runMap(reinterpret_cast<MapRequest*>(lp));
+        return 0;
     case WM_TF_OPEN:
         runOpen(reinterpret_cast<OpenRequest*>(lp));
         return 0;
@@ -911,14 +939,12 @@ tfhost* tfhost_create(const tfhost_config* config) {
 
 int tfhost_map_folder(tfhost* h, const char* host_utf8, const char* folder_utf8) {
     if (!h || !h->view || !host_utf8 || !folder_utf8) return static_cast<int>(E_INVALIDARG);
-    ComPtr<ICoreWebView2_3> v3;
-    HRESULT hr = h->view.As(&v3);
-    if (SUCCEEDED(hr)) {
-        std::wstring host = widen(host_utf8), folder = widenPath(folder_utf8);
-        hr = v3->SetVirtualHostNameToFolderMapping(host.c_str(), folder.c_str(), COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_ALLOW);
-    }
-    if (FAILED(hr)) setError(hrString("SetVirtualHostNameToFolderMapping", hr));
-    return static_cast<int>(hr);
+    MapRequest r{h, host_utf8, folder_utf8, 0};
+    HWND w = h->hwnd.load();
+    // Desde otro hilo (cambio de carpeta de proyectos en caliente) se reenvía al de UI y se espera.
+    if (w && GetWindowThreadProcessId(w, nullptr) != GetCurrentThreadId()) SendMessageW(w, WM_TF_MAP, 0, reinterpret_cast<LPARAM>(&r));
+    else runMap(&r);
+    return r.rc;
 }
 
 void tfhost_post(tfhost* h, const char* utf8) {
@@ -962,13 +988,14 @@ void tfhost_quit(tfhost* h) {
     if (w) PostMessageW(w, WM_TF_QUIT, 0, 0);
 }
 
-static int pick(tfhost* h, bool folder, bool multi, const char* title, const char* filter, char* out, int cap) {
+static int pick(tfhost* h, bool folder, bool multi, const char* title, const char* filter, const char* initial, char* out, int cap) {
     HWND w = h ? h->hwnd.load() : nullptr;
     if (!w) return -1;
     PickRequest r;
     r.folder = folder;
     r.multi = multi;
     r.title = widen(title);
+    if (initial && *initial) r.initial = widen(initial);
     if (filter && *filter) {
         std::wstring f = widen(filter), spec;
         size_t i = 0;
@@ -995,15 +1022,19 @@ static int pick(tfhost* h, bool folder, bool multi, const char* title, const cha
 }
 
 int tfhost_pick_file(tfhost* h, const char* title, const char* filter, char* out, int cap) {
-    return pick(h, false, false, title, filter, out, cap);
+    return pick(h, false, false, title, filter, nullptr, out, cap);
 }
 
 int tfhost_pick_folder(tfhost* h, const char* title, char* out, int cap) {
-    return pick(h, true, false, title, nullptr, out, cap);
+    return pick(h, true, false, title, nullptr, nullptr, out, cap);
+}
+
+int tfhost_pick_folder_at(tfhost* h, const char* title, const char* initial, char* out, int cap) {
+    return pick(h, true, false, title, nullptr, initial, out, cap);
 }
 
 int tfhost_pick_files(tfhost* h, const char* title, const char* filter, char* out, int cap) {
-    return pick(h, false, true, title, filter, out, cap);
+    return pick(h, false, true, title, filter, nullptr, out, cap);
 }
 
 int tfhost_open_url(tfhost* h, const char* url_utf8) {

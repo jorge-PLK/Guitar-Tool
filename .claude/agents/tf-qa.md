@@ -1,10 +1,10 @@
 ---
 name: tf-qa
+contextCap: 150k
 description: Verificación mecánica de ToneForge: suite entera (Tools/test.sh), build de la app, arrancarla y capturar la pantalla a fichero. Devuelve un veredicto corto. Úsalo para toda verificación que no sea un juicio visual o de oído; existe para que la salida de swift test/xcodebuild no pase por el hilo principal. Lo lanza el hilo principal una vez, al terminar todo y justo antes del commit.
 tools: Read, Grep, Glob, Bash
 model: sonnet
 effort: low
-maxTurns: 20
 omitClaudeMd: true
 ---
 

@@ -464,6 +464,9 @@ final class RecordService {
         return snapshot(c)
     }
 
+    /// Hay una cuenta atrás, una toma o un ajuste en curso (B2: no se mueve la carpeta mientras tanto).
+    var isBusy: Bool { controller.map { $0.phase != .idle } ?? false }
+
     /// `resume`: devuelve el reproductor de Backing a la sesión de audio (false si Backing también se cierra).
     func close(resume: Bool) async {
         await willFinishOffset?()
@@ -699,6 +702,7 @@ extension Bridge {
         // W2-E2: cámara en vivo hacia la página (15 fps, 640 px), igual en ToneForge.exe y en tf-webdev.
         service.makeCameraRelay = { [weak self] in self?.makeFrameRelay(channel: RecordService.cameraChannel) }
         service.register(on: router)
+        recordService = service
         Self.wireOffsetSheet(record: service, takeView: takeViewService)
         // W2-E2: vista previa de Ajustes por el mismo canal; Grabar le quita la cámara al abrir y la comparte mientras está abierta.
         let preview = CameraPreviewService(options: options)

@@ -217,7 +217,7 @@ final class TakeViewSession {
 @MainActor
 final class TakeViewService {
     private let options: LaunchOptions
-    private let root: URL?
+    private let root: ProjectsRoot
     private let profileStore: ProfileStore?
     private let outbox = TakeViewOutbox()
     /// Antes de abrir y de dar a play: para lo que suene en Backing.
@@ -237,7 +237,7 @@ final class TakeViewService {
     /// Cuánto después del final vio la parada el hilo principal (s; solo diagnóstico: el audio ya paró en `endTime`).
     private(set) var lastEndDetectionLag: Double?
 
-    nonisolated init(options: LaunchOptions, root: URL?, pauseOthers: @escaping @MainActor @Sendable () -> Void = {}) {
+    nonisolated init(options: LaunchOptions, root: ProjectsRoot, pauseOthers: @escaping @MainActor @Sendable () -> Void = {}) {
         self.options = options
         self.root = root
         self.pauseOthers = pauseOthers

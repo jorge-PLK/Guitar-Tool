@@ -182,7 +182,7 @@ struct StudyOpen {
 @MainActor
 final class StudyService {
     private let options: LaunchOptions
-    private let root: URL?
+    private let root: ProjectsRoot
     /// Dónde se escribe el estudio de un tema (por defecto `project.json` directo; 8.3a puede poner `Library`).
     var storeFactory: @Sendable (URL) -> any StudyStoring = { FileStudyStore(folder: $0) }
 
@@ -210,7 +210,7 @@ final class StudyService {
     /// Controlador al que está enganchado el tema abierto.
     private var audioController: AudioController?
 
-    nonisolated init(options: LaunchOptions, root: URL?, storeFactory: (@Sendable (URL) -> any StudyStoring)? = nil) {
+    nonisolated init(options: LaunchOptions, root: ProjectsRoot, storeFactory: (@Sendable (URL) -> any StudyStoring)? = nil) {
         self.options = options
         self.root = root
         if let storeFactory { self.storeFactory = storeFactory }

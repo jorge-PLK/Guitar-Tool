@@ -136,7 +136,7 @@ final class LinkEngine: @unchecked Sendable {
 
     let jobs: JobEngine
     let sources: ExternalSources
-    private let root: URL?
+    private let root: ProjectsRoot
     private let lock = NSLock()
     private var _session: LinkImportSession?
     private var counter = 0
@@ -146,7 +146,7 @@ final class LinkEngine: @unchecked Sendable {
     private var openPlaylist: (@Sendable (String) async throws -> LinkResolveResult)?
     private var cancelPlaylistLoading: (@Sendable () async -> Bool)?
 
-    init(jobs: JobEngine, sources: ExternalSources, root: URL?) {
+    init(jobs: JobEngine, sources: ExternalSources, root: ProjectsRoot) {
         self.jobs = jobs
         self.sources = sources
         self.root = root
@@ -166,7 +166,7 @@ final class LinkEngine: @unchecked Sendable {
         let sources = self.sources, root = self.root
         let s = LinkImportSession(hooks: .init(
             makeImporter: { try await sources.makeImporter() },
-            lookup: { await Task.detached { LibraryLookup.scan(root: root) }.value }))
+            lookup: { await Task.detached { LibraryLookup.scan(root: root.url) }.value }))
         lock.withLock { _session = s }
         return s
     }
@@ -406,7 +406,7 @@ extension Bridge {
         }
     }
 
-    func registerLinkMethods(root: URL?, options: LaunchOptions) {
+    func registerLinkMethods(root: ProjectsRoot, options: LaunchOptions) {
         let sources = link ?? ExternalSources.production(supportDir: options.supportDir,
                                                           environment: ProcessInfo.processInfo.environment)
         let defaultDir = SourceKit.HelperLocator.defaultSupportDirectory.deletingLastPathComponent()

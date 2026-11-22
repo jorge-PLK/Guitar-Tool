@@ -4,7 +4,6 @@ description: Documentación de ToneForge: filas y "Última actualización" de do
 tools: Read, Edit, Write, Grep, Glob, Bash
 model: sonnet
 effort: low
-maxTurns: 20
 omitClaudeMd: true
 ---
 
