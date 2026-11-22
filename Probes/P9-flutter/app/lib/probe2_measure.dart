@@ -9,12 +9,16 @@ import 'probe2_util.dart';
 const methods4 = ['app.info', 'library.list', 'settings.get', 'audio.devices'];
 
 /// n rondas secuenciales de los 4 métodos; devuelve ms por ida y vuelta y errores.
-Future<(List<double>, int)> rounds(TfCore core, int n) async {
+Future<(List<double>, int)> rounds(
+  TfCore core,
+  int n, [
+  List<String> methods = methods4,
+]) async {
   final ms = <double>[];
   var errors = 0;
   final sw = Stopwatch();
   for (var i = 0; i < n; i++) {
-    for (final m in methods4) {
+    for (final m in methods) {
       sw.reset();
       sw.start();
       try {

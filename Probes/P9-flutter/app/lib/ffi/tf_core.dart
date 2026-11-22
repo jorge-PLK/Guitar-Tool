@@ -1,22 +1,21 @@
 // Enlaces dart:ffi a libAppCoreFFI y cliente mínimo (sin paquete `ffi`:
-// malloc/free de libc por DynamicLibrary.process()).
+// malloc/free de la libc: process() en macOS, ucrtbase.dll en Windows).
 import 'dart:async';
 import 'dart:convert';
 import 'dart:ffi';
+import 'dart:io' show Platform;
 import 'dart:isolate';
 import 'dart:typed_data';
 
 typedef TfMessageCb = Void Function(Pointer<Uint8>, Int32);
 
-final _libc = DynamicLibrary.process();
+final _libc = Platform.isWindows
+    ? DynamicLibrary.open('ucrtbase.dll')
+    : DynamicLibrary.process();
 final _malloc = _libc.lookupFunction<Pointer<Uint8> Function(IntPtr),
     Pointer<Uint8> Function(int)>('malloc');
 final _cfree = _libc.lookupFunction<Void Function(Pointer<Uint8>),
     void Function(Pointer<Uint8>)>('free');
-
-/// `pthread_main_np()` llamado desde el isolate actual: 1 = hilo principal.
-int pthreadMainNp() => _libc
-    .lookupFunction<Int32 Function(), int Function()>('pthread_main_np')();
 
 Pointer<Uint8> _cString(String s) {
   final b = utf8.encode(s);
@@ -65,6 +64,12 @@ class TfCore {
         nowNs = lib.lookupFunction<Int64 Function(), int Function()>(
             'tf_debug_now_ns',
             isLeaf: true),
+        isMainThread = lib.lookupFunction<Int32 Function(), int Function()>(
+            'tf_debug_is_main_thread'),
+        apartment = lib.lookupFunction<Int32 Function(), int Function()>(
+            'tf_debug_apartment'),
+        _mainActorSelftest = lib.lookupFunction<Int32 Function(Int32),
+            int Function(int)>('tf_debug_mainactor_selftest'),
         _emit = lib.lookupFunction<Int32 Function(Int32, Int32, Int32),
             int Function(int, int, int)>('tf_debug_emit');
 
@@ -82,6 +87,11 @@ class TfCore {
   final void Function(int) _shutdown;
   final int Function() liveBuffers;
   final int Function() nowNs;
+  /// 1 si el hilo que llama es el principal del proceso.
+  final int Function() isMainThread;
+  /// Windows: 0 STA, 1 MTA, 2 NA, 3 MAINSTA, -1 sin COM; otras = -2.
+  final int Function() apartment;
+  final int Function(int) _mainActorSelftest;
   final int Function(int, int, int) _emit;
 
   NativeCallable<TfMessageCb>? _callable;
@@ -159,6 +169,9 @@ class TfCore {
     _cfree(p);
     return c.future;
   }
+
+  /// 0 lanzada, 1 núcleo sin arrancar; el resultado llega como `probe.mainactor`.
+  int mainActorSelftest(int timeoutMs) => _mainActorSelftest(timeoutMs);
 
   int emit(int hz, int count, int bytes) => _emit(hz, count, bytes);
   void shutdown(int timeoutMs) => _shutdown(timeoutMs);
