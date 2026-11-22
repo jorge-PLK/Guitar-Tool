@@ -17,6 +17,7 @@ String? _opt(List<String> a, String n) {
 
 const _enc = JsonEncoder.withIndent('  ');
 const _ch = 0;
+String _phase = 'init';
 
 /// Textura + giro por metadato (info.rotationDegrees) a tamaño de pantalla.
 class _Surf {
@@ -78,16 +79,33 @@ Future<void> _run(List<String> args, ValueNotifier<_Surf?> surf, Watchdog wd,
     'failed': failed,
   };
   final path = _opt(args, '--report');
+  // Los NaN/infinitos (p. ej. mediana sin muestras) hacen fallar jsonEncode: se vuelcan como null.
+  Object? clean(Object? o) => o is double && !o.isFinite
+      ? null
+      : o is Map
+          ? {for (final e in o.entries) '${e.key}': clean(e.value)}
+          : o is List
+              ? [for (final e in o) clean(e)]
+              : o;
   void write() {
-    if (path != null) File(path).writeAsStringSync(_enc.convert(report));
+    if (path == null) return;
+    try {
+      File(path).writeAsStringSync(_enc.convert(clean(report)));
+    } catch (e) {
+      File(path).writeAsStringSync('{"writeError":"$e","case":"$kase","aborted":${report['aborted'] == true}}');
+    }
   }
 
   final limit = double.tryParse(_opt(args, '--exit-after') ?? '') ?? 120;
   Timer(Duration(milliseconds: (limit * 1000).round()), () {
     report['aborted'] = true;
+    report['phase'] = _phase;
     failed.add('aborted');
-    write();
-    exit(3);
+    try {
+      write();
+    } finally {
+      exit(3);
+    }
   });
   try {
     await _measure(args, surf, wd, ft, kase, report);
@@ -121,6 +139,7 @@ Future<void> _measure(List<String> args, ValueNotifier<_Surf?> surf, Watchdog wd
     failed.add('startRc=$rc');
     return;
   }
+  _phase = 'open';
   final v = TfVideo.open(libPath); // lookups perezosos: solo en este modo
   final sw = Stopwatch()..start();
   final file = _opt(args, '--file')!;
@@ -147,6 +166,7 @@ Future<void> _measure(List<String> args, ValueNotifier<_Surf?> surf, Watchdog wd
     core.shutdown(5000);
     return;
   }
+  _phase = 'case';
   final info = v.info(_ch);
   report['info'] = info;
   final id = v.textureCreate(_ch);
@@ -278,6 +298,7 @@ Future<void> _measure(List<String> args, ValueNotifier<_Surf?> surf, Watchdog wd
   ft.active = false;
   report['frameTiming'] = ft.toJson();
 
+  _phase = 'shutdown';
   surf.value = null;
   await _wait(0.1);
   v.textureDispose(_ch);
