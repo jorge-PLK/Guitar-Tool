@@ -30,7 +30,7 @@ step_sync() {
   mkdir -p "$ROOT/Temp/p9-flutter"
   # Sin builds, modelos ni medios pesados (ninguno hace falta para compilar los paquetes).
   ( cd "$ROOT" && COPYFILE_DISABLE=1 tar -cf "$tar" \
-      --exclude .build --exclude build --exclude .dart_tool --exclude .fvm --exclude .git --exclude .DS_Store \
+      --exclude .build --exclude build --exclude .dart_tool --exclude .fvm --exclude ephemeral --exclude .git --exclude .DS_Store \
       --exclude '*.mlpackage' --exclude '*.onnx' --exclude '*.safetensors' --exclude '*.pt' \
       --exclude '*.wav' --exclude '*.mp3' --exclude '*.flac' --exclude '*.m4a' --exclude '*.mp4' --exclude '*.mov' \
       Packages Probes/P9-flutter ) >>"$LOG" 2>&1 || { echo "fallo al empaquetar"; return 1; }
@@ -39,7 +39,7 @@ step_sync() {
   scp -q -o BatchMode=yes "$tar" "$PC_HOST:$PC_ROOT_SCP/src.tar" >>"$LOG" 2>&1 || { echo "fallo scp"; return 1; }
   # Borra fuentes que ya no existen (sin tocar .build/build/.dart_tool/.fvm) y extrae encima (conserva mtimes).
   remote "cd $PC_ROOT && tar -tf src.tar | sed 's#^\./##' | grep -v '/\$' | sort > out/new.lst && \
-    cd src && find Packages Probes/P9-flutter \( -name .build -o -name build -o -name .dart_tool -o -name .fvm \) -prune -o -type f -print 2>/dev/null | sort > ../out/old.lst && \
+    cd src && find Packages Probes/P9-flutter \( -name .build -o -name build -o -name .dart_tool -o -name .fvm -o -name ephemeral \) -prune -o -type f -print 2>/dev/null | sort > ../out/old.lst && \
     cd .. && comm -13 out/new.lst out/old.lst > out/gone.lst; echo \"borrados: \$(wc -l < out/gone.lst)\"; \
     (cd src && xargs -d '\n' -r rm -f < ../out/gone.lst) && tar -xf src.tar -C src && echo extraido" || { echo "fallo al extraer (ver $LOG)"; return 1; }
   tail -2 "$LOG"
@@ -142,7 +142,21 @@ step_threads() {
   return 0
 }
 
+# pc.sh webview [wv_all|wv_flutter|wv_inapp]: compila y arranca las candidatas de WebView (P9.7e). Sin argumento, las tres.
+step_webview() {
+  local cand="${1:-}" t0
+  t0="$("${SSH[@]}" "powershell -NoProfile -Command \"(Get-Date).AddMinutes(-1).ToString('yyyy-MM-dd HH:mm:ss')\"" | tr -d '\r')"
+  remote "mkdir -p $PC_ROOT/out && echo '$cand' > $PC_ROOT/out/webview.arg" || return 1
+  { echo "=== stray ANTES ==="; stray; } >>"$LOG"
+  run_bg webview.ps1 webview 3000; local rc=$?
+  { echo "=== stray DESPUES (desde $t0) ==="; stray -Since "'$t0'"; } >>"$LOG"
+  grep -E '^TF:|^error:' "$LOG" | grep -v 'TF:start' | cut -c1-230 | head -13
+  echo "rutas escapadas: $(awk '/=== stray DESPUES/{f=1} f && /^STRAY/' "$LOG" | wc -l | tr -d ' ') (ver log)"
+  return $rc
+}
+
 case "$STEP" in
+  webview) shift; step_webview "$@"; rc=$? ;;
   app) step_app; rc=$? ;;
   run) shift; step_run "$@"; rc=$? ;;
   threads) step_threads; rc=$? ;;

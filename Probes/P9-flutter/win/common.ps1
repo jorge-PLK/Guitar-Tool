@@ -38,7 +38,11 @@ function Set-FlutterEnv() {
     $env:FLUTTER_SUPPRESS_ANALYTICS = "true"
     $env:BOT = "true"
     $env:DART_DISABLE_TELEMETRY = "1"
-    New-Item -ItemType Directory -Force $env:PUB_CACHE, $env:APPDATA, $env:LOCALAPPDATA | Out-Null
+    # NuGet (plugins con CMake que bajan nuget.exe / paquetes, p. ej. WebView2): caches dentro de $P9.
+    $env:NUGET_PACKAGES = Join-Path $P9 "nuget\packages"
+    $env:NUGET_HTTP_CACHE_PATH = Join-Path $P9 "nuget\http-cache"
+    $env:NUGET_PLUGINS_CACHE_PATH = Join-Path $P9 "nuget\plugins-cache"
+    New-Item -ItemType Directory -Force $env:PUB_CACHE, $env:APPDATA, $env:LOCALAPPDATA, $env:NUGET_PACKAGES, $env:NUGET_HTTP_CACHE_PATH, $env:NUGET_PLUGINS_CACHE_PATH | Out-Null
 }
 
 # Flags de swift build para x64 (los de Tools/win/remote/common.ps1 adaptados a D:\).
