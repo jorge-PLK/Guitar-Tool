@@ -1,6 +1,6 @@
 # P9 · Viabilidad de la interfaz Flutter
 
-**Estado: en ejecución (22/11/2026). Pruebas 1 y 2 (Mac) pasadas; siguiente, primera pasada en el PC x64.** Primera parte de la Fase 7f. Decide si se mantienen las decisiones marcadas (P9) en [ADR-021](../adr/ADR-021.md). Código en `Probes/P9-flutter/` (fuera de la puerta de tests); resultados, en este fichero, debajo de cada prueba.
+**Estado: en ejecución (22/11/2026). Pruebas 1, 2 y 6 (Mac) pasadas; primera pasada en el PC x64 en curso.** Primera parte de la Fase 7f. Decide si se mantienen las decisiones marcadas (P9) en [ADR-021](../adr/ADR-021.md). Código en `Probes/P9-flutter/` (fuera de la puerta de tests); resultados, en este fichero, debajo de cada prueba.
 
 ## Reglas
 
@@ -96,3 +96,14 @@ Nativo → Dart (emisor sintético `tf_debug_emit`, mensajes de 300 bytes, laten
 - No cubierto aquí: Windows, audio real y biblioteca grande (`library.list` con carpeta vacía).
 
 ABI usada en la prueba (candidata; se congela al cerrar P9): `tf_core_start`, `tf_core_start_port`, `tf_core_init_dart_api`, `tf_core_send`, `tf_core_free`, `tf_core_shutdown`; `optionsJSON` = `{"args": [...]}` que pasa por `LaunchOptions.parse`; códigos de `start`: 0 bien, 1 ya arrancado, 2 opciones inválidas, 3 falló `Bridge.init`. `tf_debug_live_buffers`, `tf_debug_now_ns` y `tf_debug_emit` son solo de la prueba.
+
+### Prueba 6 · Captura y tests (Mac) — PASA
+
+Adelantada a la primera pasada del PC porque es Dart puro y no depende de la vía de hilos. Código: `Probes/P9-flutter/app/lib/probe6_snapshot.dart`, `app/test/` y `Probes/P9-flutter/test-probe.sh`. Commit `53559df`. Repetir: `open -g -n -W <tf_probe.app> --args --snapshot <png>` (build release) y `bash Probes/P9-flutter/test-probe.sh`.
+
+- **Umbral** (PNG correcto sin ventana en primer plano; golden estable en dos ejecuciones): cumplido. El orquestador miró la captura y el golden: fuentes reales, bordes de 1 px, radios, degradado y trazos finos correctos.
+- **`--snapshot`** con `RepaintBoundary.toImage`: PNG de 1440×900 exactos; 4 capturas idénticas byte a byte (SHA1 `5d851888…`), incluidas una con la ventana totalmente tapada por otra y una con la app oculta (`set visible false`). Minimizada, sin probar. La app frontal no cambió. 2,45-2,71 s desde `open` hasta el PNG, con el retardo de 2,0 s.
+- **`pixelRatio` fijo a 1.0** y contenido de tamaño lógico fijo (`SizedBox` de 1440×900, o `--window WxH`) dentro del `RepaintBoundary`, con un `FittedBox` para verlo en pantalla: la captura no depende del monitor ni del tamaño real de la ventana. `--window` no puede fijar la ventana sin plugin (`window_manager` llega en la ola 0).
+- **Golden** con `matchesGoldenFile`: estable en dos ejecuciones. Carga los TTF reales con `FontLoader` (sin ellos `flutter test` pinta cuadrados) y fija `devicePixelRatio` 1.0 y 1440×900. El render de test es por software, no depende del monitor. Sin probar en otra máquina; se generan solo en el Mac, como ya dice `arquitectura.md`.
+- **El golden y la captura de la app no son idénticos byte a byte** (hashes distintos: motor real frente a render de test), aunque a la vista coinciden. Son dos referencias distintas: los goldens protegen de regresiones en tests; las capturas `--snapshot` son las que se comparan con la referencia de SwiftUI.
+- **`test-probe.sh`** (lo que será el paso `FlutterApp` de `Tools/test.sh`): `flutter analyze` + `flutter test --reporter=json`, log completo a `Temp/logs/p9-flutter-test.log`, resumen de 3 líneas en verde (`analyze: 0 avisos` / `tests: 5 pasados, 0 fallados, 0 saltados`) y una línea `fichero:línea mensaje` por fallo. Códigos comprobados: 0 verde, 1 test fallado o avisos, 2 error de compilación. `flutter test`: ~3 s en caliente, 7,4 s la primera vez. Depende de `python3` para resumir el JSON.
