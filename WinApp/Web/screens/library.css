@@ -10,10 +10,11 @@
 .search input::-webkit-search-cancel-button { display: none; }
 .search input::placeholder { color: var(--muted); }
 .search .clear { display: flex; border: 0; background: none; color: var(--muted); padding: 0; }
-.segmented { display: flex; padding: 2px; gap: 2px; height: var(--ctl-h-sm); background: var(--field); border: 1px solid var(--field-line); border-radius: var(--radius-sm); }
-.segmented button { border: 0; background: transparent; color: var(--text-2); padding: 0 14px; border-radius: 6px; font-weight: 500; }
-.segmented button.on { background: var(--blue); color: #fff; }
-.segmented button:hover:not(.on) { background: var(--neutral-bg); }
+/* Picker .segmented del Mac (mismo aspecto que .rate-seg de Ajustes): contenedor gris sin borde, elegido en gris claro */
+.segmented { display: flex; padding: 2px; gap: 1px; height: 24px; background: var(--field-line); border-radius: 7px; }
+.segmented button { border: 0; background: transparent; color: var(--text); padding: 0 14px; border-radius: 5px; font-size: 13px; font-weight: 400; }
+.segmented button.on { background: #5A5F66; }
+.segmented button:hover:not(.on) { background: rgba(255, 255, 255, .06); }
 
 .table-card { overflow-x: auto; }
 .lib-table { width: 100%; border-collapse: collapse; min-width: 640px; }

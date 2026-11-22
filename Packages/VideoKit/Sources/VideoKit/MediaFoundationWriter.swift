@@ -4,8 +4,8 @@ import Foundation
 /// `takes/<id>/video.mov` en Windows (plan, «Fase 7c», paso 7, parte 7.2) con el contrato del Mac: solo vídeo, con la
 /// resolución y los fps reales, y **PTS = tiempo del tema** sin el desfase manual, en escala de 90 000.
 ///
-/// - Códec: HEVC si Media Foundation tiene un codificador HEVC (`MediaFoundationEncoders.hasHEVC`) y acepta el formato;
-///   si no, H.264 (`codec` dice cuál). Contenedor MPEG-4 aunque la extensión sea `.mov`.
+/// - Códec: siempre H.264 (`MontageCodec.supported`; Jorge, 21/11/2026, paso 8 W2-E1: en Windows el único códec de
+///   vídeo es H.264, sin rama HEVC). Contenedor MPEG-4 aunque la extensión sea `.mov`.
 /// - El fichero empieza en el tiempo 0 del tema: una toma que empieza a mitad lleva un tramo vacío delante (lista de
 ///   ediciones, `MP4EditList`), como el `.mov` de `AVAssetWriter`.
 /// - Cada fotograma se escribe al llegar el siguiente, con duración = siguiente PTS − PTS: un fotograma perdido deja un
@@ -22,7 +22,7 @@ public final class VideoTakeWriter: VideoFrameSink, @unchecked Sendable {
     public let url: URL
     public let format: VideoFormat
     public let realTime: Bool
-    /// Códec con que se escribe (HEVC si hay codificador).
+    /// Códec con que se escribe (en Windows, siempre H.264).
     public let codec: MontageCodec
     private let queue = DispatchQueue(label: "ToneForge.VideoTakeWriter", qos: .userInitiated)
     private let lock = NSLock()
@@ -43,7 +43,7 @@ public final class VideoTakeWriter: VideoFrameSink, @unchecked Sendable {
         try? FileManager.default.removeItem(at: url)
         var lastError = ""
         var made: (MediaFoundationMuxer, MontageCodec)?
-        for c in (MediaFoundationEncoders.hasHEVC ? [MontageCodec.hevc, .h264] : [.h264]) {
+        for c in MontageCodec.supported {
             do {
                 let m = try MediaFoundationMuxer(url: url, config: .init(
                     width: format.width, height: format.height, fps: format.fps, codec: c,

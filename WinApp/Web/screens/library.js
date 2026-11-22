@@ -5,11 +5,13 @@ import { call } from '../bridge.js';
 import { icon } from '../icons.js';
 import {
   entries, skipped, listError, loaded, selectedId, detail, fold, mediaUrl, jobs, failures, notify,
-  loadLibrary, openProject, closeProject, selectEntry, openBacking,
+  loadLibrary, openProject, closeProject, selectEntry, openBacking, go,
 } from '../state.js';
+import { viewRequest } from '../record/store.js';
 import { PopupMenu, AccentBar } from '../ui.js';
 import { RenameSheet, TrashDialog, FirstRunSheet, DuplicateDialog, CleanupDialog, DeleteTakeDialog, SongInfoFields, saveSongInfo } from './library-dialogs.js';
 import { LinkSheet } from './link-sheet.js';
+import { playlistIndicator } from '../playlist/store.js';
 import { pickAndImport } from './import-files.js';
 
 // Vista recordada entre arranques (Mac: @AppStorage "libraryGrouping"). El buscador y el artista abierto, no.
@@ -98,10 +100,18 @@ function Segmented() {
   return html`<div class="segmented" role="radiogroup" aria-label="Vista">${opt('songs', 'Temas')}${opt('artists', 'Artistas')}</div>`;
 }
 
+/// Cápsula del indicador de la lista (LibraryView.header del Mac): abre de nuevo la hoja de la lista.
+function PlaylistCapsule() {
+  const p = playlistIndicator.value;
+  return html`<button class="pl-capsule" title="Ver la importación de la lista" onClick=${() => { dialog.value = { kind: 'link' }; }}>
+    ${p.live ? html`<span class="spinner" aria-hidden="true"></span>` : icon('check', 16)}<span>${p.text}</span></button>`;
+}
+
 function Header() {
   return html`<div class="lib-header">
     <div><h1 class="page-title">Biblioteca</h1><p class="page-sub">Tus temas.</p></div>
     <div class="lib-tools">
+      ${playlistIndicator.value ? html`<${PlaylistCapsule} />` : null}
       <${SearchField} /><${Segmented} />
       <button class="btn primary" onClick=${() => { dialog.value = { kind: 'link' }; }}>Importar tema</button>
     </div>
@@ -122,6 +132,8 @@ const separating = e => e.separationState === 'queued' || e.separationState === 
 function reveal(id) { call('library.reveal', { id }).catch(err => notify('error', `No se pudo abrir la carpeta: ${err.message}`)); }
 
 const isIntake = j => j.stage === 'import' || j.stage === 'download';
+// Los temas de una lista (`playlist-<id>`) se ven en la hoja de la lista y en la cápsula de la cabecera; el Mac no pinta fila por tema.
+const isListTrack = j => j.id.startsWith('playlist-');
 const isLive = j => j && !isIntake(j);
 const cancellable = (e, j) => isLive(j) && j.stage === 'separation' && (e.separationState === 'queued' || e.separationState === 'running');
 
@@ -173,7 +185,7 @@ function StateCell({ e }) {
 }
 
 function ImportRows() {
-  const list = Object.values(jobs.value).filter(isIntake);
+  const list = Object.values(jobs.value).filter(j => isIntake(j) && !isListTrack(j));
   return list.map(j => html`<tr class="row import-row" key=${j.id}><td colSpan="5"><div class="import-line">
     <span class="t">${j.title}</span><span class="grow"></span>
     ${j.state === 'queued' ? null : html`<div class="import-bar"><${AccentBar} fraction=${j.fraction} /></div>`}
@@ -194,9 +206,9 @@ function Row({ e }) {
     <td class="c-num">${e.takeCount ? e.takeCount : '—'}</td>
     <td class="c-state"><${StateCell} e=${e} /></td>
     <td class="c-actions"><div class="actions">
-      <button class="btn secondary sm icon" onClick=${ev => { ev.stopPropagation(); reveal(e.id); }} aria-label="Mostrar carpeta" title="Mostrar carpeta">${icon('folder', 15)}</button>
-      <button class="btn secondary sm icon" onClick=${ev => { ev.stopPropagation(); askRename(e); }} aria-label="Editar título y artista" title="Editar título y artista">${icon('pencil', 15)}</button>
-      <button class="btn secondary sm icon hover-danger" onClick=${ev => { ev.stopPropagation(); askTrash(e); }} aria-label="Eliminar" title="Eliminar…">${icon('trash', 15)}</button>
+      <button class="btn secondary sm icon" onClick=${ev => { ev.stopPropagation(); reveal(e.id); }} aria-label="Mostrar carpeta" title="Mostrar carpeta">${icon('folder', 19)}</button>
+      <button class="btn secondary sm icon" onClick=${ev => { ev.stopPropagation(); askRename(e); }} aria-label="Editar título y artista" title="Editar título y artista">${icon('pencil', 19)}</button>
+      <button class="btn secondary sm icon hover-danger" onClick=${ev => { ev.stopPropagation(); askTrash(e); }} aria-label="Eliminar" title="Eliminar…">${icon('trash', 19)}</button>
     </div></td>
   </tr>`;
 }
@@ -206,7 +218,7 @@ function Table({ list }) {
     <thead><tr><th>Tema / Artista</th><th class="c-num">Tomas</th><th>Estado</th>
       <th class="c-actions"><span class="sr-only">Acciones</span></th></tr></thead>
     <tbody><${ImportRows} />${list.map(e => html`<${Row} key=${e.id} e=${e} />`)}</tbody></table>
-    ${entries.value.length === 0 && !Object.values(jobs.value).some(isIntake) ? html`<${EmptyLibrary} />` : list.length === 0 ? html`<${NoMatch} />` : null}
+    ${entries.value.length === 0 && !Object.values(jobs.value).some(j => isIntake(j) && !isListTrack(j)) ? html`<${EmptyLibrary} />` : list.length === 0 ? html`<${NoMatch} />` : null}
   </div>`;
 }
 
@@ -275,6 +287,13 @@ const infoRow = (k, v) => html`<div class="info-row"><span class="muted">${k}</s
 // ProjectRecordingsView del Mac: m:ss truncado (Fmt.clock) y «–» si no se lee el audio.
 const fmtTakeClock = d => d == null ? '–' : `${Math.floor(Math.max(d, 0) / 60)}:${String(Math.floor(Math.max(d, 0)) % 60).padStart(2, '0')}`;
 
+/// «Ver toma» (Mac: visor sobre la página del tema). Aquí el visor vive en Grabar, que trae los desfases de la toma: se abre el tema allí y el visor al estar lista.
+function viewTake(projectId, takeId) {
+  selectEntry(projectId);
+  viewRequest.value = { takeId };
+  go('record');
+}
+
 function Takes({ data }) {
   const parts = (data.parts ?? []).filter(p => p.takes?.length);
   const ask = (part, t) => { dialog.value = { kind: 'deleteTake', id: data.id, takeId: t.id, label: `Toma ${t.number} · ${part.name}` }; };
@@ -289,6 +308,7 @@ function Takes({ data }) {
       <span class="muted small-text">${t.hasVideo ? 'Con vídeo' : 'Sin vídeo'}</span>
       ${t.punchCount > 0 ? html`<span class="muted small-text">${t.punchCount === 1 ? '1 punch' : `${t.punchCount} punches`}</span>` : null}
       <span class="grow"></span>
+      <button class="btn secondary sm" disabled=${!t.audio} onClick=${() => viewTake(data.id, t.id)}>${icon('play', 12)} Ver toma</button>
       <button class="btn secondary sm" onClick=${() => ask(p, t)}>Eliminar</button></div>`)}</div>`)}`;
 }
 

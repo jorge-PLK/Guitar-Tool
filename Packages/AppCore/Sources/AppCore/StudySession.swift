@@ -16,6 +16,24 @@ protocol StudyStoring: Sendable {
 
 extension Library: StudyStoring {}
 
+/// Escritura de tomas y del estado de grabación por partes (W2-R1, Grabar). Aparte de `StudyStoring` para no obligar a los
+/// almacenes que solo guardan el estudio; `StudySession` los usa si el suyo lo cumple (`Library`, `FileStudyStore`, `QueueStudyStore`).
+protocol TakeStoring: Sendable {
+    /// Añade o sustituye (por id) tomas del proyecto. Solo toca `takes`.
+    func saveTakes(id: UUID, _ takes: [Take]) async throws
+    /// Solo toca `recording`.
+    func saveRecording(id: UUID, _ recording: RecordingState) async throws
+}
+
+extension Library: TakeStoring {}
+
+extension QueueStudyStore: TakeStoring {
+    func saveTakes(id: UUID, _ takes: [Take]) async throws { try await jobs.library().saveTakes(id: id, takes) }
+    func saveRecording(id: UUID, _ recording: RecordingState) async throws {
+        try await jobs.library().saveRecording(id: id, recording)
+    }
+}
+
 /// Escritura directa de `project.json` (carga, cambia `study` y `sections`, guarda). Un cerrojo serializa las escrituras de
 /// este proceso; no coordina con una `Library` que escriba el mismo tema a la vez.
 final class FileStudyStore: StudyStoring, @unchecked Sendable {
@@ -53,6 +71,28 @@ final class FileStudyStore: StudyStoring, @unchecked Sendable {
             p.updatedAt = Date()
             try ProjectFile.save(p, to: folder)
             return p.guitarOptions
+        }
+    }
+}
+
+extension FileStudyStore: TakeStoring {
+    func saveTakes(id: UUID, _ takes: [Take]) async throws {
+        try lock.withLock {
+            var p = try ProjectFile.load(folder: folder)
+            for t in takes {
+                if let i = p.takes.firstIndex(where: { $0.id == t.id }) { p.takes[i] = t } else { p.takes.append(t) }
+            }
+            p.updatedAt = Date()
+            try ProjectFile.save(p, to: folder)
+        }
+    }
+
+    func saveRecording(id: UUID, _ recording: RecordingState) async throws {
+        try lock.withLock {
+            var p = try ProjectFile.load(folder: folder)
+            p.recording = recording
+            p.updatedAt = Date()
+            try ProjectFile.save(p, to: folder)
         }
     }
 }
@@ -152,7 +192,7 @@ final class StudySession {
 
     /// Rejilla de Songsterr guardada (puede ser de otro tema; `metronomeBeats` lo comprueba). Igual que el Mac: se lee de
     /// disco mientras sea nil, en cada `loadAnalysis`.
-    private(set) var songsterrGrid: SongsterrGridFile?
+    var songsterrGrid: SongsterrGridFile?
 
     /// Rejilla del metrónomo de Backing (igual que `StudySession.metronomeBeats` del Mac): la corregida desde Songsterr si
     /// la fuente de la tablatura es ese mismo tema y revisión (y trae al menos 2 pulsos); si no, la del análisis.
@@ -292,6 +332,52 @@ final class StudySession {
             guard !Task.isCancelled else { return }
             await self?.flush()
         }
+    }
+
+    // MARK: Tomas (mini-spec Fase 3, «Grabación»; W2-R1, copia de `App/Sources/StudySession.swift`)
+
+    /// Último fallo al guardar tomas en `project.json` (nil si fue bien).
+    private(set) var takeSaveError: String?
+    private var takeSaves: [Task<Void, Never>] = []
+
+    /// Tomas con fichero alineado que se pueden oír, de la más antigua a la más reciente.
+    var playableTakes: [Take] {
+        project.takes.filter { !$0.discarded && $0.processedFile != nil && $0.songStart != nil && $0.sampleRate != nil }
+            .sorted { $0.createdAt < $1.createdAt }
+    }
+
+    /// Añade o sustituye (por id) tomas del proyecto y las guarda ya (solo toca `takes`).
+    func saveTakes(_ takes: [Take]) {
+        for t in takes {
+            if let i = project.takes.firstIndex(where: { $0.id == t.id }) { project.takes[i] = t } else { project.takes.append(t) }
+        }
+        guard let writer = store as? any TakeStoring else {
+            takeSaveError = "No se pudo guardar la toma en el proyecto (este almacén no guarda tomas)."
+            return
+        }
+        let id = projectID
+        takeSaves.append(Task { [weak self] in
+            do {
+                try await writer.saveTakes(id: id, takes)
+                self?.takeSaveError = nil
+            } catch {
+                self?.takeSaveError = "No se pudo guardar la toma en el proyecto (\(error))."
+            }
+            self?.onChange?()
+        })
+    }
+
+    /// Espera a que terminen los guardados de tomas lanzados.
+    func awaitTakeSaves() async {
+        let pending = takeSaves
+        takeSaves = []
+        for t in pending { await t.value }
+    }
+
+    /// Guarda el estado de grabación por partes (solo toca `recording`) y lo deja también en el proyecto en memoria.
+    func saveRecording(_ state: RecordingState) async throws {
+        project.recording = state
+        if let writer = store as? any TakeStoring { try await writer.saveRecording(id: projectID, state) }
     }
 
     /// Guarda ya (al cerrar la pantalla o salir de la app).

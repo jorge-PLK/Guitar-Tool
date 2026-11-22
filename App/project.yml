@@ -46,6 +46,11 @@ targets:
       - path: Resources/alphaTab
         type: folder
         buildPhase: resources
+      # Fuentes del diseño (Inter y Space Grotesk, mismos TTF que la web de Windows; Tools/fonts-to-ttf.py):
+      # Contents/Resources/Fonts/, registradas con ATSApplicationFontsPath.
+      - path: Resources/Fonts
+        type: folder
+        buildPhase: resources
       # Icono de la app: los PNG salen de Resources/AppIcon.svg con Tools/make-icon.sh.
       - path: Resources/Assets.xcassets
     dependencies:
@@ -116,6 +121,7 @@ targets:
       path: Sources/Info.plist
       properties:
         CFBundleDisplayName: ToneForge
+        ATSApplicationFontsPath: Fonts
         NSCameraUsageDescription: Para grabar tu vídeo tocando.
         NSMicrophoneUsageDescription: Para grabar tu guitarra desde la pedalera.
         NSLocalNetworkUsageDescription: Para conectar con el Remote Editor de la Flex Prime por Wi-Fi.

@@ -163,6 +163,8 @@ Cumplida el 18/11/2026 (ADR-018): Jorge probó a mano la app («todo correcto»)
 
 Lista de Jorge del 17/11/2026, tras usar la app. La mini-spec se escribe al empezar; las dudas abiertas van al final.
 
+*Decisión de Jorge, 22/11/2026: la 7b se hará sobre la interfaz en Flutter (ver «Condición de cierre de la 7c»), no sobre SwiftUI ni sobre la página de WebView2.*
+
 Biblioteca:
 
 - [ ] Quitar la cabecera de contadores (temas, tomas grabadas, vídeos exportados): no aporta
@@ -208,8 +210,8 @@ Pedida por Jorge el 18/11/2026: ToneForge en Windows para su uso y para prestarl
 - [x] Alcance de la versión de Windows: qué funciones de la Etapa 1 entran, decidido por Jorge con el resultado de la prueba de viabilidad: todo de una, interfaz WebView2 (ADR-020).
 - [x] Capa de plataforma: todos los paquetes compilan en Windows (ARM64 y x64) y sus tests pasan en la VM, con los del Mac en verde. *Hecho el 19/11/2026: suite entera del Mac y `App` en verde; en la VM los 13 paquetes en ARM64 y x64 con 0 fallos; 114 saltos `[paso 7]` (reproductor 37, remuestreador 23, onnx-runtime 17, direct2d 14, sintetizador 11, media-foundation 11, parada 1) y 5 saltos `[windows]` permanentes. Tareas heredadas para el paso 7 al final del «Corte del paso 6».*
 - [x] Piezas de Windows: señal, audio (decodificación, WASAPI, reproductor), modelos con ONNX Runtime y GPU, vídeo con Media Foundation y helpers. *Hecho el 21/11/2026, solo x64 (ARM64 retirado como puerta el 19-20/11): suite entera del Mac verde; en la VM x64 Debug los 13 paquetes con 0 fallos y 0 saltos `[paso 7]` (eran 114): NativeKit 45 pasados/1 saltado, AudioKit 184/3, VideoKit 82/3, Store 202/1, ModelKit 18/6, StudyKit 45/4, TabKit 228/23, StemKit 77/13, SourceKit 116/0, y AnalysisKit, HeadRushKit, MatchKit y Tone3000Kit 1/0. Quedan saltos `[windows]` justificados (sin GPU DirectX 12 en la VM, CoreMedia, etiquetas ID3, `posixPermissions` en NTFS, zips de modelos no sincronizados, FoundationNetworking sin `file://`, sin AudioToolbox) y de variables de entorno (`TF_MODEL_TESTS` y similares). `tf-audio.exe` y `tf-video.exe` compilan como PE x64; `tf-audio devices` lista los dos endpoints HDA con su driver y mínimo de 128 muestras en compartido y exclusivo. Con modelo real (`TF_MODELS_DIR=C:\tf-models`): pose MoveNet frente a Vision error medio 0,0251 (umbral 0,05), 75,9 ms por fotograma; encuadre 126 ms por muestra. Falta, en un PC: DirectML y tiempos sin emulación, latencia y `verify` con la Flex Prime, `tf-video sync` con cámara, HEVC por hardware y el oído (ver «Pendiente tras el paso 7»).*
-- [ ] Interfaz WebView2: anfitrión, puente con el núcleo Swift y las 7 pantallas. *Ola 0 y ola 1 hechas (21/11/2026; condición de paso de la ola 1 cumplida, ver «Estado del paso 8»): carcasa, Biblioteca, importación por fichero y enlace, separación, Backing y Tablatura. Faltan, en la ola 2, Grabar, Montaje, Tone, Ajustes, la hoja de Songsterr y las playlists; luego las pasadas manuales de Jorge.*
-- [ ] Instalador de Windows (solo x64 desde el 19-20/11/2026; antes unificado ARM64 y x64 en un solo `.exe`) publicado como release en GitHub, como la v1.0 de macOS. GitHub Actions (`windows-latest`) solo si la compilación x64 desde la VM no sale limpia. El instalador cumple el requisito de la Fase 7d (modo silencioso, por usuario, cerrar y relanzar la app).
+- [ ] Interfaz WebView2: anfitrión, puente con el núcleo Swift y las 7 pantallas. *Ola 0 y ola 1 hechas (21/11/2026; condición de paso de la ola 1 cumplida, ver «Estado del paso 8»): carcasa, Biblioteca, importación por fichero y enlace, separación, Backing y Tablatura. Ola 2 hecha el 22/11/2026 (Grabar, Montaje, Ajustes, «Ver toma», hoja de Songsterr y listas; lo verificado y lo que no, en «Estado del paso 8»). Faltan las pasadas manuales de Jorge en un PC y el núcleo pendiente de «Condición de cierre de la 7c».*
+- [ ] Instalador de Windows. *Sale de la 7c por decisión de Jorge (22/11/2026): va al final de la cadena 7c → Flutter → actualizador → instalador (ver «Condición de cierre de la 7c»). Lo que sigue se conserva para cuando se haga.* (solo x64 desde el 19-20/11/2026; antes unificado ARM64 y x64 en un solo `.exe`) publicado como release en GitHub, como la v1.0 de macOS. GitHub Actions (`windows-latest`) solo si la compilación x64 desde la VM no sale limpia. El instalador cumple el requisito de la Fase 7d (modo silencioso, por usuario, cerrar y relanzar la app).
   - *Retirado el 20/11/2026 («abandonamos ARM64»): un solo instalador x64; sin `IsWow64Process2` ni `/ARCH`. Se conservan el modo silencioso, la instalación por usuario y cerrar y relanzar la app. Lo que sigue es la decisión original, por historia.*
   - Unificado (decisión de Jorge, 19/11/2026): lleva las dos arquitecturas y decide al instalar cuál copia según la máquina nativa del equipo, leída con `IsWow64Process2` (no con `PROCESSOR_ARCHITECTURE` ni con `GetNativeSystemInfo`, que dan x64 si el propio instalador corre emulado en ARM64). El instalador en sí es x64 o x86 para arrancar en los dos (Windows 11 ARM emula x64). Solo se instala una arquitectura: ejecutable, DLL de Swift, ONNX Runtime y DirectML, helpers (yt-dlp, Deno, ffmpeg) y shims de NativeKit de la que toque; lo que no depende de la arquitectura (páginas de la interfaz WebView2, SoundFont, recursos) va una vez. Los modelos ONNX no van dentro: se bajan aparte (`models-win-v1`).
   - *Retirado el 20/11/2026 (solo x64).* Forzar arquitectura con un parámetro (`/ARCH=x64` o `/ARCH=arm64`, también en modo silencioso), para probar la x64 en la VM ARM64; forzar ARM64 en un equipo x64 se rechaza con un mensaje claro. Una reinstalación o actualización conserva la arquitectura instalada salvo que se fuerce otra, y al cambiar borra la anterior.
@@ -335,7 +337,7 @@ Pendiente tras el paso 7 (hallazgos sin tocar, 21/11/2026; van al paso de la int
 
 Corte del paso 8, interfaz WebView2 (aprobado por Jorge el 21/11/2026, con las recomendaciones del orquestador).
 
-- **Hallazgo.** La lógica de pantalla vive en `App/Sources` (~6k líneas: `AppModel`, `TabController`, `RecordController`, `MontageController`, `AudioController`, `StudySession`, `BackingController` y las sesiones de importación), y parte usa AppKit y AVFoundation. `App/` no se toca, así que Windows lleva copias adaptadas. Deuda para arreglos generales: que el Mac use `AppCore`.
+- **Hallazgo.** La lógica de pantalla vive en `App/Sources` (~6k líneas: `AppModel`, `TabController`, `RecordController`, `MontageController`, `AudioController`, `StudySession`, `BackingController` y las sesiones de importación), y parte usa AppKit y AVFoundation. `App/` no se toca, así que Windows lleva copias adaptadas. Deuda: que el Mac use `AppCore`; ya no se refactoriza (decisión de Jorge, 22/11/2026): la resuelve la migración a Flutter, donde el Mac hablará con `AppCore` por el puente y la lógica de `App/Sources` desaparecerá con SwiftUI.
 - **Arquitectura.** `Packages/AppCore` (Swift portátil, tests en el Mac): controladores sin interfaz, router del puente y DTO `Codable`, que son la fuente de verdad del contrato (`LaunchOptions`, `Bridge` con `send`/`receive`/`mediaFolder`). `WinApp/` (SwiftPM): `CWebView2Host` (shim C++/COM con ventana Win32, WebView2 con loader estático, hosts virtuales `app.toneforge` para las páginas y `media.toneforge` para la carpeta de proyectos, mensajes y captura PNG con `CapturePreview`), el ejecutable `ToneForge.exe` y `Web/`. El SDK de WebView2 viene de NuGet con SHA (`Tools/win/fetch-webview2.sh`). `Tools/webdev` (`tf-webdev`, solo desarrollo en el Mac) es un WKWebView que carga el mismo `Web/` contra `AppCore` con `--snapshot`, porque los agentes no usan la VM.
 - **Puente JSON.** Petición `{id, method, params}`, respuesta `{id, result|error}`, eventos `{event, payload}`. Posición y vúmetros a 30 Hz como máximo. Nada binario por JSON: los ficheros van por host virtual. El audio está siempre en el núcleo Swift (reproductor portátil y WASAPI), nunca en Web Audio. Tablatura: se reutilizan `tab.html` y `tf-bridge.js` con un adaptador de transporte, copiados al compilar.
 - **Tecnología de la página.** Preact, htm y signals vendorizados, módulos ES, sin build ni node. Canvas imperativo para la línea de tiempo, la rejilla de acordes y los vúmetros. `tokens.css` sale de los bocetos. Descartados: sin framework (7 pantallas con mucho estado) y Svelte o React con build (meten node).
@@ -369,24 +371,36 @@ Estado del paso 8 (21/11/2026, rama `fase-7c`).
 - [x] Stems casi vacíos visibles en el mezclador: umbral de pico de `StemLevelMeter.isEmpty` de −40 a −30 dBFS en las dos plataformas (decisión de Jorge, 21/11/2026; ADR-009, D11). Test en `StemLevelMeterTests`. *Falta saber si la fuga es de ONNX o de esa versión del tema: separar «2004 Remix» en el Mac y medir. Margen de 1 dB en el piano.*
 - [x] «Reintentar» en fila con error de la Biblioteca: no existe en el Mac ni en Windows; las dos usan «Separar de nuevo» del menú de fila. Paridad correcta.
 
+Estado del paso 8, ola 2 (cerrada el 22/11/2026, rama `fase-7c`, sin commit desde `3e83dc8` al escribir esto).
+
+- [x] **Ola 2 hecha**: núcleo y página de Grabar, «Ver toma» y «Ajustar desfase» (`takeview.*`), Montaje (vista previa por `frames.montage`), Ajustes (audio, cámara y vídeo, modelos, biblioteca), hoja de Songsterr (segundo WebView2 oculto) y listas; fuentes Inter y Space Grotesk en las dos apps y tres pasadas de paridad visual SwiftUI/WebView2.
+- [x] **Verificado en la VM x64** con `Temp/win/eval/wave2-b.js` (log `Temp/win/eval/out/wave2-b.vm2.txt`): `DONE wave2 41/41 (skip 7)`. WASAPI lista 1 salida y 1 entrada y cambia y restaura la frecuencia; `takeview.open` sobre una toma existente (la posición avanza 2,0 s en 2 s, pausa, backing mudo, seek); Songsterr en WebView2 oculto (19 resultados, 6 pistas, vista previa show/hide); `link.classify` 4/4; Montaje (fotograma del compositor), uso de disco y modelos. En seco en el Mac con `tf-webdev`: `DONE wave2 38/38 (skip 7)`. `node --check` de todo `WinApp/Web`: limpio.
+- [ ] **Saltado (7) por falta de hardware o por la VM**: fotogramas de cámara (VM sin cámara), calibración, vúmetro y toma (en la VM la salida va a 48 kHz y la entrada a 44,1 kHz, y WASAPI compartido bloquea Grabar), cortes `eligible` y `video.openCameraPrivacy`. *Falta la pasada de Jorge en un PC con la HeadRush (ver más abajo).*
+- [x] **Dos fallos de la primera compilación de AppCore en Windows, arreglados en código común**: `testPunchInReplacesSpanAndKeepsBase` (NTFS: `commitPunch` reescribía `processed.wav` con el reproductor abierto; arreglo `reloadTakeTracks(excluding:)`) y `TakeViewTests.testStopsAtTakeEnd` (parada por reloj de pared; arreglo `StudyPlaybackEngine.endTime`, test `testEndTimeStopsAtTheExactSample`, sobrante 0 muestras en los dos motores). Tests en el Mac: AppCore 227/0, AudioKit 256 ejecutados (3 omitidos) y 0 fallos.
+- Tests en la VM x64 antes de los arreglos: Store 206 pasados, 0 fallos, 1 saltado; VideoKit 86/0/3; AudioKit 193/0/3; AppCore 221 pasados y 2 fallos (los dos de arriba).
+- Tests en la VM tras los arreglos: AppCore 222 pasados y 1 fallo, AudioKit 194 pasados, 0 fallos y 3 saltados. Punch-in y parada de fin de toma pasan. El fallo es intermitente y de tiempos en `FrameRelayTests` (cambia entre pasadas: `testPressureWithRealEncoder`, peor `push` 0,68 ms frente a 0,5; `testLatestWinsDelaysEarlyFrameToItsSlot`, 222 ms frente a 77,5; en la primera pasada los dos pasaron). VM x64 emulada en debug: falta repetirlo en un PC real o hacer esos tests deterministas con reloj inyectado (va con la medida R3/M2).
+- [x] **Arranque**: la app no abría ventana por `CreateCoreWebView2Environment` = `0x80010106`; arreglado con `tfhost_init_ui_thread` (ADR-020, spec).
+- [x] **M3 (Jorge, 22/11/2026)**: la vista previa de Montaje se queda a 640 px en las dos plataformas.
+- [ ] **Paridad visual con el Mac**: las dudas de paridad visual SwiftUI/WebView2 pierden prioridad porque la interfaz migra a Flutter; se anotan y no se persiguen más.
+- [ ] **Diferencias Mac/Windows listadas a Jorge**: fila «Formato» de la exportación solo en el Mac (Windows exporta solo H.264); sin barra de scroll visible en Windows (la página se desplaza con rueda, trackpad y teclado); triángulo de «Tonalidad» muy pequeño; casilla marcada gris; último layout de Montaje («…» en el Mac, nombre entero en la web); iconos de Biblioteca y Tablatura de la barra lateral distintos.
+
 Ola 2, trabajo ya identificado (además de las partes 8.9+ de la tabla):
 
-- [ ] Grabar y Montaje: «Ver toma» (visor de tomas; la Biblioteca de Windows ya lista, puntúa y elimina tomas) y los retoques del Mac a 1100×680 (Montaje: columnas 252/276 bajo 900 pt de contenido, tiempo en una línea y cabecera en dos líneas enteras, `MontageView.swift`; Grabar: píldora de la toma en una línea y cámara y «Rotar» en segunda fila, `RecordView.swift`). Capturas del Mac en `Temp/qa-7c/shots4/`.
-- [ ] Importación de Songsterr (hoja, `tab/songsterr-grid.json`; `AppCore` solo lo lee) y listas, álbumes y episodios en el enlace (el mensaje de «enlace no admitido» de Windows no los promete hoy; volver al literal del Mac).
+- [x] Grabar y Montaje: «Ver toma» (visor de tomas) y los retoques del Mac a 1100×680 (Montaje: columnas 252/276, tiempo en una línea; Grabar: píldora de la toma en una línea y cámara y «Rotar» en segunda fila). *Hecho en la ola 2 (`takeview.*`, `TakeViewTests` 8/8, `OffsetSheetTests` 4/4); verificado en la VM con `takeview.open` sobre una toma existente; falta Grabar real con la HeadRush (abajo).*
+- [x] Importación de Songsterr (hoja, `tab/songsterr-grid.json`) y listas, álbumes y episodios en el enlace. *Hecho en la ola 2; en la VM Songsterr en WebView2 oculto (19 resultados, 6 pistas) y `link.classify` 4/4.*
 - [ ] F3: arena de ONNX Runtime en la separación (desglose con `TF_SEPARATE_TIMING=1`, `StemKit/SeparationTiming.swift`); decidir el arreglo con los números. Propuesto para la fase de arreglos, sin respuesta de Jorge.
 - [ ] Sin probar desde la página: limpieza real de la Biblioteca («Limpiar…»), borrado real de toma y recarga de Backing al borrar con el tema abierto, soltar ficheros, selector múltiple, «Sin artista» al final, ajuste del bucle por arrastre en WebView2, metrónomo con rejilla de Songsterr (oído de Jorge), «Oír transcripción» y vuelta a Backing (oído de Jorge, arreglo de `TabController.close()` en el Mac).
-- [ ] Dudas visuales para Jorge: color de la casilla marcada, interruptor encendido, triángulos de menú muy pequeños y botones de la barra de edición (12 px frente a 13 pt); error de yt-dlp con la línea cruda en inglés (comparar con el Mac).
+- [ ] Dudas visuales para Jorge (pierden prioridad por la migración a Flutter, 22/11/2026): color de la casilla marcada, interruptor encendido, triángulos de menú muy pequeños y botones de la barra de edición (12 px frente a 13 pt); error de yt-dlp con la línea cruda en inglés (comparar con el Mac).
 
 Pendientes para la fase de arreglos (decisiones de Jorge, 21/11/2026, salvo las marcadas):
 
-- [ ] Separador de guitarras en Windows: `AppCore/Services.swift` tiene `guitarSplitter: nil`; falta un `GuitarSplitting` portable con RoFormer sobre ONNX Runtime, el modelo en el catálogo y el cableado en `JobServices.production`. Con él, «Generar L y R».
 - [ ] Interruptor «Guitarras en L y R»: en el Mac se oculta si no hay canales de guitarra ni guitarras separadas (`App/Sources/BackingMixer.swift:36`); `WinApp/Web/backing/mixer.js` (`GuitarOptions`) lo muestra siempre. Igualar Windows al Mac.
-- [ ] Cambiar la carpeta de proyectos en caliente (Mac: `AppModel.swift:1015-1050` y `Library.relocate`; Windows: `Bridge.swift:70-75` e `ImportMethods.swift:158-183`, que devuelve `restartRequired`).
 - [ ] Sección que no envuelve ningún acorde entero: no pinta caja ni se borra con el ratón, igual en el Mac (`App/Sources/SectionBoxes.swift:238-258`) y en Windows (`WinApp/Web/backing/strip.js:146-152`); arreglar en las dos.
 - [ ] Tiempo de respuesta del puente bajo carga, sin medir: solo consta una llamada (`library.list`) sin respuesta en 15 s, el límite de `WinApp/Web/bridge.js:7`, al 41 % de la separación; si la interfaz se nota congelada, hay que medirlo.
 - [ ] Comparar «2004 Remix» en el Mac: separarlo y medir RMS y pico de piano y otros (en la VM: piano −77,3 / −31,0 y otros −75,3 / −36,6 dBFS).
 - [ ] Que el instalador lleve los helpers (`tf-separate`, `tf-audio`, `tf-video`).
-- [ ] Deuda: que el Mac use `AppCore`. `WinApp/Web/fonts` sin usar (no borrar sin un sí explícito de Jorge).
+- [ ] Deuda «que el Mac use `AppCore`»: ya no se refactoriza; se resuelve con la migración a Flutter (el Mac hablará con `AppCore` por el puente y la lógica de `App/Sources` desaparecerá con SwiftUI). `WinApp/Web/fonts` sin usar (no borrar sin un sí explícito de Jorge).
+- *El separador de guitarras en Windows y el cambio de carpeta en caliente se han movido a «Condición de cierre de la 7c» (22/11/2026).*
 
 Tiempos del paso 7 (VM x64 sana con `dotpr` nuevo; el Mac en Debug). El tope de 15 s de reloj de `calibrateLatency` se deja como estaba. Release no mueve la separación (es ONNX Runtime en CPU emulada).
 
@@ -405,11 +419,35 @@ Tiempos del paso 7 (VM x64 sana con `dotpr` nuevo; el Mac en Debug). El tope de 
 
 SNR frente a ORT del Mac: 119,3 / 118,9 dB. StemKit con modelo en release: 81/0, 9 saltos de bancos opcionales. `docs/probes/P8-windows.md` enlaza a esta tabla.
 
-Condición de paso: la de la mini-spec del port (aprobada por Jorge el 18/11/2026; solo x64).
+Condición de paso: la de la mini-spec del port (aprobada por Jorge el 18/11/2026; solo x64), más la condición de cierre de abajo.
+
+#### Condición de cierre de la 7c (decisión de Jorge, 22/11/2026)
+
+La 7c solo se cierra con todo el núcleo cerrado en las dos plataformas. Orden nuevo: cierre de la 7c → migración de la interfaz a Flutter (Mac y Windows, unificada) → actualizador automático (7d) → instalador de Windows. El instalador sale de la 7c (era el final del paso 8). La Fase 7b se hará sobre Flutter. Sin estimaciones todavía.
+
+Núcleo pendiente (ids de `Temp/win/appcore-gap-audit.md`; entre paréntesis, agente):
+
+- [ ] B1 · Separador de guitarras en Windows: `AppCore/Services.swift` tiene `guitarSplitter: nil`; falta un `GuitarSplitting` portable con RoFormer sobre ONNX Runtime, el modelo en el catálogo y el cableado en `JobServices.production`; con él, «Generar L y R» (`tf-ml` el modelo, `tf-engineer`).
+- [ ] B2 · Cambio de carpeta de proyectos en caliente: hoy `ImportMethods.swift` guarda el perfil y devuelve `restartRequired`; debe llamar a `Library.relocate` (`tf-implementer`).
+- [ ] B3 · Primer arranque: proponer `~/Music/ToneForge` y crearla, sin reiniciar (`tf-implementer`).
+- [ ] B4 · Fotos de artista por AppCore (`tf-implementer`).
+- [ ] B6 · Cierre ordenado: `terminateAll` y `flush` del estudio (`tf-implementer`).
+- [ ] A1 · Cámaras en Ajustes del Mac por AppCore: hoy `resolvedCameras` da `nil` con cámara real (`tf-implementer`).
+- [ ] M1 · Hoja «Encuadre» en el Mac: `takeFrame` devuelve `nil` fuera de Windows (`tf-engineer`).
+- [ ] R3 y M2 · Medir en el Mac el rendimiento de la cámara y de la vista previa de Montaje por JPEG y `FrameRelay` (`tf-engineer`).
+- [ ] F3 · Arena de ONNX Runtime en la separación (desglose con `TF_SEPARATE_TIMING=1`): pendiente de decisión de Jorge con los números.
+- T3 (guardar fichero y abrir URL) y S4 (modelos embebidos en `Bundle.main`) son del anfitrión Flutter, no de la 7c.
+- [ ] Sin probar desde la página y dudas visuales: siguen abiertas en «Ola 2, trabajo ya identificado».
+
+Pendiente de Jorge (hardware, pasada en un PC):
+
+- [ ] Grabar real en Windows con la HeadRush: calibración con cancelación, vúmetro, toma corta, punch-in y `takeview.openOffset`. *Con un solo dispositivo no aparece el bloqueo de frecuencias distintas de la VM.*
+- [ ] Cámara por Media Foundation y «Rotar»; `tf-webdev --camera real`.
+- [ ] Audio y cámara reales del Mac por el puente de `AppCore`.
 
 ### Fase 7d · Actualizaciones automáticas (sin rama aún; rama `fase-7d` desde `main` al cerrar la 7c)
 
-Pedida por Jorge el 19/11/2026, solo planeada: la app busca versiones nuevas y ofrece actualizar o saltar esa versión, con el changelog, en macOS y en Windows. Va después de la 7c porque el lado de Windows necesita su instalador (paso 8) y la interfaz WebView2. Estimación: 4 a 6 horas.
+Pedida por Jorge el 19/11/2026, solo planeada: la app busca versiones nuevas y ofrece actualizar o saltar esa versión, con el changelog, en macOS y en Windows. Orden nuevo (Jorge, 22/11/2026): va después de la 7c y de la migración de la interfaz a Flutter, y antes del instalador de Windows, que sale de la 7c; se prueba contra un feed local (`--update-feed`). Los requisitos que le pone al instalador (abajo) se mantienen para cuando se haga. Estimación: 4 a 6 horas (anterior a este cambio de orden; sin revisar).
 
 Decisiones de Jorge (19/11/2026):
 
@@ -433,7 +471,7 @@ Mini-spec propuesta (se cierra al empezar la fase):
 - **Diálogo.** «ToneForge X.Y disponible», versión instalada y nueva, tamaño, changelog acumulado y tres botones: «Actualizar», «Saltar esta versión» y «Más tarde». Después, progreso de descarga y verificación e «Instalar y reiniciar». Saltar oculta esa versión pero no las siguientes; el botón manual de Ajustes enseña también la saltada. «Más tarde» vuelve a avisar en la siguiente comprobación.
 - **Cuándo no molesta.** Si hay una grabación, una exportación de montaje o una separación en marcha, el aviso espera a que acabe; instalar no se permite hasta entonces. Sin red: la comprobación automática calla y la manual da un error claro.
 - **Datos.** Los proyectos y la carpeta de soporte no se tocan al actualizar. Toda migración del índice de `Store` tiene que leer lo de la versión anterior (ver la nota de datos borrados por un binario atrasado).
-- **Requisito para el instalador de Windows (7c, paso 8).** Modo silencioso, instalación por usuario en `%LOCALAPPDATA%` (sin UAC en cada actualización), cerrar la app abierta (Restart Manager) y relanzarla, no volver a bajar CUDA si ya está, y conservar la arquitectura instalada al actualizar.
+- **Requisito para el instalador de Windows (antes en el paso 8 de la 7c; ahora posterior al actualizador).** Modo silencioso, instalación por usuario en `%LOCALAPPDATA%` (sin UAC en cada actualización), cerrar la app abierta (Restart Manager) y relanzarla, no volver a bajar CUDA si ya está, y conservar la arquitectura instalada al actualizar.
 - **Reparto (propuesto; según «Modelos por fase»).** Orquestador Opus. `web-researcher`: Sparkle 2 con `SPUUserDriver`, actualizaciones con `.pkg` y TCC con firma de desarrollo, y modo silencioso del instalador que elija la 7c. Prueba de Sparkle: hilo principal con `tf-implementer`. `tf-implementer`: UpdateKit, diálogo (SwiftUI y WebView2), Ajustes, instalación en Windows y script de release. `tf-docs` y `tf-qa` al final. Nada pide Opus: no hay señal ni modelos.
 
 Condición de paso (propuesta, a aprobar por Jorge): en el Mac, de una compilación instalada a una más nueva desde un feed de prueba: el aviso sale con el changelog acumulado; «Saltar» oculta esa versión y no la siguiente; «Actualizar» descarga, verifica, instala, relanza y conserva proyectos y permisos de cámara y micrófono; un fichero con la firma alterada se rechaza. Lo mismo en la VM de Windows, en ARM64 y en x64. Sin red, la comprobación automática no dice nada. Con una grabación en marcha no aparece el aviso.

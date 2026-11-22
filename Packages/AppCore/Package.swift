@@ -21,11 +21,14 @@ let package = Package(
         // 8.7: tablatura (`Tab*.swift`).
         .package(path: "../TabKit"),
         // L-F8: duración de las tomas (`AudioFileReader`, también en Windows).
-        .package(path: "../NativeKit")
+        .package(path: "../NativeKit"),
+        // W2-C: Grabar y Montaje en Windows (`VideoKit`).
+        .package(path: "../VideoKit")
     ],
     targets: [
-        .target(name: "AppCore", dependencies: ["Store", "AudioKit", "ModelKit", "StemKit", "StudyKit", "SourceKit", "TabKit",
+        .target(name: "AppCore", dependencies: ["Store", "AudioKit", "ModelKit", "StemKit", "StudyKit", "SourceKit", "TabKit", "VideoKit",
                                           .product(name: "NativeAudioFile", package: "NativeKit")]),
-        .testTarget(name: "AppCoreTests", dependencies: ["AppCore", "Store", "SourceKit", "StudyKit"])
+        // W2-E2: los tests usan VideoKit y AudioKit directamente (FrameRelayTests, RecordTests): declarados, no transitivos.
+        .testTarget(name: "AppCoreTests", dependencies: ["AppCore", "Store", "SourceKit", "StudyKit", "TabKit", "VideoKit", "AudioKit"])
     ]
 )

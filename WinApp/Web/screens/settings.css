@@ -1,0 +1,59 @@
+/* Pantalla Ajustes: App/Sources/SettingsView.swift y VideoSettingsView.swift (medidas en pt = px). */
+.settings { padding: 28px 52px 28px 36px; gap: 0; }   /* +16 a la derecha: hueco que el Mac reserva para la barra del ScrollView (36 + 16); la barra aquí es superpuesta */
+.settings-inner { display: flex; flex-direction: column; gap: 20px; }
+.settings-title { font-family: var(--font-display); font-size: 30px; font-weight: 700; }
+.settings .page-sub { margin-top: 6px; }
+.stabs { align-self: flex-start; display: flex; gap: 4px; padding: 3px; background: var(--field); border: 1px solid var(--field-line); border-radius: 10px; }
+.stabs button { height: 44px; padding: 0 18px; border: 0; border-radius: 8px; background: transparent; color: var(--text-2); font-weight: 500; }
+.stabs button.on { background: var(--accent-bg); color: var(--accent); font-weight: 600; }
+.stabs button:hover:not(.on) { background: var(--neutral-bg); }
+.sstack { display: flex; flex-direction: column; gap: 20px; }
+
+.sgroup { padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; }
+.sgroup-head { display: flex; flex-direction: column; gap: 6px; }
+.sgroup-head h2 { font-family: var(--font-display); font-size: 18px; font-weight: 500; }
+.sgroup-head p { font-size: 13px; color: var(--muted); }
+.sfield { display: flex; flex-direction: column; gap: 6px; }
+.sfield-label { font-size: 13px; color: var(--muted); }
+.pathbox { min-height: 44px; display: flex; align-items: center; padding: 0 12px; background: var(--field); border: 1px solid var(--field-line);
+  border-radius: var(--radius-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; line-height: 42px; user-select: text; -webkit-user-select: text; }
+.inforow { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; min-height: 40px; background: var(--field); border-radius: var(--radius-ctl); }
+.inforow-trail { display: flex; align-items: center; gap: 8px; }
+.val { font-weight: 600; color: var(--text-2); }
+.val.accent { color: var(--accent); } .val.ok { color: var(--ok); } .val.danger { color: var(--danger); }
+.snote { font-size: 13px; color: var(--muted); }
+.snote.ok { color: var(--ok); } .snote.danger { color: var(--danger); }
+.srow-btns { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* Picker del Mac (menú emergente) */
+.popup { font: inherit; appearance: none; -webkit-appearance: none; height: 28px; padding: 0 28px 0 10px; border: 0; border-radius: 6px; color: var(--text); background-color: var(--field-line);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='14' viewBox='0 0 10 14' fill='none' stroke='%23C9CED4' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 5.5L5 2.5l3 3M2 8.5l3 3 3-3'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 9px center; text-overflow: ellipsis; max-width: 100%; }
+.popup:disabled { opacity: .5; }
+.popup option { background: var(--field); color: var(--text); }
+/* Toggle(.switch) */
+.switch { position: relative; width: 38px; height: 22px; padding: 0; border: 0; border-radius: 999px; background: #3A3F45; flex: none; }
+.switch.on { background: var(--blue); }
+.switch .knob { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform .12s; }
+.switch.on .knob { transform: translateX(16px); }
+
+/* Cámara y vídeo */
+.cam-layout { display: flex; align-items: flex-start; gap: 20px; }
+.cam-rows { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.cam-preview { flex: none; aspect-ratio: 16 / 9; background: #000; border: 1px solid var(--field-line); border-radius: 10px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.cam-msg { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px; text-align: center; font-size: 12px; color: var(--text-2); }
+.cam-msg svg { color: var(--muted); }
+/* Mac: TextField .roundedBorder (oscuro #1B1B1B con borde fino, 70 x 26) y Stepper en caja gris #2E3034 con chevrones (medidos en step8-fontmac-settings-video.png) */
+.numfield { width: 70px; height: 26px; padding: 0 6px; text-align: right; background: #1B1B1B; border: 1px solid var(--field-line); border-radius: 6px; color: var(--text); outline: none; user-select: text; -webkit-user-select: text; }
+.numfield:focus { box-shadow: 0 0 0 2px var(--accent); }
+.numfield:disabled { opacity: .5; }
+.stepper { display: flex; flex-direction: column; width: 20px; height: 26px; background: #2E3034; border-radius: 6px; overflow: hidden; }
+.stepper button { flex: 1; width: 100%; height: 13px; padding: 0; border: 0; background: transparent; color: var(--text); display: flex; align-items: center; justify-content: center; }
+.stepper button svg { width: 12px; height: 12px; }
+.stepper button:disabled { opacity: .5; }
+
+/* Alturas del Mac: picker de menú de 24 pt (fila de 44 pt con relleno 10), fila de info sin alto mínimo. Pesos: los de SwiftUI
+   (TF.display(30) = 700, TF.display(18, .medium) = 500, .fontWeight(.semibold) = 600; el resto Inter 400). */
+.settings .popup { height: 24px; }
+.settings .page-sub { margin-top: 8px; }
+.inforow { min-height: 0; }

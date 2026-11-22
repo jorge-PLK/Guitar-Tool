@@ -55,6 +55,7 @@ public final class StudyPlayer {
     private var rateValue = 1.0
     private var pitchValue = 0.0
     private var loopValue: ClosedRange<Double>?
+    private var endValue: Double?
     private var metronomeValue = Metronome()
     private var pausedTime = 0.0
     private var masterGainValue = 0.0
@@ -241,6 +242,7 @@ public final class StudyPlayer {
         scheduler.configure(stems: stems, length: length, sampleRate: sr) { [weak self] generation in
             Task { @MainActor in await self?.reachedEnd(generation) }
         }
+        scheduler.setEnd(endFrames())
         if host != nil && !offline { installFeeds() }
         applyMix()
         loop = loopValue
@@ -382,7 +384,13 @@ public final class StudyPlayer {
         try? await Task.sleep(for: .milliseconds(300))
         guard isPlaying, generation == runGeneration, loopRange() == nil else { return }
         pause()
-        pausedTime = duration
+        pausedTime = Double(endFrames()) / sampleRate
+    }
+
+    /// Muestra del tema donde acaba la reproducción: `endTime` dentro del tema, o su longitud.
+    private func endFrames() -> Int64 {
+        guard let t = endValue, sampleRate > 0 else { return lengthFrames }
+        return min(lengthFrames, max(0, Int64((t * sampleRate).rounded())))
     }
 
     // MARK: Mezcla
@@ -474,6 +482,19 @@ public final class StudyPlayer {
             loopValue = newValue
             if sampleRate > 0, newValue != nil, loopRange() == nil { loopValue = nil }
             scheduler.setLoop(loopRange())
+        }
+    }
+
+    /// Fin de la reproducción en segundos de canción (`nil` = el final del tema). Se aplica al programar, no con un
+    /// temporizador: tras esa muestra no se programa nada y la pasada acaba como al terminar los stems, así que no
+    /// suena ni una muestra de más aunque quien para lo vea tarde («Ver toma», W2-V). Sobrevive a `load`/`setTakes`.
+    /// En marcha vale para lo que aún no está programado (`StudyPlayerConstants.queueSeconds` por delante): ponerlo
+    /// antes de `play`.
+    public var endTime: Double? {
+        get { endValue }
+        set {
+            endValue = newValue
+            scheduler.setEnd(endFrames())
         }
     }
 

@@ -13,6 +13,8 @@ struct AppInfo: Codable, Sendable {
     var mediaBase: String
     var projectsFolder: String?
     var launch: Launch
+    /// Lista o álbum importándose (cola en marcha o parada) que sobrevive a una recarga de la página; nil si no hay.
+    var playlist: PlaylistSnapshot?
 }
 
 /// Puente entre la página (WebView2) y el núcleo Swift: JSON entrante -> `Router` -> `send`.
@@ -27,6 +29,8 @@ public final class Bridge: @unchecked Sendable {
     private var _send: @Sendable (String) -> Void = { _ in }
     /// Cola de trabajos y biblioteca viva (8.3a, `JobQueue.swift`).
     let jobs: JobEngine
+    /// Instantánea de la lista viva (`PlaylistEngine`), para `app.info`.
+    nonisolated(unsafe) var liveList: (@Sendable () async -> PlaylistSnapshot?)?
     /// Backing: tema abierto y reproductor (8.5, `StudyMethods.swift`).
     let studyService: StudyService
     /// Herramientas externas y descargas por enlace (8.3b, `LinkMethods.swift`); nil = las de producción.
@@ -35,6 +39,10 @@ public final class Bridge: @unchecked Sendable {
     let spotify: (any SpotifySearching)?
     /// Tablatura (8.7, `TabService.swift`).
     let tabService: TabService
+    /// Montaje (W2-M1, `MontageMethods.swift`).
+    let montageService: MontageService
+    /// Visor de tomas con el audio en el núcleo (W2-V, `TakeViewMethods.swift`).
+    let takeViewService: TakeViewService
     private var _host: (any HostServices)?
 
     /// Diálogos nativos; los pone el anfitrión (8.3a, `ImportMethods.swift`). Sin él, `host.*` da `unsupported`.
@@ -78,6 +86,11 @@ public final class Bridge: @unchecked Sendable {
         let supportDir = options.supportDir
         self.tabService = TabService(studyService: studyService, services: { tab ?? TabServices.production(supportDir: supportDir) },
                                      store: QueueTabStore(jobs: queue))
+        self.montageService = MontageService(options: options, root: folder, storeFactory: { _ in QueueMontageStore(jobs: queue) },
+                                             reveal: { try (reveal ?? Bridge.openFolder)($0) },
+                                             pauseOthers: { [study = self.studyService] in study.current?.controller.stop() })
+        self.takeViewService = TakeViewService(options: options, root: folder,
+                                               pauseOthers: { [study = self.studyService] in study.current?.controller.stop() })
         registerMethods()
     }
 
@@ -106,7 +119,11 @@ public final class Bridge: @unchecked Sendable {
             version: Bridge.version, platform: Bridge.platform, mediaBase: mediaBase,
             projectsFolder: projects?.path,
             launch: .init(screen: options.screen, project: options.project, snapshot: options.snapshot != nil))
-        router.register("app.info") { (_: Empty) in info }
+        router.register("app.info") { [weak self] (_: Empty) -> AppInfo in
+            var i = info
+            if let live = self?.liveList { i.playlist = await live() }
+            return i
+        }
 
         let root = projects
         let jobs = self.jobs
@@ -115,11 +132,17 @@ public final class Bridge: @unchecked Sendable {
         }
         registerImportMethods(root: projects, options: options)
         registerLinkMethods(root: projects, options: options)
+        registerSettingsMethods(root: projects, options: options)
         studyService.setSink { [weak self] in self?.send($0) }
         studyService.register(on: router)
+        registerAudioMethods(options: options)   // W2-C, `AudioMethods.swift`
+        registerRecordMethods(options: options)   // W2-R1, `RecordMethods.swift`
         tabService.hostProvider = { [weak self] in self?.host }
         tabService.setSink { [weak self] in self?.send($0) }
         tabService.register(on: router)
+        registerMontageMethods()   // W2-M1, `MontageMethods.swift`
+        registerTakeViewMethods()   // W2-V, `TakeViewMethods.swift`
+        FrameRelay.register(on: router)   // W2-E1, `FrameRelay.swift`
         let opener = revealOverride
         router.register("library.reveal") { (p: ProjectIDParams) -> RevealResult in
             guard let id = UUID(uuidString: p.id) else {
@@ -137,6 +160,12 @@ public final class Bridge: @unchecked Sendable {
                 throw RPCError(code: "bad-params", message: "«id» no es un UUID.")
             }
             return try Bridge.service(root).detail(id: id)
+        }
+        router.register("library.takeBacking") { (p: TakeBackingParams) -> TakeBackingResult in
+            guard let id = UUID(uuidString: p.id), let takeId = UUID(uuidString: p.takeId) else {
+                throw RPCError(code: "bad-params", message: "«id» y «takeId» deben ser UUID.")
+            }
+            return try Bridge.service(root).takeBacking(id: id, takeId: takeId)
         }
     }
 

@@ -575,6 +575,14 @@ final class PortablePlaybackEngine: @unchecked Sendable {
         readerLock.unlock()
     }
 
+    /// Última muestra del tema que se programa (exclusiva; como mucho `length`): tras ella los anillos se vacían, la
+    /// salida es silencio y llega `onEnd`. En marcha vale para lo que aún no está programado.
+    func setEnd(_ frames: Int64) {
+        readerLock.lock()
+        planner.length = min(max(0, frames), length)
+        readerLock.unlock()
+    }
+
     /// Clics del metrónomo (muestras del tema, ordenados). En marcha, los ya programados se rehacen desde lo que suena.
     func setClicks(_ clicks: [ClickFrame]) {
         readerLock.lock()

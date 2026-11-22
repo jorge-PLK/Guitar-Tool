@@ -96,6 +96,50 @@ class StudyPlayerTests: XCTestCase {
     @MainActor
     func runIndex(_ p: any PlayerUnderTest, _ start: Int64) -> Double { p.runStartFrame - Double(start) }
 
+    // MARK: Fin por muestras
+
+    /// `endTime` («Ver toma», W2-V): backing de 3 s (0,25) y una toma de 1 s (0,5) desde 0,7 s, como abre el visor
+    /// (fin = inicio de la toma + su duración). Desde 0,5 s, lo último que suena es la muestra anterior al fin, ni una
+    /// más, con un fin que cae a mitad de trozo; y sin `endTime` vuelve a sonar hasta el final del tema.
+    @MainActor
+    func testEndTimeStopsAtTheExactSample() throws {
+        let dir = try tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let backing = try writeStem("backing", in: dir, left: [Float](repeating: 0.25, count: Int(3 * sr)),
+                                    right: [Float](repeating: 0.25, count: Int(3 * sr)))
+        let takeURL = dir.appendingPathComponent("take.wav")
+        try TakeFile.write([[Float](repeating: 0.5, count: Int(sr))], sampleRate: sr, to: takeURL)
+        let takeStart = 0.7, from = 0.5
+        let end = takeStart + 1.0
+        let endFrame = Int((end * sr).rounded())
+        let p = kind.offline()
+        try p.load(tracks: [backing])
+        p.endTime = end   // antes de `setTake`: debe sobrevivir a la recarga
+        try p.setTake(TakeTrack(id: "take", url: takeURL, songStart: takeStart))
+        XCTAssertEqual(p.endTime, end)
+        p.seek(to: from)
+        try p.play()
+        let r = try p.renderOffline(frames: Int(1.6 * sr))
+        let out = r.channels[0]
+        // Índice de la muestra del tema `from` en lo renderizado.
+        let i0 = Int((runIndex(p, r.start) + p.modelLatencyFrames).rounded())
+        let first = i0 - Int((from * sr).rounded())   // índice que tendría la muestra 0 del tema
+        let last = try XCTUnwrap(out.lastIndex { abs($0) > 1e-6 })
+        let overshoot = (last + 1) - (first + endFrame)
+        print("W2-V fin por muestras (\(kind.rawValue)): última muestra con sonido \(last + 1 - first), fin \(endFrame) → sobrante "
+              + "\(overshoot) muestras (\(String(format: "%.3f", Double(overshoot) / sr * 1000)) ms)")
+        XCTAssertEqual(overshoot, 0, "ni una muestra de backing tras el fin")
+        XCTAssertEqual(out[first + endFrame - 1], 0.75, accuracy: 1e-4, "hasta el fin suenan backing y toma enteros")
+        XCTAssertEqual(out[first + endFrame - Int(0.5 * sr)], 0.75, accuracy: 1e-4)
+        XCTAssertTrue(out[(first + endFrame)...].allSatisfy { $0 == 0 }, "tras el fin, silencio")
+
+        p.endTime = nil
+        p.seek(to: from)
+        let s = try p.renderOffline(frames: Int(1.6 * sr))
+        let j0 = Int((runIndex(p, s.start) + p.modelLatencyFrames).rounded()) - Int((from * sr).rounded())
+        XCTAssertEqual(s.channels[0][j0 + endFrame + Int(0.2 * sr)], 0.25, accuracy: 1e-4, "sin endTime sigue el backing")
+    }
+
     // MARK: Sincronía, mute/solo, ganancia
 
     @MainActor

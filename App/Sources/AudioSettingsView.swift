@@ -121,7 +121,7 @@ struct AudioSettingsView: View {
                         Text($0.label).tag(String?.some($0.uid))
                     }
                 }
-                .labelsHidden().frame(maxWidth: 320)
+                .labelsHidden().frame(maxWidth: 320, alignment: .trailing)
             }
             InfoRow(label: "Dispositivo de entrada") {
                 Picker("Dispositivo de entrada", selection: Binding(
@@ -131,14 +131,14 @@ struct AudioSettingsView: View {
                         Text($0.label).tag(String?.some($0.uid))
                     }
                 }
-                .labelsHidden().frame(maxWidth: 320)
+                .labelsHidden().frame(maxWidth: 320, alignment: .trailing)
             }
             InfoRow(label: "Frecuencia de trabajo") {
                 Picker("Frecuencia de trabajo", selection: Binding(
                     get: { model.profile.workingSampleRate }, set: { model.setSampleRate($0) })) {
                     ForEach(EquipmentProfile.allowedSampleRates, id: \.self) { Text(Fmt.rate($0)).tag($0) }
                 }
-                .pickerStyle(.segmented).labelsHidden().frame(width: 220)
+                .pickerStyle(.segmented).labelsHidden().frame(width: 220, alignment: .trailing)
             }
             if let mismatch = rateMismatch(list) { rateWarning(mismatch) }
         }
@@ -187,7 +187,7 @@ struct AudioSettingsView: View {
                     get: { audio.backingOut }, set: { p in update { $0.backingOut = p } })) {
                     ForEach(backing, id: \.value) { Text($0.label).tag($0.value) }
                 }
-                .labelsHidden().frame(maxWidth: 280)
+                .labelsHidden().frame(maxWidth: 280, alignment: .trailing)
             }
             InfoRow(label: "Entrada de guitarra") {
                 InputMeters(levels: model.audio.inputLevels)
@@ -195,7 +195,7 @@ struct AudioSettingsView: View {
                     get: { audio.guitarIn }, set: { g in update { $0.guitarIn = g } })) {
                     ForEach(guitar, id: \.value) { Text($0.label).tag($0.value) }
                 }
-                .labelsHidden().frame(maxWidth: 280)
+                .labelsHidden().frame(maxWidth: 280, alignment: .trailing)
                 .disabled(audio.inputDeviceUID == nil)
             }
         }

@@ -69,6 +69,8 @@ enum WASAPIListing {
             let side = d.flow == .render ? "salida" : "entrada"
             out.append("Dispositivo: \(d.name) · \(side)\(d.isDefault ? " (por defecto)" : "")")
             out.append("  UID: \(d.id)")
+            // W2-E2: `PKEY_Device_ContainerId`, para ver en un PC si la entrada y la salida de la HeadRush comparten aparato.
+            out.append("  Contenedor: \(d.containerID ?? "no lo da Windows")")
             out.append("  Formato de mezcla: \(d.mix.label)")
             out.append("  Driver: \(driverText(d.driver))")
             if !d.driver.adapterInstance.isEmpty {

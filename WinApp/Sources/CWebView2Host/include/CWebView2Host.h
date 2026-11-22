@@ -58,10 +58,46 @@ int tfhost_open_url(tfhost* host, const char* url_utf8);
 /// Igual para carpetas.
 int tfhost_pick_folder(tfhost* host, const char* title_utf8, char* out_utf8, int cap);
 
+/// Códigos de resultado de tfhost_hidden_load (primer argumento de `done`).
+enum {
+    TFHOST_HIDDEN_OK = 0,           // `status` = HTTP del documento principal (200 si no se pudo leer), `html` = outerHTML
+    TFHOST_HIDDEN_OFFLINE = 1,      // fallo de navegación (sin red, DNS...) o tope agotado antes de terminar de cargar
+    TFHOST_HIDDEN_READY_TIMEOUT = 2,// cargó pero `ready_script` no dio true en `timeout_ms`
+    TFHOST_HIDDEN_HTTP = 3,         // documento principal con estado >= 400; `status` lleva el código
+    TFHOST_HIDDEN_CANCELLED = 4,    // tfhost_hidden_cancel con ese id
+    TFHOST_HIDDEN_UNAVAILABLE = 5   // sin ventana, no se pudo crear el navegador, o ya había otra carga en curso
+};
+
+/// Navegador oculto (W2-H): segundo WebView2 sin pantalla (ventana propia sin mostrar, perfil InPrivate = almacén no
+/// persistente), creado en la primera carga. Una carga a la vez (serializar es cosa de quien llama; con otra en curso `done`
+/// recibe UNAVAILABLE). Navega a `url_utf8`, evalúa `ready_script_utf8` (expresión JS con resultado booleano; NULL o "" = no
+/// esperar) cada 250 ms tras cargar y devuelve `document.documentElement.outerHTML`. `timeout_ms` cuenta desde el inicio de
+/// la navegación. El user agent es el propio de WebView2. `id` lo elige quien llama (distinto de 0) para tfhost_hidden_cancel.
+/// `done(result, status, html_utf8, ctx)` se llama una sola vez, en el hilo de UI; `html_utf8` solo vale durante la llamada
+/// (NULL salvo con OK). Seguro desde cualquier hilo (se reenvía al de UI).
+void tfhost_hidden_load(tfhost* host, uint64_t id, const char* url_utf8, const char* ready_script_utf8, int timeout_ms,
+                        void (*done)(int result, int status, const char* html_utf8, void* ctx), void* ctx);
+/// Cancela la carga `id` si es la que corre (done recibe CANCELLED); si no, no hace nada. Seguro desde cualquier hilo.
+void tfhost_hidden_cancel(tfhost* host, uint64_t id);
+
+/// Vista previa visible (W2-H): tercer WebView2 (perfil normal, el mismo de la app: cookies persistentes) como hijo de la
+/// ventana, encima de la página. `x,y,w,h` en píxeles CSS de la página (origen = esquina superior izquierda del área de
+/// cliente); se multiplican por la escala del monitor. Con otra `url` navega; con la misma solo recoloca. Solo https.
+/// Seguro desde cualquier hilo (se reenvía al de UI; el orden de llamadas del mismo hilo se conserva).
+void tfhost_preview_show(tfhost* host, const char* url_utf8, double x, double y, double w, double h);
+/// Oculta el panel y navega a about:blank (detiene el audio). Idempotente; sin panel no hace nada. Cualquier hilo.
+void tfhost_preview_hide(tfhost* host);
+
 /// Instancia única (mutex Local\ToneForge.SingleInstance, vive hasta que acaba el proceso). Devuelve 1 si esta es la
 /// primera; si ya hay otra ToneForge abierta le trae la ventana al frente (la restaura si está minimizada) y devuelve 0.
 /// Llamar antes de tfhost_create.
 int tfhost_single_instance(void);
+
+/// Deja el hilo que llama en STA (CoInitializeEx APARTMENTTHREADED, sin CoUninitialize). Llamar lo primero en el hilo de UI,
+/// antes de crear el Bridge o tocar Media Foundation/WASAPI: esas piezas piden MTA y, si llegan antes, WebView2 ya no puede
+/// crearse (RPC_E_CHANGED_MODE). Con STA ya puesto, su CoInitializeEx MTA devuelve RPC_E_CHANGED_MODE y siguen sin él.
+/// 0 si el hilo queda en STA; si no, el HRESULT (p. ej. 0x80010106 si ya estaba en MTA).
+int tfhost_init_ui_thread(void);
 #endif
 
 #ifdef __cplusplus

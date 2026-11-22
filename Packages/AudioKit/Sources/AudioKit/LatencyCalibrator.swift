@@ -2,6 +2,10 @@ import Foundation
 
 /// Clave de una calibración (mini-spec Fase 3, «Calibración de latencia» · Lo que se guarda): vale mientras
 /// no cambie ningún campo. Mismos campos que `CalibrationKey` de Store (la app hace de puente).
+///
+/// Con WASAPI (paso 8, F2; `io.wasapiIdentity`): `inputUID`/`outputUID` = contenedor del endpoint (el aparato físico) o,
+/// sin contenedor, el id del endpoint; `wasapi` = modo y endpoints concretos. Con CoreAudio `wasapi` es nil y la clave
+/// (y su codificación) es la de siempre.
 public struct LatencyCalibrationKey: Sendable, Equatable, Hashable, Codable {
     public var inputUID: String
     public var outputUID: String
@@ -11,21 +15,52 @@ public struct LatencyCalibrationKey: Sendable, Equatable, Hashable, Codable {
     public var inputChannel: Int
     /// Canal de salida del barrido (el izquierdo de `backingOut`), desde 1.
     public var outputChannel: Int
+    /// Solo WASAPI: modo y endpoints (nil con CoreAudio; no se codifica).
+    public var wasapi: WASAPICalibrationPath?
 
     public init(inputUID: String, outputUID: String, sampleRate: Double, bufferFrames: Int,
-                inputChannel: Int, outputChannel: Int) {
+                inputChannel: Int, outputChannel: Int, wasapi: WASAPICalibrationPath? = nil) {
         self.inputUID = inputUID
         self.outputUID = outputUID
         self.sampleRate = sampleRate
         self.bufferFrames = bufferFrames
         self.inputChannel = inputChannel
         self.outputChannel = outputChannel
+        self.wasapi = wasapi
     }
 
     /// Clave de una sesión con esos canales (desde 1).
     public init(io: any AudioIO, backingOutLeft: Int, guitarIn: [Int]) {
         self.init(inputUID: io.inputDeviceUID, outputUID: io.outputDeviceUID, sampleRate: io.format.sampleRate,
                   bufferFrames: io.format.bufferFrames, inputChannel: guitarIn.first ?? 1, outputChannel: backingOutLeft)
+        if let w = io.wasapiIdentity {
+            inputUID = Self.deviceIdentity(endpoint: io.inputDeviceUID, container: w.inputContainer)
+            outputUID = Self.deviceIdentity(endpoint: io.outputDeviceUID, container: w.outputContainer)
+            wasapi = WASAPICalibrationPath(mode: w.mode, inputEndpoint: io.inputDeviceUID, outputEndpoint: io.outputDeviceUID)
+        }
+    }
+
+    /// Identidad de aparato de un endpoint: su contenedor si lo tiene; si no, el endpoint (vacío sigue vacío). La misma
+    /// regla que `CalibrationKey.deviceIdentity` de Store.
+    public static func deviceIdentity(endpoint: String, container: String?) -> String {
+        guard !endpoint.isEmpty, let container, !container.isEmpty else { return endpoint }
+        return container
+    }
+}
+
+/// Camino WASAPI de una calibración (paso 8, F2). Los endpoints van aunque el UID sea el contenedor: dos endpoints del
+/// mismo aparato pueden ser caminos distintos (otro par de canales, otro flujo USB con su búfer) y WASAPI no dice si
+/// comparten latencia, así que una calibración nunca vale para otro endpoint ni para otro modo.
+public struct WASAPICalibrationPath: Sendable, Equatable, Hashable, Codable {
+    public var mode: WASAPIShareMode
+    /// Id del endpoint de captura y de render (vacío = el de defecto del sistema, en términos del perfil).
+    public var inputEndpoint: String
+    public var outputEndpoint: String
+
+    public init(mode: WASAPIShareMode, inputEndpoint: String, outputEndpoint: String) {
+        self.mode = mode
+        self.inputEndpoint = inputEndpoint
+        self.outputEndpoint = outputEndpoint
     }
 }
 

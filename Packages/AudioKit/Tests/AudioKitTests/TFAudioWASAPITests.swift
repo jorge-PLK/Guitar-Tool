@@ -16,7 +16,7 @@ final class TFAudioWASAPITests: XCTestCase {
     static func flexOut(driver: WASAPIDriverInfo = usb2) -> WASAPIDeviceInfo {
         WASAPIDeviceInfo(id: "{0.0.0.00000000}.{out}", name: "Altavoces (Flex Prime)", flow: .render, isDefault: false, mix: mix48,
                          defaultPeriod100ns: 100_000, minimumPeriod100ns: 26_667, engine: engine, exclusiveFloat: false,
-                         driver: driver)
+                         driver: driver, containerID: "{5A1B2C3D-0000-1111-2222-333344445555}")
     }
 
     static func flexIn(driver: WASAPIDriverInfo = usb2) -> WASAPIDeviceInfo {
@@ -132,6 +132,9 @@ final class TFAudioWASAPITests: XCTestCase {
         XCTAssertTrue(lines.contains("  Compartido: IAudioClient, periodo fijo 480 muestras (10,000 ms)"), "sin IAudioClient3")
         XCTAssertTrue(lines.contains("  Exclusivo: mínimo 144 muestras (3,000 ms); float32 en exclusivo: sí"))
         XCTAssertTrue(lines.contains("  Driver: de Microsoft · servicio HdAudAddService · Microsoft · hdaudio.inf"))
+        // W2-E2: contenedor del aparato (o aviso si Windows no lo da).
+        XCTAssertTrue(lines.contains("  Contenedor: {5A1B2C3D-0000-1111-2222-333344445555}"), lines.joined(separator: "\n"))
+        XCTAssertTrue(lines.contains("  Contenedor: no lo da Windows"))
         XCTAssertFalse(lines.contains { $0.contains("Error al consultar") })
         XCTAssertEqual(WASAPIListing.lines([], requestedPeriod: 512).last, "No hay dispositivos de audio.")
     }

@@ -8,14 +8,18 @@ import {
 } from './state.js';
 import { Library } from './screens/library.js';
 import { Backing } from './screens/backing.js';
+import { Record } from './screens/record.js';
+import { Montage } from './screens/montage.js';
 import { Tab } from './screens/tab.js';
+import { Settings } from './screens/settings.js';
 import { Notices } from './ui.js';
+import { DeviceCard } from './settings/device-card.js';   // indicador de salida de la barra lateral (AudioDeviceMonitor del Mac)
 import { ImportDuplicate, installFileDrop } from './screens/import-files.js';
 
 function NavItem({ item }) {
   const active = screen.value === item.id;
   return html`<button class=${'nav-item' + (active ? ' active' : '')} aria-current=${active ? 'page' : undefined}
-    onClick=${() => go(item.id)}>${icon(item.icon)}<span>${item.label}</span></button>`;
+    onClick=${() => go(item.id)}>${icon(item.icon, 17, 1.5)}<span>${item.label}</span></button>`;
 }
 
 function SelectedCard() {
@@ -40,12 +44,6 @@ function Marquee({ text, cls }) {
   };
   return html`<span class=${'marquee ' + cls} onMouseEnter=${e => move(e.currentTarget, true)} onMouseLeave=${e => move(e.currentTarget, false)}>
     <span class="marquee-in">${text || '\u00a0'}</span></span>`;
-}
-
-function DeviceCard() {
-  // Como el Mac sin dispositivo elegido (AudioDeviceMonitor): «Salida del sistema · Por defecto» con punto verde.
-  return html`<div class="device-card"><div class="row"><span class="dot ok" aria-hidden="true"></span><span>Salida del sistema</span></div>
-    <div class="sub">Por defecto</div></div>`;
 }
 
 function Sidebar() {
@@ -74,7 +72,10 @@ function Main() {
   }
   if (!info.value) return html`<div class="screen"></div>`;
   if (screen.value === 'backing') return html`<${Backing} />`;
+  if (screen.value === 'record') return html`<${Record} />`;
+  if (screen.value === 'montage') return html`<${Montage} />`;
   if (screen.value === 'tab') return html`<${Tab} />`;
+  if (screen.value === 'settings') return html`<${Settings} />`;
   return screen.value === 'library' ? html`<${Library} />` : html`<${Placeholder} id=${screen.value} />`;
 }
 

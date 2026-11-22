@@ -1,8 +1,11 @@
 /* Carcasa y componentes comunes. Valores de tokens.css; medidas de docs/design/Main.dc.html. */
 *, *::before, *::after { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); color-scheme: dark; }
-body { font-family: var(--font-body); font-size: var(--fs-body); line-height: 1.4; overflow: hidden;
-  -webkit-font-smoothing: antialiased; user-select: none; -webkit-user-select: none; }
+body { font-family: var(--font-body); font-size: var(--fs-body); line-height: normal;   /* altura natural de la fuente (Inter 1,21; Space Grotesk 1,28): como SwiftUI en el Mac */ overflow: hidden;
+  user-select: none; -webkit-user-select: none; }
+/* Barras de desplazamiento superpuestas como en macOS: no ocupan ancho (el contenido no se estrecha al aparecer el scroll). Se desplaza con rueda, trackpad o teclado. */
+* { scrollbar-width: none; }
+*::-webkit-scrollbar { display: none; width: 0; height: 0; }
 button, input { font: inherit; color: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: default; }
@@ -42,7 +45,7 @@ h1, h2, h3, p { margin: 0; }
 .screen { flex: 1; min-height: 0; padding: var(--pad-y) var(--pad-x); display: flex; flex-direction: column; gap: 24px; }
 .scroll { flex: 1; min-height: 0; overflow: auto; margin-right: calc(-1 * var(--pad-x) / 2); padding-right: calc(var(--pad-x) / 2); }
 .screen-scroll { overflow: auto; }
-.page-title { font-family: var(--font-display); font-size: 32px; font-weight: 700; line-height: 1.2; }
+.page-title { font-family: var(--font-display); font-size: 32px; font-weight: 700; }
 .page-sub { margin-top: 6px; color: var(--muted); }
 .placeholder { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--muted); }
 .placeholder .name { font-family: var(--font-display); font-size: 22px; font-weight: 700; color: var(--text-2); }
@@ -123,10 +126,10 @@ h1, h2, h3, p { margin: 0; }
 .modal-actions.nowrap .btn { padding: 0 16px; }
 
 /* Casilla: Toggle(.checkbox) del Mac, 16x16, radio 5, fondo gris sin borde; marcada con el azul del sistema y tilde blanca */
-.check input, .tab-check input { appearance: none; -webkit-appearance: none; width: 16px; height: 16px; margin: 0; flex: none; border-radius: 5px; background: #2E3034;
+.check input, .tab-check input { appearance: none; -webkit-appearance: none; width: 16px; height: 16px; margin: 0; flex: none; border-radius: 5px; background: #232528;
   display: inline-grid; place-content: center; cursor: pointer; }
 .check input::after, .tab-check input::after { content: ''; width: 9px; height: 5px; margin-top: -2px; border-left: 2px solid #fff; border-bottom: 2px solid #fff; transform: rotate(-45deg) scale(0); }
-.check input:checked, .tab-check input:checked { background: var(--blue); }
+.check input:checked, .tab-check input:checked { background: #393A3D; }   /* el Mac: casilla marcada #393A3D (vacía #232528), medidos en step8-fontmac-montage-grid.png; la casilla es la nativa */
 .check input:checked::after, .tab-check input:checked::after { transform: rotate(-45deg) scale(1); }
 /* deshabilitada: la etiqueta (.disabled) atenúa casilla y texto */
 .check input:disabled, .tab-check input:disabled { cursor: default; }

@@ -363,15 +363,10 @@ public final class SimulatedCameraCapture: CameraCapture, @unchecked Sendable {
         guard let base = CVPixelBufferGetBaseAddress(pb) else { return pb }
         let rowBytes = CVPixelBufferGetBytesPerRow(pb), h = CVPixelBufferGetHeight(pb), w = CVPixelBufferGetWidth(pb)
         let c = config.color
-        for y in 0..<h {
-            let row = base.advanced(by: y * rowBytes).assumingMemoryBound(to: UInt8.self)
-            for x in 0..<w {
-                row[4 * x] = c.b
-                row[4 * x + 1] = c.g
-                row[4 * x + 2] = c.r
-                row[4 * x + 3] = 255
-            }
-        }
+        // Un píxel BGRA repetido por fila (W2-E2: el bucle píxel a píxel tardaba ~200 ms por fotograma 1080p en debug y la
+        // cámara simulada de tf-webdev salía a 5 fps).
+        var pixel: [UInt8] = [c.b, c.g, c.r, 255]
+        for y in 0..<h { memset_pattern4(base.advanced(by: y * rowBytes), &pixel, 4 * w) }
         return pb
     }
     #else

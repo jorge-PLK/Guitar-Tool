@@ -1,0 +1,70 @@
+/* Hoja «Tablatura de Songsterr». Mac: App/Sources/TabSourceSheet.swift (padding 24, alto 640, columna de lista 612, vista previa 640). */
+.modal:has(.ss-sheet) { padding: 24px; gap: 0; height: min(640px, calc(100vh - 48px)); overflow: hidden; font-size: 13px; color: var(--text-2); }
+.modal:has(.ss-sheet) > .modal-title:empty { display: none; }
+.ss-sheet { flex: 1; min-height: 0; display: flex; align-items: stretch; gap: 20px; }
+.ss-col { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 14px; }
+.ss-title { font-family: var(--font-display); font-size: 22px; font-weight: 700; margin: 0; color: var(--text); }
+.ss-grow { flex: 1; }
+.ss-sheet .muted { color: var(--muted); }
+.ss-center { flex: 1; display: flex; align-items: center; justify-content: center; }
+.ss-busy { display: flex; align-items: center; gap: 8px; }
+.ss-busy .spinner { width: 14px; height: 14px; flex: none; }
+.ss-h32 { height: 32px; }
+.ss-h32p { height: 32px; padding: 0 20px; }
+
+/* Resultados */
+.ss-results { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
+.ss-detail { flex: none; padding: 12px; background: var(--field); border: 1px solid var(--field-line); border-radius: 10px; display: flex; flex-direction: column; gap: 4px; }
+.ss-detail-title { font-size: 14px; font-weight: 600; color: var(--text); }
+.ss-track { display: flex; gap: 10px; }
+.ss-t-name { width: 190px; flex: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ss-t-inst { width: 170px; flex: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ss-t-tun { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ss-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+.ss-row { flex: none; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border: 0; border-radius: 8px; background: none; color: var(--text-2); text-align: left; font-size: 13px; }
+.ss-row:hover { background: var(--field); }
+.ss-row.on { background: var(--accent-bg); color: var(--text); }
+.ss-row-text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ss-radio { flex: none; color: var(--muted); }
+.ss-radio.on { color: var(--accent); }
+
+/* Enlace y avisos */
+.ss-link { flex: none; display: flex; flex-direction: column; gap: 6px; }
+.ss-link-row { display: flex; gap: 8px; }
+.ss-input { flex: 1; min-width: 0; height: 32px; padding: 0 10px; background: var(--field); border: 1px solid var(--field-line); border-radius: 8px; color: var(--text); outline: none; font-size: 13px; }
+.ss-input:focus { border-color: var(--accent); }
+.ss-link-err { color: var(--danger); }
+.ss-issue { flex: none; padding: 12px; background: var(--danger-bg); border-radius: 10px; display: flex; flex-direction: column; gap: 8px; }
+.ss-issue-msg { color: var(--text); }
+.ss-actions { flex: none; display: flex; align-items: center; gap: 8px; }
+.ss-working { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
+.ss-bar { width: 260px; }
+
+/* Emparejamiento */
+.ss-pairs { flex: none; padding: 0 12px; background: var(--field); border: 1px solid var(--field-line); border-radius: 10px; }
+.ss-pairs > * + * { border-top: 1px solid var(--line); }
+.ss-pair { height: 44px; display: flex; align-items: center; gap: 12px; }
+.ss-p-name { width: 150px; flex: none; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ss-arrow { flex: none; color: var(--muted); }
+.ss-solo { font-variant-numeric: tabular-nums; }
+.ss-select { flex: none; height: 28px; padding: 0 8px; background: var(--card); color: var(--text); border: 1px solid var(--field-line); border-radius: 6px; font-size: 13px; }
+.ss-conf { font-variant-numeric: tabular-nums; }
+.ss-conf.good { color: var(--ok); }
+.ss-conf.fair { color: var(--accent); }
+.ss-conf.bad { color: var(--danger); }
+.ss-conf.muted { color: var(--muted); }
+.ss-warnings { flex: none; max-height: 140px; overflow-y: auto; padding: 12px; background: var(--accent-bg); border-radius: 10px; display: flex; flex-direction: column; gap: 4px; }
+.ss-warn { display: flex; align-items: flex-start; gap: 6px; color: var(--text-2); }
+.ss-warn-ic { flex: none; color: var(--accent); display: flex; padding-top: 1px; }
+
+/* Vista previa: el recuadro se reserva aquí y el anfitrión pone encima un panel nativo (host.preview.show) */
+.ss-preview { flex: 1; min-width: 300px; }
+.ss-preview-head { flex: none; display: flex; align-items: center; gap: 8px; height: 32px; }
+.ss-preview-head b { font-size: 14px; font-weight: 600; color: var(--text); }
+.ss-preview-box { flex: 1; min-height: 0; border: 1px solid var(--field-line); border-radius: 10px; background: var(--card); display: flex; align-items: center; justify-content: center; padding: 16px; text-align: center; }
+
+/* Con el panel nativo visible nada de la página puede quedar debajo de él: los avisos pasan a la esquina inferior izquierda. */
+body.ss-preview-on .notices { top: auto; right: auto; bottom: 16px; left: 16px; width: 320px; }
+
+/* Paridad con el Mac (W2-COS): hoja TF.bg sin borde. */
+.modal.modal:has(.ss-sheet) { background: var(--bg); border: 0; }

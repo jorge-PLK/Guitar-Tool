@@ -30,11 +30,30 @@ enum TF {
     static let danger = Color(hex: 0xF07178)
     static let dangerBg = Color(hex: 0x331A1C)
 
+    /// Fuentes del diseño, empaquetadas en App/Resources/Fonts (mismos TTF que la web de Windows). Solo existen
+    /// estas caras, así que cada peso pedido se mapea a una que existe y se pide por nombre PostScript
+    /// (`.custom(...).weight()` sobre una fuente sin variable no cambia de cara).
+    ///
+    /// Peso pedido -> cara usada (la interfaz de Windows usa la misma tabla):
+    ///   display (familia "Space Grotesk"; PostScript SpaceGroteskLight-*):
+    ///     .ultraLight .thin .light .regular .medium -> 500 (SpaceGroteskLight-Medium)
+    ///     .semibold .bold .heavy .black             -> 700 (SpaceGroteskLight-Bold)
+    ///   body (familia "Inter"):
+    ///     .ultraLight .thin .light .regular         -> 400 (Inter-Regular)
+    ///     .medium                                   -> 500 (Inter-Medium)
+    ///     .semibold .bold .heavy .black             -> 600 (Inter-SemiBold)
     static func display(_ size: CGFloat, _ weight: Font.Weight = .bold) -> Font {
-        .custom("Space Grotesk", size: size).weight(weight)
+        switch weight {
+        case .semibold, .bold, .heavy, .black: .custom("SpaceGroteskLight-Bold", size: size)
+        default: .custom("SpaceGroteskLight-Medium", size: size)
+        }
     }
     static func body(_ size: CGFloat = 14, _ weight: Font.Weight = .regular) -> Font {
-        .custom("Inter", size: size).weight(weight)
+        switch weight {
+        case .semibold, .bold, .heavy, .black: .custom("Inter-SemiBold", size: size)
+        case .medium: .custom("Inter-Medium", size: size)
+        default: .custom("Inter-Regular", size: size)
+        }
     }
 }
 

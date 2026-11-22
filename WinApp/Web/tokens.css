@@ -1,5 +1,13 @@
 /* Tokens de ToneForge: boceto docs/design/Main.dc.html y App/Sources/Theme.swift (enum TF). */
 
+/* Fuentes del diseño (Inter y Space Grotesk), mismas que usa el Mac (App/Sources/Theme.swift, enum TF). Rutas relativas a
+   tokens.css: valen con el host virtual app.toneforge y con tf-webdev. Solo existen estas caras; el emparejamiento de pesos del
+   navegador da la misma tabla que TF.display/TF.body: Inter 400 / 500 / 600 (>=600 -> 600), Space Grotesk 500 (<=500) / 700 (>=600). */
+@font-face { font-family: "Inter"; font-style: normal; font-weight: 400; font-display: block; src: url("fonts/inter-latin-400.woff2") format("woff2"); }
+@font-face { font-family: "Inter"; font-style: normal; font-weight: 500; font-display: block; src: url("fonts/inter-latin-500.woff2") format("woff2"); }
+@font-face { font-family: "Inter"; font-style: normal; font-weight: 600; font-display: block; src: url("fonts/inter-latin-600.woff2") format("woff2"); }
+@font-face { font-family: "Space Grotesk"; font-style: normal; font-weight: 500; font-display: block; src: url("fonts/space-grotesk-latin-500.woff2") format("woff2"); }
+@font-face { font-family: "Space Grotesk"; font-style: normal; font-weight: 700; font-display: block; src: url("fonts/space-grotesk-latin-700.woff2") format("woff2"); }
 
 :root {
   /* Colores */
@@ -24,10 +32,11 @@
   --danger-bg: #331A1C;
   --device-ok: #4CC38A;
 
-  /* Tipografía: cada plataforma usa la fuente del sistema (decisión de Jorge; el Mac usa SF). */
-  --font-body: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
-  --font-display: "Segoe UI Variable Display", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  /* Tipografía: las fuentes del diseño en las dos apps (decisión de Jorge, 21/11/2026); la del sistema solo de respaldo. */
+  --font-body: "Inter", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Space Grotesk", "Inter", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
   --fs-body: 14px;
+  font-synthesis: none;   /* nunca negrita ni cursiva sintéticas: solo las caras reales */
 
   /* Medidas */
   --sidebar-w: 240px;

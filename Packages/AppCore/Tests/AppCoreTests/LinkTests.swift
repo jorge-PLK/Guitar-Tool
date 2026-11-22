@@ -262,6 +262,8 @@ final class LinkTests: XCTestCase {
         let badopt = await rig.errorCode("link.resolve", "{\"url\":\"https://example.com/x\"}"); let bad = try XCTUnwrap(badopt)
         XCTAssertEqual(bad.code, "unsupported-link")
         XCTAssertTrue(bad.message.hasPrefix("Enlace no admitido\nSe admiten enlaces"))
+        // Literal del Mac (`LinkImportSheet.swift`, `supportedLinks`).
+        XCTAssertTrue(bad.message.hasSuffix(", además de listas de YouTube (youtube.com/playlist) y listas o álbumes de Spotify (open.spotify.com/playlist, open.spotify.com/album). Episodios no."))
         let empty = await rig.errorCode("link.resolve", "{\"url\":\"  \"}")
         XCTAssertEqual(empty?.code, "bad-params")
 

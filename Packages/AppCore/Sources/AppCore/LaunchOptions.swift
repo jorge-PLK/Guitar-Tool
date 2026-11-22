@@ -1,5 +1,13 @@
 import Foundation
 
+/// `--camera real|simulated` (W2-E2): de dónde salen las cámaras de Grabar y de la vista previa de Ajustes.
+public enum CameraMode: String, Sendable, Equatable {
+    /// Las del sistema (Media Foundation en Windows, AVFoundation en el Mac: pide permiso al abrir la cámara).
+    case real
+    /// «Cámara simulada» con imagen; no abre ningún dispositivo ni pide permiso.
+    case simulated
+}
+
 /// Opciones de línea de órdenes del anfitrión (plan, «Fase 7c», paso 8).
 public struct LaunchOptions: Sendable {
     public var projectsFolder: URL?
@@ -12,6 +20,8 @@ public struct LaunchOptions: Sendable {
     public var window: (width: Int, height: Int)?
     /// `--audio simulated|device` (8.5): `simulated` no abre ningún dispositivo de audio (QA y tests).
     public var audio: AudioMode
+    /// `--camera` (W2-E2); nil = según `--audio` (`simulated` -> cámara simulada; si no, las del sistema).
+    public var camera: CameraMode?
 
     /// Espera por defecto antes de la captura, en segundos.
     public static let defaultSnapshotDelay = 2.0
@@ -59,6 +69,9 @@ public struct LaunchOptions: Sendable {
                 consumed = true
             case "--audio":
                 if let m = AudioMode(rawValue: v.lowercased()) { o.audio = m }
+                consumed = true
+            case "--camera":
+                if let m = CameraMode(rawValue: v.lowercased()) { o.camera = m }
                 consumed = true
             default: break
             }

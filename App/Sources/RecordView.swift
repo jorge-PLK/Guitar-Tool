@@ -404,10 +404,18 @@ struct RecordPreview: View {
     }
 
     private func placeholder(_ text: String) -> some View {
-        VStack(spacing: 8) {
-            Image(systemName: "video").font(.system(size: 40, weight: .light))
+        // Bajo las píldoras (64 pt); si la vista previa es baja (mezclador expandido) se prescinde primero del icono
+        // y luego del texto antes que solaparse con ellas.
+        ViewThatFits(in: .vertical) {
+            VStack(spacing: 8) {
+                Image(systemName: "video").font(.system(size: 28, weight: .light))
+                Text(text)
+            }
             Text(text)
+            Color.clear
         }
+        .multilineTextAlignment(.center)
+        .padding(.top, 64).padding(.horizontal, 16).padding(.bottom, 8)
         .foregroundStyle(TF.muted)
     }
 

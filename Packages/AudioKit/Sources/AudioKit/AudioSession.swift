@@ -24,11 +24,15 @@ public struct AudioSetup: Sendable, Equatable {
     public var guitarIn: [Int]
     /// 512 fijo en esta fase (mini-spec Fase 3, «Reglas propias»).
     public var bufferFrames: Int
+    /// Modo WASAPI con el que abrir (paso 8, F2); nil = no es WASAPI (CoreAudio lo ignora). Va en la clave de calibración.
+    public var wasapiMode: WASAPIShareMode?
 
     public static let defaultBufferFrames = 512
 
     public init(inputDeviceUID: String, outputDeviceUID: String, sampleRate: Double, backingLeft: Int = 1,
-                backingRight: Int = 2, guitarIn: [Int] = [], bufferFrames: Int = AudioSetup.defaultBufferFrames) {
+                backingRight: Int = 2, guitarIn: [Int] = [], bufferFrames: Int = AudioSetup.defaultBufferFrames,
+                wasapiMode: WASAPIShareMode? = nil) {
+        self.wasapiMode = wasapiMode
         self.inputDeviceUID = inputDeviceUID
         self.outputDeviceUID = outputDeviceUID
         self.sampleRate = sampleRate
@@ -150,7 +154,7 @@ public final class AudioSession: @unchecked Sendable {
     #endif
 
     #if os(Windows)
-    /// `WASAPIAudioIO` sobre los endpoints del `AudioSetup`, modo compartido (parte 7.10).
+    /// `WASAPIAudioIO` sobre los endpoints del `AudioSetup`, en `setup.wasapiMode` (nil = compartido; parte 7.10, F2).
     public static let wasapi: IOFactory = { setup in try WASAPIAudioIO(setup: setup) }
     #endif
 
@@ -160,6 +164,15 @@ public final class AudioSession: @unchecked Sendable {
         coreAudio
         #else
         wasapi
+        #endif
+    }
+
+    /// Modo WASAPI de `systemIO` (paso 8, F2): compartido en Windows (sin selector en la interfaz), nil en el Mac.
+    public static var systemWASAPIMode: WASAPIShareMode? {
+        #if canImport(CoreAudio)
+        nil
+        #else
+        .shared
         #endif
     }
 
@@ -191,6 +204,8 @@ public final class AudioSession: @unchecked Sendable {
     private var levels: LevelHistory?
     private var calibrator: LatencyCalibrator?
     private var calibratorOriginSent = false
+    /// `cancelCalibration()` lo pone; la espera de `calibrateLatency` lo lee (bajo `consumerLock`).
+    private var calibrationCancelRequested = false
     private var calibrationFrames = 0
     private var recording: Recording?
     private var finishedTake: Result<RecordedTake, AudioSessionError>?
@@ -401,6 +416,7 @@ public final class AudioSession: @unchecked Sendable {
             calibrator = cal
             calibratorOriginSent = false
             calibrationFrames = 0
+            calibrationCancelRequested = false
         }
         rt.origin.store(Int64.min, ordering: .sequentiallyConsistent)
         rt.calibrating.store(true, ordering: .sequentiallyConsistent)
@@ -413,6 +429,7 @@ public final class AudioSession: @unchecked Sendable {
         while true {
             if let reason = interruption { throw AudioSessionError.interrupted(reason) }
             guard isOpen else { throw AudioSessionError.notOpen }
+            if consumerLock.withLock({ calibrationCancelRequested }) { throw CancellationError() }
             if cal.isComplete { break }
             if Date().timeIntervalSince(start) > Self.calibrationTimeoutSeconds { break }
             let frames = consumerLock.withLock { calibrationFrames }
@@ -423,6 +440,12 @@ public final class AudioSession: @unchecked Sendable {
         if result.isValid { calibration = result }
         progress?(1)
         return result
+    }
+
+    /// Corta la calibración en marcha: `calibrateLatency` lanza `CancellationError` en el siguiente sondeo (20 ms), suelta el
+    /// calibrador y deja la calibración anterior de la sesión. No toca la señal ni el calibrador.
+    public func cancelCalibration() {
+        consumerLock.withLock { if calibrator != nil { calibrationCancelRequested = true } }
     }
 
     /// Vuelve a desplazar las tomas sin calibrar hechas con la clave de `calibration` (mini-spec Fase 3,

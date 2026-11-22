@@ -12,6 +12,7 @@
 #include <wrl.h>
 #include <WebView2.h>
 #include <atomic>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <cwchar>
@@ -47,6 +48,16 @@ const UINT WM_TF_CAPTURE = WM_APP + 2;
 const UINT WM_TF_QUIT = WM_APP + 3;
 const UINT WM_TF_PICK = WM_APP + 4;
 const UINT WM_TF_OPEN = WM_APP + 5;
+const UINT WM_TF_HIDDEN_LOAD = WM_APP + 6;     // lp = HiddenJob*
+const UINT WM_TF_HIDDEN_CANCEL = WM_APP + 7;   // wp = id de la carga
+const UINT WM_TF_PREVIEW_SHOW = WM_APP + 8;    // lp = PreviewRequest*
+const UINT WM_TF_PREVIEW_HIDE = WM_APP + 9;
+// Navegador oculto (W2-H; contrato W2-G, SongsterrHiddenPage.pollMillis = 250): cada cuánto se evalúa ready_script.
+const UINT_PTR kHiddenTimer = 1;
+const UINT kHiddenPollMs = 250;
+// Tamaño de la vista del navegador oculto (contrato W2-G: 1200x800).
+const int kHiddenWidth = 1200;
+const int kHiddenHeight = 800;
 const DWORD kCreateTimeoutMs = 60000;
 const wchar_t* const kClassName = L"ToneForgeHostWindow";
 
@@ -222,6 +233,25 @@ struct CaptureRequest {
     void* ctx;
 };
 
+// Una carga del navegador oculto (la crea tfhost_hidden_load, la libera hiddenFinish; solo se toca en el hilo de UI).
+struct HiddenJob {
+    uint64_t id = 0;
+    std::wstring url, ready;
+    ULONGLONG timeoutMs = 30000;
+    ULONGLONG start = 0;          // GetTickCount64 al aceptar y de nuevo al empezar la navegación
+    void (*done)(int, int, const char*, void*) = nullptr;
+    void* ctx = nullptr;
+    UINT64 navId = 0;             // última NavigationStarting vista de esta carga (las completadas de otras se ignoran)
+    bool navDone = false;
+    bool polling = false;         // hay un ExecuteScript en vuelo
+    int status = 200;
+};
+
+struct PreviewRequest {
+    std::wstring url;
+    double x, y, w, h;
+};
+
 }  // namespace
 
 struct tfhost {
@@ -239,6 +269,19 @@ struct tfhost {
     bool loadFailed = false;
     HRESULT hr = S_OK;
     std::string failure;
+    // Navegador oculto (W2-H): ventana propia sin mostrar + controlador InPrivate.
+    HWND hiddenWnd = nullptr;
+    ComPtr<ICoreWebView2Controller> hiddenController;
+    ComPtr<ICoreWebView2> hiddenView;
+    bool hiddenCreating = false;
+    HiddenJob* job = nullptr;
+    // Vista previa visible (W2-H): controlador con el perfil normal, hijo de la ventana principal.
+    ComPtr<ICoreWebView2Controller> prevController;
+    ComPtr<ICoreWebView2> prevView;
+    bool prevCreating = false;
+    bool prevWanted = false;
+    std::wstring prevUrl, prevLoaded;
+    double prevX = 0, prevY = 0, prevW = 0, prevH = 0;
 };
 
 namespace {
@@ -353,6 +396,275 @@ void controllerReady(tfhost* h) {
     h->controllerReady = true;
 }
 
+
+// ---- Navegador oculto (W2-H) ----
+
+enum { kHiddenOk = 0, kHiddenOffline = 1, kHiddenReadyTimeout = 2, kHiddenHttp = 3, kHiddenCancelled = 4, kHiddenUnavailable = 5 };
+
+// Decodifica el literal JSON de una cadena (lo que da ExecuteScript con un string) a UTF-16 y de ahí a UTF-8.
+bool decodeJsonString(const wchar_t* json, std::string* out) {
+    if (!json || json[0] != L'"') return false;
+    std::wstring r;
+    const wchar_t* p = json + 1;
+    for (; *p && *p != L'"'; p++) {
+        if (*p != L'\\') { r += *p; continue; }
+        p++;
+        switch (*p) {
+        case L'n': r += L'\n'; break;
+        case L'r': r += L'\r'; break;
+        case L't': r += L'\t'; break;
+        case L'b': r += L'\b'; break;
+        case L'f': r += L'\f'; break;
+        case L'u': {
+            unsigned v = 0;
+            for (int i = 1; i <= 4; i++) {
+                wchar_t c = p[i];
+                if (c >= L'0' && c <= L'9') v = v * 16 + (c - L'0');
+                else if (c >= L'a' && c <= L'f') v = v * 16 + (c - L'a' + 10);
+                else if (c >= L'A' && c <= L'F') v = v * 16 + (c - L'A' + 10);
+                else return false;
+            }
+            r += static_cast<wchar_t>(v);   // los pares sustitutos se quedan tal cual: es UTF-16
+            p += 4;
+            break;
+        }
+        case L'\0': return false;
+        default: r += *p; break;   // \" \\ \/
+        }
+    }
+    *out = narrow(r.c_str());
+    return true;
+}
+
+void hiddenFinish(tfhost* h, int result, int status, const std::string* html) {
+    HiddenJob* j = h->job;
+    if (!j) return;
+    h->job = nullptr;
+    HWND w = h->hwnd.load();
+    if (w) KillTimer(w, kHiddenTimer);
+    if (h->hiddenView) h->hiddenView->Stop();
+    auto done = j->done;
+    auto ctx = j->ctx;
+    delete j;
+    if (done) done(result, status, html ? html->c_str() : nullptr, ctx);
+}
+
+void hiddenFetchHtml(tfhost* h) {
+    HiddenJob* j = h->job;
+    if (!j || !h->hiddenView) return;
+    j->polling = true;
+    uint64_t id = j->id;
+    HRESULT hr = h->hiddenView->ExecuteScript(
+        L"document.documentElement.outerHTML",
+        Callback<ICoreWebView2ExecuteScriptCompletedHandler>([h, id](HRESULT err, LPCWSTR json) -> HRESULT {
+            HiddenJob* cur = h->job;
+            if (!cur || cur->id != id) return S_OK;
+            cur->polling = false;
+            std::string html;
+            if (SUCCEEDED(err) && decodeJsonString(json, &html)) hiddenFinish(h, kHiddenOk, cur->status, &html);
+            return S_OK;   // si falla se reintenta en el siguiente tic
+        }).Get());
+    if (FAILED(hr)) j->polling = false;
+}
+
+// Evalúa ready_script (sin él, pide el HTML ya); el resultado llega como el literal JSON "true".
+void hiddenPoll(tfhost* h) {
+    HiddenJob* j = h->job;
+    if (!j || !j->navDone || j->polling || !h->hiddenView) return;
+    if (j->ready.empty()) { hiddenFetchHtml(h); return; }
+    j->polling = true;
+    uint64_t id = j->id;
+    HRESULT hr = h->hiddenView->ExecuteScript(
+        j->ready.c_str(),
+        Callback<ICoreWebView2ExecuteScriptCompletedHandler>([h, id](HRESULT err, LPCWSTR json) -> HRESULT {
+            HiddenJob* cur = h->job;
+            if (!cur || cur->id != id) return S_OK;
+            cur->polling = false;
+            if (SUCCEEDED(err) && json && wcscmp(json, L"true") == 0) hiddenFetchHtml(h);   // error al evaluar = false
+            return S_OK;
+        }).Get());
+    if (FAILED(hr)) j->polling = false;
+}
+
+void hiddenTick(tfhost* h) {
+    HiddenJob* j = h->job;
+    HWND w = h->hwnd.load();
+    if (!j) { if (w) KillTimer(w, kHiddenTimer); return; }
+    if (GetTickCount64() - j->start >= j->timeoutMs) {
+        // Sin terminar de cargar (o sin navegador) = sin red; cargada y sin estado = formato cambiado.
+        int r = !h->hiddenView ? kHiddenUnavailable : (j->navDone ? kHiddenReadyTimeout : kHiddenOffline);
+        hiddenFinish(h, r, 0, nullptr);
+        return;
+    }
+    hiddenPoll(h);
+}
+
+void hiddenStart(tfhost* h) {
+    HiddenJob* j = h->job;
+    if (!j || !h->hiddenView) return;
+    j->start = GetTickCount64();   // el tope cuenta desde el inicio de la navegación
+    j->navDone = false;
+    j->navId = 0;
+    if (FAILED(h->hiddenView->Navigate(j->url.c_str()))) hiddenFinish(h, kHiddenOffline, 0, nullptr);
+}
+
+void hiddenControllerReady(tfhost* h) {
+    h->hiddenController->get_CoreWebView2(&h->hiddenView);
+    RECT rc = {0, 0, kHiddenWidth, kHiddenHeight};
+    h->hiddenController->put_Bounds(rc);
+    ComPtr<ICoreWebView2Settings> s;
+    if (SUCCEEDED(h->hiddenView->get_Settings(&s))) {
+        s->put_IsScriptEnabled(TRUE);
+        s->put_IsWebMessageEnabled(FALSE);
+        s->put_AreDefaultScriptDialogsEnabled(FALSE);
+        s->put_IsStatusBarEnabled(FALSE);
+        s->put_AreHostObjectsAllowed(FALSE);
+        s->put_AreDefaultContextMenusEnabled(FALSE);
+        s->put_AreDevToolsEnabled(FALSE);
+    }
+    EventRegistrationToken tok;
+    h->hiddenView->add_NewWindowRequested(
+        Callback<ICoreWebView2NewWindowRequestedEventHandler>(
+            [](ICoreWebView2*, ICoreWebView2NewWindowRequestedEventArgs* args) -> HRESULT {
+                args->put_Handled(TRUE);
+                return S_OK;
+            }).Get(), &tok);
+    h->hiddenView->add_NavigationStarting(
+        Callback<ICoreWebView2NavigationStartingEventHandler>(
+            [h](ICoreWebView2*, ICoreWebView2NavigationStartingEventArgs* args) -> HRESULT {
+                UINT64 nid = 0;
+                if (h->job && SUCCEEDED(args->get_NavigationId(&nid))) h->job->navId = nid;   // también redirecciones
+                return S_OK;
+            }).Get(), &tok);
+    h->hiddenView->add_NavigationCompleted(
+        Callback<ICoreWebView2NavigationCompletedEventHandler>(
+            [h](ICoreWebView2*, ICoreWebView2NavigationCompletedEventArgs* args) -> HRESULT {
+                HiddenJob* j = h->job;
+                if (!j) return S_OK;
+                UINT64 nid = 0;
+                args->get_NavigationId(&nid);
+                if (nid != j->navId) return S_OK;   // fin de una navegación anterior (cancelada)
+                int http = 0;
+                ComPtr<ICoreWebView2NavigationCompletedEventArgs2> a2;
+                if (SUCCEEDED(args->QueryInterface(IID_PPV_ARGS(&a2)))) a2->get_HttpStatusCode(&http);
+                if (http >= 400) { hiddenFinish(h, kHiddenHttp, http, nullptr); return S_OK; }
+                BOOL ok = FALSE;
+                args->get_IsSuccess(&ok);
+                if (!ok) {
+                    COREWEBVIEW2_WEB_ERROR_STATUS st = COREWEBVIEW2_WEB_ERROR_STATUS_UNKNOWN;
+                    args->get_WebErrorStatus(&st);
+                    hiddenFinish(h, st == COREWEBVIEW2_WEB_ERROR_STATUS_OPERATION_CANCELED ? kHiddenCancelled : kHiddenOffline, 0, nullptr);
+                    return S_OK;
+                }
+                j->status = http >= 100 ? http : 200;
+                j->navDone = true;
+                hiddenPoll(h);   // primer sondeo ya; los siguientes, cada 250 ms
+                return S_OK;
+            }).Get(), &tok);
+}
+
+// Crea la ventana sin mostrar y el controlador InPrivate (almacén no persistente); asíncrono: al acabar arranca la carga pendiente.
+void hiddenEnsure(tfhost* h) {
+    if (h->hiddenView || h->hiddenCreating) return;
+    ComPtr<ICoreWebView2Environment10> env10;
+    if (!h->env || FAILED(h->env.As(&env10))) { hiddenFinish(h, kHiddenUnavailable, 0, nullptr); return; }
+    if (!h->hiddenWnd) {
+        // Ventana emergente que nunca se muestra (ni barra de tareas ni foco): solo es el padre del controlador.
+        h->hiddenWnd = CreateWindowExW(WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE, L"STATIC", L"", WS_POPUP, 0, 0,
+                                       kHiddenWidth, kHiddenHeight, nullptr, nullptr, GetModuleHandleW(nullptr), nullptr);
+        if (!h->hiddenWnd) { hiddenFinish(h, kHiddenUnavailable, 0, nullptr); return; }
+    }
+    ComPtr<ICoreWebView2ControllerOptions> opts;
+    if (FAILED(env10->CreateCoreWebView2ControllerOptions(&opts)) || !opts) { hiddenFinish(h, kHiddenUnavailable, 0, nullptr); return; }
+    opts->put_IsInPrivateModeEnabled(TRUE);
+    h->hiddenCreating = true;
+    HRESULT hr = env10->CreateCoreWebView2ControllerWithOptions(
+        h->hiddenWnd, opts.Get(),
+        Callback<ICoreWebView2CreateCoreWebView2ControllerCompletedHandler>(
+            [h](HRESULT result, ICoreWebView2Controller* controller) -> HRESULT {
+                h->hiddenCreating = false;
+                if (FAILED(result) || !controller) { hiddenFinish(h, kHiddenUnavailable, 0, nullptr); return S_OK; }
+                h->hiddenController = controller;
+                hiddenControllerReady(h);
+                hiddenStart(h);
+                return S_OK;
+            }).Get());
+    if (FAILED(hr)) { h->hiddenCreating = false; hiddenFinish(h, kHiddenUnavailable, 0, nullptr); }
+}
+
+void hiddenAccept(tfhost* h, HiddenJob* j) {
+    HWND w = h->hwnd.load();
+    if (h->job || !w) {   // otra carga en curso (o ventana cerrada)
+        auto done = j->done; auto ctx = j->ctx;
+        delete j;
+        if (done) done(kHiddenUnavailable, 0, nullptr, ctx);
+        return;
+    }
+    j->start = GetTickCount64();
+    h->job = j;
+    SetTimer(w, kHiddenTimer, kHiddenPollMs, nullptr);
+    if (h->hiddenView) hiddenStart(h); else hiddenEnsure(h);
+}
+
+// ---- Vista previa visible (W2-H) ----
+
+void previewApply(tfhost* h) {
+    if (!h->prevController || !h->prevView) return;
+    HWND w = h->hwnd.load();
+    if (!h->prevWanted || !w) {
+        h->prevController->put_IsVisible(FALSE);
+        if (!h->prevLoaded.empty()) { h->prevLoaded.clear(); h->prevView->Navigate(L"about:blank"); }   // detiene el audio
+        return;
+    }
+    // De píxeles CSS a físicos: la escala del monitor de la ventana (el zoom de la página está desactivado).
+    double scale = GetDpiForWindow(w) / 96.0;
+    RECT rc;
+    rc.left = static_cast<LONG>(lround(h->prevX * scale));
+    rc.top = static_cast<LONG>(lround(h->prevY * scale));
+    rc.right = static_cast<LONG>(lround((h->prevX + h->prevW) * scale));
+    rc.bottom = static_cast<LONG>(lround((h->prevY + h->prevH) * scale));
+    h->prevController->put_Bounds(rc);
+    h->prevController->put_IsVisible(TRUE);
+    if (h->prevLoaded != h->prevUrl) {
+        h->prevLoaded = h->prevUrl;
+        h->prevView->Navigate(h->prevUrl.c_str());
+    }
+}
+
+void previewCreate(tfhost* h) {
+    HWND w = h->hwnd.load();
+    if (h->prevCreating || h->prevController || !h->env || !w) return;
+    h->prevCreating = true;
+    HRESULT hr = h->env->CreateCoreWebView2Controller(
+        w, Callback<ICoreWebView2CreateCoreWebView2ControllerCompletedHandler>(
+               [h](HRESULT result, ICoreWebView2Controller* controller) -> HRESULT {
+                   h->prevCreating = false;
+                   if (FAILED(result) || !controller) return S_OK;   // sin panel: el siguiente show lo reintenta
+                   h->prevController = controller;
+                   controller->get_CoreWebView2(&h->prevView);
+                   ComPtr<ICoreWebView2Settings> s;
+                   if (SUCCEEDED(h->prevView->get_Settings(&s))) {
+                       s->put_IsScriptEnabled(TRUE);
+                       s->put_IsWebMessageEnabled(FALSE);
+                       s->put_AreHostObjectsAllowed(FALSE);
+                       s->put_IsStatusBarEnabled(FALSE);
+                       s->put_IsZoomControlEnabled(FALSE);
+                       s->put_AreDefaultContextMenusEnabled(h->devtools ? TRUE : FALSE);
+                       s->put_AreDevToolsEnabled(h->devtools ? TRUE : FALSE);
+                   }
+                   EventRegistrationToken tok;
+                   h->prevView->add_NewWindowRequested(
+                       Callback<ICoreWebView2NewWindowRequestedEventHandler>(
+                           [](ICoreWebView2*, ICoreWebView2NewWindowRequestedEventArgs* args) -> HRESULT {
+                               args->put_Handled(TRUE);
+                               return S_OK;
+                           }).Get(), &tok);
+                   previewApply(h);
+                   return S_OK;
+               }).Get());
+    if (FAILED(hr)) h->prevCreating = false;
+}
+
 LRESULT CALLBACK wndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     if (msg == WM_NCCREATE) {
         auto* cs = reinterpret_cast<CREATESTRUCTW*>(lp);
@@ -433,12 +745,42 @@ LRESULT CALLBACK wndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     case WM_TF_OPEN:
         runOpen(reinterpret_cast<OpenRequest*>(lp));
         return 0;
+    case WM_TF_HIDDEN_LOAD:
+        if (h) hiddenAccept(h, reinterpret_cast<HiddenJob*>(lp));
+        else delete reinterpret_cast<HiddenJob*>(lp);
+        return 0;
+    case WM_TF_HIDDEN_CANCEL:
+        if (h && h->job && h->job->id == static_cast<uint64_t>(wp)) hiddenFinish(h, kHiddenCancelled, 0, nullptr);
+        return 0;
+    case WM_TF_PREVIEW_SHOW: {
+        auto* r = reinterpret_cast<PreviewRequest*>(lp);
+        if (h) {
+            h->prevWanted = true;
+            h->prevUrl = r->url;
+            h->prevX = r->x; h->prevY = r->y; h->prevW = r->w; h->prevH = r->h;
+            if (h->prevController) previewApply(h); else previewCreate(h);
+        }
+        delete r;
+        return 0;
+    }
+    case WM_TF_PREVIEW_HIDE:
+        if (h) { h->prevWanted = false; previewApply(h); }
+        return 0;
+    case WM_TIMER:
+        if (h && wp == kHiddenTimer) hiddenTick(h);
+        return 0;
     case WM_TF_QUIT:
         DestroyWindow(hwnd);
         return 0;
     case WM_DESTROY:
         if (h) {
             h->hwnd.store(nullptr);
+            hiddenFinish(h, kHiddenUnavailable, 0, nullptr);
+            if (h->hiddenController) h->hiddenController->Close();
+            if (h->prevController) h->prevController->Close();
+            h->hiddenView.Reset(); h->hiddenController.Reset();
+            h->prevView.Reset(); h->prevController.Reset();
+            if (h->hiddenWnd) { DestroyWindow(h->hiddenWnd); h->hiddenWnd = nullptr; }
             if (h->controller) h->controller->Close();
             h->view.Reset();
             h->controller.Reset();
@@ -458,7 +800,13 @@ tfhost* tfhost_create(const tfhost_config* config) {
     if (!config) { setError("config nula"); return nullptr; }
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
-    if (FAILED(hr) && hr != RPC_E_CHANGED_MODE) { setError(hrString("CoInitializeEx", hr)); return nullptr; }
+    // WebView2 exige STA: si el hilo ya está en MTA (otra pieza inicializó COM antes), seguir solo fallaría luego en
+    // CreateCoreWebView2Environment con el mismo código. Ver tfhost_init_ui_thread.
+    if (hr == RPC_E_CHANGED_MODE) {
+        setError(hrString("CoInitializeEx STA: el hilo de UI ya esta en MTA (algo inicializo COM antes de tfhost_create)", hr));
+        return nullptr;
+    }
+    if (FAILED(hr)) { setError(hrString("CoInitializeEx", hr)); return nullptr; }
 
     auto* h = new tfhost();
     h->cfg = *config;
@@ -669,6 +1017,39 @@ int tfhost_open_url(tfhost* h, const char* url_utf8) {
     return r.rc;
 }
 
+void tfhost_hidden_load(tfhost* h, uint64_t id, const char* url_utf8, const char* ready_script_utf8, int timeout_ms,
+                        void (*done)(int, int, const char*, void*), void* ctx) {
+    HWND w = h ? h->hwnd.load() : nullptr;
+    auto* j = new HiddenJob();
+    j->id = id;
+    j->url = widen(url_utf8);
+    j->ready = widen(ready_script_utf8);
+    j->timeoutMs = timeout_ms > 0 ? static_cast<ULONGLONG>(timeout_ms) : 30000;
+    j->done = done;
+    j->ctx = ctx;
+    if (!w || j->url.empty() || !PostMessageW(w, WM_TF_HIDDEN_LOAD, 0, reinterpret_cast<LPARAM>(j))) {
+        delete j;
+        if (done) done(kHiddenUnavailable, 0, nullptr, ctx);
+    }
+}
+
+void tfhost_hidden_cancel(tfhost* h, uint64_t id) {
+    HWND w = h ? h->hwnd.load() : nullptr;
+    if (w) PostMessageW(w, WM_TF_HIDDEN_CANCEL, static_cast<WPARAM>(id), 0);
+}
+
+void tfhost_preview_show(tfhost* h, const char* url_utf8, double x, double y, double wd, double ht) {
+    HWND w = h ? h->hwnd.load() : nullptr;
+    if (!w || !url_utf8) return;
+    auto* r = new PreviewRequest{widen(url_utf8), x, y, wd, ht};
+    if (r->url.empty() || !PostMessageW(w, WM_TF_PREVIEW_SHOW, 0, reinterpret_cast<LPARAM>(r))) delete r;
+}
+
+void tfhost_preview_hide(tfhost* h) {
+    HWND w = h ? h->hwnd.load() : nullptr;
+    if (w) PostMessageW(w, WM_TF_PREVIEW_HIDE, 0, 0);
+}
+
 int tfhost_single_instance(void) {
     HANDLE m = CreateMutexW(nullptr, FALSE, L"Local\\ToneForge.SingleInstance");   // se queda abierto a propósito
     if (m && GetLastError() == ERROR_ALREADY_EXISTS) {
@@ -680,6 +1061,12 @@ int tfhost_single_instance(void) {
         return 0;
     }
     return 1;
+}
+
+int tfhost_init_ui_thread(void) {
+    // Sin CoUninitialize: el hilo de UI vive hasta el final del proceso (como la de tfhost_create).
+    HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    return (hr == S_OK || hr == S_FALSE) ? 0 : static_cast<int>(hr);
 }
 
 const char* tfhost_last_error(void) {

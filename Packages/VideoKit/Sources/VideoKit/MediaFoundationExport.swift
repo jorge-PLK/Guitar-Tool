@@ -27,7 +27,7 @@ extension MontageExporter {
     static let aacSampleRates: Set<Int> = [44_100, 48_000]
 
     /// Codifica `frames` y la mezcla (recortada a la duración del vídeo) en `url`, con parcial y sustitución como en el
-    /// Mac. HEVC solo si hay codificador; si no, H.264 (el resumen dice cuál).
+    /// Mac. Siempre H.264 aunque se pida HEVC (Jorge, 21/11/2026, W2-E1; el resumen dice el usado).
     static func write(frames: any MontageFrameSource, mixURL: URL?, settings: MontageExportSettings, to url: URL,
                       progress: (@Sendable (Double) -> Void)?) async throws -> MontageExportSummary {
         let partial = url.deletingPathExtension().appendingPathExtension("partial." + settings.container.fileExtension)
@@ -38,7 +38,7 @@ extension MontageExporter {
             guard let m = mix, m.frameCount > 0, aacSampleRates.contains(Int(m.sampleRate)) else { throw MontageError.audio(mixURL.lastPathComponent) }
         }
         var used = settings
-        if settings.codec == .hevc, !MediaFoundationEncoders.hasHEVC { used.codec = .h264 }
+        if !MontageCodec.supported.contains(settings.codec) { used.codec = MontageCodec.supported[0] }
         let job = MuxJob(frames: frames, mix: mix, settings: used, url: partial, progress: progress)
         do {
             let n = try await withTaskCancellationHandler {

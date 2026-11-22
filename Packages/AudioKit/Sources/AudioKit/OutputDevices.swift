@@ -16,9 +16,13 @@ public struct AudioDevice: Sendable, Equatable, Identifiable {
     /// Frecuencia ACTUAL del dispositivo (`nil` = desconocida). El aviso de frecuencia se basa en esta, no en
     /// `sampleRates`: hay aparatos que declaran varias pero solo la cambian desde su propio menú.
     public var nominalSampleRate: Double?
+    /// Aparato físico al que pertenece (Windows: `PKEY_Device_ContainerId` del endpoint; paso 8, F2). nil en CoreAudio,
+    /// donde un dispositivo ya es el aparato entero.
+    public var containerID: String?
 
     public init(id: UInt32, uid: String, name: String, inputChannels: Int = 0, outputChannels: Int = 0,
-                sampleRates: [Double] = [], nominalSampleRate: Double? = nil) {
+                sampleRates: [Double] = [], nominalSampleRate: Double? = nil, containerID: String? = nil) {
+        self.containerID = containerID
         self.id = id
         self.uid = uid
         self.name = name

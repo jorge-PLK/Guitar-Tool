@@ -1,6 +1,7 @@
 // Simulador de `tab.*` para `?mock=1` (sin núcleo): partitura pequeña, selección por clic, edición básica y progreso.
 // Variantes con `?tab=`: progress (bajo transcribiendo, batería en cola) | working (nada listo) | choose | waiting | empty | failed.
 import { setMockHandler, mockEmit, BridgeError } from '../bridge.js';
+import '../mock/songsterr.js';
 
 const variant = new URLSearchParams(location.search).get('tab');
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -49,6 +50,10 @@ function fresh(id) {
     selection: null, span: null, revision, flash: null,
   };
 }
+
+/// Para `mock/songsterr.js`: cambia el TabState simulado (aceptar el emparejamiento o pasar a automática) y lo devuelve.
+export function mockTabPatch(fn) { if (!st) throw new BridgeError('not-open', 'No hay ninguna tablatura abierta.'); fn(st); revision++; st.revision = revision; return clone(st); }
+export const mockTabOpen = () => st != null;
 
 function emitState() { mockEmit('tab.state', clone(st)); }
 const readyTracks = () => st.tracks.filter(t => t.transcription === 'ready');

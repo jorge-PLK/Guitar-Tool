@@ -202,6 +202,13 @@ final class StudyService {
     /// Cola de trabajos y último estado de análisis emitido (parte 8.5b, `StudyEdits.swift`).
     let edits = StudyEditsLink()
     private let profileStore: ProfileStore?
+    /// W2-C: servicio de `audio.*` (dueño de la sesión de audio). Si hay una sesión abierta con guitarra asignada, el reproductor de
+    /// estudio se engancha a ella (como `BackingController` con `AudioController` en el Mac). nil = sin `audio.*`.
+    nonisolated(unsafe) var audioService: AudioService?
+    /// W2-R1: se llama al empezar `close()` (Grabar se cierra con el tema).
+    nonisolated(unsafe) var onClosing: (@MainActor @Sendable () async -> Void)?
+    /// Controlador al que está enganchado el tema abierto.
+    private var audioController: AudioController?
 
     nonisolated init(options: LaunchOptions, root: URL?, storeFactory: (@Sendable (URL) -> any StudyStoring)? = nil) {
         self.options = options
@@ -282,7 +289,17 @@ final class StudyService {
                                      left: profile.audio?.backingOut.left ?? 1, right: profile.audio?.backingOut.right ?? 2)
         let session = StudySession(project: project, folder: folder, store: storeFactory(folder))
         let audio = StudyAudio(mode: options.audio, output: output)
+        let hostController = audioService?.controller()
+        if let hostController {
+            hostController.start()
+            audio.externalHost = { hostController.wouldHostPlayer }
+        }
         let controller = BackingController(session: session, audio: audio, masterGainDB: profile.masterGainDB)
+        if let hostController {
+            hostController.onHostingEnded = { [weak audio] in audio?.restoreOwnOutput() }
+            hostController.bind(player: controller.player, study: session)
+            audioController = hostController
+        }
         // Como el Mac (`AppModel.openStudy`): un tema separado sin análisis vigente lo pide al abrir.
         // Sin analizador o sin separación no es error: se queda en `missing`.
         if let jobs = edits.jobs, project.separation.state == .done,
@@ -306,9 +323,12 @@ final class StudyService {
     func close() async {
         ticker?.cancel()
         ticker = nil
+        await onClosing?()   // W2-R1: Grabar usa la sesión del tema; se cierra antes
         guard let o = current else { return }
         current = nil
         o.session.onChange = nil
+        audioController?.unbind()
+        audioController = nil
         o.controller.shutdown()
         if o.session.hasPendingSave { await o.session.flush() }
         if let t = masterSaveTask {

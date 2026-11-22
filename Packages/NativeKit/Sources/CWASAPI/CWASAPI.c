@@ -230,6 +230,24 @@ static void read_name(IMMDevice *dev, char *out, int cap) {
     RELEASE(ps);
 }
 
+/// PKEY_Device_ContainerId (paso 8, F2): GUID del aparato físico, común a todos sus endpoints. Vacío si no está.
+static const PROPERTYKEY TF_PKEY_ContainerId = {{0x8C7ED206, 0x3F8A, 0x4827, {0xB3, 0xAB, 0xAE, 0x9E, 0x1F, 0xAE, 0xFC, 0x6C}}, 2};
+static const GUID TF_GUID_NULL = {0, 0, 0, {0, 0, 0, 0, 0, 0, 0, 0}};
+
+static void read_container(IMMDevice *dev, char *out, int cap) {
+    IPropertyStore *ps = NULL;
+    PROPVARIANT pv;
+    WCHAR buf[64];
+    out[0] = 0;
+    if (FAILED(IMMDevice_OpenPropertyStore(dev, STGM_READ, &ps))) return;
+    PropVariantInit(&pv);
+    if (SUCCEEDED(IPropertyStore_GetValue(ps, &TF_PKEY_ContainerId, &pv)) && pv.vt == VT_CLSID && pv.puuid
+        && !IsEqualGUID(pv.puuid, &TF_GUID_NULL) && StringFromGUID2(pv.puuid, buf, 64) > 0)
+        to_utf8(buf, out, cap);
+    PropVariantClear(&pv);
+    RELEASE(ps);
+}
+
 static void query_device(IMMDevice *dev, wasapi_device_info *d) {
     IAudioClient *c = NULL;
     IAudioClient3 *c3 = NULL;
@@ -359,6 +377,7 @@ int32_t wasapi_enumerate(wasapi_device_info *out, int32_t capacity) {
                     CoTaskMemFree(id);
                 }
                 read_name(dev, d->name, WASAPI_NAME_CAP);
+                read_container(dev, d->container_id, WASAPI_ID_CAP);
                 query_device(dev, d);
                 query_driver(dev, d);
                 RELEASE(dev);

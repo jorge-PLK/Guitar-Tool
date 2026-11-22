@@ -19,7 +19,7 @@ const SEND_MS = 60;
 const dbToFrac = db => (clamp(db, FADER_MIN_DB, FADER_MAX_DB) - FADER_MIN_DB) / (FADER_MAX_DB - FADER_MIN_DB);
 const capTop = db => `${(1 - dbToFrac(db)) * 100}%`;
 
-function Fader({ db, label, dbRef, onChange, onCommit }) {
+export function Fader({ db, label, dbRef, onChange, onCommit }) {
   const cap = useRef(null);
   const live = useRef(null);
   const lastSend = useRef(0);
@@ -72,7 +72,7 @@ function Fader({ db, label, dbRef, onChange, onCommit }) {
   </div>`;
 }
 
-function Toggle({ text, on, label, onClick }) {
+export function Toggle({ text, on, label, onClick }) {
   return html`<button class=${'mix-toggle' + (on ? ' on' : '')} aria-label=${label} aria-pressed=${on} onClick=${onClick}>${text}</button>`;
 }
 
@@ -128,7 +128,7 @@ function Channel({ c, dim, meters }) {
   </div>`;
 }
 
-function paintMeter(el, m) {
+export function paintMeter(el, m) {
   if (!el) return;
   const floor = METER_FLOOR_DB;
   const f = m && m.rmsDB > SILENT_DB ? clamp((m.rmsDB - floor) / -floor, 0, 1) : 0;

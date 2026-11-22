@@ -1,8 +1,9 @@
 import Foundation
+import SourceKit
 import Store
 
 /// Diálogos nativos que pone el anfitrión Swift de Windows (otra parte del paso 8); el núcleo no los implementa.
-public protocol HostServices: Sendable {
+public protocol HostServices: Sendable, HiddenPageLoading {
     /// Selector de fichero; `types` son extensiones sin punto (`["wav","flac","mp3"]`). `nil` si se cancela.
     func pickFile(types: [String]) async -> URL?
     /// Selector de varios ficheros; `[]` si se cancela. Tiene versión por omisión (uno solo) en la extensión.
@@ -13,6 +14,23 @@ public protocol HostServices: Sendable {
     func saveFile(suggestedName: String, types: [String]) async -> URL?
     /// Abre una URL con la aplicación del sistema para su esquema. `false` si nada la abre (p. ej. `spotify:` sin la app).
     func openURL(_ url: URL) async -> Bool
+    /// Vista previa visible (W2-H): panel nativo con la página `url` colocado sobre la ventana en `rect` (píxeles CSS de la
+    /// página; el anfitrión aplica la escala del monitor). Llamarlo de nuevo cambia la posición y, si `url` cambió, navega.
+    /// `false` si el anfitrión no tiene vista previa (por omisión).
+    func showPreview(url: URL, rect: PreviewRect) async -> Bool
+    /// Oculta el panel y detiene su página. Idempotente; seguro sin vista previa creada.
+    func hidePreview() async
+}
+
+/// Rectángulo en píxeles CSS de la página (origen arriba a la izquierda del área de la página).
+public struct PreviewRect: Sendable, Equatable, Codable {
+    public var x: Double
+    public var y: Double
+    public var width: Double
+    public var height: Double
+    public init(x: Double, y: Double, width: Double, height: Double) {
+        self.x = x; self.y = y; self.width = width; self.height = height
+    }
 }
 
 public extension HostServices {
@@ -20,6 +38,12 @@ public extension HostServices {
     func pickFiles(types: [String]) async -> [URL] { await pickFile(types: types).map { [$0] } ?? [] }
     func saveFile(suggestedName: String, types: [String]) async -> URL? { nil }
     func openURL(_ url: URL) async -> Bool { false }
+    func showPreview(url: URL, rect: PreviewRect) async -> Bool { false }
+    func hidePreview() async {}
+    /// Navegador oculto (W2-G, `TabSongsterr.swift`). Por omisión no hay: la hoja de Songsterr da `unsupported`.
+    func load(url: URL, userAgent: String?, readyScript: String?, timeout: TimeInterval) async throws -> HiddenPage {
+        throw HiddenPageError.unsupported
+    }
 }
 
 struct ImportFileParams: Codable, Sendable { var path: String }
@@ -52,6 +76,9 @@ struct PickedFileResult: Codable, Sendable {
 struct PickedFilesResult: Codable, Sendable { var paths: [String] }
 struct OpenURLParams: Codable, Sendable { var urls: [String] }
 struct OpenURLResult: Codable, Sendable { var opened: String? }
+struct PreviewShowParams: Decodable, Sendable { var url: String; var x: Double; var y: Double; var width: Double; var height: Double }
+struct PreviewShowResult: Codable, Sendable { var shown: Bool }
+struct PreviewHideResult: Codable, Sendable { var hidden: Bool }
 struct PickedFolderResult: Codable, Sendable {
     var path: String?
     var restartRequired: Bool
@@ -92,6 +119,8 @@ extension Bridge {
     }
 
     public func shutdownAsync() async {
+        await closeMontage()   // W2-E2: guarda el montaje y para su relevo al cerrar la ventana (los dos anfitriones)
+        await closeTakeView()   // W2-V: suelta la salida del visor de tomas
         await closeTab()
         await closeStudy()
         await jobs.shutdown()
@@ -127,12 +156,7 @@ extension Bridge {
             let r = try await jobs.rename(id: try uuid(p.id), title: p.title, artist: p.artist)
             return RenameResult(id: p.id, title: r.title, artist: r.artist)
         }
-        router.register("library.cleanupInfo") { (p: ProjectIDParams) in
-            CleanupInfoResult(bytes: try await jobs.cleanupBytes(id: try uuid(p.id)))
-        }
-        router.register("library.cleanup") { (p: ProjectIDParams) in
-            CleanupResult(cleaned: true, bytes: try await jobs.cleanup(id: try uuid(p.id)))
-        }
+        // `library.cleanupInfo` y `library.cleanup` (con `id` nulo = toda la biblioteca): `SettingsMethods.swift` (W2-A).
         router.register("library.deleteTake") { [weak self] (p: DeleteTakeParams) in
             let id = try uuid(p.id)
             try await jobs.deleteTake(id: id, takeID: try uuid(p.takeId))
@@ -168,6 +192,25 @@ extension Bridge {
                 if await host.openURL(url) { return OpenURLResult(opened: text) }
             }
             return OpenURLResult(opened: nil)
+        }
+        // Vista previa de Songsterr (W2-H): solo https y songsterr.com; sin anfitrión o sin vista previa, `unsupported`.
+        router.register("host.preview.show") { [weak self] (p: PreviewShowParams) in
+            guard let url = URL(string: p.url), url.scheme == "https", SongsterrReader.isSongsterrHost(url.host) else {
+                throw RPCError(code: "bad-params", message: "«url» debe ser una página https de songsterr.com.")
+            }
+            guard [p.x, p.y, p.width, p.height].allSatisfy(\.isFinite), p.width >= 1, p.height >= 1 else {
+                throw RPCError(code: "bad-params", message: "El rectángulo de la vista previa no es válido.")
+            }
+            guard let host = self?.host else { throw Bridge.noHost }
+            let rect = PreviewRect(x: p.x, y: p.y, width: p.width, height: p.height)
+            guard await host.showPreview(url: url, rect: rect) else {
+                throw RPCError(code: "unsupported", message: "El anfitrión no tiene vista previa.")
+            }
+            return PreviewShowResult(shown: true)
+        }
+        router.register("host.preview.hide") { [weak self] (_: Empty) in
+            await self?.host?.hidePreview()
+            return PreviewHideResult(hidden: true)
         }
         let profile = options.supportDir.map { ProfileStore(url: $0.appendingPathComponent("profile.json")) } ?? ProfileStore()
         router.register("host.pickProjectsFolder") { [weak self] (_: Empty) in

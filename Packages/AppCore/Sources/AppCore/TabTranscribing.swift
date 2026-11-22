@@ -19,13 +19,15 @@ protocol TabSynthesizing: Sendable {
 struct TabServices: Sendable {
     var transcriber: any TabTranscribing
     var synth: any TabSynthesizing
+    /// Songsterr (W2-G): nil = los de producción sobre el navegador oculto del anfitrión.
+    var songsterr: SongsterrServices?
 
     static func production(supportDir: URL?, environment: [String: String] = ProcessInfo.processInfo.environment) -> TabServices {
         let store = ModelStore(root: supportDir.map { $0.appendingPathComponent("Models", isDirectory: true) } ?? ModelStore.defaultRoot,
                                bundleResourceDirectory: Bundle.main.resourceURL)
         let resolver = ModelResolver(store: store, environment: environment)
         return TabServices(transcriber: ProductionTabTranscriber(models: resolver),
-                           synth: ProductionTabSynth(environment: environment))
+                           synth: ProductionTabSynth(environment: environment), songsterr: nil)
     }
 }
 

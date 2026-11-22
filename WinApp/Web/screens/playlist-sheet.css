@@ -1,0 +1,74 @@
+/* Hoja de lista/álbum dentro de «Importar lista». Mac: App/Sources/PlaylistImport.swift (PlaylistImportView) y
+   LinkImportSheet.playlistSize (880 x 700, padding 24, separación 18). */
+.modal:has(.pl-root) { padding: 24px; height: 700px; }
+.pl-root { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 14px; }
+.pl-spacer { flex: 1; }
+.pl-actions { display: flex; justify-content: flex-end; gap: 8px; align-items: center; }
+.pl-head-row { display: flex; align-items: flex-end; gap: 8px; }
+.pl-head-row .pl-head { flex: 1; min-width: 0; }
+.pl-small { height: 34px; }
+.pl-head { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.pl-name { font-size: 16px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pl-sub { font-size: 13px; color: var(--muted); }
+.pl-note { font-size: 12px; color: var(--muted); margin: 0; }
+.pl-line-between { display: flex; justify-content: space-between; align-items: baseline; }
+.muted { color: var(--muted); }
+.pl-eyebrow { font-size: 12px; font-weight: 500; letter-spacing: .7px; color: var(--muted); }
+
+.pl-table { flex: 1; min-height: 0; overflow: auto; background: rgba(15, 17, 19, .5); border: 1px solid var(--field-line); border-radius: 10px; }
+.pl-row { border-bottom: 1px solid var(--line); }
+.pl-row:last-child { border-bottom: 0; }
+.pl-row.doubtful { background: rgba(51, 26, 28, .35); }
+.pl-line { display: flex; align-items: center; gap: 12px; padding: 8px 14px; min-height: 52px; }
+.pl-row.doubtful .pl-line { padding-top: 12px; padding-bottom: 12px; }
+.pl-line.tap { cursor: default; }
+.pl-line.top { align-items: flex-start; }
+.pl-line .grow { flex: 1; min-width: 8px; }
+.pl-title { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.pl-title .t { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pl-title .a { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pl-check-btn { display: flex; padding: 0; border: 0; background: none; color: var(--muted); width: 20px; height: 20px; align-items: center; justify-content: center; flex: none; }
+.pl-check-btn.on { color: var(--accent); }
+.pl-check-ph { width: 20px; height: 20px; flex: none; }
+.pl-check { display: flex; }
+.pl-dur { width: 48px; text-align: right; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; flex: none; }
+
+.pl-rtitle { width: 250px; flex: none; min-width: 0; }
+.pl-rdur { width: 40px; text-align: right; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; flex: none; }
+.pl-cand { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: var(--field); border: 1px solid var(--field-line);
+  border-radius: 8px; color: var(--text); text-align: left; }
+.pl-cand:hover { background: var(--neutral-bg); }
+.pl-cand .grow { flex: 1; min-width: 4px; }
+.pl-cand-text { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.pl-cand-text .n { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pl-cand-text .m { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pl-ph { font-size: 13px; color: var(--text-2); white-space: nowrap; }
+.pl-ph.muted { color: var(--muted); }
+.pl-diff { font-size: 12px; font-weight: 500; color: var(--text-2); white-space: nowrap; }
+.pl-chev { flex: none; color: var(--muted); }
+
+.pl-stage { font-size: 12px; color: var(--accent); white-space: nowrap; }
+.pl-mini { width: 140px; flex: none; }
+.pl-mini .bar { height: 5px; }
+.pl-queued { font-size: 12px; color: var(--muted); }
+
+.pl-stats { display: flex; gap: 12px; }
+.pl-stat { flex: 1; padding: 12px 16px; background: var(--field); border: 1px solid var(--field-line); border-radius: 10px; display: flex; flex-direction: column; gap: 4px; }
+.pl-stat .l { font-size: 11px; letter-spacing: .7px; color: var(--muted); }
+.pl-stat .v { font-family: var(--font-display); font-size: 26px; font-weight: 700; }
+.pl-ftitle { width: 280px; flex: none; min-width: 0; }
+.pl-ferr { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.pl-ferr .e { font-size: 13px; font-weight: 600; color: var(--danger); }
+.pl-ferr .d { font-size: 12px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.pl-error .err-block { flex: none; }
+
+/* Cápsula de la Biblioteca (LibraryView.header: indicador de la lista) */
+.pl-capsule { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px; border: 0; border-radius: 999px;
+  background: var(--accent-bg); color: var(--accent); font-size: 13px; font-weight: 500; white-space: nowrap; }
+.pl-capsule:hover { background: #33291b; }
+.pl-capsule .spinner { width: 14px; height: 14px; }
+
+/* Paridad con el Mac (W2-COS): hoja TF.bg sin borde y filas sin alto mínimo (relleno 8). Pesos y alturas: los de SwiftUI. */
+.modal.modal:has(.pl-root) { background: var(--bg); border: 0; }
+.pl-line { min-height: 0; }
+.pl-root .banner { border: 0; }

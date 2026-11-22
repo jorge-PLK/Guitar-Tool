@@ -24,7 +24,7 @@ struct RecordMixer: View {
                     Text("Mezclador").font(TF.display(18))
                     Spacer()
                     Text("Salida: \(ctl.player.outputDeviceName.isEmpty ? "—" : ctl.player.outputDeviceName)")
-                        .font(TF.body(12)).foregroundStyle(TF.muted)
+                        .font(TF.body(12)).foregroundStyle(TF.muted).lineLimit(1).truncationMode(.tail)
                     Button { expanded.toggle() } label: {
                         Text(expanded ? "Plegar" : "Expandir").font(TF.body(13, .medium)).foregroundStyle(TF.text2)
                             .padding(.horizontal, 12).frame(height: 30)
@@ -70,7 +70,7 @@ struct RecordMixer: View {
                 Text("Master").font(TF.body(12, .semibold)).fixedSize()
                 Slider(value: Binding(get: { dB }, set: { ctl.setMaster(abs($0) < 1.5 ? 0 : $0) }),
                        in: BackingController.faderRange).frame(width: 40).tint(TF.accent)
-                Text(Fmt.db(dB)).font(TF.body(12)).foregroundStyle(TF.text2).monospacedDigit().frame(width: 42, alignment: .leading)
+                Text(Fmt.db(dB)).font(TF.body(12)).foregroundStyle(TF.text2).monospacedDigit().lineLimit(1).fixedSize()
             }
             Divider().frame(height: 28)
             HStack(spacing: 6) {

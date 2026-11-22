@@ -228,16 +228,25 @@ extension RecordedTake {
 extension LatencyCalibrationKey {
     /// La clave en los términos del perfil de equipo: sin salida elegida (nil) el UID va vacío, aunque la sesión
     /// la abriera en la de defecto del sistema (cuyo UID real sí lleva la clave de la sesión).
+    /// Con WASAPI (F2) el UID de la sesión ya es la identidad del aparato y no se toca si hay salida elegida; sin salida
+    /// elegida se vacían el UID y el endpoint de salida.
     public func inProfileTerms(outputDeviceUID: String?) -> LatencyCalibrationKey {
         var k = self
-        k.outputUID = outputDeviceUID ?? ""
+        guard let outputDeviceUID else {
+            k.outputUID = ""
+            k.wasapi?.outputEndpoint = ""
+            return k
+        }
+        if k.wasapi == nil { k.outputUID = outputDeviceUID } else { k.wasapi?.outputEndpoint = outputDeviceUID }
         return k
     }
 
-    /// Lo contrario: con el UID vacío del perfil, el de la salida por defecto con la que abrió la sesión.
-    public func resolvingDefaultOutput(to uid: String) -> LatencyCalibrationKey {
+    /// Lo contrario: con el UID vacío del perfil, el de la salida por defecto con la que abrió la sesión. Con WASAPI,
+    /// `endpoint` es el endpoint de esa salida (nil = `uid`).
+    public func resolvingDefaultOutput(to uid: String, endpoint: String? = nil) -> LatencyCalibrationKey {
         var k = self
         if k.outputUID.isEmpty { k.outputUID = uid }
+        if k.wasapi?.outputEndpoint.isEmpty == true { k.wasapi?.outputEndpoint = endpoint ?? uid }
         return k
     }
 }

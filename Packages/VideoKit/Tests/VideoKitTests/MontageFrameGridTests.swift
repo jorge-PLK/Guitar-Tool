@@ -499,8 +499,8 @@ final class MontageFrameGridTests: XCTestCase {
         #else
         // [windows] `IMFSinkWriter` escribe MPEG-4 sea cual sea la extensión (parte 7.2): el `.mov` lleva marca MP4.
         XCTAssertTrue(["mp42", "isom", "mp41"].contains(try Self.majorBrand(mov.mov)))
-        // Sin codificador HEVC (la VM), H.264.
-        let hevcTag = MediaFoundationEncoders.hasHEVC ? "hev1|hvc1" : "avc1"
+        // W2-E1: en Windows HEVC pedido sale siempre en H.264.
+        let hevcTag = "avc1"
         #endif
         let movLoud = LoudnessMeter.measure(mov.movAudio.channels, sampleRate: mov.movAudio.sampleRate)
         let dt = frameDuration(30)

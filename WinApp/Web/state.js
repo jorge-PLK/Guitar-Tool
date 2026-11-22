@@ -16,6 +16,7 @@ export const screenById = id => [...SCREENS, SETTINGS].find(s => s.id === id);
 export const info = signal(null);          // resultado de app.info
 export const bootError = signal(null);     // { code, message } si app.info falla
 export const screen = signal('library');   // navegación por estado
+export const settingsTab = signal('audio'); // pestaña de Ajustes: audio | video | library (AppModel.settingsTab del Mac)
 
 // Biblioteca
 export const entries = signal([]);         // [Summary] de library.list
@@ -167,6 +168,8 @@ export async function boot() {
   }
   const launch = info.value.launch ?? {};
   if (launch.screen && screenById(launch.screen)) screen.value = launch.screen;
+  const tab = /^settings-(video|library|audio)$/.exec(launch.screen ?? '');   // como `--screen settings-video` del Mac
+  if (tab) { screen.value = 'settings'; settingsTab.value = tab[1]; }
   await Promise.all([loadLibrary(), loadJobs()]);
   if (launch.project) {
     const key = fold(launch.project);

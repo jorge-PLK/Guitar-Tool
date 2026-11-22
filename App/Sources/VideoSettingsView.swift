@@ -246,7 +246,10 @@ struct VideoSettingsView: View {
         let resolutions = CameraChoices.resolutions(of: camera)
         let shown = CameraChoices.shown(video.resolution, fps: video.fps, camera: camera)
         let fpsChoices = shown.map { CameraChoices.frameRates(of: camera, at: $0.0) } ?? []
-        return SettingsGroup(title: "Cámara", note: "Webcam USB o iPhone con Continuity Camera.") {
+        let inUse = if let camera { "En uso: \(camera.name)." }
+            else if video.cameraUID != nil { "La cámara elegida está desconectada." }
+            else { "No hay ninguna cámara conectada." }
+        return SettingsGroup(title: "Cámara", note: inUse) {
             HStack(alignment: .top, spacing: 20) {
                 VStack(spacing: 10) {
                     InfoRow(label: "Cámara") {
@@ -255,14 +258,14 @@ struct VideoSettingsView: View {
                             Text("Por defecto del sistema").tag(String?.none)
                             ForEach(cameraOptions(list), id: \.uid) { Text($0.label).tag(String?.some($0.uid)) }
                         }
-                        .labelsHidden().frame(maxWidth: 280)
+                        .labelsHidden().frame(maxWidth: 280, alignment: .trailing)
                     }
                     InfoRow(label: "Resolución") {
                         Picker("Resolución", selection: Binding(
                             get: { shown?.0 ?? video.resolution }, set: { r in update { $0.resolution = r } })) {
                             ForEach(resolutions, id: \.self) { Text(CameraChoices.label($0)).tag($0) }
                         }
-                        .labelsHidden().frame(maxWidth: 160)
+                        .labelsHidden().frame(maxWidth: 160, alignment: .trailing)
                         .disabled(camera == nil)
                     }
                     InfoRow(label: "Fotogramas por segundo") {
@@ -270,7 +273,7 @@ struct VideoSettingsView: View {
                             get: { shown?.1 ?? video.fps }, set: { f in update { $0.fps = f } })) {
                             ForEach(fpsChoices, id: \.self) { Text(CameraChoices.label(fps: $0)).tag($0) }
                         }
-                        .labelsHidden().frame(maxWidth: 160)
+                        .labelsHidden().frame(maxWidth: 160, alignment: .trailing)
                         .disabled(camera == nil)
                     }
                 }
@@ -356,12 +359,12 @@ struct VideoSettingsView: View {
                     Text("HEVC").tag(VideoCodec.hevc)
                     Text("H.264").tag(VideoCodec.h264)
                 }
-                .pickerStyle(.segmented).labelsHidden().frame(width: 160)
+                .pickerStyle(.segmented).labelsHidden().frame(width: 160, alignment: .trailing)
                 Picker("Resolución de exportación", selection: Binding(
                     get: { video.export.resolution }, set: { r in update { $0.export.resolution = r } })) {
                     ForEach(CameraChoices.presets, id: \.self) { Text(CameraChoices.label($0)).tag($0) }
                 }
-                .labelsHidden().frame(width: 100)
+                .labelsHidden().frame(width: 100, alignment: .trailing)
             }
             InfoRow(label: "Volumen") {
                 Text("normalizado a −14 LUFS").fontWeight(.semibold).foregroundStyle(TF.text2)

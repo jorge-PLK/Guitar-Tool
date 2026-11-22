@@ -7,6 +7,13 @@ import Store
 // conversión, importación en la biblioteca y, ya con `Library`, la separación y el análisis como `import.file`.
 
 struct LinkURLParams: Codable, Sendable { var url: String }
+/// `link.classify`: qué es el enlace, sin leerlo (instantáneo; lo que `SourceInput.parse` decide en `link.resolve`).
+struct LinkClassifyResult: Codable, Sendable, Equatable {
+    /// `playlist` (lista o álbum) | `track` (un vídeo o canción) | `unsupported`.
+    var kind: String
+    /// `youtube` | `spotify`; nil si `unsupported`.
+    var source: String?
+}
 struct LinkCancelParams: Codable, Sendable { var jobId: String? }
 struct LinkImportParams: Codable, Sendable {
     var candidateId: String?
@@ -82,6 +89,8 @@ struct LinkResolveResult: Codable, Sendable {
     var possibleDuplicate: LinkTrackInfo?
     var noCloseCandidate: Bool
     var candidates: [LinkCandidateInfo]
+    /// W2-J: solo con `link == "playlist"` (lista o álbum): el paso 1 de la lista (`PlaylistMethods.swift`).
+    var playlist: PlaylistSnapshot?
 }
 
 struct LinkFinished: Codable, Sendable {
@@ -134,6 +143,8 @@ final class LinkEngine: @unchecked Sendable {
     private var tail: Task<Void, Never>?
     private var running: [String: Task<Void, Never>] = [:]
     private var _emitFinished: @Sendable (LinkFinished) -> Void = { _ in }
+    private var openPlaylist: (@Sendable (String) async throws -> LinkResolveResult)?
+    private var cancelPlaylistLoading: (@Sendable () async -> Bool)?
 
     init(jobs: JobEngine, sources: ExternalSources, root: URL?) {
         self.jobs = jobs
@@ -142,6 +153,12 @@ final class LinkEngine: @unchecked Sendable {
     }
 
     func setSink(_ f: @escaping @Sendable (LinkFinished) -> Void) { lock.withLock { _emitFinished = f } }
+
+    /// W2-J: el desvío a lista de `link.resolve` y su cancelación (`PlaylistMethods.swift`).
+    func setPlaylistHooks(open: @escaping @Sendable (String) async throws -> LinkResolveResult,
+                          cancelLoading: @escaping @Sendable () async -> Bool) {
+        lock.withLock { openPlaylist = open; cancelPlaylistLoading = cancelLoading }
+    }
 
     @MainActor
     private func session() -> LinkImportSession {
@@ -160,6 +177,10 @@ final class LinkEngine: @unchecked Sendable {
         let text = url.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { throw RPCError(code: "bad-params", message: "«url» está vacía.") }
         _ = try Bridge.service(root)
+        // Lista o álbum: como `continueTapped` del Mac, se desvía antes de resolver un tema suelto.
+        if case .playlist? = try? SourceInput.parse(text), let open = lock.withLock({ openPlaylist }) {
+            return try await open(text)
+        }
         let s = await session()
         do {
             let r = try await s.resolve(text)
@@ -201,7 +222,11 @@ final class LinkEngine: @unchecked Sendable {
     }
 
     @discardableResult
-    func cancelResolve() async -> Bool { await session().cancel() }
+    func cancelResolve() async -> Bool {
+        let list = await lock.withLock({ cancelPlaylistLoading })?() ?? false
+        let single = await session().cancel()
+        return single || list
+    }
 
     static func result(_ r: LinkResolution) -> LinkResolveResult {
         let kind: String = { if case .spotify = r.link { "spotify" } else { "youtube" } }()
@@ -369,6 +394,18 @@ final class LinkEngine: @unchecked Sendable {
 }
 
 extension Bridge {
+    static func classify(_ url: String) -> LinkClassifyResult {
+        switch try? SourceInput.parse(url) {
+        case .playlist(let l)?:
+            if case .youtube = l { return LinkClassifyResult(kind: "playlist", source: "youtube") }
+            return LinkClassifyResult(kind: "playlist", source: "spotify")
+        case .single(let l)?:
+            if case .youtube = l { return LinkClassifyResult(kind: "track", source: "youtube") }
+            return LinkClassifyResult(kind: "track", source: "spotify")
+        case nil: return LinkClassifyResult(kind: "unsupported", source: nil)
+        }
+    }
+
     func registerLinkMethods(root: URL?, options: LaunchOptions) {
         let sources = link ?? ExternalSources.production(supportDir: options.supportDir,
                                                           environment: ProcessInfo.processInfo.environment)
@@ -378,7 +415,9 @@ extension Bridge {
             ?? SpotifySearchClient.live(supportDir: supportDir, defaultSupportDir: defaultDir)
         let engine = LinkEngine(jobs: jobs, sources: sources, root: root)
         engine.setSink { [weak self] in self?.emit("link.finished", $0) }
+        registerPlaylistMethods(link: engine, sources: sources, root: root)
 
+        router.register("link.classify") { (p: LinkURLParams) -> LinkClassifyResult in Self.classify(p.url) }
         router.register("link.resolve") { (p: LinkURLParams) in try await engine.resolve(url: p.url) }
         router.register("link.cancel") { (p: LinkCancelParams) in
             if let key = p.jobId { return CancelledResult(cancelled: engine.cancelJob(key)) }

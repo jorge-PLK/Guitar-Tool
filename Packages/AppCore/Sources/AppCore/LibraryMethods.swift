@@ -52,7 +52,42 @@ struct TakeInfo: Codable, Sendable, Equatable {
     var duration: Double?
     var audio: String?
     var video: String?
+    /// Tiempo del tema en que empieza la toma (segundos).
+    var songStart: Double?
+    /// Desfase audio/vídeo (ms, positivo = la imagen llega tarde).
+    var videoOffsetMs: Double?
+    /// Giro de la imagen en grados horarios (0, 90, 180, 270).
+    var videoRotation: Int
+    var punches: [TakePunchInfo]
 }
+
+struct TakePunchInfo: Codable, Sendable, Equatable {
+    var start: Double
+    var end: Double
+    /// Ruta relativa a la carpeta de proyectos, o nil si el punch no tiene vídeo.
+    var videoPath: String?
+    var videoOffsetMs: Double?
+}
+
+/// `library.takeBacking`: lo que suena en «Ver toma» con el botón «Backing» (`TakeViewPlanning.plan` del Mac).
+struct TakeBackingResult: Codable, Sendable, Equatable {
+    var takeStart: Double
+    /// Volumen lineal del canal «Tú · parte» para la toma.
+    var takeVolume: Double
+    var tracks: [TakeBackingTrack]
+}
+
+struct TakeBackingTrack: Codable, Sendable, Equatable {
+    var kind: String
+    /// Ruta relativa a la carpeta de proyectos; sus tiempos son los del tema (empiezan en 0).
+    var path: String
+    /// Volumen lineal (mezcla de Grabar).
+    var volume: Double
+    /// Tramo del tema (segundos) en que esta pista se silencia (la guitarra que la parte sustituye); nil = nunca.
+    var mutedSpan: MontageRangeInfo?
+}
+
+struct TakeBackingParams: Codable, Sendable { var id: String; var takeId: String }
 
 struct PartInfo: Codable, Sendable, Equatable {
     var id: UUID
@@ -171,11 +206,63 @@ struct LibraryService: Sendable {
                     isBest: part.bestTakeID == t.id, hasVideo: t.videoFile != nil || (t.punches ?? []).contains { $0.videoFile != nil },
                     punchCount: t.punches?.count ?? 0,
                     duration: t.processedFile.flatMap { Self.duration(of: layout.url(relative: $0)) },
-                    audio: t.processedFile.map { "\(name)/\($0)" }, video: t.videoFile.map { "\(name)/\($0)" }))
+                    audio: t.processedFile.map { "\(name)/\($0)" }, video: t.videoFile.map { "\(name)/\($0)" },
+                    songStart: t.songStart, videoOffsetMs: t.videoOffset.map { $0 * 1000 }, videoRotation: t.rotationDegrees,
+                    punches: (t.punches ?? []).map {
+                        TakePunchInfo(start: $0.start, end: $0.end, videoPath: $0.videoFile.map { "\(name)/\($0)" },
+                                      videoOffsetMs: ($0.videoOffset ?? t.videoOffset).map { $0 * 1000 })
+                    }))
             }
             return PartInfo(id: part.id, name: part.name, isLead: part.isLead, takes: takes)
         }
         return ProjectDetailResult(summary: summary(s), separationError: p.separation.error, stems: stems,
                                    parts: parts, videoCount: p.videos.count)
+    }
+
+    /// Pistas del backing de «Ver toma»: stems audibles según la mezcla de Grabar (sin la guitarra completa si hay guitarras
+    /// separadas), una por guitarra separada, y la guitarra que la parte sustituye silenciada durante la toma.
+    func takeBacking(id: UUID, takeId: UUID) throws -> TakeBackingResult {
+        guard let s = ProjectScanner.scan(root: root).found.first(where: { $0.project.id == id }) else {
+            throw RPCError(code: "not-found", message: "No hay ningún tema con id \(id.uuidString).")
+        }
+        let p = s.project
+        let layout = ProjectLayout(folder: s.folder)
+        let name = s.folder.lastPathComponent
+        guard let take = p.takes.first(where: { $0.id == takeId }), let rel = take.processedFile, let start = take.songStart else {
+            throw RPCError(code: "not-found", message: "La toma no existe o no tiene audio procesado.")
+        }
+        let dur = Self.duration(of: layout.url(relative: rel)) ?? 0
+        let span = MontageRangeInfo(start: start, end: start + dur)
+        let rec = p.recordingOrInitial()
+        let part = rec.part(containingTake: takeId)
+        let replaced = part?.replaces
+        let fm = FileManager.default
+        let separated = p.guitarTracks.filter { g in g.file.map { fm.fileExists(atPath: layout.url(relative: $0).path) } == true }
+        let anySolo = rec.mix.contains { $0.solo }
+        func audible(_ m: StemMix) -> Bool { !m.muted && (!anySolo || m.solo) }
+        func linear(_ dB: Double) -> Double { pow(10, dB / 20) }
+        var tracks: [TakeBackingTrack] = []
+        for st in p.stems where !st.isEmpty {
+            let kind = st.kind
+            let url = layout.stemURL(kind)
+            guard !(kind == .guitar && !separated.isEmpty), fm.fileExists(atPath: url.path) else { continue }
+            let m = rec.mix.first { $0.kind == kind && $0.guitarRole == nil } ?? StemMix(kind: kind)
+            guard audible(m) else { continue }
+            tracks.append(TakeBackingTrack(kind: kind.rawValue, path: "\(name)/" + Self.relative(url, in: s.folder), volume: linear(m.gainDB),
+                                           mutedSpan: kind == .guitar && replaced != nil ? span : nil))
+        }
+        for g in separated {
+            let m = rec.mix.first { $0.guitarRole == g.role } ?? StemMix(kind: .guitar, guitarRole: g.role)
+            guard audible(m) else { continue }
+            tracks.append(TakeBackingTrack(kind: "guitar", path: "\(name)/\(g.role.relativePath)", volume: linear(m.gainDB),
+                                           mutedSpan: g.role == replaced ? span : nil))
+        }
+        return TakeBackingResult(takeStart: start, takeVolume: linear(rec.partMix(for: part?.id ?? takeId).gainDB), tracks: tracks)
+    }
+
+    private static func relative(_ url: URL, in folder: URL) -> String {
+        let base = folder.standardizedFileURL.path
+        let full = url.standardizedFileURL.path
+        return full.hasPrefix(base + "/") ? String(full.dropFirst(base.count + 1)) : url.lastPathComponent
     }
 }

@@ -1,16 +1,20 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { html } from '../html.js';
 import { icon } from '../icons.js';
-import { call } from '../bridge.js';
+import { call, transportName } from '../bridge.js';
 import { Modal, AccentBar } from '../ui.js';
 import { openProject, notify } from '../state.js';
+import { PlaylistView, PlaylistLoading, PlaylistError, closePlaylist } from './playlist-sheet.js';
+import { playlistIndicator, isPlaylistURL, PLAYLIST_RESOLVE_TIMEOUT_MS, resetPlaylistNotices, applySnapshot, clearPlaylist } from '../playlist/store.js';
 
 // Hoja «Importar desde enlace» (LinkImportSheet del Mac) sobre link.resolve / link.import (contrato 8.3b).
 // Estados: empty -> resolving -> candidates | repeated | error. Al importar, la hoja se cierra y el progreso
 // (download / import) se ve en la fila de la biblioteca.
 
+if (transportName() === 'mock') await import('../mock/playlist.js');   // simulador de playlist.* (solo con --mock)
+
 /// Texto de los enlaces admitidos (SourceMessages.supportedLinks del Mac).
-export const SUPPORTED_LINKS = 'Se admiten enlaces de un vídeo de YouTube (youtube.com/watch, youtu.be, music.youtube.com) y de una canción de Spotify (open.spotify.com/track o spotify:track). Listas, álbumes y episodios no.'; // listas y álbumes: ola 2; entonces vuelve el literal del Mac
+export const SUPPORTED_LINKS = 'Se admiten enlaces de un vídeo de YouTube (youtube.com/watch, youtu.be, music.youtube.com) y de una canción de Spotify (open.spotify.com/track o spotify:track), además de listas de YouTube (youtube.com/playlist) y listas o álbumes de Spotify (open.spotify.com/playlist, open.spotify.com/album). Episodios no.';
 /// Umbral de «cercano» del Mac (CandidateRanker.closeThreshold): ±3 s respecto a la duración de Spotify.
 const CLOSE_THRESHOLD_S = 3;
 /// Tras este tiempo de «Leyendo metadatos…» un enlace de Spotify pasa a «Buscando en YouTube…» (el núcleo no informa de etapas).
@@ -62,7 +66,9 @@ const FieldInput = ({ value, onInput, onEnter, placeholder, autofocus }) => html
   onKeyDown=${e => { if (e.key === 'Enter') { e.preventDefault(); onEnter?.(); } }} />`;
 
 export function LinkSheet({ onClose, onPickFile }) {
-  const [screen, setScreen] = useState('empty');
+  // Con una lista abierta en el núcleo (cola en marcha, la cápsula de la Biblioteca) la hoja entra en ella, como `openLinkImport` del Mac.
+  const [screen, setScreen] = useState(playlistIndicator.value ? 'playlist' : 'empty');
+  const [plSnap, setPlSnap] = useState(null);     // Snapshot de la lista (de link.resolve; null = se pide con playlist.state)
   const [text, setText] = useState('');
   const [resolved, setResolved] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
@@ -128,10 +134,21 @@ export function LinkSheet({ onClose, onPickFile }) {
     if (!retry) { manualLinks.current = []; setManual(''); }
     setManualError(null);
     setScreen('resolving'); setStage('metadata'); setError(null); setBanner(null); setLatest(false);
-    const timer = isSpotify(link) ? setTimeout(() => { if (mine === token.current) setStage('searching'); }, SEARCH_STAGE_AFTER_MS) : null;
+    // El núcleo dice enseguida si es lista (`link.classify`); sin respuesta, el patrón de la URL.
+    const kind = await call('link.classify', { url: link }, { timeout: 3000 }).then(c => c.kind, () => null);
+    if (mine !== token.current) return null;
+    const list = kind ? kind === 'playlist' : isPlaylistURL(link);
+    // Listas y álbumes: el núcleo lee la lista antes de responder; «Leyendo la lista…» como el Mac (loadingView) y límite largo de llamada.
+    if (list) { setScreen('plLoading'); setPlSnap(null); }
+    const timer = isSpotify(link) && !list ? setTimeout(() => { if (mine === token.current) setStage('searching'); }, SEARCH_STAGE_AFTER_MS) : null;
     try {
-      const r = await call('link.resolve', { url: link }, { timeout: 120000 });
+      const r = await call('link.resolve', { url: link }, { timeout: list ? PLAYLIST_RESOLVE_TIMEOUT_MS : 120000 });
       if (mine !== token.current) return null;
+      if (r.link === 'playlist') {
+        resetPlaylistNotices(); applySnapshot(r.playlist);
+        setPlSnap(r.playlist); setScreen('playlist');
+        return null;
+      }
       setResolved(r);
       setTitle(r.title ?? ''); setArtist(r.artist ?? '');
       const first = r.candidates.find(c => !c.inLibrary);
@@ -141,7 +158,7 @@ export function LinkSheet({ onClose, onPickFile }) {
     } catch (e) {
       if (mine !== token.current || e.code === 'cancelled') return null;
       setError({ code: e.code ?? 'internal', ...splitMessage(e.message) });
-      setScreen('error');
+      setScreen(list ? 'plError' : 'error');   // fallo al leer una lista: paso de error de la hoja de lista del Mac
       return null;
     } finally { clearTimeout(timer); }
   };
@@ -188,8 +205,12 @@ export function LinkSheet({ onClose, onPickFile }) {
   };
 
   const openExisting = id => { onClose(); openProject(id); };
-  const canClose = screen !== 'resolving';
-  const close = () => { if (screen === 'resolving') cancelResolve(); else onClose(); };
+  const canClose = screen !== 'resolving' && screen !== 'plLoading';
+  const close = async () => {
+    if (screen === 'resolving' || screen === 'plLoading') cancelResolve();
+    else if (screen === 'playlist') { await closePlaylist(); onClose(); }
+    else onClose();
+  };
 
   let body;
   if (screen === 'empty') {
@@ -205,6 +226,13 @@ export function LinkSheet({ onClose, onPickFile }) {
         <span class="grow"></span>
         <button class="btn secondary" onClick=${close}>Cancelar</button>
         <button class="btn primary" disabled=${isBusy || query.kind === 'empty'} onClick=${importTapped}>Importar</button></div>`;
+  } else if (screen === 'plLoading') {
+    body = html`<${PlaylistLoading} onCancel=${cancelResolve} />`;
+  } else if (screen === 'plError') {
+    body = html`<${PlaylistError} error=${error} onClose=${onClose} onAgain=${() => { setError(null); setScreen('empty'); }} />`;
+  } else if (screen === 'playlist') {
+    body = html`<${PlaylistView} initial=${plSnap} onClose=${onClose} onDiscard=${() => { setPlSnap(null); setScreen('empty'); }}
+      onGone=${() => { clearPlaylist(); setPlSnap(null); setScreen('empty'); }} />`;
   } else if (screen === 'resolving') {
     body = html`<div class="spin-line"><span class="spinner" aria-hidden="true"></span>
         <span>${stage === 'metadata' ? 'Leyendo metadatos…' : 'Buscando en YouTube…'}</span></div>
@@ -254,8 +282,9 @@ export function LinkSheet({ onClose, onPickFile }) {
           : !latest ? html`<button class="btn primary" onClick=${() => resolve(url)}>Reintentar</button>` : null}</div>`;
   }
 
-  const heading = screen === 'empty' ? 'Importar tema' : 'Importar desde enlace';
-  return html`<${Modal} title=${heading} width=${screen === 'empty' ? 620 : 560} onClose=${canClose ? close : close} autofocus="[data-autofocus],.modal-actions .btn.primary,input">${body}</${Modal}>`;
+  const wide = screen === 'playlist' || screen === 'plLoading' || screen === 'plError';
+  const heading = wide ? 'Importar lista' : screen === 'empty' ? 'Importar tema' : 'Importar desde enlace';
+  return html`<${Modal} title=${heading} width=${wide ? 880 : screen === 'empty' ? 620 : 560} onClose=${canClose ? close : close} autofocus="[data-autofocus],.modal-actions .btn.primary,input">${body}</${Modal}>`;
 }
 
 /// Fila de candidato (YouTube único o lista de Spotify). `on`: elegido; `open`: abrir el tema que ya está en la biblioteca.

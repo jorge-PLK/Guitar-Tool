@@ -96,6 +96,9 @@ typedef struct wasapi_device_info {
     char driver_inf[WASAPI_DRIVER_CAP];      ///< DEVPKEY_Device_DriverInfPath: «usbaudio2.inf», «oem12.inf»…
     int32_t driver_hresult;        ///< 0, el HRESULT del paso de topología que falló, o 0x80000000|CONFIGRET de cfgmgr32
     int32_t reserved_driver;
+    /// PKEY_Device_ContainerId del endpoint (paso 8, F2), «{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}» (UTF-8): el mismo para
+    /// todos los endpoints del mismo aparato físico. Vacío si no existe, no es un GUID o es GUID_NULL.
+    char container_id[WASAPI_ID_CAP];
 } wasapi_device_info;
 
 /// Escribe hasta `capacity` endpoints activos de render y captura en `out` y devuelve cuántos hay (puede ser mayor que

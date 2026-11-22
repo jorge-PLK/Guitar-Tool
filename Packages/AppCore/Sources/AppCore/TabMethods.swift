@@ -11,6 +11,7 @@ extension TabService {
         }
         router.register("tab.close") { [self] (_: Empty) -> Empty in await close(); return Empty() }
         router.register("tab.setSource") { [self] (p: TabSourceParams) -> TabState in try await setSource(p.source) }
+        registerSongsterr(on: router)
         router.register("tab.score") { [self] (p: TabTrackParams) -> TabScoreResult in try await scoreJSON(track: p.track) }
         router.register("tab.selectTrack") { [self] (p: TabTrackParams) -> TabState in
             guard let t = p.track else { throw RPCError(code: "bad-params", message: "Falta «track».") }

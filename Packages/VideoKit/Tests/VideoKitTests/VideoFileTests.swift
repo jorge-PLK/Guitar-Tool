@@ -191,8 +191,8 @@ final class VideoFileTests: XCTestCase {
         let info = try MediaFoundationReader.info(url)
         XCTAssertTrue(info.hasVideo)
         XCTAssertFalse(info.hasAudio)
-        XCTAssertEqual(info.videoCodec, writer.codec == .hevc ? "HEVC" : "H264")
-        XCTAssertEqual(writer.codec, MediaFoundationEncoders.hasHEVC ? .hevc : .h264)
+        XCTAssertEqual(info.videoCodec, "H264")
+        XCTAssertEqual(writer.codec, .h264)   // W2-E1: en Windows solo H.264
         XCTAssertEqual(info.width, 320)
         XCTAssertEqual(info.height, 180)
         let read = try Self.ptsOf(url)

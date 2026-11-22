@@ -112,10 +112,13 @@ public protocol AudioIO: AnyObject, Sendable {
     func setInterruptionHandler(_ handler: (@Sendable (AudioIOInterruption) -> Void)?)
     /// Contadores del ciclo de E/S para diagnóstico (`nil` si el dispositivo no los da).
     var diagnostics: AudioIODiagnostics? { get }
+    /// Solo WASAPI (paso 8, F2): modo y contenedores para la clave de calibración. nil (CoreAudio) = clave del Mac.
+    var wasapiIdentity: WASAPIIdentity? { get }
 }
 
 public extension AudioIO {
     var diagnostics: AudioIODiagnostics? { nil }
+    var wasapiIdentity: WASAPIIdentity? { nil }
 }
 
 /// Instante de host de una muestra de salida de la línea común (mini-spec Fase 6, «Cámara y sincronía»): lo

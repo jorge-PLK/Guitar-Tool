@@ -15,6 +15,11 @@ public struct ChannelPair: Codable, Sendable, Equatable {
 
 /// Clave de una calibración de latencia (mini-spec Fase 3, «Calibración de latencia»): la calibración vale
 /// mientras no cambie ningún campo. Los UID vacíos son «salida/entrada por defecto del sistema».
+///
+/// Windows (paso 8, F2): `inputUID`/`outputUID` son la identidad del APARATO (el contenedor del endpoint WASAPI,
+/// `PKEY_Device_ContainerId`; sin contenedor, el id del endpoint), así que la entrada y la salida de la misma pedalera
+/// dan el mismo UID, como en el Mac. El camino concreto va en `wasapi`: modo (compartido/exclusivo) y los dos endpoints.
+/// En el Mac `wasapi` es nil y no se escribe: la clave codificada es byte a byte la de siempre.
 public struct CalibrationKey: Codable, Sendable, Equatable, Hashable {
     public var inputUID: String
     public var outputUID: String
@@ -24,15 +29,57 @@ public struct CalibrationKey: Codable, Sendable, Equatable, Hashable {
     public var inputChannel: Int
     /// Canal de salida por el que salió el barrido (el izquierdo de `backingOut`), desde 1.
     public var outputChannel: Int
+    /// Solo Windows: modo y endpoints concretos (nil en el Mac; no se codifica).
+    public var wasapi: WASAPIPath?
+
+    /// Lo que la clave de Windows añade a la del Mac. Los endpoints se guardan aunque el UID sea el contenedor: dos
+    /// endpoints del mismo aparato pueden ser caminos de señal distintos (otro par de canales, otro flujo USB con su
+    /// propio búfer) y nada en WASAPI dice si comparten latencia; así una calibración nunca vale para otro endpoint.
+    public struct WASAPIPath: Codable, Sendable, Equatable, Hashable {
+        /// `WASAPIShareMode.rawValue` de AudioKit: «shared» o «exclusive».
+        public var mode: String
+        /// Id del endpoint de captura y de render (vacío = el de defecto del sistema, como los UID).
+        public var inputEndpoint: String
+        public var outputEndpoint: String
+
+        public init(mode: String, inputEndpoint: String, outputEndpoint: String) {
+            self.mode = mode
+            self.inputEndpoint = inputEndpoint
+            self.outputEndpoint = outputEndpoint
+        }
+    }
 
     public init(inputUID: String, outputUID: String, sampleRate: Double, bufferFrames: Int,
-                inputChannel: Int, outputChannel: Int) {
+                inputChannel: Int, outputChannel: Int, wasapi: WASAPIPath? = nil) {
         self.inputUID = inputUID
         self.outputUID = outputUID
         self.sampleRate = sampleRate
         self.bufferFrames = bufferFrames
         self.inputChannel = inputChannel
         self.outputChannel = outputChannel
+        self.wasapi = wasapi
+    }
+
+    /// Identidad de aparato de un endpoint en la clave de Windows: su contenedor si lo tiene; si no, el propio endpoint.
+    /// Vacío (el de defecto del sistema) sigue vacío.
+    public static func deviceIdentity(endpoint: String, container: String?) -> String {
+        guard !endpoint.isEmpty, let container, !container.isEmpty else { return endpoint }
+        return container
+    }
+}
+
+/// Lo que la clave de Windows necesita y el perfil no guarda (paso 8, F2): el modo con el que se abre WASAPI y el
+/// contenedor de los endpoints elegidos (de la lista de dispositivos). nil en el Mac.
+public struct WASAPIKeyContext: Sendable, Equatable {
+    /// «shared» o «exclusive» (`WASAPIShareMode.rawValue`).
+    public var mode: String
+    public var inputContainer: String?
+    public var outputContainer: String?
+
+    public init(mode: String, inputContainer: String? = nil, outputContainer: String? = nil) {
+        self.mode = mode
+        self.inputContainer = inputContainer
+        self.outputContainer = outputContainer
     }
 }
 
@@ -133,16 +180,24 @@ public struct AudioSettings: Codable, Sendable, Equatable {
     /// Se puede grabar si hay entrada y canal de guitarra (y la configuración es válida).
     public var canRecord: Bool { inputDeviceUID != nil && guitarIn != nil && isValid }
 
-    /// Clave con la que se calibraría ahora mismo; nil sin canal de guitarra.
-    public func calibrationKey(sampleRate: Double) -> CalibrationKey? {
+    /// Clave con la que se calibraría ahora mismo; nil sin canal de guitarra. `wasapi` solo en Windows (F2): sin él, la
+    /// clave del Mac de siempre.
+    public func calibrationKey(sampleRate: Double, wasapi: WASAPIKeyContext? = nil) -> CalibrationKey? {
         guard let first = guitarIn?.first else { return nil }
-        return CalibrationKey(inputUID: inputDeviceUID ?? "", outputUID: outputDeviceUID ?? "", sampleRate: sampleRate,
-                              bufferFrames: bufferFrames, inputChannel: first, outputChannel: backingOut.left)
+        let input = inputDeviceUID ?? "", output = outputDeviceUID ?? ""
+        var key = CalibrationKey(inputUID: input, outputUID: output, sampleRate: sampleRate,
+                                 bufferFrames: bufferFrames, inputChannel: first, outputChannel: backingOut.left)
+        if let wasapi {
+            key.inputUID = CalibrationKey.deviceIdentity(endpoint: input, container: wasapi.inputContainer)
+            key.outputUID = CalibrationKey.deviceIdentity(endpoint: output, container: wasapi.outputContainer)
+            key.wasapi = CalibrationKey.WASAPIPath(mode: wasapi.mode, inputEndpoint: input, outputEndpoint: output)
+        }
+        return key
     }
 
     /// La calibración guardada, si su clave sigue siendo la de la configuración actual.
-    public func validLatency(sampleRate: Double) -> LatencyCalibration? {
-        guard let latency, latency.key == calibrationKey(sampleRate: sampleRate) else { return nil }
+    public func validLatency(sampleRate: Double, wasapi: WASAPIKeyContext? = nil) -> LatencyCalibration? {
+        guard let latency, latency.key == calibrationKey(sampleRate: sampleRate, wasapi: wasapi) else { return nil }
         return latency
     }
 

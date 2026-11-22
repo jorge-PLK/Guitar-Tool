@@ -147,6 +147,14 @@ Orden del proceso: primero se igualan ampli, pantalla y drive con los efectos ap
 Límite a tener presente: las diferencias finas entre dos amplis de alta ganancia son justo lo que más se pierde con la mezcla del disco y la separación de pistas. Por eso la app propone y mide, pero la elección entre los finalistas es de oído.
 
 
+### Reglas aprendidas con el port a Windows (Fase 7c, ADR-020)
+
+- **COM y el hilo de UI.** Media Foundation hace `CoInitializeEx(MTA)`. Si eso ocurre en el hilo de UI antes de crear WebView2, `CreateCoreWebView2Environment` falla con `0x80010106` (`RPC_E_CHANGED_MODE`) y la app no abre. El hilo de UI se pone en STA lo primero (`tfhost_init_ui_thread`, antes de crear el `Bridge`) y nada nativo de audio o vídeo se llama de forma síncrona en él: la consulta de cámaras de `SettingsService.register` va en `Task.detached`.
+- **NTFS y ficheros abiertos.** En Windows no se puede borrar ni reescribir un fichero con un lector abierto (en macOS sí). El punch-in reescribía `processed.wav` con el reproductor de Grabar teniéndolo abierto y el punch se perdía en silencio. Se suelta la pista del reproductor antes de tocar sus ficheros (`reloadTakeTracks(excluding:)` al principio de `commitPunch`) y en ese camino no se tragan errores de fichero con `try?`.
+- **Reloj de pared.** Los temporizadores de Windows tienen un grano de unos 15,6 ms. Nada que deba ser exacto se decide por reloj de pared: el fin de toma se corta por posición de muestra (`endTime`).
+- **WASAPI en modo compartido.** Si entrada y salida van a frecuencias distintas (en la VM, salida a 48 kHz y entrada a 44,1 kHz), Grabar queda bloqueado con cualquier frecuencia de trabajo. Con un solo dispositivo (la HeadRush) no ocurre; falta confirmarlo en un PC.
+- **Verificación.** Un build verde en la VM no prueba que la app arranque: tras compilar hay que lanzarla. Los tests de cada paquete se compilan también en Windows: había código de test solo del Mac (`usleep`) y ramas `#if os(Windows)` que el Mac nunca compila.
+
 ## Riesgos
 
 Antes de escribir código de producto hay tres investigaciones que deciden la arquitectura: la API del Remote Editor, el routing USB de la Flex Prime y el alcance de la API de TONE3000.

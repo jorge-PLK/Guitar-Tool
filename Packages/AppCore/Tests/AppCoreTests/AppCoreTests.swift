@@ -155,6 +155,55 @@ final class BridgeTests: XCTestCase {
         XCTAssertEqual((bp["error"] as? [String: Any])?["code"] as? String, "bad-params")
     }
 
+    func testTakeDetailAndBacking() async throws {
+        let root = try tempDir()
+        var p = try makeProject(in: root, title: "T", artist: "A")
+        let folder = root.appendingPathComponent("A - T")
+        let layout = ProjectLayout(folder: folder)
+        p.stems = [Stem(kind: .bass, file: "stems/bass.wav"), Stem(kind: .guitar, file: "stems/guitar.wav")]
+        let take = Take(processedFile: "takes/t1/processed.wav", songStart: 2.5, videoFile: "takes/t1/video.mov", videoOffset: 0.04,
+                        punches: [TakePunch(start: 3, end: 4, videoFile: "takes/t1/punch-1/video.mov", videoOffset: 0.01)],
+                        videoRotation: 90)
+        try FileManager.default.createDirectory(at: layout.url(relative: "takes/t1"), withIntermediateDirectories: true)
+        let bass = layout.stemURL(.bass), gtr = layout.stemURL(.guitar), wav = layout.url(relative: "takes/t1/processed.wav")
+        try await MainActor.run {
+            try StudyTests.writeSine(bass, frequency: 110)
+            try StudyTests.writeSine(gtr, frequency: 220)
+            try StudyTests.writeSine(wav, frequency: 330, seconds: 1)
+        }
+        p.takes = [take]
+        let part = RecordingPart(name: "Rítmica", replaces: .rhythm, takeIDs: [take.id], bestTakeID: take.id)
+        p.recording = RecordingState(parts: [part], mix: [StemMix(kind: .bass, gainDB: -6)],
+                                     partMix: [PartMix(partID: part.id, gainDB: 6)])
+        try ProjectFile.save(p, to: folder)
+        let b = try Bridge(options: LaunchOptions(projectsFolder: root), mediaBase: "m")
+
+        let dRaw = await call(b, #"{"id":1,"method":"library.project","params":{"id":"\#(p.id.uuidString)"}}"#)
+        let d = try XCTUnwrap(dRaw["result"] as? [String: Any], "\(dRaw)")
+        let t = try XCTUnwrap((((d["parts"] as? [[String: Any]])?.first)?["takes"] as? [[String: Any]])?.first)
+        XCTAssertEqual(t["songStart"] as? Double, 2.5)
+        XCTAssertEqual(try XCTUnwrap(t["videoOffsetMs"] as? Double), 40, accuracy: 1e-9)
+        XCTAssertEqual(t["videoRotation"] as? Int, 90)
+        let punch = try XCTUnwrap((t["punches"] as? [[String: Any]])?.first)
+        XCTAssertEqual(punch["videoPath"] as? String, "A - T/takes/t1/punch-1/video.mov")
+        XCTAssertEqual(try XCTUnwrap(punch["videoOffsetMs"] as? Double), 10, accuracy: 1e-9)
+
+        let bRaw = await call(b, #"{"id":2,"method":"library.takeBacking","params":{"id":"\#(p.id.uuidString)","takeId":"\#(take.id.uuidString)"}}"#)
+        let r = try XCTUnwrap(bRaw["result"] as? [String: Any], "\(bRaw)")
+        XCTAssertEqual(r["takeStart"] as? Double, 2.5)
+        XCTAssertEqual(try XCTUnwrap(r["takeVolume"] as? Double), pow(10, 6 / 20), accuracy: 1e-9)
+        let tracks = try XCTUnwrap(r["tracks"] as? [[String: Any]])
+        XCTAssertEqual(tracks.map { $0["kind"] as? String }, ["bass", "guitar"])
+        XCTAssertEqual(try XCTUnwrap(tracks[0]["volume"] as? Double), pow(10, -6 / 20), accuracy: 1e-9)
+        XCTAssertEqual(tracks[0]["path"] as? String, "A - T/stems/bass.wav")
+        XCTAssertTrue(tracks[0]["mutedSpan"] == nil || tracks[0]["mutedSpan"] is NSNull)
+        let muted = try XCTUnwrap(tracks[1]["mutedSpan"] as? [String: Double])
+        XCTAssertEqual(muted["start"], 2.5)
+        XCTAssertEqual(try XCTUnwrap(muted["end"]), 3.5, accuracy: 0.01)
+        let nf = await call(b, #"{"id":3,"method":"library.takeBacking","params":{"id":"\#(p.id.uuidString)","takeId":"\#(UUID().uuidString)"}}"#)
+        XCTAssertEqual((nf["error"] as? [String: Any])?["code"] as? String, "not-found")
+    }
+
     func testGuitarsAndReveal() async throws {
         let root = try tempDir()
         var p = try makeProject(in: root, title: "G", artist: "A")

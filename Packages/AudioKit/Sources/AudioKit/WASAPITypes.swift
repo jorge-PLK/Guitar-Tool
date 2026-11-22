@@ -13,6 +13,20 @@ public enum WASAPIShareMode: String, Sendable, Codable, CaseIterable {
     case exclusive
 }
 
+/// Lo que una sesión WASAPI añade a la clave de calibración (paso 8, F2): el modo con el que quedó abierta y el
+/// contenedor (aparato físico) de cada endpoint. `AudioIO.wasapiIdentity`; nil en CoreAudio.
+public struct WASAPIIdentity: Sendable, Equatable, Hashable {
+    public var mode: WASAPIShareMode
+    public var inputContainer: String?
+    public var outputContainer: String?
+
+    public init(mode: WASAPIShareMode, inputContainer: String? = nil, outputContainer: String? = nil) {
+        self.mode = mode
+        self.inputContainer = inputContainer
+        self.outputContainer = outputContainer
+    }
+}
+
 /// Sentido de un endpoint.
 public enum WASAPIFlow: String, Sendable, Codable {
     case render
@@ -180,11 +194,16 @@ public struct WASAPIDeviceInfo: Sendable, Equatable, Codable, Identifiable {
     public var hresult: Int32
     /// Driver del adaptador (parte 7.10b); vacío si el endpoint no tiene adaptador físico o la consulta falló.
     public var driver: WASAPIDriverInfo
+    /// `PKEY_Device_ContainerId` del endpoint, «{XXXXXXXX-…}» (paso 8, F2): todos los endpoints del mismo aparato físico
+    /// comparten contenedor. nil si Windows no lo da. Los integrados en el PC comparten el contenedor del propio equipo.
+    public var containerID: String?
 
     public init(id: String, name: String, flow: WASAPIFlow, isDefault: Bool, mix: WASAPIFormat,
                 defaultPeriod100ns: Int64, minimumPeriod100ns: Int64, engine: WASAPIEnginePeriods?,
-                exclusiveFloat: Bool, hresult: Int32 = 0, driver: WASAPIDriverInfo = WASAPIDriverInfo()) {
+                exclusiveFloat: Bool, hresult: Int32 = 0, driver: WASAPIDriverInfo = WASAPIDriverInfo(),
+                containerID: String? = nil) {
         self.driver = driver
+        self.containerID = containerID
         self.id = id
         self.name = name
         self.flow = flow

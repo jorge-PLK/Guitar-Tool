@@ -45,6 +45,8 @@ public final class WASAPIAudioIO: AudioIO, @unchecked Sendable {
     public let declaredLatencySamples: Double
     /// Lo que quedó abierto (caminos, formatos del dispositivo, búferes y periodos concedidos).
     public let streamInfo: WASAPIStreamInfo
+    /// Modo abierto (el que devuelve el shim) y contenedor de cada endpoint, para la clave de calibración (F2).
+    public let wasapiIdentity: WASAPIIdentity?
 
     private let allowInputResampling: Bool
     private let bridge: WASAPIBridge
@@ -57,9 +59,9 @@ public final class WASAPIAudioIO: AudioIO, @unchecked Sendable {
     private var interruptionHandler: (@Sendable (AudioIOInterruption) -> Void)?
     private var lastStatus = WASAPIStreamStatus()
 
-    /// Dúplex sobre los endpoints de `setup` (salida vacía = render por defecto), modo compartido.
+    /// Dúplex sobre los endpoints de `setup` (salida vacía = render por defecto), en `setup.wasapiMode` (nil = compartido).
     public convenience init(setup: AudioSetup) throws {
-        try self.init(setup: setup, options: Options())
+        try self.init(setup: setup, options: Options(mode: setup.wasapiMode ?? .shared))
     }
 
     public convenience init(setup: AudioSetup, options: Options) throws {
@@ -138,6 +140,8 @@ public final class WASAPIAudioIO: AudioIO, @unchecked Sendable {
         inputDeviceUID = useCapture ? wasapiString(raw.capture_id) : ""
         outputDeviceUID = wasapiString(raw.render_id)
         declaredLatencySamples = info.declaredLatencySamples(sampleRate: rate)
+        wasapiIdentity = WASAPIIdentity(mode: info.mode, inputContainer: capture?.containerID,
+                                        outputContainer: render.containerID)
         // Todo asignado: ya se puede dar `self` (débil) al puente de avisos.
         bridge.setOwner(self)
     }
@@ -408,7 +412,8 @@ extension WASAPIDeviceInfo {
                   driver: WASAPIDriverInfo(adapterInstance: wasapiString(d.adapter_instance), adapterName: wasapiString(d.adapter_name),
                                            service: wasapiString(d.driver_service), provider: wasapiString(d.driver_provider),
                                            version: wasapiString(d.driver_version), description: wasapiString(d.driver_desc),
-                                           infPath: wasapiString(d.driver_inf), hresult: d.driver_hresult))
+                                           infPath: wasapiString(d.driver_inf), hresult: d.driver_hresult),
+                  containerID: { let c = wasapiString(d.container_id); return c.isEmpty ? nil : c }())
     }
 }
 

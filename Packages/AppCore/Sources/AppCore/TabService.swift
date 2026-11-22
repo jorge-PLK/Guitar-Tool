@@ -68,17 +68,17 @@ final class TabService {
 
     private let studyService: StudyService
     private let makeServices: @Sendable () -> TabServices
-    private lazy var services: TabServices = makeServices()
-    private let tabStore: (any TabSourceStoring)?
+    lazy var services: TabServices = makeServices()
+    let tabStore: (any TabSourceStoring)?
     private let outbox = TabOutbox()
     /// La pone `Bridge`: diálogo de guardar del anfitrión.
     nonisolated(unsafe) var hostProvider: @Sendable () -> (any HostServices)? = { nil }
 
-    private var session: StudySession?
+    private(set) var session: StudySession?
     private var ctl: BackingController?
     private(set) var phase: Phase = .working
     private(set) var editor: TabEditor?
-    private var sources: [TabSource] = []
+    private(set) var sources: [TabSource] = []
     private var vocalSource: TabSource?
     private var alpha: AlphaTabScore?
     private var fingerprints: [String: TrackSourceFingerprint] = [:]
@@ -125,7 +125,7 @@ final class TabService {
 
     nonisolated func setSink(_ sink: @escaping @Sendable (String) -> Void) { outbox.set(sink) }
 
-    private func emit<T: Encodable>(_ event: String, _ payload: T) {
+    func emit<T: Encodable>(_ event: String, _ payload: T) {
         if let m = Router.eventMessage(event, payload) { outbox.send(m) }
     }
 
@@ -137,6 +137,19 @@ final class TabService {
     }
 
     var isOpen: Bool { session != nil }
+
+    /// Hoja de Songsterr (W2-G, `TabSongsterr.swift`).
+    lazy var songsterr = SongsterrSheet(owner: self)
+
+    /// Sustituye la partitura (Songsterr: «Aceptar»): descarta lo pendiente y la guarda ya.
+    func replaceScore(_ score: TabScore) {
+        work?.cancel()
+        saveTask?.cancel()
+        editor = TabEditor(score: score)
+        saveNow()
+    }
+
+    func setNotices(_ n: [String]) { notices = n }
 
     // MARK: Abrir y cerrar
 
@@ -156,6 +169,7 @@ final class TabService {
 
     /// Guarda lo editado, cancela lo pendiente y suelta la síntesis del reproductor (el estudio sigue abierto).
     func close() {
+        songsterr.reset()
         work?.cancel()
         work = nil
         saveTask?.cancel()
@@ -204,7 +218,7 @@ final class TabService {
     }
 
     /// El estudio se cerró o cambió de tema por fuera: esta pantalla ya no es válida.
-    private func require() throws -> (session: StudySession, ctl: BackingController) {
+    func require() throws -> (session: StudySession, ctl: BackingController) {
         guard let s = session, let c = ctl, studyService.current?.session === s else {
             if session != nil { close() }
             throw RPCError(code: "not-open", message: "No hay ninguna tablatura abierta.")
@@ -300,8 +314,13 @@ final class TabService {
 
     func setSource(_ source: String) async throws -> TabState {
         let (session, _) = try require()
+        if source == "songsterr" {
+            // Abre la hoja (menú «Fuente» > «Songsterr…»); la fuente se guarda con `tab.songsterr.accept`.
+            _ = try await songsterr.open()
+            return state()
+        }
         guard source == "automatic" else {
-            throw RPCError(code: "unsupported", message: "Solo la transcripción automática está disponible en esta versión.")
+            throw RPCError(code: "bad-params", message: "«source» debe ser «automatic» o «songsterr».")
         }
         guard let tabStore else { throw RPCError(code: "unsupported", message: "No hay biblioteca donde guardar la fuente.") }
         do { try await tabStore.saveTabSource(.automatic, for: session.projectID) } catch {

@@ -87,6 +87,17 @@ final class ExternalSources {
                               workRoot: workRoot)
     }
 
+    /// Para listas (W2-J): el `yt-dlp` se busca en cada llamada, así que tras «Actualizar y reintentar» la cola ya usa el nuevo.
+    func makePlaylistImporter(importHandler: @escaping @MainActor (ImportedSource) async throws -> Void) async throws -> PlaylistImporter {
+        let loc = await locator()
+        let yt = try loc.ytDlp()
+        let live = LiveYtDlpRunner(base: runner) { try? loc.ytDlp().url }
+        let client = YtDlpClient(executable: yt.url, deno: try loc.deno(), runner: live)
+        let transcoder = AudioTranscoder(ffmpeg: try loc.ffmpeg(), runner: runner)
+        return PlaylistImporter(ytDlp: client, transcoder: transcoder, http: http, spotify: SpotifyEmbedClient(http: http),
+                                workRoot: workRoot, importHandler: importHandler)
+    }
+
     func updateYtDlp() async throws -> YtDlpInstallInfo {
         let updater = YtDlpUpdater(supportDirectory: supportDirectory, http: URLSessionFetcher(timeout: Self.updateTimeout),
                                    runner: runner)

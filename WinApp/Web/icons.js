@@ -1,8 +1,8 @@
 import { html } from './html.js';
 
 // Iconos de trazo (24x24, stroke currentColor), estilo del boceto.
-const svg = (size, body) => html`<svg aria-hidden="true" width=${size} height=${size} viewBox="0 0 24 24" fill="none"
-  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
+const svg = (size, body, sw = 2) => html`<svg aria-hidden="true" width=${size} height=${size} viewBox="0 0 24 24" fill="none"
+  stroke="currentColor" stroke-width=${sw} stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
 
 const paths = {
   library: html`<path d="M3 7h10M3 12h10M3 17h5"/><path d="M18 17V6c0 2 3 2.5 3 5"/><circle cx="15.5" cy="17" r="2.5" fill="currentColor"/>`,
@@ -14,7 +14,7 @@ const paths = {
   search: html`<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>`,
   trash: html`<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/>`,
   folder: html`<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>`,
-  pencil: html`<path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>`,
+  pencil: html`<path d="M16.5 3.5l4 4L8 20l-5 1 1-5z"/>`,
   chevronLeft: html`<path d="M15 18l-6-6 6-6"/>`,
   close: html`<path d="M18 6L6 18M6 6l12 12"/>`,
   check: html`<circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-6"/>`,
@@ -28,7 +28,9 @@ const paths = {
   redo: html`<path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/>`,
   plus: html`<path d="M12 5v14M5 12h14"/>`,
   minus: html`<path d="M5 12h14"/>`,
-  music: html`<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>`,
+  // music.note del Mac: una corchea rellena
+  music: html`<path d="M12 17.5V4c.8 3.4 6.5 3.8 6.5 8.5"/><ellipse cx="8.6" cy="17.6" rx="3.9" ry="3.1" fill="currentColor"/>`,
+  chevronDown: html`<path d="M6 9l6 6 6-6"/>`,
 };
 
-export const icon = (name, size = 18) => svg(size, paths[name]);
+export const icon = (name, size = 18, strokeWidth = 2) => svg(size, paths[name], strokeWidth);

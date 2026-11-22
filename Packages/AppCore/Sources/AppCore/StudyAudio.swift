@@ -24,6 +24,10 @@ final class StudyAudio {
     let player: StudyPlayer
     private var session: AudioSession?
     private var pump: RealtimePump?
+    /// Primer stem cargado, para volver a la salida simulada propia si la sesión del `AudioController` deja de alojar el reproductor.
+    private var lastFirstTrack: URL?
+    /// W2-C: devuelve true si el `AudioController` va a alojar el reproductor en su sesión (así la simulación propia no se crea).
+    var externalHost: (@MainActor () -> Bool)?
 
     /// `output`: salida elegida en el perfil (`nil` UID = la del sistema).
     init(mode: AudioMode, output: OutputSelection) {
@@ -55,7 +59,10 @@ final class StudyAudio {
     /// En `device` no hace nada: la salida se abre al dar a play.
     func prepare(firstTrack url: URL) throws {
         guard mode == .simulated else { return }
-        if player.isHosted, session?.isOpen == true { return }
+        lastFirstTrack = url
+        // Alojado fuera (sesión del `AudioController`: no hay simulación propia) o ya en la simulación propia.
+        if player.isHosted, session == nil || session?.isOpen == true { return }
+        if externalHost?() == true { return }
         teardownSimulation()
         let rate = try TakeResampling.sampleRate(of: url)
         let io = SimulatedAudioIO(sampleRate: rate, inputs: [SimulatedInput(source: nil)],
@@ -76,6 +83,13 @@ final class StudyAudio {
         p.start()
     }
 
+    /// La sesión del `AudioController` soltó el reproductor: en simulado vuelve a su salida propia; en `device` no hace falta (la
+    /// salida se abre al dar a play).
+    func restoreOwnOutput() {
+        guard mode == .simulated, !player.isHosted, let url = lastFirstTrack else { return }
+        try? prepare(firstTrack: url)
+    }
+
     private func teardownSimulation() {
         pump?.stop()
         pump = nil
@@ -93,8 +107,9 @@ final class StudyAudio {
 
 /// Hilo que da cuerda a `SimulatedAudioIO.pump` con el reloj real (el modo automático del simulador va lo más rápido
 /// que puede): cada vuelta pide los bloques que habría pedido un dispositivo hasta ahora.
-private final class RealtimePump: @unchecked Sendable {
-    private let io: SimulatedAudioIO
+/// Débil: la sesión es la dueña de la E/S; al cerrarse y soltarla, el hilo termina solo (W2-C: también lo usa `AudioController`).
+final class RealtimePump: @unchecked Sendable {
+    private weak var io: SimulatedAudioIO?
     private let sampleRate: Double
     private let block: Int
     private let lock = NSLock()
@@ -114,6 +129,7 @@ private final class RealtimePump: @unchecked Sendable {
             while lock.withLock({ running }) {
                 let target = Int((ProcessInfo.processInfo.systemUptime - origin) * sampleRate)
                 while done + block <= target, lock.withLock({ running }) {
+                    guard let io else { return }
                     io.pump(frames: block)
                     done += block
                 }

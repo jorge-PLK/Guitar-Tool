@@ -11,6 +11,14 @@ public enum MontageCodec: String, Codable, Sendable, CaseIterable {
     #if canImport(AVFoundation)
     var avCodec: AVVideoCodecType { self == .hevc ? .hevc : .h264 }
     #endif
+
+    /// Códecs que se pueden elegir para tomas y exportación, el preferido primero. En Windows solo H.264 (Jorge,
+    /// 21/11/2026, paso 8 W2-E1: sin rama HEVC; la página no enseña selector si hay uno). El Mac no cambia.
+    #if os(Windows)
+    public static let supported: [MontageCodec] = [.h264]
+    #else
+    public static let supported: [MontageCodec] = [.hevc, .h264]
+    #endif
 }
 
 /// Contenedor del fichero exportado (Jorge, 17/11/2026: selector MOV / MP4 en Exportación). Mismo vídeo y mismo

@@ -1,0 +1,36 @@
+/* Ajustes · Audio y hoja de calibración: App/Sources/AudioSettingsView.swift y CalibrationSheet.swift (medidas en pt = px). */
+.inforow .popup { max-width: min(100%, 320px); }
+.meters { display: block; flex: none; }
+
+/* Picker .segmented del Mac: dos opciones, la elegida en gris claro */
+.rate-seg { display: flex; padding: 2px; gap: 1px; width: 220px; height: 24px; background: var(--field-line); border-radius: 7px; }
+.rate-seg button { flex: 1; border: 0; padding: 0; border-radius: 5px; background: transparent; color: var(--text); font-size: 13px; }
+.rate-seg button.on { background: #5A5F66; }
+.rate-seg button:hover:not(.on) { background: rgba(255, 255, 255, .06); }
+
+/* Aviso de frecuencia distinta (rateWarning del Mac) */
+.rate-warn { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.rate-warn p { margin: 0; }
+.rate-warn-main { font-size: 13px; color: var(--accent); }
+.rate-warn-hint { font-size: 12px; color: var(--muted); }
+
+/* Hoja Calibrar latencia */
+.cal-col { display: flex; flex-direction: column; align-items: stretch; gap: 14px; }
+.cal-col.tight { gap: 12px; align-items: flex-start; }
+.modal .cal-text { margin: 0; font-size: 14px; color: var(--text-2); white-space: normal; }
+.modal .cal-text.muted { color: var(--muted); }
+.modal .cal-block { margin: 0; font-size: 13px; color: var(--accent); white-space: normal; }
+.cal-bar .bar { height: 8px; }
+.cal-pct { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.cal-chip { align-self: flex-start; }
+.cal-rows { align-self: stretch; display: flex; flex-direction: column; gap: 8px; padding: 14px; background: var(--field); border-radius: 10px; }
+.cal-row { display: flex; align-items: baseline; gap: 12px; }
+.cal-row-label { width: 120px; flex: none; font-size: 13px; color: var(--muted); }
+.cal-row-value { font-size: 14px; font-weight: 600; color: var(--text); }
+.cal-fail { margin: 0; font-family: var(--font-display); font-size: 16px; font-weight: 700; color: var(--danger); }
+
+/* Paridad con el Mac (W2-COS): la hoja es TF.bg sin borde. */
+.modal.modal:has(.cal-col) { background: var(--bg); border: 0; }
+.cal-rows { border: 0; }
+/* Segmentado del Mac: 146 x 24 pt, ajustado al contenido. */
+.rate-seg { width: 146px; height: 24px; }

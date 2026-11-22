@@ -25,6 +25,41 @@ final class App: @unchecked Sendable {
 /// Segundos que se espera, en modo --snapshot, a que la página termine de cargar antes de rendirse.
 let snapshotWatchdogSeconds = 90.0
 
+/// Exclusión mutua asíncrona (una carga del navegador oculto a la vez; las demás esperan su turno, en orden).
+final class AsyncMutex: @unchecked Sendable {
+    private let lock = NSLock()
+    private var busy = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func acquire() async {
+        let mustWait: Bool = lock.withLock {
+            if busy { return true }
+            busy = true
+            return false
+        }
+        if mustWait { await withCheckedContinuation { c in lock.withLock { waiters.append(c) } } }   // el turno se hereda (busy sigue true)
+    }
+
+    func release() {
+        let next: CheckedContinuation<Void, Never>? = lock.withLock {
+            if waiters.isEmpty { busy = false; return nil }
+            return waiters.removeFirst()
+        }
+        next?.resume()
+    }
+}
+
+/// Una carga en vuelo del navegador oculto: el callback C la recibe como `ctx` (retenida hasta `done`).
+final class HiddenLoadBox: @unchecked Sendable {
+    let id: UInt64
+    let continuation: CheckedContinuation<HiddenPage, Error>
+    private let lock = NSLock()
+    private var _cancelled = false
+    init(id: UInt64, continuation: CheckedContinuation<HiddenPage, Error>) { self.id = id; self.continuation = continuation }
+    var cancelled: Bool { lock.withLock { _cancelled } }
+    func markCancelled() { lock.withLock { _cancelled = true } }
+}
+
 /// Diálogos nativos del anfitrión: `IFileOpenDialog` modal sobre la ventana, en el hilo de UI (el shim hace el SendMessage).
 /// Se llaman desde un hilo propio para no bloquear el pool cooperativo mientras el diálogo está abierto.
 final class WindowsHostServices: HostServices, @unchecked Sendable {
@@ -85,6 +120,71 @@ final class WindowsHostServices: HostServices, @unchecked Sendable {
             "Elegir carpeta".withCString { tfhost_pick_folder(host, $0, out, cap) }
         }
     }
+
+    // MARK: Navegador oculto (W2-H, contrato W2-G): segundo WebView2 InPrivate del shim.
+
+    private let hiddenTurn = AsyncMutex()
+    private let hiddenIDLock = NSLock()
+    private var nextHiddenID: UInt64 = 0
+
+    /// El `userAgent` que llega (Safari del Mac) se IGNORA: el navegador usa el propio de WebView2, que coincide con el motor.
+    func load(url: URL, userAgent: String?, readyScript: String?, timeout: TimeInterval) async throws -> HiddenPage {
+        await hiddenTurn.acquire()
+        defer { hiddenTurn.release() }
+        try Task.checkCancellation()
+        guard let host = app?.host else { throw HiddenPageError.unsupported }
+        let id: UInt64 = hiddenIDLock.withLock { nextHiddenID += 1; return nextHiddenID }
+        let box = Box<HiddenLoadBox?>(nil)
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<HiddenPage, Error>) in
+                let load = HiddenLoadBox(id: id, continuation: continuation)
+                box.value = load
+                let ctx = Unmanaged.passRetained(load).toOpaque()
+                let done: @convention(c) (Int32, Int32, UnsafePointer<CChar>?, UnsafeMutableRawPointer?) -> Void = { result, status, html, ctx in
+                    let load = Unmanaged<HiddenLoadBox>.fromOpaque(ctx!).takeRetainedValue()
+                    switch result {
+                    case 0: load.continuation.resume(returning: HiddenPage(status: Int(status), html: html.map { String(cString: $0) } ?? ""))
+                    case 1: load.continuation.resume(throwing: HiddenPageError.offline)
+                    case 2: load.continuation.resume(throwing: HiddenPageError.readyTimeout)
+                    case 3: load.continuation.resume(throwing: HiddenPageError.httpStatus(Int(status)))
+                    case 4: load.continuation.resume(throwing: HiddenPageError.cancelled)
+                    default: load.continuation.resume(throwing: HiddenPageError.unsupported)
+                    }
+                }
+                let timeoutMs = Int32(max(1, min(timeout, 600)) * 1000)
+                let post: (UnsafePointer<CChar>?) -> Void = { ready in
+                    url.absoluteString.withCString { tfhost_hidden_load(host, id, $0, ready, timeoutMs, done, ctx) }
+                }
+                if let readyScript { readyScript.withCString { post($0) } } else { post(nil) }
+                // Cancelada antes de que el shim recibiera la carga: el aviso de cancelar pudo llegar antes y perderse.
+                if load.cancelled { tfhost_hidden_cancel(host, id) }
+            }
+        } onCancel: {
+            box.value?.markCancelled()
+            if let host = self.app?.host { tfhost_hidden_cancel(host, id) }
+        }
+    }
+
+    // MARK: Vista previa visible (W2-H): rect en píxeles CSS de la página; el shim aplica la escala del monitor.
+
+    func showPreview(url: URL, rect: PreviewRect) async -> Bool {
+        guard let host = app?.host else { return false }
+        url.absoluteString.withCString { tfhost_preview_show(host, $0, rect.x, rect.y, rect.width, rect.height) }
+        return true
+    }
+
+    func hidePreview() async {
+        guard let host = app?.host else { return }
+        tfhost_preview_hide(host)
+    }
+}
+
+/// Caja mutable mínima para compartir un valor entre el cuerpo y el aviso de cancelación.
+final class Box<T>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _value: T
+    init(_ v: T) { _value = v }
+    var value: T { get { lock.withLock { _value } } set { lock.withLock { _value = newValue } } }
 }
 
 let logLock = NSLock()
@@ -248,6 +348,11 @@ let closeStudyBudget = 3.0
 
 func runUI() {
     startup.mark("hilo de UI en marcha")
+    // STA antes que nada: crear el Bridge puede tocar Media Foundation (cámaras), que pide MTA; si llegase antes, WebView2
+    // fallaría con RPC_E_CHANGED_MODE (0x80010106). Con STA puesto, esas piezas siguen sin cambiar el modo.
+    let comHR = tfhost_init_ui_thread()
+    startup.mark(comHR == 0 ? "COM en STA en el hilo de UI"
+                            : "COM: no se pudo poner STA (HRESULT 0x\(String(UInt32(bitPattern: comHR), radix: 16)))")
     let bridge: Bridge
     startup.mark("creando Bridge")
     do {
@@ -372,6 +477,7 @@ func runUI() {
     // en el hilo principal dentro de dispatchMain, no en este).
     let closed = DispatchSemaphore(value: 0)
     Task.detached {
+        await bridge.closeMontage()   // W2-E2 (ya lo hizo on_close -> shutdown; repetirlo no hace nada)
         await bridge.closeStudy()
         closed.signal()
     }

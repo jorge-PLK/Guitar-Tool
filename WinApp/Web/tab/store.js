@@ -92,6 +92,9 @@ function apply(st) {
   syncScore(st);
 }
 
+/// Para la hoja de Songsterr: aplica el TabState de `tab.songsterr.accept/automatic` (lanza `tab.transcribe` de las `queued`).
+export const applyTabState = st => apply(st);
+
 /// A diferencia del Mac, abrir no transcribe: las pistas `queued` se lanzan aquí (una vez por pista y apertura).
 function maybeTranscribe(st) {
   if (st.phase !== 'working' && st.phase !== 'ready') return;

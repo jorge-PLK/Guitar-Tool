@@ -53,19 +53,19 @@
 
 .chord-card { flex: none; display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: var(--radius-ctl); background: var(--field); }
 .chord-card-text { min-width: 90px; display: flex; flex-direction: column; gap: 2px; }
-.chord-card-name { font-family: var(--font-display); font-weight: 700; font-size: 22px; line-height: 1.2; }
+.chord-card-name { font-family: var(--font-display); font-weight: 700; font-size: 22px; }
 .chord-card-next { font-size: 12px; color: var(--muted); }
 .chord-card-capo { font-size: 12px; color: var(--accent); }
 
-.bk-info-row { display: flex; align-items: center; flex-wrap: nowrap; gap: 14px; font-size: 13px; color: var(--text-2); min-width: 0; }
+.bk-info-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; font-size: 13px; color: var(--text-2); min-width: 0; }
 .bk-info-row .stat b { color: var(--text); font-weight: 600; }
 .labeled { display: inline-flex; align-items: center; gap: 6px; }
 .select { height: 30px; padding: 0 8px; border-radius: var(--radius-sm); border: 1px solid var(--field-line); background: var(--field);
   color: var(--text); font: inherit; font-size: 13px; color-scheme: dark; min-width: 112px; }
 .cents { width: 62px; font-variant-numeric: tabular-nums; }
 .range { appearance: none; -webkit-appearance: none; height: 4px; border-radius: 2px; background: var(--field-line); outline-offset: 6px; margin: 0; width: 100px; }
-.range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: 0; cursor: pointer; }
-.range::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: 0; }
+.range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 20px; height: 20px; border-radius: 50%; background: #DCDEDD; border: 0; box-shadow: 0 1px 2px rgba(0, 0, 0, .4); cursor: pointer; }
+.range::-moz-range-thumb { width: 20px; height: 20px; border-radius: 50%; background: #DCDEDD; border: 0; }
 
 /* Barra de progreso */
 .progress { position: relative; height: 22px; cursor: pointer; touch-action: none; border-radius: 6px; }
@@ -81,12 +81,13 @@
 .play-btn { width: 52px; height: 52px; border-radius: 50%; border: 0; background: var(--accent); color: var(--accent-ink); display: flex; align-items: center; justify-content: center; }
 .play-btn:hover { background: var(--accent-hover); }
 .clock { font-family: var(--font-display); font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.clock .total { color: var(--muted); font-weight: 500; }
+.clock .total { color: var(--muted); }   /* el Mac: reloj entero en TF.display(20) bold (BackingTimeline.swift) */
+.transport .labeled.tempo, .transport .check { font-size: 13px; }   /* el Mac: TF.body(13) en tempo y metrónomo */
 .loop-pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: var(--radius-sm); background: var(--accent-bg);
   color: var(--accent); font-size: 13px; font-weight: 600; white-space: nowrap; }
 .loop-x { display: inline-flex; border: 0; background: none; color: inherit; padding: 2px; cursor: pointer; }
 .loop-marks { display: inline-flex; gap: 6px; }
-.btn.mark { height: 30px; padding: 0 10px; font-size: 12px; }
+.btn.mark { height: 30px; padding: 0 16px; font-size: 14px; }   /* SecondaryButton(height: 30): body 14 medium, padding 16 */
 .btn.mark.pending { box-shadow: inset 0 0 0 1px var(--accent); color: var(--accent); }
 .labeled.tempo { color: var(--text-2); gap: 10px; }
 .labeled.tempo .range { width: 120px; }
@@ -180,7 +181,7 @@
 .guitar-status { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-2); min-width: 0; }
 .guitar-status.err { color: var(--danger); }
 .guitar-status.err span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 360px; }
-.switch { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: var(--text); cursor: pointer; }
+.switch { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; font-size: 13px; font-weight: 500; color: var(--text); cursor: pointer; }
 /* Interruptor: NSSwitch del Mac (Toggle .switch, tint TF.accent): pista 43x19, pomo claro en píldora 26x16 */
 .switch input { appearance: none; -webkit-appearance: none; width: 43px; height: 19px; border-radius: 10px; background: #3A3C40; position: relative; margin: 0; cursor: pointer; transition: background .12s; flex: none; }
 .switch input::after { content: ''; position: absolute; left: 1.5px; top: 1.5px; width: 26px; height: 16px; border-radius: 8px; background: #DCDEDD; box-shadow: 0 1px 2px rgba(0, 0, 0, .35); transition: transform .12s; }
@@ -195,11 +196,11 @@
 .head-actions { display: inline-flex; align-items: center; gap: 10px; }
 .head-actions .btn { gap: 8px; }
 
-/* Fila de controles: una sola línea como en el Mac (también a 1280 de ancho). */
+/* Fila de controles: envuelve como el FlowRow del Mac (BackingTimeline.infoRow: spacing 10, selectores 112, deslizador 70, «N cents» 56). */
 .bk-info-row > * { white-space: nowrap; flex: none; }
-.bk-info-row .select { min-width: 96px; padding: 0 6px; }
-.bk-info-row .labeled { gap: 5px; }
-.bk-info-row .range { width: 72px; }
+.bk-info-row .select { width: 112px; min-width: 112px; padding: 0 6px; }
+.bk-info-row .labeled { gap: 6px; }
+.bk-info-row .range { width: 70px; }
 .bk-info-row .cents { width: 56px; }
 
 /* Ventana de sección como la del Mac: sugerencias con el elegido en gris claro (no naranja) y «Solo» como interruptor. */
@@ -207,4 +208,3 @@
 .sec-suggest .pchip.on { background: var(--line); color: var(--text); }
 .section-panel .switch { align-self: flex-start; }
 
-@media (max-width: 1340px) { .bk-info-row { gap: 8px; } .bk-info-row .labeled { gap: 4px; } .bk-info-row .select { min-width: 90px; } }

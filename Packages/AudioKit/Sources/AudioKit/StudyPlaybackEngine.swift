@@ -42,6 +42,8 @@ public protocol StudyPlaybackEngine: AnyObject {
     /// ±1250 cents.
     var pitchCents: Double { get set }
     var loop: ClosedRange<Double>? { get set }
+    /// Fin de la reproducción (s de canción, `nil` = final del tema): parada exacta por muestras al programar.
+    var endTime: Double? { get set }
     var metronome: Metronome { get set }
 
     /// Alojado en una sesión de `AudioIO`: backing y grabación con el reloj del dispositivo.

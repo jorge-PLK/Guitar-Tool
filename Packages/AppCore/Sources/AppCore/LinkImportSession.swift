@@ -165,7 +165,7 @@ enum SourceMessages {
         var detail: String
     }
 
-    static let supportedLinks = "Se admiten enlaces de un vídeo de YouTube (youtube.com/watch, youtu.be, music.youtube.com) y de una canción de Spotify (open.spotify.com/track o spotify:track). Listas, álbumes y episodios no."  // listas y álbumes: ola 2; entonces vuelve el literal del Mac
+    static let supportedLinks = "Se admiten enlaces de un vídeo de YouTube (youtube.com/watch, youtu.be, music.youtube.com) y de una canción de Spotify (open.spotify.com/track o spotify:track), además de listas de YouTube (youtube.com/playlist) y listas o álbumes de Spotify (open.spotify.com/playlist, open.spotify.com/album). Episodios no."
 
     static func text(for e: SourceError) -> Message {
         switch e {

@@ -295,7 +295,7 @@ struct TabContent: View {
         HStack(spacing: 16) {
             if track.kind != .drums, let tuning = track.tuning {
                 HStack(spacing: 8) {
-                    Text("Afinación").foregroundStyle(TF.muted)
+                    Text("Afinación").foregroundStyle(TF.muted).lineLimit(1).fixedSize()
                     Picker("Afinación", selection: Binding(get: { tuning.preset },
                                                            set: { tab.setTuning($0, trackID: track.id) })) {
                         ForEach(TuningPreset.fixed, id: \.self) { Text(TabController.tuningName($0)).tag($0) }

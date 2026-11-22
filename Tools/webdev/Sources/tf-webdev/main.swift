@@ -4,12 +4,17 @@ import UniformTypeIdentifiers
 import WebKit
 
 // tf-webdev [--web-dir D] [--alphatab-dir D] [--projects-folder D] [--support-dir D] [--screen S] [--project P] [--window WxH]
-//           [--snapshot out.png] [--snapshot-delay s] [--foreground] [--mock]
+//           [--snapshot out.png] [--snapshot-delay s] [--foreground] [--mock] [--camera real|simulated (por omisión)]
 //           [--eval js] [--eval-delay s] [--eval-file f.js [--eval-exit]]   (--eval-file como el de ToneForge.exe; --eval-exit sale al acabar)
 // Páginas en tf-app://app/…, carpeta de proyectos en tf-media://media/… (mediaBase de app.info).
 
 let args = Array(CommandLine.arguments.dropFirst())
-let options = LaunchOptions.parse(args)
+/// W2-E2: sin `--camera real`, cámara simulada (la de AVFoundation pediría permiso de cámara al abrir Grabar o Ajustes).
+let options: LaunchOptions = {
+    var o = LaunchOptions.parse(args)
+    if o.camera == nil { o.camera = .simulated }
+    return o
+}()
 let mock = args.contains("--mock")
 let background = (options.snapshot != nil || args.contains("--eval-file")) && !args.contains("--foreground")
 
@@ -108,8 +113,148 @@ final class MessageHandler: NSObject, WKScriptMessageHandler {
     }
 }
 
+/// Navegador oculto (W2-G/W2-H, `HiddenPageLoading`): segundo `WKWebView` sin ventana, almacén no persistente, una carga cada
+/// vez, sondeo de `readyScript` cada 250 ms. Igual que `SongsterrWebLoader` del Mac.
+@MainActor
+final class HiddenBrowser: NSObject, WKNavigationDelegate {
+    /// Cada cuánto se evalúa `readyScript` (contrato W2-G, `SongsterrHiddenPage.pollMillis`).
+    static let pollInterval: Duration = .milliseconds(250)
+    private let webView: WKWebView
+    private var navigation: CheckedContinuation<Void, Error>?
+    private var status = 200
+    private var busy = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    override init() {
+        let config = WKWebViewConfiguration()
+        config.websiteDataStore = .nonPersistent()
+        webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 1200, height: 800), configuration: config)
+        super.init()
+        webView.navigationDelegate = self
+    }
+
+    func load(url: URL, userAgent: String?, readyScript: String?, timeout: TimeInterval) async throws -> HiddenPage {
+        guard url.scheme == "https" else { throw HiddenPageError.unsupported }
+        while busy {
+            await withCheckedContinuation { waiters.append($0) }
+            try Task.checkCancellation()
+        }
+        busy = true
+        defer {
+            busy = false
+            if !waiters.isEmpty { waiters.removeFirst().resume() }
+        }
+        webView.customUserAgent = userAgent
+        status = 200
+        let deadline = Date().addingTimeInterval(timeout)
+        try await navigate(url, deadline: deadline)
+        while true {
+            try Task.checkCancellation()
+            var ready = true
+            if let readyScript { ready = (try? await webView.evaluateJavaScript(readyScript) as? Bool) == true }
+            if ready, let html = try await webView.evaluateJavaScript("document.documentElement.outerHTML") as? String {
+                return HiddenPage(status: status, html: html)
+            }
+            guard Date() < deadline else { throw HiddenPageError.readyTimeout }
+            try await Task.sleep(for: Self.pollInterval)
+        }
+    }
+
+    private func navigate(_ url: URL, deadline: Date) async throws {
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, Error>) in
+                navigation = c
+                webView.load(URLRequest(url: url, timeoutInterval: max(1, deadline.timeIntervalSinceNow)))
+            }
+        } onCancel: {
+            Task { @MainActor in self.finish(.failure(HiddenPageError.cancelled)); self.webView.stopLoading() }
+        }
+    }
+
+    private func finish(_ result: Result<Void, Error>) {
+        guard let c = navigation else { return }
+        navigation = nil
+        c.resume(with: result)
+    }
+
+    func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse) async -> WKNavigationResponsePolicy {
+        if navigationResponse.isForMainFrame, let http = navigationResponse.response as? HTTPURLResponse {
+            status = http.statusCode
+            if http.statusCode >= 400 {
+                finish(.failure(HiddenPageError.httpStatus(http.statusCode)))
+                return .cancel
+            }
+        }
+        return .allow
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { finish(.success(())) }
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { finish(.failure(Self.map(error))) }
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        finish(.failure(Self.map(error)))
+    }
+
+    private static func map(_ error: Error) -> HiddenPageError {
+        guard let e = error as? URLError else { return .offline }
+        return e.code == .cancelled ? .cancelled : .offline
+    }
+}
+
+/// Vista previa visible (W2-H): `WKWebView` hijo de la página principal, almacén por defecto (cookies persistentes como el Mac).
+@MainActor
+final class PreviewPanel {
+    private(set) var view: WKWebView?
+    private var loaded: URL?
+    var parent: NSView?
+
+    func show(url: URL, rect: PreviewRect) {
+        guard let parent else { return }
+        let v: WKWebView
+        if let view { v = view } else {
+            let config = WKWebViewConfiguration()
+            config.websiteDataStore = .default()
+            v = WKWebView(frame: .zero, configuration: config)
+            v.allowsBackForwardNavigationGestures = true
+            view = v
+        }
+        if v.superview !== parent { parent.addSubview(v) }
+        // Los puntos de AppKit son los píxeles CSS (zoom 1); el WKWebView padre está volteado: y desde arriba.
+        v.frame = NSRect(x: rect.x, y: rect.y, width: rect.width, height: rect.height)
+        v.isHidden = false
+        if loaded != url { loaded = url; v.load(URLRequest(url: url)) }
+    }
+
+    func hide() {
+        guard let v = view, !v.isHidden || loaded != nil else { return }
+        v.isHidden = true
+        if loaded != nil { loaded = nil; v.load(URLRequest(url: URL(string: "about:blank")!)) }   // detiene el audio de Songsterr
+    }
+
+    /// Captura del panel visible, con su marco en la página (para componerla sobre la captura principal).
+    func snapshot() async -> (NSImage, NSRect)? {
+        guard let v = view, !v.isHidden, v.superview != nil else { return nil }
+        let cfg = WKSnapshotConfiguration()
+        cfg.snapshotWidth = NSNumber(value: Double(v.bounds.width))
+        guard let image = try? await v.takeSnapshot(configuration: cfg) else { return nil }
+        return (image, v.frame)
+    }
+}
+
 /// Diálogos nativos del puente (host.pickAudioFile / host.pickProjectsFolder) con NSOpenPanel.
 final class PanelHost: HostServices, @unchecked Sendable {
+    let hidden = MainActor.assumeIsolated { HiddenBrowser() }
+    let preview = MainActor.assumeIsolated { PreviewPanel() }
+
+    func load(url: URL, userAgent: String?, readyScript: String?, timeout: TimeInterval) async throws -> HiddenPage {
+        try await hidden.load(url: url, userAgent: userAgent, readyScript: readyScript, timeout: timeout)
+    }
+
+    func showPreview(url: URL, rect: PreviewRect) async -> Bool {
+        await MainActor.run { preview.show(url: url, rect: rect); return preview.parent != nil }
+    }
+
+    func hidePreview() async { await MainActor.run { preview.hide() } }
+
     func pickFile(types: [String]) async -> URL? {
         await MainActor.run {
             let panel = NSOpenPanel()
@@ -152,6 +297,7 @@ final class Host: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     var webView: WKWebView!
     let handler = MessageHandler()
     var bridge: Bridge?
+    var panelHost: PanelHost?
     let webDir: URL
     let alphaTabDir: URL
 
@@ -161,7 +307,8 @@ final class Host: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         let mediaBase = "tf-media://media/"
         if !mock {
             do { bridge = try Bridge(options: options, mediaBase: mediaBase) } catch { fail("AppCore: \(error)") }
-            bridge?.host = PanelHost()
+            panelHost = PanelHost()
+            bridge?.host = panelHost
             bridge?.start()
         }
         let config = WKWebViewConfiguration()
@@ -203,6 +350,7 @@ final class Host: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         window.appearance = NSAppearance(named: .darkAqua)
         window.backgroundColor = NSColor(red: 0x0F / 255.0, green: 0x11 / 255.0, blue: 0x13 / 255.0, alpha: 1)
         window.contentView = webView
+        panelHost?.preview.parent = webView
         // Siempre en la pantalla principal y con el contenido exactamente del tamaño pedido.
         window.setContentSize(NSSize(width: size.0, height: size.1))
         if let main = NSScreen.screens.first {
@@ -287,7 +435,21 @@ final class Host: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         let cfg = WKSnapshotConfiguration()
         cfg.snapshotWidth = NSNumber(value: Double(webView.bounds.width))
         webView.takeSnapshot(with: cfg) { image, error in
-            guard let image, let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
+            guard var image else { fail("captura: \(String(describing: error))") }
+            Task { @MainActor in
+            // La vista previa (W2-H) es otro WKWebView: se compone sobre la captura principal.
+            if let (overlay, frame) = await self.panelHost?.preview.snapshot() {
+                let base = image
+                let out = NSImage(size: base.size)
+                out.lockFocus()
+                base.draw(in: NSRect(origin: .zero, size: base.size))
+                let scale = base.size.width / max(1, self.webView.bounds.width)
+                overlay.draw(in: NSRect(x: frame.minX * scale, y: base.size.height - frame.maxY * scale,
+                                        width: frame.width * scale, height: frame.height * scale))
+                out.unlockFocus()
+                image = out
+            }
+            guard let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
                   let png = rep.representation(using: .png, properties: [:]) else { fail("captura: \(String(describing: error))") }
             do {
                 try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -295,6 +457,7 @@ final class Host: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             } catch { fail("escribir captura: \(error)") }
             print("captura: \(url.path) (\(rep.pixelsWide)x\(rep.pixelsHigh))")
             exit(0)  // sin cola de trabajos que esperar: las capturas no lanzan separaciones
+            }
         }
     }
 

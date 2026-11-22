@@ -94,6 +94,8 @@ public final class SimulatedAudioIO: AudioIO, @unchecked Sendable {
     /// dispositivo corre más rápido y da más muestras por segundo de host que su frecuencia nominal).
     public let hostDriftPPM: Double
     public let automatic: Bool
+    /// Para simular una sesión WASAPI en la clave de calibración (F2): modo y contenedores. nil = como CoreAudio.
+    public let wasapiIdentity: WASAPIIdentity?
 
     /// Capacidad del historial de salida: 2¹⁸ muestras (5,4 s a 48 kHz) de retardo máximo.
     private static let historyFrames = 1 << 18
@@ -120,7 +122,8 @@ public final class SimulatedAudioIO: AudioIO, @unchecked Sendable {
                 inputDeviceUID: String = "sim-in", outputDeviceUID: String = "sim-out",
                 clock: AudioIOClock = .single, initialSampleTime: Int64 = 0, seed: UInt64 = 1,
                 automatic: Bool = false, hostStartSeconds: Double = SimulatedAudioIO.defaultHostStartSeconds,
-                hostDriftPPM: Double = 0) {
+                hostDriftPPM: Double = 0, wasapiIdentity: WASAPIIdentity? = nil) {
+        self.wasapiIdentity = wasapiIdentity
         format = AudioIOFormat(sampleRate: sampleRate, inputChannels: inputs.count, outputChannels: outputChannels,
                                bufferFrames: bufferFrames)
         self.hostStartSeconds = hostStartSeconds

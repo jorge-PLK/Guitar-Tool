@@ -124,6 +124,12 @@ final class StemScheduler: @unchecked Sendable {
         queue.sync { planner.loop = loop }
     }
 
+    /// Última muestra del tema que se programa (exclusiva): tras ella los players se quedan sin nada (silencio) y
+    /// llega `onEnd`. En marcha vale para lo que aún no está programado.
+    func setEnd(_ frames: Int64) {
+        queue.sync { planner.length = max(0, frames) }
+    }
+
     /// Rellena la cola ya (render offline de los tests; en tiempo real lo hacen los avisos).
     func topUp() {
         queue.sync { topUpOnQueue() }

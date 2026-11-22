@@ -1,0 +1,177 @@
+/* Pantalla Montaje: App/Sources/MontageView.swift y MontageFramingSheet.swift (el Mac manda; pt = px).
+   Pesos como en SwiftUI: TF.display(n) = 700, TF.body(n, .semibold) = 600, .medium = 500, el resto 400. */
+.screen.montage { padding: 20px 36px; gap: 14px; overflow: hidden; }
+.screen.montage .grow { flex: 1; }
+.screen.montage h2 { font-family: var(--font-display); font-size: 18px; font-weight: 700; margin: 0 0 2px; }
+.screen.montage .small { font-size: 12px; }
+.screen.montage .tiny { font-size: 11px; }
+.screen.montage .band-label { font-size: 10px; }   /* el Mac: TF.body(10) en «Tramo del vídeo» */
+.screen.montage .accent-text, .screen.montage .modal p.accent-text { color: var(--accent); }
+.screen.montage .danger-text, .screen.montage .modal p.danger-text { color: var(--danger); }
+.screen.montage .modal p.muted { color: var(--muted); }
+
+.mt-head { display: flex; align-items: flex-start; gap: 16px; }
+.mt-head .song { font-size: 13px; }
+.mt-title { font-size: 26px; font-weight: 700; margin-top: 2px; }
+.mt-notices { display: flex; flex-direction: column; gap: 6px; }
+.mt-notices:empty { display: none; }
+.mt-link { background: none; border: 0; padding: 0; font-size: 12px; color: var(--muted); text-decoration: underline; flex: none; }
+.mt-chooser { display: flex; flex-direction: column; gap: 16px; align-items: flex-start; }
+
+/* Cuerpo: la cabecera queda fija; columnas y línea de tiempo hacen scroll */
+.mt-scroll { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; margin-right: -36px; padding-right: 52px;   /* 36 + 16: el Mac reserva ~16 pt a la derecha del contenido con scroll (barra del ScrollView) */
+  display: flex; flex-direction: column; gap: 14px; }
+.mt-scroll > * { flex: none; }
+.mt-cols { display: flex; align-items: stretch; gap: 16px; }
+.mt-card { padding: 15px 18px 16px; }
+.mt-layout { width: 270px; flex: none; display: flex; flex-direction: column; gap: 8px; }
+.mt-settings { width: 300px; flex: none; display: flex; flex-direction: column; gap: 6px; }
+.compact .mt-layout { width: 252px; }
+.compact .mt-settings { width: 276px; }
+.mt-preview { flex: 1; min-width: 0; padding: 15px 20px 16px; display: flex; flex-direction: column; gap: 10px; }
+
+/* Layout */
+.mt-layout-item { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 52px; padding: 6px 8px; text-align: left; flex: none;
+  background: var(--field); border: 1px solid var(--field-line); border-radius: 12px; color: var(--text); }
+.mt-layout-item.on { background: var(--accent-bg); border-color: var(--accent); }
+.mt-layout-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.mt-layout-text .n { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Mac: 11 pt con minimumScaleFactor(0.8) y lineLimit(1) (MontageView.swift:263); FitText (montage/columns.js) lo encoge hasta 0,8 como el Mac; 11 px de base, y «…» si no cabe */
+.mt-layout-text .d { display: block; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mt-thumb { display: flex; justify-content: center; width: 64px; flex: none; }
+.mt-thumb > div { box-sizing: content-box; padding: 4px; background: var(--bg); border-radius: 6px; display: flex; gap: 3px; }
+.mt-thumb .th-grid { flex-direction: column; }
+.mt-thumb .th-grid > .th-row { flex: 1; display: flex; gap: 3px; }
+.mt-thumb .th-grid > i, .mt-thumb .th-row > i { flex: 1; }
+.mt-thumb i { background: #5A636C; border-radius: 3px; display: block; }
+.mt-thumb .w56 { width: 56px; } .mt-thumb .w24 { width: 24px; } .mt-thumb .h30 { height: 30px; } .mt-thumb .h40 { height: 40px; }
+.mt-rhythm { display: flex; flex-direction: column; gap: 4px; }
+
+/* Vista previa */
+.mt-prev-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 12px; font-size: 13px; }
+.mt-prev-head > span { white-space: nowrap; }
+.mt-player-wrap { flex: 1; min-height: 0; container-type: size; display: flex; align-items: center; justify-content: center; }
+.mt-player { position: relative; width: min(100cqw, 100cqh * 16 / 9); aspect-ratio: 16 / 9; background: #0B0C0E; border: 1px solid var(--field-line);
+  border-radius: 14px; overflow: hidden; }
+.mt-player.portrait { width: min(100cqw, 100cqh * 9 / 16); aspect-ratio: 9 / 16; }
+.mt-player canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.mt-prep { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+.mt-controls { display: flex; align-items: center; gap: 12px; }
+.mt-play { flex: none; width: 44px; height: 44px; border-radius: 50%; border: 0; background: var(--accent); color: var(--accent-ink); display: flex; align-items: center; justify-content: center; }
+.mt-play:disabled { opacity: .4; }
+.mt-clock { font-size: 13px; white-space: nowrap; font-variant-numeric: tabular-nums; flex: none; }
+.mt-slider { appearance: none; -webkit-appearance: none; flex: 1; min-width: 24px; height: 18px; margin: 0; background: transparent; outline-offset: 4px; }
+.mt-slider::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: linear-gradient(to right, var(--accent) var(--f, 0%), var(--field-line) var(--f, 0%)); }
+.mt-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; margin-top: -7px; border-radius: 50%; background: #E3E4E6; border: 0; box-shadow: 0 1px 2px rgba(0,0,0,.4); }
+.mt-slider::-moz-range-track { height: 4px; border-radius: 2px; background: var(--field-line); }
+.mt-slider::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: #E3E4E6; border: 0; }
+.mt-slider:disabled { opacity: .5; }
+
+/* Exportación */
+.mt-set-head { display: flex; align-items: center; gap: 6px; }
+.mt-info { display: inline-flex; padding: 0; border: 0; background: none; color: var(--text-2); }
+.mt-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; min-height: 24px; }
+.mt-row .lbl { color: var(--text-2); }
+.mt-popup { font: inherit; font-size: 13px; appearance: none; -webkit-appearance: none; height: 24px; padding: 0 26px 0 10px; border: 0; border-radius: 6px; color: var(--text);
+  background-color: var(--field-line); color-scheme: dark; max-width: 100%;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='14' viewBox='0 0 10 14' fill='none' stroke='%23C9CED4' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 5.5L5 2.5l3 3M2 8.5l3 3 3-3'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 8px center; }
+.mt-popup.wide { width: 100%; height: 28px; }
+.mt-popup:disabled { opacity: .5; }
+.mt-popup option { background: var(--field); color: var(--text); }
+.mt-check { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-2); }
+/* En el Mac el Toggle desactivado no se atenúa (el texto lleva color explícito): se queda igual. */
+.mt-check.disabled { opacity: 1; }
+.mt-pop { position: fixed; z-index: 60; width: 340px; padding: 14px; background: var(--field); border: 1px solid var(--field-line); border-radius: var(--radius-ctl);
+  box-shadow: 0 12px 32px rgba(0,0,0,.5); display: flex; flex-direction: column; gap: 6px; }
+.mt-pop h3 { font-family: var(--font-display); font-size: 16px; font-weight: 700; margin: 0; }
+.mt-pop .row { display: flex; justify-content: space-between; gap: 16px; font-size: 13px; }
+.mt-pop .row .k { color: var(--text-2); }
+.mt-pop .row .v { font-weight: 600; }
+.mt-pop.mt-cutmenu { width: auto; min-width: 190px; padding: 12px; gap: 4px; }
+.mt-choice { display: flex; align-items: center; gap: 6px; padding: 3px 0; border: 0; background: none; color: var(--text); font-size: 13px; text-align: left; }
+.mt-choice .ck { width: 14px; display: inline-flex; }
+.mt-choice:disabled { opacity: .4; }
+.mt-choice.danger { color: var(--danger); padding-left: 0; }
+.mt-pop .sep { height: 1px; background: var(--line); margin: 4px 0; }
+
+/* Avisos y estado de la exportación */
+.mt-export { display: flex; flex-direction: column; gap: 6px; padding: 10px 14px; border-radius: 10px; background: var(--field); font-size: 13px; }
+.mt-export.running, .mt-export.failed, .mt-export:not(.done) { flex-direction: row; align-items: center; gap: 12px; }
+.mt-export.running { align-self: flex-start; }
+.mt-export.running .bar-wrap { flex: none; width: 320px; }
+.mt-export .bar-wrap { flex: 1; }
+.mt-export .pc { font-variant-numeric: tabular-nums; }
+.mt-export .st, .mt-export .path { font-weight: 500; }
+.mt-export.done { background: var(--ok-bg); }
+.mt-export.failed { background: var(--danger-bg); }
+.mt-export .top { display: flex; align-items: center; gap: 12px; }
+.mt-export .ok { color: var(--ok); display: inline-flex; }
+.mt-export .path { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mt-empty { padding: 20px; display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
+
+/* Línea de tiempo */
+.mt-timeline { padding: 14px 18px; display: flex; flex-direction: column; gap: 8px; position: relative; }
+.mt-tl-main { display: flex; align-items: flex-start; gap: 10px; }
+.mt-tl-labels { flex: none; display: flex; flex-direction: column; gap: 6px; }
+.band-label { height: 8px; line-height: 8px; white-space: nowrap; }
+.mt-lane-label, .mt-plane-label, .mt-missing-label { height: 30px; display: flex; align-items: center; gap: 6px; position: relative; min-width: 0; }
+.mt-lane-label { cursor: default; touch-action: none; }
+.mt-lane-label.dragging { opacity: .4; }
+.mt-lane-label .grip { color: var(--muted); display: inline-flex; flex: none; cursor: grab; }
+.mt-lane-label .name, .mt-plane-label .name, .mt-missing-label .name { font-size: 13px; font-weight: 600; color: var(--text-2); white-space: nowrap; flex: none; }
+.mt-lane-label .drop-line { position: absolute; left: 0; right: 0; height: 3px; background: var(--accent); pointer-events: none; }
+.mt-lane-label .drop-line.top { top: -6px; } .mt-lane-label .drop-line.bottom { bottom: -6px; }
+.mt-mini { height: 26px; padding: 0 10px; font-size: 12px; white-space: nowrap; flex: none; background: var(--field); color: var(--text); font-weight: 500;
+  border: 1px solid var(--field-line); border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; }
+.mt-mini:disabled { opacity: .5; }
+.mt-mini.sq { width: 26px; padding: 0; }
+.mt-mini.rot { color: var(--accent); }
+.spinner.mini { width: 10px; height: 10px; border-width: 2px; }
+.mt-track { position: relative; flex: 1; min-width: 0; overflow: hidden; cursor: pointer; touch-action: none; user-select: none; -webkit-user-select: none; }
+.mt-track-rows { display: flex; flex-direction: column; gap: 6px; }
+.mt-track i { display: block; font-style: normal; }
+.mt-band, .mt-sections, .mt-lane { position: relative; flex: none; }
+.mt-band { height: 8px; }
+.mt-band .fill { position: absolute; top: 0; height: 8px; border-radius: 3px; background: rgba(242,163,58,.35); min-width: 2px; }
+.mt-band .fade { position: absolute; top: 0; height: 8px; border-radius: 3px; }
+.mt-band .fade.in { background: linear-gradient(to right, var(--bg), var(--accent)); }
+.mt-band .fade.out { background: linear-gradient(to right, var(--accent), var(--bg)); }
+.mt-sections { height: 24px; border-radius: 6px; background: rgba(15,17,19,.6); }
+.mt-sections .sec { position: absolute; top: 0; height: 24px; line-height: 24px; padding: 0 6px; font-size: 11px; font-weight: 600; border-radius: 6px; white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis; background: var(--neutral-bg); color: var(--text-2); box-sizing: border-box; }
+.mt-sections .sec.solo { background: var(--accent-bg); color: var(--accent); }
+.mt-lane { height: 30px; border-radius: 6px; background: var(--field); }
+.mt-lane .take { position: absolute; top: 0; bottom: 0; border: 1px dashed; border-radius: 6px; box-sizing: border-box; min-width: 2px; }
+.mt-lane .pres { position: absolute; top: 0; bottom: 0; border-radius: 6px; min-width: 2px; }
+.mt-plane .shot { position: absolute; top: 2px; bottom: 2px; border-radius: 4px; min-width: 2px; box-sizing: border-box; }
+.mt-plane .shot.auto { background: var(--neutral-bg); border: 1px dashed rgba(154,163,173,.4); }
+.mt-plane .shot.black { background: #000; border: 1px solid color-mix(in srgb, var(--c) 60%, transparent); }
+.mt-plane-hit { position: absolute; inset: 0; cursor: pointer; }
+.mt-plane .cut { position: absolute; top: 0; width: 8px; height: 30px; border-radius: 2px; background: var(--text); border: 1px solid var(--bg); box-sizing: border-box; cursor: ew-resize; z-index: 2; }
+.mt-plane .cut.warn { background: var(--accent); }
+.mt-track .dim { position: absolute; top: 0; bottom: 0; background: rgba(15,17,19,.6); pointer-events: none; }
+.mt-track .gap { position: absolute; top: 0; bottom: 0; background: rgba(15,17,19,.7); border: 1px dashed rgba(154,163,173,.4); box-sizing: border-box; pointer-events: none; }
+.mt-track .head { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--text); pointer-events: none; }
+.mt-tl-note { display: flex; align-items: flex-start; gap: 12px; font-size: 12px; color: var(--muted); }
+
+/* Hoja «Encuadre» */
+.modal:has(.mt-sheet-body) { padding: 24px; gap: 12px; }
+.modal:has(.mt-sheet-body) .modal-title { font-size: 20px; font-weight: 700; }
+.mt-sheet-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.mt-sheet-body { display: flex; flex-direction: column; gap: 12px; }
+.mt-sheet-body p { margin: 0; }
+.mt-frame { position: relative; width: 100%; max-width: calc(400px * var(--ar, 1.7778)); background: #000; border: 1px solid var(--field-line); border-radius: 10px;
+  overflow: hidden; cursor: crosshair; touch-action: none; user-select: none; -webkit-user-select: none; }
+.mt-frame img { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.mt-frame .none { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; }
+.mt-frame .shade { position: absolute; background: rgba(0,0,0,.5); pointer-events: none; display: block; }
+.mt-frame .box { position: absolute; border: 2px solid var(--accent); box-sizing: border-box; pointer-events: none; display: block; }
+.mt-frame .handle { position: absolute; width: 14px; height: 14px; border-radius: 50%; background: var(--accent); pointer-events: none; display: block; }
+.mt-srow { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.mt-srow .l { width: 130px; color: var(--text-2); flex: none; }
+.mt-srow .l.muted { width: auto; color: var(--muted); }
+.mt-srow .v { width: 56px; text-align: right; font-variant-numeric: tabular-nums; flex: none; }
+.mt-srow .v.narrow { width: 44px; }
+.mt-follow { display: flex; flex-direction: column; gap: 6px; }
+.mt-sheet-actions { display: flex; align-items: center; gap: 10px; }

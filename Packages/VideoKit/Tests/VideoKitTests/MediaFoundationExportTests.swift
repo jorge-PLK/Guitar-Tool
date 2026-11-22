@@ -105,8 +105,8 @@ final class MediaFoundationExportTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: dir.appendingPathComponent("m.partial.mov").path))
     }
 
-    /// MOV y MP4 con el mismo contenido; extensión equivocada → `containerMismatch` antes de escribir; HEVC pedido sin
-    /// codificador → H.264 (el resumen lo dice).
+    /// MOV y MP4 con el mismo contenido; extensión equivocada → `containerMismatch` antes de escribir; HEVC pedido →
+    /// H.264 siempre en Windows (W2-E1; el resumen lo dice).
     func testExportContainersAndCodec() async throws {
         let dir = try TestWav.tempDir("MediaFoundationExportTests")
         defer { try? FileManager.default.removeItem(at: dir) }
@@ -115,7 +115,7 @@ final class MediaFoundationExportTests: XCTestCase {
             let url = dir.appendingPathComponent("m.\(c.fileExtension)")
             let s = try await MontageExporter.write(frames: FlashFrames(frameCount: 15, duration: 0.5, width: 320, height: 180), mixURL: nil,
                                                     settings: .init(codec: .hevc, width: 320, height: 180, fps: 30, container: c), to: url, progress: nil)
-            XCTAssertEqual(s.settings.codec, MediaFoundationEncoders.hasHEVC ? .hevc : .h264)
+            XCTAssertEqual(s.settings.codec, .h264)   // W2-E1: en Windows solo H.264
             let info = try MediaFoundationReader.info(url)
             XCTAssertEqual(info.videoCodec, s.settings.codec == .hevc ? "HEVC" : "H264")
             XCTAssertEqual(info.width, 320)

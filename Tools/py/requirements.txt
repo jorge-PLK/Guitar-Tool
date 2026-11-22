@@ -47,3 +47,6 @@ resampy==0.4.3
 six==1.17.0
 # Fase 4 (modelos de guitarra): pesos de lumabeat/mvsep-mega53-guitar en safetensors
 safetensors==0.8.0
+# Fuentes del diseño (Tools/fonts-to-ttf.py): woff2 -> TTF
+fonttools==4.67.0
+brotli==1.2.1

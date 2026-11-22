@@ -35,6 +35,7 @@
 		5B7C970A73829188FB47C9B4 /* BackingController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D4CF1DC9FDEAB554C9AD979 /* BackingController.swift */; };
 		6193C9D14BAEB11B56782763 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E90B1053A3471D11C92D139D /* AppModel.swift */; };
 		6B2CB02994D613E35DA0839E /* RecordView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E011C272B14FB7C0AE41788A /* RecordView.swift */; };
+		6D3CD27A01C35C46F465717D /* Fonts in Resources */ = {isa = PBXBuildFile; fileRef = A9E3DF2308CA8F02717C646F /* Fonts */; };
 		6EDCD951F3C93FFB3F0ED07D /* BackingTimeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = E27D5B253DA1C4343F39E6BA /* BackingTimeline.swift */; };
 		7350420DA384E14BC5BC3250 /* SongsterrWebLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC8960E0153E054AF7893480 /* SongsterrWebLoader.swift */; };
 		76714F099705DCC2D5A65785 /* SpotifyDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2EAC3A46E07E41D6F5C6366 /* SpotifyDemo.swift */; };
@@ -122,6 +123,7 @@
 		9671A99E86917B93EDEFF6AC /* AudioKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = AudioKit; path = ../Packages/AudioKit; sourceTree = SOURCE_ROOT; };
 		985ACC4EA619EF42E2EE0BD3 /* PunchTimeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PunchTimeline.swift; sourceTree = "<group>"; };
 		A8AD8ABAB86887E41E7902FE /* GuitarOptionsViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuitarOptionsViews.swift; sourceTree = "<group>"; };
+		A9E3DF2308CA8F02717C646F /* Fonts */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Fonts; path = Resources/Fonts; sourceTree = SOURCE_ROOT; };
 		AA0F285BE0A6F852B7BC7958 /* BasicPitch_nmp.mlpackage.zip */ = {isa = PBXFileReference; lastKnownFileType = archive.zip; path = BasicPitch_nmp.mlpackage.zip; sourceTree = "<group>"; };
 		B2EAC3A46E07E41D6F5C6366 /* SpotifyDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpotifyDemo.swift; sourceTree = "<group>"; };
 		B432A65725F572C008D34948 /* ADTOF_FrameRNN_fp32.mlpackage.zip */ = {isa = PBXFileReference; lastKnownFileType = archive.zip; path = ADTOF_FrameRNN_fp32.mlpackage.zip; sourceTree = "<group>"; };
@@ -179,6 +181,7 @@
 			isa = PBXGroup;
 			children = (
 				79C26A34CF2A2EE92DE78434 /* alphaTab */,
+				A9E3DF2308CA8F02717C646F /* Fonts */,
 				9E7DF7CD24EBA77EAD5E5873 /* Models */,
 				9DE596F979B79291EEE2908F /* Packages */,
 				3961451DF9C69321CC55BFD5 /* Resources */,
@@ -380,6 +383,7 @@
 				367912D9D2B87FF85C3BD016 /* Assets.xcassets in Resources */,
 				E80C7A8E62607DD51E4D80BA /* BTC_large_voca_fp16.mlpackage.zip in Resources */,
 				DFE925A768E3583404549B0D /* BasicPitch_nmp.mlpackage.zip in Resources */,
+				6D3CD27A01C35C46F465717D /* Fonts in Resources */,
 				E3E69FDF7D5B67705B5F0890 /* LeadRhythmMelRoformer_fp16.mlpackage.zip in Resources */,
 				E6CBA8E376A4719BA13B9E1D /* alphaTab in Resources */,
 			);

@@ -15,6 +15,8 @@ import {
   setTuning, setEditMode, edit, spanAction, transcribe, cancelTranscription, exportGp, localFlash, SPAN_LOOP_NAME,
 } from '../tab/store.js';
 import { forwardEditKey } from '../tab/keys.js';
+import { SongsterrSheet, sheet as songsterrSheet, openSongsterr, reviewSongsterr, resetSongsterr } from '../tab/songsterr-sheet.js';
+import { Modal } from '../ui.js';
 
 /// Mac (TabController.tuningName).
 const TUNING_NAMES = { standard: 'Estándar', halfStepDown: 'Medio tono abajo', wholeStepDown: 'Un tono abajo', dropD: 'Drop D', custom: 'Personalizada' };
@@ -23,12 +25,12 @@ const FIXED_TUNINGS = ['standard', 'halfStepDown', 'wholeStepDown', 'dropD'];
 const DRUM_PIECES = [['kick', 'Bombo'], ['snare', 'Caja'], ['hiHat', 'Charles'], ['tom', 'Tom'], ['crash', 'Platos']];
 const RATE_SEND_MS = 150;
 
-const svg = (body, size = 14) => html`<svg aria-hidden="true" width=${size} height=${size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
-  stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
+const svg = (body, size = 16, sw = 1.6) => html`<svg aria-hidden="true" width=${size} height=${size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+  stroke-width=${sw} stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
 const KIND_ICON = {
   guitar: html`<path d="M14 4l6 6-3 1-2 2a5 5 0 1 1-4-4l2-2z"/><circle cx="9.5" cy="14.5" r="1"/>`,
-  bass: html`<path d="M3 12h2l2-6 4 12 3-9 2 3h5"/>`,
-  drums: html`<circle cx="6" cy="6" r="2"/><circle cx="12" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="6" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="18" cy="12" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="12" cy="18" r="2"/><circle cx="18" cy="18" r="2"/>`,
+  bass: html`<path d="M3 10.5v3M7.5 7v10M12 3.5v17M16.5 8v8M21 10.5v3"/>`,   // waveform del Mac: barras
+  drums: html`<circle cx="7" cy="7" r="3.2"/><circle cx="17" cy="7" r="3.2"/><circle cx="7" cy="17" r="3.2"/><circle cx="17" cy="17" r="3.2"/>`,   // circle.grid.2x2
   vocal: html`<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>`,
 };
 const kindIcon = k => svg(KIND_ICON[k] ?? KIND_ICON.guitar);
@@ -71,17 +73,22 @@ function Chooser() {
 
 function SourceMenu({ st }) {
   const [menu, setMenu] = useState(null);
+  const [confirm, setConfirm] = useState(false);   // Mac: «¿Pasar a transcripción automática?»
   const label = st.source === 'songsterr' ? 'Songsterr' : st.source === 'automatic' ? 'Transcripción automática' : 'Sin elegir';
   const open = e => { const r = e.currentTarget.getBoundingClientRect(); setMenu({ x: r.right, y: r.bottom + 4 }); };
   const items = [
-    // Songsterr aún no existe en Windows (ola 2): mismos textos que el Mac, entradas deshabilitadas.
-    { label: 'Buscar en Songsterr…', disabled: true },
-    ...(st.source === 'songsterr' ? [{ label: 'Cambiar emparejamiento…', disabled: true }] : []),
-    { label: 'Transcripción automática', disabled: st.source === 'automatic', onSelect: () => setSource('automatic') },
+    { label: 'Buscar en Songsterr…', onSelect: openSongsterr },
+    ...(st.source === 'songsterr' ? [{ label: 'Cambiar emparejamiento…', onSelect: reviewSongsterr }] : []),
+    { label: 'Transcripción automática', disabled: st.source === 'automatic',
+      onSelect: () => { if (st.source === 'songsterr') setConfirm(true); else setSource('automatic'); } },
   ];
   return html`<${Fragment}><button class="tab-menu-btn" aria-haspopup="menu" disabled=${st.phase === 'waitingAnalysis' || st.phase === 'empty'}
-      onClick=${open}>Fuente: ${label}<span class="caret" aria-hidden="true">▾</span></button>
-    ${menu ? html`<${PopupMenu} x=${menu.x} y=${menu.y} align="right" items=${items} onClose=${() => setMenu(null)} />` : null}</${Fragment}>`;
+      onClick=${open}>Fuente: ${label}<span class="caret">${icon('chevronDown', 12, 3)}</span></button>
+    ${menu ? html`<${PopupMenu} x=${menu.x} y=${menu.y} align="right" items=${items} onClose=${() => setMenu(null)} />` : null}
+    ${confirm ? html`<${Modal} title="¿Pasar a transcripción automática?" width=${420} onClose=${() => setConfirm(false)}>
+      <p>Se quitan las pistas de Songsterr y sus ediciones; las demás se transcriben del audio.</p>
+      <div class="modal-actions"><button class="btn secondary" onClick=${() => setConfirm(false)}>Cancelar</button>
+        <button class="btn danger" onClick=${() => { setConfirm(false); setSource('automatic'); }}>Pasar a automática</button></div></${Modal}>` : null}</${Fragment}>`;
 }
 
 function Header() {
@@ -197,7 +204,7 @@ function Overlay({ st }) {
     case 'choosingSource':
       return html`<${Message} title="Elige la fuente de la tablatura"
         body="Songsterr trae la tablatura hecha por la comunidad; la transcripción automática sale del audio.">
-        <button class="btn secondary sm" disabled>Buscar en Songsterr</button>
+        <button class="btn secondary sm" onClick=${openSongsterr}>Buscar en Songsterr</button>
         <button class="btn secondary sm" onClick=${() => setSource('automatic')}>Transcribir automáticamente</button></${Message}>`;
     case 'waitingAnalysis':
       return html`<${Message} title="Esperando el análisis del tema"
@@ -287,7 +294,7 @@ function LoopMenu({ st }) {
     ...((study.value?.sections ?? []).map(s => ({ label: s.name, onSelect: () => setLoop(s.start, s.end, s.name) }))),
   ];
   return html`<${Fragment}><button class=${'tab-menu-btn loop' + (loop ? ' on' : '')} aria-haspopup="menu" onClick=${open}>
-      ${loop ? `Bucle: ${loop.name || 'libre'} · ${fmtClock(loop.start)}–${fmtClock(loop.end)}` : 'Bucle'}<span class="caret" aria-hidden="true">▾</span></button>
+      ${loop ? `Bucle: ${loop.name || 'libre'} · ${fmtClock(loop.start)}–${fmtClock(loop.end)}` : 'Bucle'}<span class="caret">${icon('chevronDown', 12, 3)}</span></button>
     ${menu ? html`<${PopupMenu} x=${menu.x} y=${menu.y} above=${true} items=${items} onClose=${() => setMenu(null)} />` : null}</${Fragment}>`;
 }
 
@@ -301,7 +308,7 @@ function TransportRow({ st }) {
   const quant = v => Math.round(+v / 5) * 0.05;
   return html`<div class="tab-transport">
     <button class="tab-round" aria-label="Volver al inicio" title="Volver al inicio" onClick=${() => seek(0)}>
-      ${svg(html`<path d="M6 5v14M19 5l-9 7 9 7z"/>`, 16)}</button>
+      <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M5.5 5v14M19 5.5v13L8.5 12z"/></svg></button>
     <button class="tab-play" aria-label=${playing ? 'Pausar' : 'Reproducir'} title=${playing ? 'Pausar (espacio)' : 'Reproducir (espacio)'}
       onClick=${() => (playing ? pause() : play())}>
       ${playing ? html`<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>`
@@ -351,6 +358,10 @@ export function Tab() {
   // Mac: `onChange(of: session.beats) { tab?.start() }`: al terminar el análisis, la tablatura en espera arranca sola.
   useEffect(() => { if (analysisState === 'ready' && st?.phase === 'waitingAnalysis') reopenTab(); }, [analysisState, st?.phase]);
   useEffect(() => { watchLoop(); }, [transport.value?.loop?.name]);
+  // Mac: con la fuente sin elegir (`choosingSource`) la hoja de Songsterr se abre sola (una vez por tema y por entrada en esa fase).
+  const choosing = opening.value === 'ready' && st?.phase === 'choosingSource';
+  useEffect(() => { if (choosing) openSongsterr(); }, [choosing, st?.projectId]);
+  useEffect(() => () => resetSongsterr(), [id]);   // al cambiar de tema o salir: sin hoja ni panel de vista previa
 
   if (!id) return html`<${Chooser} />`;
   if (opening.value === 'error') {
@@ -367,5 +378,6 @@ export function Tab() {
       : html`<section class="card tab-card"><div class="tab-view"><div class="tab-cover"><${Overlay} st=${null} /></div></div></section>`}
     ${open && st.editMode && st.phase === 'ready' ? html`<${EditBar} st=${st} />` : null}
     ${open ? html`<${TransportRow} st=${st} />` : null}
+    ${songsterrSheet.value ? html`<${SongsterrSheet} />` : null}
   </div>`;
 }
