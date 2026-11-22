@@ -23,7 +23,7 @@ Recuento: 28 métodos (12 en `SM`, 16 en `SE`) y 5 eventos emitidos (`study.stat
 
 ### Tabla de contrato
 
-DTO: tipos en el subapartado «Tipos» (líneas de `SM`/`SE` donde se declaran). Respuesta entre paréntesis.
+DTO: tipos en el subapartado «Tipos» (líneas de `SM`/`SE` donde se declaran). Los mismos DTO están en `contrato-tipos-b.md` (sección study); si discrepan, manda el código (`AC/StudyMethods.swift`, `StudyEdits.swift`). Respuesta entre paréntesis.
 
 | Acción del usuario o momento | Método / evento | DTO Swift (params → respuesta) | Uso en WinApp/Web |
 | --- | --- | --- | --- |
@@ -67,13 +67,13 @@ Efectos y garantías del núcleo (comprobados):
 - Todo método de transporte y edición devuelve el estado ya aplicado y además provoca un `study.state` coalescido por turno (`SM:342-347`, `SM:373-382`, `SE:193-200`). El cliente no necesita reconsultar.
 - `previewSectionEdge` no cambia estado, no guarda y no emite `study.state` (`SE:482-483`).
 - Los eventos `study.position` y `study.levels` salen con separación mínima de 0,9/30 s (`SM:11-13`). `study.levels` se calla al quedar en silencio, tras una última emisión a -120 dB (`SM:471-476`). `study.position` se emite parado solo si cambia (`SM:464`).
-- Sin tema abierto, cualquier método devuelve error `not-open` (`SM:343`, `SE:195`). El cliente lo ignora (`ST:101`, `ST:184`).
+- Sin tema abierto, todo método salvo `study.open` y `study.close` devuelve `not-open` (`study.close` no falla) (`SM:343`, `SE:195`). El cliente lo ignora (`ST:101`, `ST:184`).
 - El volumen master se guarda en el perfil con rebote (`SM:351-360`); las ediciones, por `StudySession` con rebote (`SE:5-7`).
-- Códigos de error: `bad-params`, `not-open`, `not-found` (id de sección, `SE:270`), `internal` (`SM:284`), `audio-unavailable` (aviso de audio que el cliente muestra, `ST:99`), `no-analysis` (`SE:411`), `analysis-unavailable` (`SE:321`, `SE:338`), `not-separated` (`SE:323`), `cannot-split` (`SE:446`, `SE:450`), `section-not-created` (`SE:476`), `save-failed` (`SE:161`, `SE:183`). Los demás de la cola pasan por `JobEngine.map` (`SE:326`).
+- Códigos de error: `bad-params`, `not-open`, `not-found` (id de sección, `SE:270`), `internal` (`SM:284`), `audio-unavailable` (aviso de audio que el cliente muestra, `ST:99`), `load-failed` (`loadError` del reproductor, o tema sin stems que reproducir; solo en `study.play`, `StudyBacking.swift:127,128`), `no-analysis` (`SE:411`), `analysis-unavailable` (`SE:321`, `SE:338`), `not-separated` (`SE:323`), `cannot-split` (`SE:446`, `SE:450`), `section-not-created` (`SE:476`), `save-failed` (`SE:161`, `SE:183`). Los demás de la cola pasan por `JobEngine.map` (`SE:326`).
 
 ### Tipos
 
-Convención: JSON con los nombres de campo de Swift. `?` = opcional (puede faltar o ser `null` en respuestas; en parámetros, ausente significa «no cambia», salvo indicación). Tiempos en segundos (Double). Ganancias en dB. `Empty` = objeto vacío.
+Convención: JSON con los nombres de campo de Swift. `?` = opcional (un `Optional` nil se omite: clave ausente, nunca `null`, sin `encode(to:)` a mano salvo el `init(from:)` de `StudyUpdateSectionParams`; Dart debe tratar ausente y `null` igual salvo `StudyUpdateSectionParams.color`; en parámetros, ausente significa «no cambia», salvo indicación). Tiempos en segundos (Double). Ganancias en dB. `Empty` = objeto vacío.
 
 **Enums (todos son `String` en el JSON; no hay tipo enum en Swift salvo `GuitarRole` y `AudioMode`)**
 
@@ -81,7 +81,7 @@ Convención: JSON con los nombres de campo de Swift. `?` = opcional (puede falta
 | --- | --- |
 | `StudyChannel.kind`, `StudyEmptyStem.kind` | `vocals`, `drums`, `bass`, `guitar`, `piano`, `other` (`StemKind.rawValue`, orden de canales `SM:17-19`; nombres «Voz», «Batería», «Bajo», «Guitarra», «Piano», «Resto») |
 | `StudyChannel.guitarRole`, `StudyRenameGuitarParams.role`, claves de `StudyGuitarsInfo.names` | `rhythm`, `left`, `right`, `lead` (`Packages/Store/Sources/Store/Guitars.swift:7-8`). Nombres por defecto: «Guitarra rítmica», «Guitarra izq.», «Guitarra der.», «Guitarra solista» (`Guitars.swift:13-16`) |
-| `StudyChannel.id` | `kind` para stems; `GuitarRole.trackID` para guitarras separadas (`SM:391`, `SM:396`). Es la clave de `StudyLevelsEvent.channels` y el `channel` de `StudyMixParams` |
+| `StudyChannel.id` | `kind` para stems; `GuitarRole.trackID` para guitarras separadas (`guitar_rhythm`, `guitar_L`, `guitar_R`, `guitar_lead`) (`SM:391`, `SM:396`). Es la clave de `StudyLevelsEvent.channels` y el `channel` de `StudyMixParams` |
 | `StudyAnalysisInfo.state`, `StudyAnalysisEvent.state` (análisis) | `missing`, `analyzing`, `ready`, `failed` (`SE:254-261`; `failed` lleva `error`) |
 | `StudyGuitarsInfo.process`, `StudyAnalysisEvent.state` (en `study.guitars`) | `idle`, `processing`, `failed` (`SE:24`, `SE:376-384`) |
 | `StudyAudioInfo.mode` | `simulated`, `device` (`AudioMode`, `StudyAudio.swift:6-10`) |
@@ -89,8 +89,8 @@ Convención: JSON con los nombres de campo de Swift. `?` = opcional (puede falta
 | `StudyUpdateSectionParams.snap` | `none` (por defecto), `beat`, `bar`, `chord` (`SE:503-506`) |
 | `StudySetKeyParams.key` | `"C:maj"`, `"A:min"` (raíz en sostenidos + `:maj`/`:min`); `null` quita la corrección (`SE:406-409`) |
 | `StudySetChordParams.label` | `"C:min"`, `"F#:7"`, `"N"` (`SE:431`) |
-| `StudyChord.index`, `StudySetChordParams.index` | 0...169: `raíz*14 + calidad` (calidades en orden min, maj, dim, aug, min6, maj6, min7, minmaj7, maj7, 7, dim7, hdim7, sus2, sus4); 168 = desconocido; 169 = sin acorde (`SE:426`; `WinApp/Web/backing/chords.js:3-10`) |
-| `StudyUpdateSectionParams.color`, `StudySectionInfo.color` | índice de paleta `0..<SectionEditor.paletteCount` (`SE:500-501`); ausente en params = no cambia; `null` = automático |
+| `StudyChord.index`, `StudySetChordParams.index` | 0...169 (0...167 acordes): `raíz*14 + calidad` (calidades en orden min, maj, dim, aug, min6, maj6, min7, minmaj7, maj7, 7, dim7, hdim7, sus2, sus4); 168 = desconocido; 169 = sin acorde (`SE:426`; `WinApp/Web/backing/chords.js:3-10`) |
+| `StudyUpdateSectionParams.color`, `StudySectionInfo.color` | índice de paleta `0...6` (`paletteCount` = 7, `Store/SectionEditor.swift:89`) (`SE:500-501`); ausente en params = no cambia; `null` = automático |
 
 **Transporte**
 
@@ -113,7 +113,7 @@ Convención: JSON con los nombres de campo de Swift. `?` = opcional (puede falta
 | `audioError` | String? | último fallo de salida o de reproducción |
 | `outputName` | String | aparato de salida; en Windows se conoce al abrir la salida |
 
-Rango del fader: -60...+6 dB (`StudyBacking.swift:12`).
+Rango del fader: -60...+6 dB (`StudyBacking.swift:12`). Rangos que recorta el núcleo: `rate` 0.5...2.0; `transpose` -12...12 semitonos; `fineCents` -50...50; `capo` 0...12; `gainDB` (canal, master, metrónomo) -60...6; `seek` 0...`duration`.
 
 **Abrir y snapshot**
 

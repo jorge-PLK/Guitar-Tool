@@ -1,6 +1,6 @@
 # Ficha de pantalla · Grabar y «Ver toma» (apartados 6, 7 y 8)
 
-Complementa `grabar.md` (apartados 1-5 y 9-11). Rutas relativas a `App/Sources/` salvo indicación. «Web» = `WinApp/Web/record/`. «Core» = `Packages/AppCore/Sources/AppCore/`. Hechos medidos en código; lo que depende de hardware u oído no se afirma.
+Complementa `grabar.md` (apartados 1-4, 10 y 11) y `grabar-contrato.md` (5 y 9). Rutas relativas a `App/Sources/` salvo indicación. «Web» = `WinApp/Web/record/`. «Core» = `Packages/AppCore/Sources/AppCore/`. Hechos medidos en código; lo que depende de hardware u oído no se afirma.
 
 ## 6. Interacción
 
@@ -33,13 +33,13 @@ Grabar **no tiene atajos de teclado propios**: ni `NSEvent`, ni `onKeyPress`, ni
 | Qué asa se mueve | La decide el **primer evento** del gesto (`active == nil`, l.75-79): sin entrada → entrada; con entrada y sin salida → salida; con ambas → la más cercana al puntero (`abs(t-a) <= abs(t-b)`, empate → entrada). Se fija hasta soltar (`onEnded`: `active = nil`, l.51) |
 | Entrada ≥ salida | Al mover la entrada a `t ≥ salida`: salida = `nil` (l.83) |
 | Salida ≤ entrada | Al mover la salida a `t ≤ entrada`: se intercambian (salida = antigua entrada, entrada = `t`) **y `active` pasa a entrada** (l.85) |
-| Borrar marcas | No hay gesto: se re-arman con el interruptor «Punch-in» (no verificado qué limpia; ver 9 de `grabar.md`) |
+| Borrar marcas | No hay gesto: se re-arman con el interruptor «Punch-in» (no verificado qué limpia; ver §9 de `grabar-contrato.md`) |
 | Bloqueo | `Card … .disabled(ctl.isBusy)` (l.59): sin arrastre durante cuenta, grabación, guardado o desfase. El núcleo también lo exige (`guard phase == .idle`, `RecordController.swift:1076`) |
 | Cadencia | Mac: sin límite (muta `ctl.punchIn/Out` en cada cambio). Web: como máximo un `record.setPunch` cada 50 ms + uno al soltar (`punch.js:9,53-58`) |
 | Cabezal | Línea blanca 1 px alto 54 en `x(time)`, visible si `phase != .idle || time > 0` (l.44-46); no es arrastrable |
 | Accesibilidad | Asas con etiqueta «Entrada del punch-in» / «Salida del punch-in» (l.64) |
 
-**Divergencia Mac/web (hueco a decidir por Jorge):** tras el intercambio, el Mac pasa a mover la *entrada* (l.85); la web conserva «salida» (`punch.js:36-41`) y deja que el núcleo intercambie otra vez. Ejemplo: entrada 10, salida 20; se arrastra la salida a 5 (queda entrada 5, salida 10) y se vuelve a 15: Mac → entrada 15, salida `nil`; web → entrada 5, salida 15. La web es más estable; el núcleo no guarda «asa activa». Propuesta: seguir la web.
+Resuelto: como SwiftUI. Tras el intercambio, el asa activa pasa a la entrada (`PunchTimeline.swift:85`) (decisiones-interfaz.md, «Cerradas por la regla 1:1»). La web difiere y no se copia. Ejemplo de comportamiento: entrada 10, salida 20; arrastrar la salida a 5 deja entrada 5, salida 10, y volver a 15 da entrada 15, salida `nil`.
 
 ### 6.4 Faders y deslizadores
 
@@ -65,7 +65,7 @@ La toma es un `Menu` con `primaryAction` (`RecordView.swift:271-292`): **clic = 
 
 Otros gestos: clic en el cuadro de una **parte** → `selectPart` (solo en reposo, solo si no es la activa; reinicia toma elegida, punch y recarga mezcla, `RecordView.swift:228`, `RecordController.swift:220-228`). Botón ▶ 32×32 de cada toma → «Ver toma»: `prepareToViewTake()` (pausa el transporte; falla si no está en reposo, `RecordController.swift:774-778`); deshabilitado si `isBusy`, sin `processedFile` o sin `songStart` (`RecordView.swift:252-267`).
 
-Web (comportamiento a copiar, `parts.js:19-25`): clic en toma no elegida = elegir; **segundo clic en la elegida, clic derecho o ↓** abren el menú (`PopupMenu` anclado al botón, `ui.js:36-58`: ↑/↓ mueven, Esc y Tab cierran, clic fuera cierra, primer ítem activo con foco).
+Web (solo referencia; NO se copia: el menú de toma es como SwiftUI, decisiones-interfaz.md): clic en toma no elegida = elegir; **segundo clic en la elegida, clic derecho o ↓** abren el menú (`PopupMenu` anclado al botón, `ui.js:36-58`: ↑/↓ mueven, Esc y Tab cierran, clic fuera cierra, primer ítem activo con foco).
 
 ### 6.6 Foco
 
@@ -76,17 +76,17 @@ SwiftUI: sin `@FocusState` ni `.focusable` en estas vistas; los botones son `.bu
 | Situación | SwiftUI (Mac) | Web (`WinApp/Web/record`) | Flutter |
 | --- | --- | --- | --- |
 | Modificador de punch libre | ⌥ (`NSEvent`, `PunchTimeline.swift:74`) | Alt (`punch.js:41`) | `isAltPressed`; mostrar «Alt» en Windows (texto 8) |
-| Asa activa tras intercambio | pasa a entrada (`:85`) | se mantiene salida | decisión de Jorge (6.3); propuesta: web |
+| Asa activa tras intercambio | pasa a entrada (`:85`) | se mantiene salida | como SwiftUI: pasa a entrada (decisiones-interfaz.md) |
 | Cadencia de arrastre | sin límite | 50 ms + al soltar | 50 ms |
 | Fader con teclado | solo VoiceOver ±1 | ↑↓←→ ±1, Mayús ±3, Inicio 0 | web |
-| Abrir menú de toma | indicador ▾ (`primaryAction` elige) | 2.º clic, clic dcho, ↓ | web |
+| Abrir menú de toma | indicador ▾ (`primaryAction` elige) | 2.º clic, clic dcho, ↓ | como SwiftUI (indicador ▾; `primaryAction` elige) |
 | Esc en «Ajustar desfase» | no cierra | no cierra (Modal sin `onClose`) | no cierra |
 | Esc en «Añadir parte» | cierra (sistema) | cierra | cierra |
 | Intro en «Añadir parte» | nada | añade si hay nombre (`parts.js:80`) | web |
 | Intro en ms | confirma | confirma y también en `blur`; acepta coma o punto (`offset-sheet.js:62-68,97`) | web |
 | Esc en visor | cierra (`cancelAction`) | cierra (`Modal onClose`); el diálogo apilado consume Esc (`stopPropagation`) | web |
 | Foco al abrir/cerrar hoja | del sistema | autofocus + trampa de Tab + restitución | web |
-| Barra de posición del visor | `Slider` continuo | `range step=0.01`, etiqueta «Posición» (`viewer.js:38`) | web |
+| Barra de posición del visor | `Slider` continuo | `range step=0.01`, etiqueta «Posición» (`viewer.js:38`) | comportamiento por defecto de Flutter con foco para las flechas (decisiones-interfaz.md); etiqueta «Posición» solo si el kit la lleva |
 | Espacio para reproducir/grabar | no existe | no existe | no añadir (decisión de Jorge si se quiere) |
 
 ## 7. Hojas y popovers
@@ -172,7 +172,7 @@ Claves camelCase; `{x}` = parámetro ICU. Líneas: `RV` = `RecordView.swift`, `R
 | --- | --- | --- |
 | `record_uncalibrated` | Sin calibrar: la toma puede ir desfasada decenas de ms; se corregirá al calibrar. | BackingRecord.swift:46 (usado en RV:172) |
 | `record_cameraAudioOnly` | {message} Se grabará solo el audio. | RV:174, 176 |
-| `record_cameraDenied` | Sin permiso de cámara: se grabará solo el audio. Concédelo en Ajustes del Sistema > Privacidad > Cámara. | RV:175 (texto de macOS; Windows usa `camera.message` del núcleo, ver dudas) |
+| `record_cameraDenied` | Sin permiso de cámara: se grabará solo el audio. Concédelo en Ajustes del Sistema > Privacidad > Cámara. | RV:175 (llega del núcleo por código en Mac y Windows; decisiones-interfaz.md, decisión 16) |
 | `record_blockPickPart` | Elige una parte. | RC:502 |
 | `record_blockPickTake` | Elige la toma sobre la que hacer el punch-in. | RC:504 |
 | `record_blockMarkPunch` | Marca la entrada y la salida del punch-in en la línea de tiempo. | RC:505 |
@@ -200,7 +200,7 @@ Claves camelCase; `{x}` = parámetro ICU. Líneas: `RV` = `RecordView.swift`, `R
 | `record_blockLoop` | Solo se graba sin bucle: quita el bucle. | AppLogic.swift:49 |
 | `record_blockBusy` | Hay una calibración o una grabación en marcha. | AppLogic.swift:50 |
 
-Los mensajes de `blockReason` y `messages` llegan ya redactados del núcleo/AppCore; la UI Flutter solo los pinta. Las claves anteriores sirven si el puente devuelve códigos en lugar de texto (decisión de Jorge).
+Los mensajes de `blockReason` y `messages` llegan por código y argumentos; Dart compone el texto con las claves ARB de arriba (decisiones-interfaz.md, «Mensajes: código del error de origen» y «JobInfo.text y textos de fase»).
 
 ### 8.3 Mezclador, punch-in, partes y tomas
 
@@ -296,8 +296,8 @@ Los mensajes de `blockReason` y `messages` llegan ya redactados del núcleo/AppC
 
 ## Dudas para Jorge
 
-1. Asa activa tras intercambiar entrada/salida en el punch: Mac la cambia (`PunchTimeline.swift:85`), web no. Propuesta: web.
-2. Texto de «sin permiso de cámara» en Windows (el Mac habla de Ajustes del Sistema): ¿el núcleo devuelve ya el texto? La web usa `cam.message ?? …` (`record/bar.js:95`).
-3. ¿Los mensajes de `blockReason`/`messages` llegan como texto del núcleo o como códigos para localizar en ARB?
-4. Menú de toma: ¿copiar el de la web (2.º clic, clic derecho, ↓) o un botón ▾ visible como en macOS?
-5. Confirmaciones «Borrar»/«Eliminar» con textos distintos entre Grabar y visor: ¿unificar?
+1. Resuelto: como SwiftUI (`PunchTimeline.swift:85`): pasa a mover la entrada (decisiones-interfaz.md, «Cerradas por la regla 1:1»: Grabar, tras intercambiar entrada y salida).
+2. Resuelto: llega del núcleo por código (decisiones-interfaz.md, «Cerradas por diseño ya decidido»: Texto de «sin permiso de cámara» en Windows).
+3. Resuelto: por código y argumentos; el texto se compone en Dart con ARB (decisiones-interfaz.md, «Cerradas por robustez y fiabilidad»: Mensajes, código del error de origen; «Cerradas por la regla de desvíos»: Mensajes, `JobInfo.text` y textos de fase).
+4. Resuelto: como SwiftUI (decisiones-interfaz.md, «Cerradas por la regla 1:1»: Grabar, menú de toma).
+5. Resuelto: cada texto, literal de SwiftUI (decisiones-interfaz.md, «Cerradas por la regla 1:1»: «Borrar» frente a «Eliminar»).

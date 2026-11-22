@@ -76,15 +76,15 @@ Reglas comunes (Mac = núcleo; Web las delega):
 
 | ID | Diferencia | Mac | Web | Núcleo | Propuesta |
 | --- | --- | --- | --- | --- | --- |
-| D1 | Rehacer con Ctrl+Y | no | sí (`keys.js:19-20`) | no lo conoce en `key` | Flutter en Windows: mantener Ctrl+Y y enviar `{op:redo}`. Decisión de Jorge si también en macOS. |
+| D1 | Rehacer con Ctrl+Y | no | sí (`keys.js:19-20`) | no lo conoce en `key` | Flutter en Windows: Ctrl+Y además de Ctrl+⇧+Z, enviando `{op:redo}`. En macOS solo ⇧⌘Z, sin Ctrl+Y. Resuelto (decisiones-interfaz.md, «Rehacer con Ctrl+Y»). |
 | D2 | Qué modificador es "⌘" | solo ⌘ (`mods == .command`, `:1081`); Ctrl físico no vale | `ctrl = ctrlKey \|\| metaKey` (`keys.js:12`) | `ctrl` booleano | Flutter manda `ctrl` = Cmd en macOS, Ctrl en Windows. |
-| D3 | Esc / «Sin bucle» y el ancla del tramo | `clearSpan()` conserva `spanAnchor` (`:1076`, `TabScreen.swift:459`): un ⇧clic posterior amplía desde el ancla | `spanAction('clear')` (`keys.js:14`, `tab.js:291`) pone `spanAnchor = nil` (`TabService.swift:619`): el ⇧clic siguiente empieza tramo nuevo | Esc por `key` conserva el ancla (`:944`); `tab.span clear` la borra | Hueco: Mac lo define. Flutter debe usar `key` para Esc y, para «Sin bucle», un `clear` que conserve el ancla. Falta variante en `tab.span` (decisión de Jorge si se acepta la diferencia). |
+| D3 | Esc / «Sin bucle» y el ancla del tramo | `clearSpan()` conserva `spanAnchor` (`:1076`, `TabScreen.swift:459`): un ⇧clic posterior amplía desde el ancla | `spanAction('clear')` (`keys.js:14`, `tab.js:291`) pone `spanAnchor = nil` (`TabService.swift:619`): el ⇧clic siguiente empieza tramo nuevo | Esc por `key` conserva el ancla (`:944`); `tab.span clear` la borra | Hueco: Mac lo define. Flutter debe usar `key` para Esc y, para «Sin bucle», un `clear` que conserve el ancla. Resuelto: el ancla se conserva, como SwiftUI (decisiones-interfaz.md, «Tablatura: «Sin bucle» y Esc, ¿borran el ancla del tramo?»). Falta una variante en `tab.span` que conserve el ancla. |
 | D4 | Foco que bloquea teclas | `firstResponder is NSText` (`:1072`) | `INPUT`, `SELECT`, `TEXTAREA` (`tab.js:332-333`) | no decide | En Flutter: no actuar si un `EditableText` tiene el foco. |
 | D5 | Espacio | Se consume siempre salvo campo de texto, modificadores, hoja abierta o ventana distinta; sin repetición (`SectionGridBoxes.swift:118-131`) | No actúa si hay un `<button>` enfocado ni con modificadores; no comprueba hojas; exige `studyStatus == ready` (`tab.js:334-338`) | no recibe | Seguir el criterio de Mac; en Flutter, un `Shortcuts` global que ignore el espacio si un campo de texto tiene el foco o hay hoja modal. |
 | D6 | Tecla no usada | `handleKey` devuelve false → el evento sigue (`:1062`) | Consume toda tecla "known" aunque el núcleo devuelva `handled:false` (ignora `TabState.handled`, `keys.js:24-25`) | devuelve `handled` | Flutter: respetar `handled` (mandar `KeyEventResult.ignored` si es false) o filtrar antes como Mac. |
-| D7 | Cadencia del cursor de reproducción | `Timer` de 0,05 s (20 Hz) y solo si cambia >1 ms (`TabScreen.swift:57,110-114`, `TabController.swift:698-702`) | evento `study.position` (máx. 30 Hz, `StudyMethods.swift:10`), sin umbral (`store.js:255-262`) | no tiene `tab.cursor` | Decisión de Jorge: 20 Hz como Mac o 30 Hz del evento. Ver 6.3. |
+| D7 | Cadencia del cursor de reproducción | `Timer` de 0,05 s (20 Hz) y solo si cambia >1 ms (`TabScreen.swift:57,110-114`, `TabController.swift:698-702`) | evento `study.position` (máx. 30 Hz, `StudyMethods.swift:10`), sin umbral (`store.js:255-262`) | no tiene `tab.cursor` | Resuelto: ni 20 ni 30 Hz; el cursor sale de `study.position` (30 Hz, del núcleo) interpolado en un `Ticker` por fotograma, sin temporizador propio (decisiones-interfaz.md, «Cursor de tablatura a 20 o 30 Hz»). Ver 6.4. |
 | D8 | Arrastre de pulsos | cada `beatDrag` se aplica directo (`:663-666`) | coalescido: un `tab.beatDrag` en vuelo, solo se guarda el último pendiente (`store.js:60-84`) | idempotente por pulso | Flutter: copiar el coalescido de Web. |
-| D9 | Teclas que se reenvían al núcleo | todas (decide `handleKey`) | solo las "known": 1 carácter sin ⌘/⌥ (salvo ⌘Z, ⌥Y) o `Arrow*`, `Backspace`, `Delete`, `Escape`; nunca Espacio, Tab, Enter, F1-F12 (`keys.js:5-23`) | acepta cualquiera | Flutter: mismo filtro que Web (evita viaje inútil por tecla). Con Bloq Mayús, `e.key` llega en mayúscula y `D`/`U` se activan sin ⇧ (sin comprobar si Mac hace lo mismo). |
+| D9 | Teclas que se reenvían al núcleo | todas (decide `handleKey`) | solo las "known": 1 carácter sin ⌘/⌥ (salvo ⌘Z, ⌥Y) o `Arrow*`, `Backspace`, `Delete`, `Escape`; nunca Espacio, Tab, Enter, F1-F12 (`keys.js:5-23`) | acepta cualquiera | Flutter: mismo filtro que Web (evita viaje inútil por tecla). Con Bloq Mayús, `e.key` llega en mayúscula y `D`/`U` se activan sin ⇧ (sin comprobar si Mac hace lo mismo). Resuelto para teclados no US: atajos por tecla lógica (`SingleActivator`); cifras y letras de edición por `KeyEvent.character`; se prueba con teclado español en el PC (decisiones-interfaz.md, «Teclas por `keyCode` o por carácter»). |
 
 ### 6.2 Foco: página de alphaTab frente a controles nativos
 
@@ -130,23 +130,23 @@ Estado a pintar según los eventos del núcleo: `tab.selection {bar, fraction}` 
 | Seguir el cursor (`follow`) | La página: si el cursor sale de la vista, desplaza `scrollTo` para dejarlo a un tercio de la altura. No actúa con el cursor visible. | por evento | `tf-bridge.js:515-521` |
 | Marcador de selección | Núcleo emite `tab.selection` en cada cambio de selección | por evento | `TabService.swift:548` |
 | Rango del tramo | Núcleo emite `tab.range` en cada cambio de tramo | por evento | `TabService.swift:628` |
-| Bucle del tramo | Clic/arrastre/⇧clic/⇧←→ crean el bucle `Selección` (`spanLoopName`) con `ctl.setLoop`; `seek` al inicio si cambia el inicio. Si el bucle activo deja de ser `Selección`, se quita solo el resaltado (`loopChanged`). Web lo replica con `watchLoop` (`store.js:264-273`). | por evento | `TabController.swift:23,727-738,761-773`; `TabService.swift:568-579` |
+| Bucle del tramo | Clic/arrastre/⇧clic/⇧←→ crean el bucle `Selección` (`spanLoopName`; en Flutter la marca no se compara por texto, ver `tabLoopSelection` en 8.1) con `ctl.setLoop`; `seek` al inicio si cambia el inicio. Si el bucle activo deja de ser `Selección`, se quita solo el resaltado (`loopChanged`). Web lo replica con `watchLoop` (`store.js:264-273`). | por evento | `TabController.swift:23,727-738,761-773`; `TabService.swift:568-579` |
 | Menú «Bucle» | Opciones: «Sin bucle», `Selección` (si hay tramo), «Compás N» (compás de la selección), una por sección del tema. | por clic | `TabScreen.swift:457-479` |
 
-Qué hace falta de Flutter: dibujar la partitura recibe `tab.score` (ya es así); el cursor lo mueve el almacén suscrito a `study.position` (como Web); el umbral de 1 ms y el tope 20/30 Hz es la decisión D7.
+Qué hace falta de Flutter: dibujar la partitura recibe `tab.score` (ya es así); el cursor lo mueve el almacén suscrito a `study.position` (como Web); la cadencia está resuelta en D7 (`Ticker` por fotograma sobre `study.position`); no se porta el umbral de 1 ms de Mac ni el tope de 20/30 Hz.
 
 ### 6.5 Menús contextuales
 
 - Mac: ninguno en la pantalla (`grep contextMenu|willOpenMenu` en `Tab*.swift`, `Songsterr*.swift`: 0). Sin comprobar: el `WKWebView` de la partitura conserva el menú contextual por defecto de WebKit (sin código que lo quite).
 - Windows: `AreDefaultContextMenusEnabled` solo con devtools (`CWebView2Host.cpp:349`, `:547`); en producción no hay menú contextual.
 - Menús desplegables (no contextuales): «Fuente: …» (`TabScreen.swift:151-167`), selector de afinación (`:299-306`), «Bucle» (`:457-479`).
-- Propuesta (decisión de Jorge): sin menú contextual en Flutter, igual que en Windows hoy.
+- Resuelto: sin menú contextual (decisiones-interfaz.md, «Tablatura: zoom y menú contextual»).
 
 ### 6.6 Scroll y zoom
 
 - Scroll: nativo de la página (`window.scrollY`). La partitura va en modo `Page` (`tf-bridge.js:401`) con el texto no seleccionable (`:407-408`). Se conserva el desplazamiento al repintar (`pendingScroll`, `:411, :441`). Rueda y barra: las del navegador. El cursor sigue por 6.4.
 - Zoom: la app no lo tiene. Mac: sin código de zoom ni magnificación (sin comprobar el valor por defecto de `WKWebView`). Windows: `put_IsZoomControlEnabled(FALSE)` (`CWebView2Host.cpp:347, :676`). Escala de alphaTab sin tocar (valor por defecto).
-- Propuesta (decisión de Jorge): sin zoom en la primera versión de Flutter.
+- Resuelto: sin zoom (decisiones-interfaz.md, «Tablatura: zoom y menú contextual»).
 - Arrastrar y soltar ficheros: no hay en esta pantalla (`grep onDrop|onDrag` sobre `Tab*.swift`: 0).
 
 ## 8. Textos
@@ -200,7 +200,7 @@ Estados de la zona de partitura
 
 | Clave ARB | Texto | Fichero:línea |
 | --- | --- | --- |
-| `tabWebError` | alphaTab: {mensaje} | `TabScreen.swift:325` |
+| `tabWebError` | Mensaje genérico traducido (texto exacto por fijar); se muestra con `{detalle}` = texto de la página. El prefijo literal `alphaTab:` deja de ser el texto de ARB. | `TabScreen.swift:325` |
 | `tabWorkingTitle` | Transcribiendo… | `TabScreen.swift:329` |
 | `tabWorkingBody` | La primera vez tarda un poco. Lo hecho se guarda pista a pista. | `TabScreen.swift:330` |
 | `tabChoosingTitle` | Elige la fuente de la tablatura | `TabScreen.swift:343` |
@@ -247,7 +247,7 @@ Barra de edición
 | `tabDelete` | Borrar | `TabScreen.swift:405` |
 | `tabKeysHint` | Dígitos: traste · ↑ ↓: cuerda · ← →: mover · +/−: duración · ⌘Z deshacer | `TabScreen.swift:407` |
 
-En Windows `⌘Z` debería ser `Ctrl+Z`: texto con variable de plataforma o clave doble (`tabKeysHintMac`, `tabKeysHintWin`). Decisión de Jorge (el texto web actual está en `WinApp/Web/screens/tab.js`; sin comprobar su literal).
+En Windows `⌘Z` debería ser `Ctrl+Z`: clave doble (`tabKeysHintMac`, `tabKeysHintWin`). Resuelto: variante por plataforma (decisiones-interfaz.md, «Rehacer con Ctrl+Y»: el texto de ayuda «⌘Z» lleva variante por plataforma).
 
 Transporte y bucle
 
@@ -262,7 +262,7 @@ Transporte y bucle
 | `tabLoopActive` | Bucle: {nombre} · {desde}–{hasta} | `TabScreen.swift:471` |
 | `tabLoopFree` | libre | `TabScreen.swift:471` |
 | `tabLoopNone` | Sin bucle | `TabScreen.swift:459` |
-| `tabLoopSelection` | Selección | `TabController.swift:23` |
+| `tabLoopSelection` | Selección. En Flutter la marca de «Selección» no se compara por texto: el bucle del tramo lleva una marca del núcleo y el texto visible sale de ARB (decisiones-interfaz.md, «Nombres por defecto que el núcleo guarda en español»; cita `TabService:42`). | `TabController.swift:23` |
 | `tabLoopBar` | Compás {n} | `TabScreen.swift:464` |
 | `tabLoopBarName` | compás {n} (nombre del bucle, minúscula) | `TabScreen.swift:464` |
 
@@ -282,7 +282,7 @@ Avisos y mensajes breves (el aviso breve dura 3 s: `TabController.swift:884-892`
 | `tabNoticeRedone` | Se han rehecho: {pistas}. Su audio cambió, así que se perdieron las ediciones de esas pistas. | `TabController.swift:243` |
 | `tabNoticeTranscription` | Transcripción: {partes}. | `TabController.swift:318` |
 | `tabNoticeShifted` | {n} notas fuera del registro de la afinación se subieron o bajaron una octava | `TabController.swift:316` |
-| `tabNoticeDropped` | {n} se quitaron por no caber en las cuerdas | `TabController.swift:316` |
+| `tabNoticeDropped` | {n} se quitaron por no caber en las cuerdas | `TabController.swift:317` |
 | `tabNoticeAnd` | {a} y {b} (unión de las dos partes) | `TabController.swift:318` |
 | `tabFlashSaveFailed` | No se pudo guardar la tablatura: {error} | `TabController.swift:634` |
 | `tabFlashNoHits` | No hay golpes seleccionados. | `TabController.swift:976` |
@@ -338,17 +338,17 @@ Hoja de Songsterr (`TabSourceSheet.swift`, `SongsterrLookup.swift`, `TabControll
 | `tabSheetPickAutomatic` | Transcripción automática | `TabSourceSheet.swift:306` |
 | `tabSheetWorkingRead` | Leyendo Songsterr… | `TabController.swift:450` |
 | `tabSheetWorkingDownload` | Descargando pistas de Songsterr… | `TabController.swift:450, 488` |
-| `tabIssueNoResults` | No está en Songsterr. | `SongsterrLookup.swift:40` |
-| `tabIssueRateLimited` | Songsterr está limitando las peticiones. Espera un poco y vuelve a intentarlo. | `SongsterrLookup.swift:41` |
-| `tabIssueOffline` | No se pudo conectar con Songsterr. Comprueba la conexión. | `SongsterrLookup.swift:42` |
-| `tabIssueFormatChanged` | Songsterr ha cambiado su formato. | `SongsterrLookup.swift:43` |
-| `tabIssueInvalidLink` | Ese enlace no es de Songsterr. | `SongsterrLookup.swift:44` |
-| `tabIssueHttp` | Songsterr respondió con el error {código}. | `SongsterrLookup.swift:33` |
+| `tabIssueNoResults` | No está en Songsterr. | `Packages/SourceKit/Sources/SourceKit/Songsterr/SongsterrLookup.swift:40` |
+| `tabIssueRateLimited` | Songsterr está limitando las peticiones. Espera un poco y vuelve a intentarlo. | `Packages/SourceKit/Sources/SourceKit/Songsterr/SongsterrLookup.swift:41` |
+| `tabIssueOffline` | No se pudo conectar con Songsterr. Comprueba la conexión. | `Packages/SourceKit/Sources/SourceKit/Songsterr/SongsterrLookup.swift:42` |
+| `tabIssueFormatChanged` | Songsterr ha cambiado su formato. | `Packages/SourceKit/Sources/SourceKit/Songsterr/SongsterrLookup.swift:43` |
+| `tabIssueInvalidLink` | Ese enlace no es de Songsterr. | `Packages/SourceKit/Sources/SourceKit/Songsterr/SongsterrLookup.swift:44` |
+| `tabIssueHttp` | Songsterr respondió con el error {código}. | `Packages/SourceKit/Sources/SourceKit/Songsterr/SongsterrLookup.swift:33` |
 
 Notas:
 
-- Las filas con rangos de línea sacadas de ventanas parciales (p. ej. `TabController.swift:316-318`, `SongsterrLookup.swift:33`) son aproximadas a ±3 líneas; las demás se leyeron en el sitio. `TabSourceSheet.swift:96-130` (nombres de resultados y pistas) son datos, no textos fijos.
-- Mensajes de error del núcleo (`RPCError` en `TabService.swift`, p. ej. «La tablatura no está lista.») llegan al cliente ya redactados: no van a ARB, se muestran tal cual (`TabService.swift:981, 985, 992, 997, 1005, 1014, 623`). Decisión de Jorge si se traducen por `code`.
+- Las filas con rangos de línea sacadas de ventanas parciales (p. ej. `TabController.swift:316-318`, `SongsterrLookup.swift:33`) están comprobadas (exactas); `SongsterrLookup.swift` está en `Packages/SourceKit/Sources/SourceKit/Songsterr/`. `TabSourceSheet.swift:96-130` (nombres de resultados y pistas) son datos, no textos fijos.
+- Mensajes de error del núcleo (`RPCError` en `TabService.swift`, p. ej. «La tablatura no está lista.») hoy se redactan en español en el núcleo (`TabService.swift:981, 985, 992, 997, 1005, 1014, 623`). Resuelto: el núcleo conserva el código del error y los argumentos; el texto se compone en Dart con ARB (decisiones-interfaz.md, «Mensajes: código del error de origen» y «`JobInfo.text` y textos de fase»).
 - El texto de «Compás {n}, pulso {m}» etc. se arma en el controlador de Mac (`selectionSummary`, `headerSummary`); el núcleo entrega `TabState.header` ya formado en Web (`tab.js` lo usa tal cual). Sin comprobar si `selectionSummary` también llega del núcleo.
 
 ### 8.2 Textos que viven dentro de la página web (no van a ARB salvo decisión)
@@ -372,4 +372,4 @@ Notas:
 | `frame.js` (Web) | `Partitura` (título accesible del iframe) | `WinApp/Web/tab/frame.js:44` | Solo existe en Windows; no hay equivalente Mac. |
 | `tab.js` (Web) | `No se pudo abrir la tablatura`, `Reintentar` | `WinApp/Web/screens/tab.js:369-371` | Pantalla de error de apertura que solo existe en Windows (SwiftUI no la tiene). Si Flutter la necesita: `tabOpenFailed`, `tabSheetRetry`. |
 
-Propuesta: los errores de la tabla 8.2 no se traducen; se muestran como detalle técnico bajo `tabWebError`. Si Flutter sustituye la página de alphaTab por un `CustomPainter`, desaparecen. Decisión de Jorge.
+Resuelto: los textos de dentro de la página no van a ARB; Dart muestra un mensaje genérico traducido y el texto de la página como detalle (decisiones-interfaz.md, «Errores de alphaTab (`webError`)»).

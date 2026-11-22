@@ -67,7 +67,7 @@ Colores sueltos fuera de `TF`: `0x4CC38A` (RV:95, `deviceOk`), `.white @0.9` (AG
     - `SongRow` (LV:208-254) → `TfListRow` (kit) + `TfSongCover` (kit) + `TfChip` + `TfSecondaryButton(height: 36)` ×2 + `TfIconButton` papelera; envoltorio `TfContextMenu`
     - `LibraryEmpty` / `NoMatches` → `TfStateMessage`
   - `ArtistBar` (LV:88-97)
-  - `ArtistGrid` (LV:71-86) → `GridView` con `SliverGridDelegateWithMaxCrossAxisExtent(maxCrossAxisExtent: 220, crossAxisSpacing: 20, mainAxisSpacing: 24)`. Ojo: el mínimo de 160 de `GridItem.adaptive` no tiene equivalente directo; el número de columnas lo da el ancho, así que hay que calcularlo (`floor((ancho+20)/(160+20))` como tope de columnas con ancho ≤ 220) y probar con capturas.
+  - `ArtistGrid` (LV:71-86) → `GridView` con delegado propio que respete mínimo 160 y máximo 220 por recuadro (`crossAxisSpacing: 20`, `mainAxisSpacing: 24`); `SliverGridDelegateWithMaxCrossAxisExtent` no tiene mínimo. Se comprueba con capturas (decisiones-interfaz.md).
     - `ArtistTile` (AG:7-76), `ArtistAvatar` (`CustomPainter` no; `Container` con color + `Text`); foto vía `Image.memory` desde la `data:` URL
   - `ProjectDetailPage` (LV:267-386)
     - `SongTitleBlock` (LV:286-310) con modo edición → `SongInfoFields`
@@ -85,7 +85,7 @@ Ningún `CustomPainter`: todo se resuelve con widgets estándar.
 | Estado | Qué se ve | Qué lo decide |
 | --- | --- | --- |
 | Sin carpeta de proyectos | `FirstRunSheet` modal sin cierre (RV:31-32) | `needsFolder` (AM): equivale a que la biblioteca no está abierta/`app.info` sin carpeta |
-| Cargando | No hay estado visual en SwiftUI: la lista aparece vacía hasta que llega `refresh()`. Propuesta: no mostrar «Todavía no hay temas» hasta recibir el primer `library.list`. | primera respuesta de `library.list` |
+| Cargando | No hay estado visual en SwiftUI: la lista aparece vacía hasta que llega `refresh()`. Resuelto: no se muestra «Todavía no hay temas» hasta recibir el primer `library.list` (decisiones-interfaz.md). | primera respuesta de `library.list` |
 | Biblioteca vacía, vista Temas | Tabla con cabecera + `emptyLibrary` (LV:183-186) | `entries.isEmpty && imports.isEmpty` |
 | Biblioteca vacía, vista Artistas | `Card` con `emptyLibrary` (LV:74) | `entries.isEmpty` |
 | Con datos, Temas | Filas ordenadas por título plegado (LV:196) | `library.list` |
@@ -93,7 +93,7 @@ Ningún `CustomPainter`: todo se resuelve con widgets estándar.
 | Búsqueda sin resultados | «Ningún tema coincide con «…»» (LV:65-68, 197-199) | texto del buscador recortado de espacios |
 | Importación en curso | Fila extra arriba con barra y «Importando N %» (LV:172-181) | evento `jobs.progress` / `jobs.list` |
 | Estado de separación | Chip por fila (LV:256-264) | `separationState` de `ProjectSummary` + `jobs.progress` |
-| Fila seleccionada | Verde con franja (LV:235-238) | `backingTarget` (estado de la app, ver §9 de contrato) |
+| Fila seleccionada | Verde con franja (LV:235-238) | `backingTarget` (estado de Dart; decisiones-interfaz.md) |
 | Fila en hover | Tinte acento 0,07 | ratón |
 | Tema duplicado al importar | Alerta «Este tema ya está en la biblioteca» (RV:38-47) | error de duplicado de `import.file` |
 | Aviso genérico | Alerta con título y mensaje + «Aceptar» (RV:35-37) | `notice` (errores de importar, mover a Papelera, etc.) |
@@ -113,7 +113,7 @@ Ver biblioteca-contrato.md.
 
 - **Pulsar fila**: selecciona el tema (`select`, LV:244); la fila vuelve a verde. No abre el detalle: el detalle se abre desde la tarjeta «tema seleccionado» de la barra (RV:78).
 - **Hover**: fila (LV:241-243), `ArtistTile` borde acento (AG:30), papelera icono rojo (LV:402), `MarqueeText` de la tarjeta lateral. En Flutter: `MouseRegion`.
-- **Menú contextual de fila** (LV:245-253, clic derecho): «Separar de nuevo» (deshabilitado si se separa), «Cancelar separación» (solo si se separa), «Limpiar…» (deshabilitado si se separa; título «Limpiar «{título}»»), «Mostrar en Finder», línea, «Eliminar…». En Windows «Finder» pasa a «Explorador» (clave propia por plataforma, **decisión de Jorge** si se localiza por sistema).
+- **Menú contextual de fila** (LV:245-253, clic derecho): «Separar de nuevo» (deshabilitado si se separa), «Cancelar separación» (solo si se separa), «Limpiar…» (deshabilitado si se separa; título «Limpiar «{título}»»), «Mostrar en Finder», línea, «Eliminar…». En Windows «Finder» pasa a «Explorador de archivos» (variante por plataforma en ARB; decisiones-interfaz.md).
 - **Soltar ficheros**: `dropDestination(for: URL.self)` en toda la ventana (RV:28-30), también sobre otras secciones. Solo importa `wav`, `flac`, `mp3` (AM:694-697); el resto se ignora sin avisar. Flutter: `desktop_drop` en la raíz de la app, no solo en esta pantalla.
 - **Teclado**: sin atajos propios en la lista ni en el buscador. En hojas: `Esc` cancela y `Intro` confirma (LS:493,495; AG:159,161; LV:295). La alerta de Papelera marca «Mover a la Papelera» como acción por defecto (`Intro`, LV:44). El buscador no tiene `onSubmit`.
 - **Foco**: `SongInfoSheet` y el modo edición del detalle enfocan el campo «Título» al abrirse (AG:165; LV:279).
@@ -191,10 +191,10 @@ Claves en `app_es.arb`, todas con prefijo `library_`; inglés lo traduce el agen
 | `library_stateQueued` / `_Running` / `_Done` / `_Failed` / `_Imported` | En cola / Separando {percent} / Separado / Error / Importado | LV:258-262 |
 | `library_stateFailedUnknown` | Error desconocido | LV:261 |
 | `library_takesNone` | — | LV:218 |
-| `library_revealTooltip` | Mostrar en Finder (en Windows «Mostrar en el Explorador»; decisión de Jorge) | LV:224 |
+| `library_revealTooltip` | Mostrar en Finder (en Windows «Mostrar en el Explorador de archivos»; variante por plataforma, decisiones-interfaz.md) | LV:224 |
 | `library_editTooltip` | Editar título y artista | LV:228 |
 | `library_deleteTooltip` / `library_deleteLabel` | Eliminar… / Eliminar | LV:403-404 |
-| `library_menuSeparate` / `_menuCancelSeparation` / `_menuClean` / `_menuReveal` / `_menuDelete` | Separar de nuevo / Cancelar separación / Limpiar… / Mostrar en Finder / Eliminar… | LV:246-252 |
+| `library_menuSeparate` / `_menuCancelSeparation` / `_menuClean` / `_menuReveal` / `_menuDelete` | Separar de nuevo / Cancelar separación / Limpiar… / Mostrar en Finder (variante por plataforma, como `library_revealTooltip`) / Eliminar… | LV:246-252 |
 | `library_cleanTitle` | Limpiar «{title}» | LV:248 |
 
 ### Artistas
@@ -216,7 +216,7 @@ Claves en `app_es.arb`, todas con prefijo `library_`; inglés lo traduce el agen
 | `library_stateDetailFailed` / `library_stateDetailFailedUnknown` | Error: {message} / desconocido | LV:378 |
 | `library_stemsTitle` / `library_stemsNone` / `library_stemEmpty` | Stems / Sin stems todavía. / vacío | LV:329-337 |
 | `library_openInBacking` | Abrir en Backing track | LV:352 |
-| `library_revealButton` | Mostrar en Finder | LV:355 |
+| `library_revealButton` | Mostrar en Finder (variante por plataforma, como `library_revealTooltip`) | LV:355 |
 | `library_deleteButton` | Eliminar… | LV:357 |
 | `library_save` / `library_cancel` | Guardar / Cancelar | LV:292-294 |
 
@@ -253,7 +253,7 @@ Claves en `app_es.arb`, todas con prefijo `library_`; inglés lo traduce el agen
 | Clave | Español | Origen |
 | --- | --- | --- |
 | `library_trashTitle` | ¿Eliminar “{title}”? | LV:41 |
-| `library_trashToBin` / `library_trashDelete` | Mover a la Papelera / Eliminar del disco (en Windows «Papelera de reciclaje», decisión de Jorge) | LV:44-45 |
+| `library_trashToBin` / `library_trashDelete` | Mover a la Papelera / Eliminar del disco (en Windows «Papelera de reciclaje»; variante por plataforma, decisiones-interfaz.md) | LV:44-45 |
 | `library_trashMessage` | Se va con el tema: {contents}. Si se está separando o está abierto en Backing, se detiene primero.\nEliminar del disco no se puede deshacer. La Papelera conserva la carpeta hasta que la vacíes. | LV:48 |
 | `library_trashContentsStems` | `{count, plural, =0{sus stems} one{1 stem} other{{count} stems}}` | AM:190 |
 | `library_trashContentsTakes` / `_Videos` | `{count, plural, one{1 toma} other{{count} tomas}}` / `{count, plural, one{1 vídeo} other{{count} vídeos}}` | AM:191-192 |
@@ -377,7 +377,7 @@ Ya existe una versión web en `WinApp/Web/screens/library.js` (y `library-dialog
 | I. Textos | claves del apartado 8 en `app_es.arb` y `app_en.arb` | M | `tf-flutter-mech` (Haiku) |
 | J. Tests | `test/features/library/*`, goldens | M | `tf-flutter` (Sonnet) |
 
-Orden: A primero; B, C, D, E, G, H en paralelo; F tras E (comparte la hoja y `source_messages.dart`); I y J al final. A y C dependen de las decisiones de agrupación y selección (apartado 9 del contrato).
+Orden: A primero; B, C, D, E, G, H en paralelo; F tras E (comparte la hoja y `source_messages.dart`); I y J al final. A y C: selección, búsqueda, plegado y agrupación son estado de Dart (decisiones-interfaz.md). Ya no hay decisión pendiente.
 
 ## 11. Criterios de aceptación
 

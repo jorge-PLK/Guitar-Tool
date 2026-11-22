@@ -29,7 +29,7 @@ Evidencia oficial: `Temp/research/7f-ui-facts.md` (no versionado). «Sin verific
 | Grabar: menú de toma | Como SwiftUI. |
 | Grabar y visor: «Borrar» frente a «Eliminar» | Cada texto, literal de SwiftUI. |
 | Grabar: dos rojos sueltos (`E5534B`, `C8433A`) | Dos tokens con nombre. |
-| Calibración: botón «Cancelar» durante la medida | No se añade botón. Cerrar la hoja con la medida en marcha envía `audio.cancelCalibration` (comportamiento de `AppCore`, como la web). |
+| Calibración: botón «Cancelar» durante la medida | No se añade botón y la hoja no se cierra mientras mide, como SwiftUI. `audio.cancelCalibration` se envía solo si la hoja se destruye de todos modos (cierre de ventana, cambio de pantalla). |
 | Ajustes: tras mover la carpeta de proyectos | Se queda en Ajustes, como SwiftUI. |
 | Backing: bucles guardados (`study.open.loops`), `gainDB` del metrónomo | Sin interfaz: SwiftUI no la tiene. |
 | Backing: A/B, `RecordButton`, `ComparePanel`, `TakeChannel` | Código muerto: no se porta. |
@@ -109,6 +109,36 @@ Repaso del 22/11/2026 con el criterio 0. «Se mantiene» = revisado y sin cambio
 | Contenido de las olas | Se mantiene. | — |
 | Commits | Pequeños y frecuentes con push (Jorge); ADR-021 decisión 24, `orquestador.md` y `plan.md` corregidos. | Decían «un commit por ola, sin push». |
 | Agentes `tf-flutter*` | Se mantienen. | No citan nada de lo enmendado. |
+
+## Cerradas en la revisión de coherencia (22/11/2026)
+
+Dudas que devolvieron las auditorías de fichas y contratos (`Temp/flutter/audit-*.md`).
+
+| Pregunta | Resolución | Criterio |
+| --- | --- | --- |
+| Opcionales: `null` explícito o clave ausente (`path` de `PickedFileResult`, `artistPhoto`…) | Regla general de los DTO de Dart: ausente y `null` se leen igual; al enviar, Dart omite la clave. | Robustez: el núcleo hace las dos cosas según el tipo. |
+| `study.setTranspose` con `semitones` y `fineCents` a la vez | Sin regla: el núcleo acepta ambos; Dart envía lo que cambie el control. | — |
+| Textos de audio y calibración del núcleo (`label`, `hint`, `rows`, `calibrateBlock`, `rateMismatch.*`, `calibrateInstructions`) | Por código y argumentos, como todo texto que genera el núcleo (decisión 16). | Diseño ya decidido. |
+| «Abrir Ajustes del Sistema» en Windows | Variante por plataforma en ARB: «Abrir Configuración». Nombre de Windows sin verificar en fuente oficial. | Documentación. |
+| Hoja de calibración: ¿se puede cerrar midiendo? | No, como SwiftUI. `audio.cancelCalibration` se envía solo si la hoja se destruye de todos modos (cierre de ventana, cambio de pantalla). | 1:1 + robustez. |
+| `video.cameras` y `video.settings` vacías en el Mac sin `--camera`/`--audio simulated` | Hueco claro de núcleo (enumerar no toca señal): `tf-implementer`, antes de la ola 3. | Desvíos. |
+| Selector de idioma: ancho y nota | Ancho por captura en la revisión de la ola 1. Sin nota. | Función nueva, mínima. |
+| Tablatura: botones de batería (`pieceName(p).capitalized`) | Una clave ARB por pieza, ya con mayúscula; no se capitaliza en código. | Capitalizar depende del idioma. |
+| Tablatura: «Sin bucle» conserva el ancla, ¿cómo? | Núcleo: si `tab.span` al limpiar borra también el ancla, es hueco claro (variante que la conserva), ola 2. | Desvíos. |
+| Tablatura: reloj numérico del transporte | Misma fuente que el cursor (`study.position` interpolado en el `Ticker`); el texto solo se repinta cuando cambia el valor mostrado. | Un solo reloj. |
+| Tablatura: `selectionSummary` y `headerSummary` | Los compone Dart con los datos del estado; si hoy llegan como texto del núcleo, pasan a código y argumentos. | Decisión 16. |
+| Tablatura: `D` y `U` con Bloq Mayús | Atajos por tecla lógica y estado real de ⇧ (`SingleActivator`), no por mayúscula del carácter. | Documentación (misma fila que «Teclas por `keyCode`»). |
+| Backing: rueda sobre la tira de acordes; cerrar el popover al perder el foco la ventana; Intro en «Añadir parte» | Solo existen en la web: no se portan. Queda el scroll por defecto de Flutter. | 1:1. |
+| Backing y Grabar: cadencia de las llamadas durante un arrastre (borde de sección, punch) | Sin periodo fijo: una sola llamada en vuelo por arrastre, la última posición gana, y una final al soltar. Vale para todo arrastre que consulte al núcleo. | Robustez: no acumula cola si el núcleo va lento ni añade retardo si va rápido. |
+| Backing: fader con teclado | Lo que tenga SwiftUI: si solo expone la acción ajustable de accesibilidad, `Semantics(onIncrease/onDecrease)` con el mismo paso y sin teclas propias. | 1:1. |
+| Hojas: autofoco, trampa de Tab, devolver el foco | Comportamiento por defecto de las rutas de diálogo de Flutter; autofoco donde SwiftUI lo da. Sin trabajo extra. | Documentación. |
+| Grabar: campo de milisegundos del desfase | Confirma como SwiftUI; acepta coma o punto decimal. | 1:1 + robustez (teclado español). |
+| Tema: `.fontWeight(.semibold)` sobre la fuente heredada (¿se pinta 600 o 400?); separación de 14 entre filas de `SettingsGroup`; ancho de los botones de carpeta y lápiz | Manda lo que se ve: se fija con las capturas de referencia de la ola 0 y el token lleva el peso y la medida de la captura. | 1:1 (base visual = lo que pinta SwiftUI). |
+| Songsterr: un slot de voz saldría con `role: "guitar"` y `kind: "vocal"` | Se comprueba con los fixtures de `tab.songsterr.*` en la ola 2; si ocurre, hueco claro de núcleo. Los ids reales de `TabSource` salen de esos mismos fixtures. | Desvíos. |
+| `host.preview.show`: unidades del rectángulo | Píxeles lógicos desde la esquina del contenido de la ventana. En Flutter la vista previa es un `TfWebView` dentro de la hoja: la petición `showPreview` solo le da la URL (ya validada por el núcleo) y el rectángulo no se usa para colocar nada. | Robustez: sin ventana nativa superpuesta que sincronizar. |
+| Canal entre Dart y `tf-bridge.js` | El canal de mensajes JS del paquete de WebView, oculto tras `TfWebView`. Lo fija P9, prueba 4. | Se mide. |
+| `frames.montage`: ¿BGRA o JPEG? | El núcleo emite JPEG en base64 salvo que el anfitrión registre `setMontageFrameSink`; `AppCoreFFI` lo registra y entrega a la textura. | Código (`MontageMethods.swift:762-766`). |
+| Tablatura: texto genérico de `tabWebError` | El literal que use SwiftUI para ese fallo; si no hay, «No se pudo mostrar la tablatura.» Se fija en la ola 2. | 1:1. |
 
 ## Dudas reales, para Jorge
 

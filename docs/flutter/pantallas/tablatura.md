@@ -52,7 +52,7 @@ Capas, de abajo arriba:
 1. `TfWebView` (alphaTab). Opacidad 1 solo si `phase == .ready`, o si ya hay entradas y `phase == .working` (TS:193: se sigue viendo la partitura anterior mientras se transcribe otra pista). En el resto de fases, opacidad 0 (sigue vivo y cargado, no se descarga).
 2. Overlay de Flutter (`overlay(tab)`, TS:321-362) que cubre el mismo rectángulo y varía por fase (2.4). Es Flutter encima del WebView; si la plataforma no permite componer Flutter sobre una vista nativa, hay que decidirlo en el `TfWebView` (pendiente de Jorge, ver 11).
 
-Se dibuja en Flutter fuera del rectángulo: cabecera, aviso, selector «Oír», pastillas, controles de pista, pie, barra de edición, transporte. Se dibuja en Flutter encima del WebView: mensajes de fase (2.4) y el texto de error `alphaTab: …` (TS:324-326, `TF.danger`, `body(13)`, `padding()` de 16, esquina superior izquierda según el contenedor). Lo que pinta alphaTab dentro (pentagrama, cursor de reproducción, selección de tramo y de nota) es del WebView y va en `tablatura-contrato.md` y `tablatura-interaccion.md`: aquí ni se mide ni se reproduce.
+Se dibuja en Flutter fuera del rectángulo: cabecera, aviso, selector «Oír», pastillas, controles de pista, pie, barra de edición, transporte. Se dibuja en Flutter encima del WebView: mensajes de fase (2.4) y el aviso de error del WebView (TS:324-326 muestra «alphaTab: <error>»; en Flutter, mensaje genérico traducido con el texto de la página como detalle, decisiones-interfaz.md «Errores de alphaTab»; `TF.danger`, `body(13)`, `padding()` de 16, esquina superior izquierda según el contenedor). Lo que pinta alphaTab dentro (pentagrama, cursor de reproducción, selección de tramo y de nota) es del WebView y va en `tablatura-contrato.md` y `tablatura-interaccion.md`: aquí ni se mide ni se reproduce.
 
 ### 2.4 Mensajes de fase (overlay)
 
@@ -65,7 +65,7 @@ Los cinco mensajes comparten caja: `padding(24)`, alineados arriba a la izquierd
 | `.waitingAnalysis` | TS:353-356 | `message(...)` (TS:364-372, `spacing: 10`): título «Esperando el análisis del tema», cuerpo «La tablatura necesita los compases y pulsos del análisis. Puedes lanzarlo desde Backing track.», botón `SecondaryButton(height: 34)` «Analizar». |
 | `.empty` | TS:357-358 | `message`: «No hay pistas que transcribir» / «Este tema no tiene stems de guitarra, bajo o batería con audio.», sin botón. |
 | `.failed(m)` | TS:359-360 | `message`: «No se pudo transcribir» / `m`, sin botón. Nótese que no hay «Reintentar» (ver contrato apartado 9). |
-| `.ready` + error de web | TS:323-326 | Sin caja: solo «alphaTab: <error>» en `TF.danger`, fondo transparente. |
+| `.ready` + error de web | TS:323-326 | Sin caja: mensaje genérico traducido + detalle (texto de la página) en `TF.danger`, fondo transparente (SwiftUI: «alphaTab: <error>»; decisiones-interfaz.md «Errores de alphaTab»). |
 
 ### 2.5 Barra de edición
 
@@ -85,10 +85,10 @@ TS:418-455. `HStack(spacing: 14)`, `Spacer(minLength: 0)` al final. Es el mismo 
 | --- | --- | --- |
 | Volver al inicio | TS:421-426 | Círculo 44×44, icono `backward.end.fill` 15 pt `TF.text`, fondo `TF.field`, borde `TF.fieldLine`. «Volver al inicio». |
 | Reproducir/pausa | TS:428-434 | Círculo 52×52 `TF.accent`, icono `play.fill`/`pause.fill` 20 pt `TF.accentInk`. «Reproducir»/«Pausar». |
-| Reloj | TS:436-437 | `Fmt.clock(time)` `TF.text` + « / » + `Fmt.clock(duration)` `TF.muted`, `TF.display(20)`, dígitos monoespaciados. Se refresca cada 0,05 s (`Timer`, TS:57, TS:110-114). |
+| Reloj | TS:436-437 | `Fmt.clock(time)` `TF.text` + « / » + `Fmt.clock(duration)` `TF.muted`, `TF.display(20)`, dígitos monoespaciados. Se refresca cada 0,05 s (`Timer`, TS:57, TS:110-114) (referencia SwiftUI; en Flutter el cursor va por `Ticker` sobre `study.position`, decisiones-interfaz.md «Cursor de tablatura a 20 o 30 Hz»; el reloj numérico usa esa misma fuente y solo repinta el texto cuando cambia el valor mostrado). |
 | Tempo | TS:439-446 | «Tempo» + `TfSlider` 50…200 de paso efectivo 5 (ancho 120, `TF.accent`) + porcentaje `Fmt.percent(rate)` `.semibold` `TF.text`, ancho 54 a la izquierda, dígitos monoespaciados; `body(13)` `TF.text2`. |
 | Metrónomo | TS:448-450 | `TfCheckbox` «Metrónomo», `body(13)` `TF.text2`; deshabilitado sin `session.beats`. |
-| Bucle | TS:457-479 | `TfMenu` sin borde: etiqueta «Bucle» (`TF.text2`) o «Bucle: <nombre|libre> · m:ss–m:ss» (`TF.accent`), `body(13, .semibold)`. Elementos: «Sin bucle»; «Selección» si hay tramo (`spanLoopName`, TC:23); «Compás n» si hay compás seleccionado; una entrada por sección del tema. |
+| Bucle | TS:457-479 | `TfMenu` sin borde: etiqueta «Bucle» (`TF.text2`) o «Bucle: <nombre\|libre> · m:ss–m:ss» (`TF.accent`), `body(13, .semibold)`. Elementos: «Sin bucle»; «Selección» si hay tramo (`spanLoopName`, TC:23); «Compás n» si hay compás seleccionado; una entrada por sección del tema. En Flutter la marca de «Selección» no se compara por texto: el bucle del tramo lleva una marca del núcleo y el texto visible sale de ARB (`tabLoopSelection`) (decisiones-interfaz.md, «Nombres por defecto que el núcleo guarda en español»; cita `TabService:42`). |
 
 ### 2.7 Diálogo de confirmación
 
@@ -150,7 +150,7 @@ El estado lo decide `tab.phase` (TC:27-37) y, para la hoja, `tab.importStage` (T
 | `.working` con pistas | WebView visible con la partitura previa; overlay transparente con el mismo texto encima; pastillas visibles; botones de edición deshabilitados (dependen de `.ready`). | `phase == .working`, `!entries.isEmpty`. |
 | `.ready` | WebView visible; cabecera completa; barra de edición si `editMode`. | `phase == .ready`. |
 | `.ready` con aviso | Cuadro de aviso entre la cabecera y la tarjeta hasta cerrarlo con la X. | `!notices.isEmpty` (TC:73; `dismissNotices`, TC:351). |
-| `.ready` con error del WebView | Texto «alphaTab: …» en rojo sobre el WebView, que sigue visible. | `webError` (TC:93). |
+| `.ready` con error del WebView | Texto «alphaTab: …» en rojo sobre el WebView, que sigue visible (genérico + detalle, ver 2.4). | `webError` (TC:93). |
 | `.failed(m)` | Overlay «No se pudo transcribir» con `m`. Sin reintento. | `phase == .failed`. |
 | Modo edición | «Editar notas» activo (acento); barra de edición bajo la tarjeta; ayuda según batería o melódica. | `editMode` y `phase == .ready`. |
 | Selección | Pie con «Compás n, pulso m …»; botones de edición habilitados según `selection`/`selectedNote`. | `selection`, `selectedNote`. |
@@ -158,7 +158,7 @@ El estado lo decide `tab.phase` (TC:27-37) y, para la hoja, `tab.importStage` (T
 | Escuchando transcripción | Altavoz en la pastilla; casilla «Oír transcripción» marcada; selector «Oír»: «Stems»/«Transcripción»/«Mixto»; «Sintetizando n/total…» o «Sintetizando…» mientras se renderiza. | `isListening`, `listenMode`, `synthProgress`, `synth[id] == .rendering`. |
 | Pista silenciada/solo | Grupo de pastilla al 55 %; M o S en acento. | `isDimmed`, `isMuted`, `isSolo`. |
 | Bucle activo | Etiqueta del menú «Bucle: …» en acento. | `ctl.loop != nil`. |
-| Reproduciendo | Botón central con pausa; reloj corre a 0,05 s. | `ctl.isPlaying`, `ctl.player.currentTime`. |
+| Reproduciendo | Botón central con pausa; reloj corre a 0,05 s (referencia SwiftUI; en Flutter el cursor va por `Ticker` sobre `study.position`, decisiones-interfaz.md «Cursor de tablatura a 20 o 30 Hz»; el reloj numérico usa esa misma fuente y solo repinta el texto cuando cambia el valor mostrado). | `ctl.isPlaying`, `ctl.player.currentTime`. |
 
 ## 7. Hojas y popovers
 
@@ -168,9 +168,9 @@ No hay popovers en esta pantalla (grep de `.popover` en `TabScreen.swift`/`TabSo
 
 **Disparo:** TS:99-102; `tab.sourceSheetOpen`; la abre sola `askForSource` (TC:389-392) o el menú «Fuente» / botón «Buscar en Songsterr». Cierre: `closeSourceSheet`. Es un `TfSheet`.
 
-**Marco (TSS:23-41).** `HStack(alignment: .top, spacing: 20)`: columna de lista de ancho fijo 612 (`listWidth`) con `VStack(spacing: 14)`, y, si hay vista previa, panel de ancho 640 (`previewWidth`). `padding(24)`, fondo `TF.bg`, alto fijo 640 (`sheetHeight`); ancho total 660 sin previa o 660 + 20 + 640 = 1320 con previa. `TF.body(13)` `TF.text2`. Título «Tablatura de Songsterr» `TF.display(22)`. El paso lo decide `importStage` (TC:40): `.choosing`, `.working`, `.pairing`, `.failed`.
+**Marco (TSS:23-41).** `HStack(alignment: .top, spacing: 20)`: columna de lista de ancho fijo 612 (`listWidth`) con `VStack(spacing: 14)`, y, si hay vista previa, panel de ancho 640 (`previewWidth`). `padding(24)`, fondo `TF.bg`, alto fijo 640 (`sheetHeight`); ancho total 660 sin previa o 660 + 20 + 640 = 1320 con previa (en Flutter, min(1320, ventana − márgenes); lista 612 fija). `TF.body(13)` `TF.text2`. Título «Tablatura de Songsterr» `TF.display(22)`. El paso lo decide `importStage` (TC:40): `.choosing`, `.working`, `.pairing`, `.failed`.
 
-En una ventana de Flutter menor de 1320 px de ancho la hoja con vista previa no cabe: el ancho disponible mínimo de ventana está en `tokens-componentes.md` §6; la decisión de reducir, desplazar o abrir la previa en panel aparte es de Jorge.
+En una ventana de Flutter menor de 1320 px de ancho la hoja con vista previa no cabe: el ancho disponible mínimo de ventana está en `tokens-componentes.md` §6; Resuelto: ancho = el menor entre 1320 y la ventana menos márgenes; la lista conserva 612 y la vista previa ocupa el resto; se comprueba con captura a 1100 (decisiones-interfaz.md, «Hoja de Songsterr de 1320 px con ventana mínima de 1100»).
 
 **Paso `.choosing` (TSS:63-90).**
 
@@ -242,12 +242,12 @@ Capturas de referencia a igualar (nombre propuesto, sobre el tema oscuro y venta
 
 Tests de widgets que deben existir (sin WebView real: `TfWebView` falso):
 
-- Para cada fase de 2.4 y 4, el overlay muestra título y botón correctos; con `.working` y pistas el WebView falso está visible y el overlay no es opaco; en `.ready` con `webError` aparece «alphaTab: …».
+- Para cada fase de 2.4 y 4, el overlay muestra título y botón correctos; con `.working` y pistas el WebView falso está visible y el overlay no es opaco; en `.ready` con `webError` aparecen el mensaje genérico y el detalle (no se comprueba el prefijo literal «alphaTab:», ver 2.4).
 - Cabecera: «Editar notas», «Exportar» y menú «Fuente» deshabilitados en las fases de la tabla 4.
 - Pastilla: activa/inactiva, atenuada al 55 % con `isDimmed`, M/S de 28×28.
 - Pie: prioridad `flash` > `selectionSummary` > texto fijo, `flash` desaparece a los 3 s (tiempo falso).
 - Barra de edición: botones deshabilitados sin selección; variante batería con seis botones.
-- Hoja: un test por paso (`choosing` con resultados, `failed`, `working`, `pairing`); marcar un resultado abre la previa; `confidenceColor` por tramos (0,6 y 0,35 exactos); `tuningText` de «E A D G B E» (cuerda grave primero); ancho 660 y 1320 con previa.
+- Hoja: un test por paso (`choosing` con resultados, `failed`, `working`, `pairing`); marcar un resultado abre la previa; `confidenceColor` por tramos (0,6 y 0,35 exactos); `tuningText` de «E A D G B E» (cuerda grave primero); ancho 660 sin previa; con previa, min(1320, ventana − márgenes) con la lista en 612.
 - Store: transiciones de fase, caducidad del `flash`, `notices` descartables.
 
 Pasos manuales para Jorge (necesitan vista o el WebView real):
@@ -257,4 +257,4 @@ Pasos manuales para Jorge (necesitan vista o el WebView real):
 3. Songsterr: la previa inicia sesión/cookies una vez y las conserva entre sesiones; la hoja cabe en la ventana mínima.
 4. Comparar capturas Flutter y SwiftUI de la lista anterior.
 
-Pendientes de Jorge (decisión, no hallazgos de código): (a) composición Flutter encima de un WebView nativo; (b) comportamiento de la hoja de 1320 px en ventanas estrechas; (c) añadir icono y botón de reintentar a `TfNotice` y a `.failed` (hoy no los tiene SwiftUI).
+Dudas sin resolver: (a) composición Flutter encima de un WebView nativo: se mide en P9, pruebas 4 y 7. Resuelto: (b) hoja de 1320 px, ver 7.1 (decisiones-interfaz.md); (c) no se añaden icono ni «Reintentar» a `TfNotice` ni a `.failed` (decisiones-interfaz.md, «Tablatura: icono en el aviso y botón «Reintentar» en el fallo»).

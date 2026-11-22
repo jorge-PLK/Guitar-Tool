@@ -20,10 +20,10 @@
 | [decisiones-interfaz.md](decisiones-interfaz.md) | Resolución de las preguntas de las fichas; manda sobre las «Dudas para Jorge» de cada ficha y deja las dudas reales | Orquestador y agentes de pantalla |
 | [pantallas/](pantallas/) | Fichas por pantalla (plantilla en `_PLANTILLA.md`): `biblioteca`, `backing`, `tablatura`, `grabar`, `montaje`, `ajustes` | El agente de esa pantalla |
 | [desvios.md](desvios.md) | Registro de desvíos de núcleo, su regla y los nuevos por pantalla y ola | Orquestador, `tf-implementer`, `tf-docs` |
-
-Cada ficha de pantalla va en 2 o 3 ficheros de `pantallas/`: `<pantalla>.md` (visual y estados), `<pantalla>-contrato.md` (apartados 5 y 9: métodos del puente y desvíos) y `<pantalla>-interaccion.md` (apartados 6-8). Hay `-interaccion.md` en `backing`, `tablatura` y `grabar`; `biblioteca`, `montaje` y `ajustes` llevan menos ficheros (`ajustes.md` es la ficha completa; `biblioteca-contrato.md` y `montaje-contrato.md` existen aparte). Si una ficha pide algo que `decisiones-interfaz.md` ya resolvió, vale lo de `decisiones-interfaz.md`.
 | [../probes/P9-flutter.md](../probes/P9-flutter.md) | Prueba de viabilidad: pruebas, umbrales, respaldos y resultados | Orquestador y agentes de P9 |
 | `ref/<pantalla>/<estado>.png` | Capturas de referencia de SwiftUI (se generan en la ola 0) y `DIFERENCIAS.md` por pantalla | Orquestador al validar |
+
+Cada ficha de pantalla va en 2 o 3 ficheros de `pantallas/`: `<pantalla>.md` (visual y estados), `<pantalla>-contrato.md` (apartados 5 y 9: métodos del puente y desvíos) y `<pantalla>-interaccion.md` (apartados 6-8). Hay `-interaccion.md` en `backing`, `tablatura` y `grabar`. Hay `-contrato.md` en `backing`, `biblioteca`, `grabar`, `montaje` y `tablatura`. `ajustes.md` es la ficha completa y no tiene ni `-interaccion.md` ni `-contrato.md`; `biblioteca` y `montaje` no tienen `-interaccion.md`. Si una ficha pide algo que `decisiones-interfaz.md` ya resolvió, vale lo de `decisiones-interfaz.md`.
 
 Reglas que no cambian en toda la fase:
 

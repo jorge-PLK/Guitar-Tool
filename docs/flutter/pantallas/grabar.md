@@ -36,7 +36,7 @@ Pantalla donde se graba la guitarra sobre el backing del tema abierto: vista de 
 | Capa de píldoras | RV:369-384 | `VStack` con `padding(16)`: arriba la fila de píldoras; tras `Spacer()`, abajo, el contador de cuenta atrás. |
 | Fila de píldoras | RV:372-378 | `ViewThatFits(in: .horizontal)`: variante 1 `HStack(alignment: .top)` con REC fija, `Spacer(minLength: 8)` y píldoras de cámara; variante 2 `VStack(alignment: .leading, spacing: 8)` con REC y debajo, a la derecha, las de cámara. |
 | Píldora (base) | RV:453-457 | `TF.body(14)`, una línea (`lineLimit(1)`, recorta con «…»), `padding(.horizontal, 12).padding(.vertical, 6)`, fondo `0x0F1113` @0,75 (= `TF.bg`), cápsula. |
-| Píldora REC | RV:429-436 | `HStack(spacing: 8)`: círculo 10×10, rojo `0xE5534B` si `phase` no es `.idle` ni `.adjusting`, si no `TF.muted`; texto `«REC · »` (solo en ese caso) + `Toma N · <parte>` en `semibold`. N = `nextTakeNumber` (RC:209). Texto con el color primario del sistema (blanco). |
+| Píldora REC | RV:429-436 | `HStack(spacing: 8)`: círculo 10×10, rojo `TfColors.<nombre>` (token con nombre, decisiones-interfaz.md; nombre definitivo en `tokens-componentes.md` §2.1; el botón ya cita `TfColors.recordButton`) si `phase` no es `.idle` ni `.adjusting`, si no `TF.muted`; texto `«REC · »` (solo en ese caso) + `Toma N · <parte>` en `semibold`. N = `nextTakeNumber` (RC:209). Texto con el color primario del sistema (blanco). |
 | Píldora de formato | RV:422-427 | Solo con `cameraLabel` (`<resolución> · <fps>`, RC:393-396): texto `TF.text2`. |
 | Píldora «Rotar» | RV:438-451 | `HStack(spacing: 6)`: icono `rotate.right` + «Rotar» o «Rotar · N°» (90/180/270); `TF.text2` con 0°, `TF.accent` con giro. Deshabilitada si `phase != .idle` (sin cambio visual propio). |
 | Contador de cuenta atrás | RV:380-382 | Número `TF.display(64)` blanco, sombra negra @0,6, radio 10, y +4; abajo y centrado horizontalmente en la caja (dentro del `VStack` con `padding(16)`). |
@@ -46,10 +46,10 @@ Pantalla donde se graba la guitarra sobre el backing del tema abierto: vista de 
 Equivalencias con lo que hace AVFoundation hoy (VS:146-174):
 
 - **Rectángulo**: toda la caja 16:9 (sin esquinas propias; el recorte de radio 16 lo hace la caja).
-- **Relación de aspecto de la fuente**: la del formato de cámara (`videoFormat.width/height`); la caja es siempre 16:9, la imagen no obliga a 16:9. El relay de Windows entrega 640 px de ancho a 15 fps (`Temp/flutter/state-grabar.md`); la dimensión real llega con cada fotograma.
+- **Relación de aspecto de la fuente**: la del formato de cámara (`videoFormat.width/height`); la caja es siempre 16:9, la imagen no obliga a 16:9. El relay de Windows entrega 640 px de ancho a 15 fps (dato no versionado, medido en local); la dimensión real llega con cada fotograma.
 - **Encuadre**: `videoGravity = .resizeAspect` (VS:156) = **fit/contain**: imagen entera, con barras sobre el degradado de fondo. Nunca recorta (nunca `fill`).
 - **Rotación**: `rotation` ∈ {0, 90, 180, 270} en sentido horario (`cameraRotation`, RC:407). Con 90°/270° la capa toma ancho y alto de la caja intercambiados y se gira alrededor del centro, de modo que `resizeAspect` encaja la imagen **ya girada** (VS:162-173). En Flutter: relación de aspecto de la fuente girada (`w/h` si 0/180, `h/w` si 90/270), contain en la caja y `RotatedBox(quarterTurns: rotation / 90)`. Solo es de vista: la cámara graba sin girar.
-- **Espejo**: el código **no lo fija** (`grep -i mirror` sin resultados en `App/Sources` ni `VideoKit`). Queda el valor por defecto de `AVCaptureVideoPreviewLayer` (ajuste automático del espejo). Pendiente de Jorge: ver §4.
+- **Espejo**: el código **no lo fija** (`grep -i mirror` sin resultados en `App/Sources` ni `VideoKit`). Queda el valor por defecto de `AVCaptureVideoPreviewLayer` (ajuste automático del espejo). Se replica lo que salga de la captura de SwiftUI con cámara real (ola 3); ver §11.1 y decisiones-interfaz.md, «Se resuelven midiendo».
 - **Sin transiciones**: el giro se aplica con `CATransaction.setDisableActions(true)` (VS:164-165): salto seco.
 
 ### 2.3 Barra de grabación (`RecordBar`, RV:462-538)
@@ -121,7 +121,7 @@ Equivalencias con lo que hace AVFoundation hoy (VS:146-174):
 | Hoja | TV:282-301 | Ancho fijo **720**, `padding(20)`, fondo `TF.bg`; `VStack(alignment: .leading, spacing: 14)`: cabecera, pantalla, controles, error (si hay), acciones. |
 | Cabecera | TV:303-315 | `HStack`: título «Toma N · <parte>» `TF.display(18)`; si es la mejor, chip «★ mejor» `TF.body(11, .semibold)` `TF.ok` sobre `TF.okBg`, `padding(.horizontal, 9).padding(.vertical, 3)`, cápsula; `Spacer`; botón `xmark` 13 pt semibold `TF.text2` (Esc lo cierra). |
 | Pantalla | TV:318-332 | `ZStack` con fondo **negro** (`Color.black`), `aspectRatio(16/9, .fit)`, radio **10**, borde `TF.line`. Contenido: **`TfVideoSurface`** con vídeo; «Sin vídeo: solo audio» `TF.body(12)` `TF.muted` si hay audio y no vídeo; `TfSpinner` mientras carga (sin error). |
-| Controles | TV:334-359 | `HStack(spacing: 12)`: botón redondo 36×36 `TF.accent`, icono `play.fill`/`pause.fill` 15 pt `TF.accentInk`; posición `m:ss` (`Fmt.clock`, trunca, BackingTimeline:473) `TF.body(12)` `TF.muted` monoespaciada; `Slider` flexible `0…max(duración, 0,1)` (nativo; `TfSlider`, sin tinte propio: usa el acento del sistema, **decisión de Jorge** si se unifica a `TF.accent`); duración igual que la posición; botón «Backing»/«Backing mudo» (alto 32, `padding(.horizontal, 10)`, radio 8, fondo `TF.field`, borde `TF.fieldLine`; icono `speaker.wave.2.fill` o `speaker.slash.fill` + `TF.body(12, .semibold)`; `TF.text2` encendido, `TF.accent` mudo). |
+| Controles | TV:334-359 | `HStack(spacing: 12)`: botón redondo 36×36 `TF.accent`, icono `play.fill`/`pause.fill` 15 pt `TF.accentInk`; posición `m:ss` (`Fmt.clock`, trunca, BackingTimeline:473) `TF.body(12)` `TF.muted` monoespaciada; `Slider` flexible `0…max(duración, 0,1)` (`TfSlider` con tinte `TF.accent`; SwiftUI usa el acento del sistema, desvío visual aceptado, decisiones-interfaz.md); duración igual que la posición; botón «Backing»/«Backing mudo» (alto 32, `padding(.horizontal, 10)`, radio 8, fondo `TF.field`, borde `TF.fieldLine`; icono `speaker.wave.2.fill` o `speaker.slash.fill` + `TF.body(12, .semibold)`; `TF.text2` encendido, `TF.accent` mudo). |
 | Error | TV:287 | Línea `TF.body(12)` `TF.danger`. |
 | Acciones | TV:361-367 | `HStack(spacing: 10)`: `SecondaryButton` «Marcar como mejor» (inactivo si ya es la mejor), `Spacer`, `SecondaryButton` «Eliminar…» (confirma con diálogo, TV:295-300). |
 | Superficie de «Ajustar desfase» | OS:34-48 | Misma receta: negro, 16:9 fit, radio **12**, borde `TF.line`, `PlayerLayerView` o error `TF.danger` con `padding()` o `TfSpinner`. Resto de la hoja: `grabar-interaccion.md` §7. |
@@ -165,7 +165,7 @@ Equivalencias con lo que hace AVFoundation hoy (VS:146-174):
 | Cargando tema | `TfSpinner` centrado. | `model.study == nil`; `ctl == nil`. |
 | Tema sin separar | `TfCard` «Este tema aún no está separado» y botón a la biblioteca. | `session.project.separation.state != .done`. |
 | Sin cámara | Caja con degradado y marcador «Sin vídeo: se grabará solo el audio» (icono según altura); sin píldora de formato ni «Rotar» ni etiqueta de desfase; línea de estado `TF.accent` «<motivo> Se grabará solo el audio.». Grabar sigue permitido. | `cameraState` = `none` / `failed` (con mensaje del núcleo); `cameraLabel == nil`. |
-| Sin permiso de cámara | Igual que arriba; línea de estado con la ruta a Ajustes del Sistema (RV:175; en Windows el texto lo define `grabar-interaccion.md` §8). | `cameraState == .denied`. |
+| Sin permiso de cámara | Igual que arriba; línea de estado con la ruta a Ajustes del Sistema (RV:175; en Windows y Mac el texto llega del núcleo por código, decisiones-interfaz.md, decisión 16). | `cameraState == .denied`. |
 | Cámara simulada | Marcador «Vista previa de la cámara · <nombre> (simulada)»; sí hay píldoras de formato y «Rotar» y etiqueta de desfase. | `cameraState == .simulated`. |
 | Buscando cámara | `TfSpinner` en el centro de la caja. Se re-sondea cada 2 s (RV:99, RV:130). | `cameraState == .idle`. |
 | Sin calibrar | No bloquea. Línea `TF.accent` «Sin calibrar: la toma puede ir desfasada decenas de ms; se corregirá al calibrar.» solo en reposo y sin otro bloqueo (RV:172). El botón sigue activo. | `!audio.calibrationValid`, `blockReason == nil`, `phase == .idle`. |
@@ -241,6 +241,6 @@ Solo Jorge puede probarlo con hardware o de vista/oído:
 
 ## Dudas para Jorge
 
-1. Espejo de la vista previa: SwiftUI no lo fija; ¿se replica el comportamiento por defecto de AVFoundation (espejo en cámara integrada) o se deja siempre sin espejo?
-2. `E5534B` (punto REC) y `C8433A` (botón Grabar): ¿un solo token rojo? (`tokens-componentes.md` §2.1).
-3. El slider del visor usa el acento del sistema (no `TF.accent`): ¿unificar?
+1. Resuelto: se replica lo que salga de la captura de SwiftUI con cámara real en la ola 3 (hardware de Jorge) (decisiones-interfaz.md, «Se resuelven midiendo»: Espejo de la cámara). Sigue siendo prueba manual de §11.1.
+2. Resuelto: dos tokens con nombre (decisiones-interfaz.md, «Cerradas por la regla 1:1»: Grabar, dos rojos sueltos).
+3. Resuelto: `TF.accent`; desvío visual aceptado, se enseña a Jorge en la revisión de la ola 3 (decisiones-interfaz.md, «Cerradas por documentación oficial»: Slider del visor).
