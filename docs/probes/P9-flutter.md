@@ -121,3 +121,43 @@ Código: `Probes/P9-flutter/pc.sh` (`sync`, `core`, `smoke`, `fetch`) y `Probes/
 - **Flags:** `-c release --arch x86_64` y `--cache-path`/`--config-path`/`--security-path` dentro de `Temp\p9\swiftpm`; `win/common.ps1` pone `USERPROFILE`/`HOME`/`TEMP`/`TMP` dentro de `Temp\p9`. Primera compilación 245 s, incremental 13-26 s.
 - **Sin medir todavía:** retraso del hilo principal y procesos hijos en Windows; `pc.sh fetch` sin probar; `P9_STATIC=1` sin probar; DLL cargada desde un hilo que no es el principal (el caso de Flutter; lo cubre 7d).
 - **Escape fuera de la carpeta:** `C:\Users\Jorge\.swiftpm\` (`configuration\` vacía, `security\fingerprints\` con 2 JSON, `cache` como enlace a `Temp\p9\tmp\org.swift.swiftpm`). Jorge (22/11): se deja como está.
+
+#### 7d · App Flutter en el PC e hilos — SIN DECIDIR (diagnóstico pendiente)
+
+Código: `Probes/P9-flutter/pc.sh` (`app`, `run`, `threads`), `win/app.ps1`, `win/run.ps1` (tarea programada interactiva `tf-p9-run`, se crea, ejecuta y borra en cada uso) y `pc-table.py`. Commit `534bb12`. Repetir: `Probes/P9-flutter/pc.sh sync && Probes/P9-flutter/pc.sh app && Probes/P9-flutter/pc.sh threads` (10-25 min). Informes en `Temp/p9-flutter/pc/p2-<threads>-<sink>.json`.
+
+- **Build** de `tf_probe` en el PC: 71,5 s la primera vez (con `pub get`); `Release\` de 166 MB con 20 DLL (`AppCoreFFI.dll` + 19). Sin parches al código de la prueba. `flutter.bat` con `PUB_CACHE`, `APPDATA` y `LOCALAPPDATA` dentro de `Temp\p9` (`Set-FlutterEnv` en `win/common.ps1`): ninguna escritura de Flutter ni Dart fuera de la carpeta.
+- **`--threads none`** (plantilla de Flutter sin cambios): falla como se esperaba. `@MainActor` no se ejecuta (2999 ms) y `audio.devices` da timeout. Hace falta una vía.
+- **Hilos:** la vía 1 deja el isolate fuera del hilo principal del proceso (`isMainThread=0`); la vía 2 lo deja en él (`=1`). Apartamento COM 3 (STA) antes, tras arrancar y tras las llamadas, en las dos.
+- **Tabla** (dos tandas; cuando hubo informe, 4000 idas y vueltas, 0 errores, mediana 0,17-0,21 ms):
+
+| Combinación | Tanda A (20:14) | Tanda B (20:28-20:48) |
+| --- | --- | --- |
+| vía 1 · puerto | p99 0,33 ms, máx 1,98; vigilante 30,6 ms; cierre 33 ms limpio; informe completo | cuelgue (sin informe, 124) |
+| vía 1 · `listener` | p99 0,30, máx 20,9; vigilante 18,8 ms; cierre 32 ms limpio | `@MainActor` timeout; p99 6,06, máx 8369; vigilante 5792 ms |
+| vía 2 · puerto | p99 0,32, máx 3,0; vigilante 18,6 ms; cierre 31 ms limpio | p99 14,8, máx 3313; vigilante 5313 ms; cierre 7531 ms no limpio; RSS +9 MB |
+| vía 2 · `listener` | p99 0,51, máx 15,7; vigilante 6,1 ms; cierre 10 ms limpio; RSS +12 MB entre 4000 y 8000 | p99 28,1, máx 9822; vigilante 5861 ms; cierre 6416 ms limpio |
+
+- **Único informe completo** (vía 1 · puerto, tanda A): nativo→Dart a 60 Hz libre p99 199 µs, ocupado p99 8066 µs; ráfaga de 5000 a 10,1 µs por mensaje; 0 pérdidas, 0 fuera de orden; RSS 78 → 108 MB; eventos de fondo de `import.file` recibidos (5 de progreso, 6 `library.changed`). En el resto, el probe para en el primer umbral que falla y no llega a esas fases.
+- **Lectura:** ninguna vía cumple «ningún bloqueo del hilo de UI > 16 ms» de forma fiable. La tanda A lo roza con una ejecución por combinación; la tanda B tiene bloqueos de ~5 s en las dos vías y con los dos mecanismos por igual, así que no distingue la vía 1 de la 2. Dos factores sin controlar en la tanda B: Jorge estaba usando el PC, y `run.ps1` cambió entre tandas (redirección de stdout/stderr, espera por `Handle`).
+- **Decisión de Jorge (22/11):** diagnóstico acotado antes de pasar al respaldo (proceso núcleo aparte): 3 repeticiones de vía 1 · puerto y de vía 2 · puerto con el PC quieto, fase exacta de cada pico del vigilante, y lanzador de la tanda A frente al de la B. Pendiente.
+- **Defectos conocidos del lanzador:** `run.ps1` espera 300 s y devuelve 125 aunque la app muriera con 124; un informe local viejo no se sobrescribe si la ejecución no dejó informe.
+
+#### 7e · Compilación de las candidatas de WebView — PASAN LAS TRES (una con ajustes de entorno)
+
+Código: `Probes/P9-flutter/webview/{wv_all,wv_flutter,wv_inapp}` (app mínima con el widget WebView y `--exit-after`), `pc.sh webview [candidata]` y `win/webview.ps1`. Repetir: `Probes/P9-flutter/pc.sh sync && Probes/P9-flutter/pc.sh webview`; una sola: `pc.sh webview wv_all|wv_flutter|wv_inapp-short`. Solo mide que compila y arranca; el comportamiento es del resto de la prueba 7.
+
+- **Tabla** (Flutter 3.50.1, Windows x64 release; ninguna obliga a Material; `analyze` con 0 avisos en las tres):
+
+| Candidata | Versiones (paquete / implementación de Windows) | Compila | Build (s) | Arranque (`--exit-after 5`) | Tamaño | Requisitos |
+| --- | --- | --- | --- | --- | --- | --- |
+| `webview_all` | 1.5.2 / `webview_all_windows` 1.5.2 | sí | 138 | código 0, 28,8 s | 25,3 MB | ninguno |
+| `webview_flutter` | 4.14.1 / `webview_flutter_windows` 1.3.1 | sí | 175,3 | código 0, 90,6 s | 23,8 MB | ninguno |
+| `flutter_inappwebview` (respaldo) | 6.1.5 / `flutter_inappwebview_windows` 0.6.0 | con ajustes de entorno | 208,3 | código 0, 10,5 s | 24,5 MB | `nuget.exe` en el PATH y ruta de proyecto corta; 8 avisos de build |
+
+- Las tres añaden `WebView2Loader.dll` y la DLL de su plugin. ATL no hizo falta en ninguna. Runtime de WebView2 del PC: 158.0.4370.33 (ya instalado).
+- **`flutter_inappwebview_windows`:** con la ruta normal falla `MSB3491` (ruta demasiado larga en `..._DEPENDENCIES_DOWNLOAD...lastbuildstate`); con ruta corta y sin NuGet falla `MSB3073: NUGET-NOTFOUND` (WIL, `Microsoft.Web.WebView2` 1.0.2792.45, `nlohmann.json` 3.11.2): el plugin espera `nuget.exe` en el PATH y no lo descarga. La prueba copia el proyecto a `Temp\p9\w\wv_inapp` y usa un `nuget.exe` suelto en `Temp\p9\tools` (nada instalado en el sistema; paquetes en `Temp\p9\nuget`).
+- **Sin explicar:** el arranque de `webview_flutter` tardó 90,6 s con `--exit-after 5` (hipótesis sin medir: inicialización de WebView2). Se mira en el resto de la prueba 7.
+- **Escritura fuera de `Temp\p9`:** `C:\Users\Jorge\AppData\Local\webview_all_windows\wv_all\EBWebView\` (datos de usuario de WebView2, 22/11 20:57), creada por `webview_all` al arrancar con el perfil real. Para la app: fijar la carpeta de datos de usuario de WebView2 dentro de `--support-dir`.
+- `pc.sh sync` excluye ahora `ephemeral` (enlaces simbólicos a rutas del Mac que hacían fallar la extracción).
+- **Sin comprobar:** que el WebView pinte el HTML; build para macOS de estas apps mínimas; `pc.sh webview` entero de una sola vez con los últimos cambios (se validó por tandas).
