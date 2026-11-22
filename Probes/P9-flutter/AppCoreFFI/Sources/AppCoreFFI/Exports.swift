@@ -53,6 +53,99 @@ public func ffiCoreRunMain() {
     dispatchMain()
 }
 
+// P9 prueba 3: fotogramas. Fuera de Apple (Windows) las funciones existen y devuelven 0/nulo/-1.
+
+@_cdecl("tf_core_set_texture_host")
+public func ffiCoreSetTextureHost(_ host: UnsafePointer<tf_texture_host>?) {
+    #if canImport(CoreVideo)
+    frameTextures.set(host?.pointee)
+    #endif
+}
+
+@_cdecl("tf_texture_create")
+public func ffiTextureCreate(_ channel: Int32) -> Int64 {
+    #if canImport(CoreVideo)
+    guard let reg = frameTextures.host?.register_texture else { return -1 }
+    let id = reg(channel)
+    frameTextures.setID(id, for: channel)
+    return id
+    #else
+    return -1
+    #endif
+}
+
+@_cdecl("tf_texture_dispose")
+public func ffiTextureDispose(_ channel: Int32) {
+    #if canImport(CoreVideo)
+    guard let id = frameTextures.id(for: channel) else { return }
+    frameTextures.setID(nil, for: channel)
+    frameTextures.host?.unregister_texture?(id)
+    #endif
+}
+
+@_cdecl("tf_frame_copy")
+public func ffiFrameCopy(_ channel: Int32) -> UnsafeMutableRawPointer? {
+    #if canImport(CoreVideo)
+    return frameSources.get(channel)?.copyForTexture()
+    #else
+    return nil
+    #endif
+}
+
+@_cdecl("tf_debug_frames_start")
+public func ffiDebugFramesStart(_ channel: Int32, _ width: Int32, _ height: Int32, _ fps: Int32) -> Int32 {
+    #if canImport(CoreVideo)
+    guard let s = FrameSource(channel: channel, width: Int(width), height: Int(height), fps: Int(fps)) else { return 1 }
+    frameSources.replace(channel, with: s)?.stop()
+    s.start()
+    return 0
+    #else
+    return 1
+    #endif
+}
+
+@_cdecl("tf_debug_frames_stop")
+public func ffiDebugFramesStop(_ channel: Int32) {
+    #if canImport(CoreVideo)
+    frameSources.get(channel)?.stop()
+    #endif
+}
+
+@_cdecl("tf_debug_frame_bgra")
+public func ffiDebugFrameBGRA(_ channel: Int32, _ dst: UnsafeMutablePointer<UInt8>?, _ capacity: Int32,
+                              _ outWidth: UnsafeMutablePointer<Int32>?, _ outHeight: UnsafeMutablePointer<Int32>?,
+                              _ outSeq: UnsafeMutablePointer<Int64>?) -> Int32 {
+    #if canImport(CoreVideo)
+    guard let s = frameSources.get(channel), let dst else { return 0 }
+    let n = s.copyBGRA(dst: dst, capacity: Int(capacity), seqInOut: outSeq)
+    if n > 0 { outWidth?.pointee = Int32(s.width); outHeight?.pointee = Int32(s.height) }
+    return Int32(n)
+    #else
+    return 0
+    #endif
+}
+
+@_cdecl("tf_debug_frames_stats")
+public func ffiDebugFramesStats(_ channel: Int32, _ produced: UnsafeMutablePointer<Int64>?, _ textureCopies: UnsafeMutablePointer<Int64>?,
+                                _ distinctTextureCopies: UnsafeMutablePointer<Int64>?, _ bgraCopies: UnsafeMutablePointer<Int64>?) {
+    #if canImport(CoreVideo)
+    let st = frameSources.get(channel)?.stats() ?? (0, 0, 0, 0, 0)
+    produced?.pointee = st.0; textureCopies?.pointee = st.1; distinctTextureCopies?.pointee = st.2; bgraCopies?.pointee = st.3
+    #else
+    produced?.pointee = 0; textureCopies?.pointee = 0; distinctTextureCopies?.pointee = 0; bgraCopies?.pointee = 0
+    #endif
+}
+
+/// Extra de prueba: coste medio del generador en µs por fotograma (solo relleno del búfer, sin la copia).
+@_cdecl("tf_debug_frames_cost_us")
+public func ffiDebugFramesCostUs(_ channel: Int32) -> Int64 {
+    #if canImport(CoreVideo)
+    return frameSources.get(channel)?.stats().4 ?? 0
+    #else
+    return 0
+    #endif
+}
+
 @_cdecl("tf_debug_mainactor_selftest")
 public func ffiDebugMainActorSelftest(_ timeoutMs: Int32) -> Int32 {
     coreState.debugMainActorSelftest(timeoutMs: timeoutMs)

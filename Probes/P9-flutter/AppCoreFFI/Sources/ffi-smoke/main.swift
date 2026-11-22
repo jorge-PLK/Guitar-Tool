@@ -232,5 +232,64 @@ func run() {
     exit(ok ? 0 : 1)
 }
 
-Thread.detachNewThread { run() }
+func cpuSeconds() -> Double {
+    var u = rusage()
+    getrusage(RUSAGE_SELF, &u)
+    func s(_ t: timeval) -> Double { Double(t.tv_sec) + Double(t.tv_usec) / 1e6 }
+    return s(u.ru_utime) + s(u.ru_stime)
+}
+
+/// P9 prueba 3: generador de fotogramas sin host de texturas. Copia textura (+1 y se suelta) y BGRA a 30 Hz.
+func runFrames() {
+    var ok = true
+    for (w, h) in [(1280, 720), (1920, 1080)] {
+        let rc = tf_debug_frames_start(0, Int32(w), Int32(h), 30)
+        if rc != 0 { print("FALLA: start \(w)x\(h) rc \(rc)"); ok = false; continue }
+        var dst = [UInt8](repeating: 0, count: w * h * 4)
+        var ow: Int32 = 0, oh: Int32 = 0, seq: Int64 = 0
+        var copyMs: [Double] = []
+        var monotonic = true, pixelsMatch = true
+        var prev: Int64 = 0
+        let cpu0 = cpuSeconds(); let t0 = nowMs()
+        var tick = 0
+        while nowMs() - t0 < 5000 {
+            if let p = tf_frame_copy(0) { Unmanaged<AnyObject>.fromOpaque(p).release() }
+            let c0 = nowMs()
+            let n = dst.withUnsafeMutableBufferPointer { tf_debug_frame_bgra(0, $0.baseAddress, Int32($0.count), &ow, &oh, &seq) }
+            if n > 0 {
+                copyMs.append(nowMs() - c0)
+                if seq <= prev { monotonic = false }
+                prev = seq
+                var decoded: Int64 = 0
+                for i in 0..<8 { decoded |= Int64(dst[i * 4]) << Int64(8 * i) }
+                if decoded != seq || Int(ow) != w || Int(oh) != h || n != Int32(w * h * 4) { pixelsMatch = false }
+            } else if n < 0 { ok = false; print("FALLA: bgra rc \(n)") }
+            tick += 1
+            // 30 Hz con fechas absolutas.
+            let wait = t0 + Double(tick) * 1000.0 / 30.0 - nowMs()
+            if wait > 0 { Thread.sleep(forTimeInterval: wait / 1000) }
+        }
+        let elapsed = nowMs() - t0
+        let cpu = cpuSeconds() - cpu0
+        var produced: Int64 = 0, tex: Int64 = 0, distinct: Int64 = 0, bgra: Int64 = 0
+        tf_debug_frames_stats(0, &produced, &tex, &distinct, &bgra)
+        let cost = Double(tf_debug_frames_cost_us(0)) / 1000
+        tf_debug_frames_stop(0)
+        let fps = Double(max(produced - 1, 0)) / (elapsed / 1000)  // N fotogramas = N-1 intervalos
+        let avgCopy = copyMs.isEmpty ? 0 : copyMs.reduce(0, +) / Double(copyMs.count)
+        print(String(format: "%dx%d: producidos %lld, fps %.2f, generador %.3f ms/fot, copia BGRA %.3f ms (n=%d), CPU %.1f %%, texturaCopias %lld distintas %lld, bgra %lld, secuencia monotona %@, pixeles=seq %@",
+                     w, h, produced, fps, cost, avgCopy, copyMs.count, cpu / (elapsed / 1000) * 100, tex, distinct, bgra,
+                     monotonic ? "si" : "NO", pixelsMatch ? "si" : "NO"))
+        if abs(fps - 30) > 0.2 { ok = false; print("FALLA: fps fuera de 30 +- 0.2") }
+        if !monotonic || !pixelsMatch { ok = false }
+    }
+    print(ok ? "RESULTADO: OK" : "RESULTADO: FALLA")
+    exit(ok ? 0 : 1)
+}
+
+if CommandLine.arguments.contains("--frames") {
+    Thread.detachNewThread { runFrames() }
+} else {
+    Thread.detachNewThread { run() }
+}
 dispatchMain()

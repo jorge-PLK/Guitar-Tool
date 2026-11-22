@@ -80,6 +80,37 @@ TF_API int32_t tf_debug_apartment(void);
 /// Solo prueba: 1 si el hilo que llama es el principal del proceso, 0 si no.
 TF_API int32_t tf_debug_is_main_thread(void);
 
+// ---- P9 prueba 3 (Fase 7f): fotogramas ----
+
+#define TF_CHANNEL_CAMERA 0
+#define TF_CHANNEL_MONTAGE 1
+
+/// Tabla que da el runner (macOS). Se llama solo desde el hilo de plataforma salvo `frame_available`,
+/// cuya implementación del runner reencola a main si hace falta.
+typedef struct {
+  int64_t (*register_texture)(int32_t channel);
+  void (*frame_available)(int64_t id);
+  void (*unregister_texture)(int64_t id);
+} tf_texture_host;
+
+/// Nulo = sin texturas. Antes de que Dart arranque el núcleo.
+TF_API void tf_core_set_texture_host(const tf_texture_host *host);
+/// host->register_texture; -1 si no hay host. Desde el hilo de plataforma.
+TF_API int64_t tf_texture_create(int32_t channel);
+TF_API void tf_texture_dispose(int32_t channel);
+/// CVPixelBufferRef retenido (+1) del último fotograma o NULL (siempre NULL fuera de Apple). Thread-safe.
+TF_API void *tf_frame_copy(int32_t channel);
+
+/// Solo prueba. 0 bien.
+TF_API int32_t tf_debug_frames_start(int32_t channel, int32_t width, int32_t height, int32_t fps);
+TF_API void tf_debug_frames_stop(int32_t channel);
+/// Copia el último fotograma a dst (BGRA8888 compacto). *outSeq es entrada (último visto) y salida.
+/// Devuelve bytes escritos; 0 sin fotograma nuevo; -1 no cabe.
+TF_API int32_t tf_debug_frame_bgra(int32_t channel, uint8_t *dst, int32_t capacity, int32_t *outWidth, int32_t *outHeight, int64_t *outSeq);
+TF_API void tf_debug_frames_stats(int32_t channel, int64_t *produced, int64_t *textureCopies, int64_t *distinctTextureCopies, int64_t *bgraCopies);
+/// Coste medio del generador, µs por fotograma.
+TF_API int64_t tf_debug_frames_cost_us(int32_t channel);
+
 #ifdef __cplusplus
 }
 #endif

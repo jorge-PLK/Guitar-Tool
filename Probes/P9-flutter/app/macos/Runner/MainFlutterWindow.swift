@@ -13,6 +13,9 @@ class MainFlutterWindow: NSWindow {
 
     RegisterGeneratedPlugins(registry: flutterViewController)
 
+    // P9 prueba 3: tabla de texturas para el núcleo (solo si hay --core-lib).
+    TfTextureHost.shared.install(registry: flutterViewController.engine.registrar(forPlugin: "TfTexture").textures)
+
     super.awakeFromNib()
   }
 
