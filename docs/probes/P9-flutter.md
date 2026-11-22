@@ -1,6 +1,6 @@
 # P9 · Viabilidad de la interfaz Flutter
 
-**Estado: en ejecución (22/11/2026). Pruebas 1, 2, 3 y 6 (Mac) pasadas; en el PC x64 pasan 7b y 7e y 7d está decidido (vía 1); pendientes 4, 5 y el resto de la 7.** Primera parte de la Fase 7f. Decide si se mantienen las decisiones marcadas (P9) en [ADR-021](../adr/ADR-021.md). Código en `Probes/P9-flutter/` (fuera de la puerta de tests); resultados, en este fichero, debajo de cada prueba.
+**Estado: en ejecución (22/11/2026). Pruebas 1, 2, 3 y 6 (Mac) pasadas; prueba 4 con los casos automáticos pasados en las dos candidatas y `keys` pendiente de Jorge; prueba 5 en curso; en el PC x64 pasan 7b y 7e y 7d está decidido (vía 1); pendiente el resto de la 7.** Primera parte de la Fase 7f. Decide si se mantienen las decisiones marcadas (P9) en [ADR-021](../adr/ADR-021.md). Código en `Probes/P9-flutter/` (fuera de la puerta de tests); resultados, en este fichero, debajo de cada prueba.
 
 ## Reglas
 
@@ -117,6 +117,57 @@ Código: `Probes/P9-flutter/AppCoreFFI/Sources/AppCoreFFI/Frames.swift` (generad
 - **Resultado: gana textura externa (provisional; falta Windows).** Las dos pasan 0 descartes con memoria estable; la textura cuesta menos de la mitad de CPU a 720p y casi una cuarta parte a 1080p.
 - **Sin medir:** raster de la textura (`FrameTiming` no la cubre: 0 fotogramas de framework); hueco de secuencia en textura; ±1 de borde al parar (último fotograma producido y no copiado). El vigilante de 14,8-17,0 ms queda sin investigar (roza 16 ms).
 - Juicio visual del orquestador (captura de `texture 720` a los 8 s, `Temp/p9-flutter/p3-texture-720.png`): correcto. Fotograma 16:9 centrado con bandas en la ventana 800×600, fondo liso, barra blanca de bordes nítidos, sin desgarro ni franjas. Sin verificar a la vista: orden de canales (el fondo rota de color; una captura no distingue BGRA de RGBA). Se comprueba con un color fijo en la prueba de textura de Windows.
+
+### Prueba 4 · WebView (Mac) — AUTOMÁTICOS PASAN EN LAS DOS; FALTA `keys` (Jorge)
+
+Código: `Probes/P9-flutter/webview/wv_all` y `Probes/P9-flutter/webview/wv_flutter` (una app por candidata, con `shim.js`, `probe.js`, `tab.html` y `ctx.dart` comunes). Commits `a867b60`, `bdada29` (`webview_all`), `fa88e6d` (`webview_flutter`) y `9a1839c` (modos ocultos de Songsterr). Repetir: `Probes/P9-flutter/run-probe4.sh <wv_all|wv_flutter> <caso|all>` con `caso` = `tab`, `messages`, `overlay`, `resize`, `songsterr`, `occluded`; informes en `Temp/p9-flutter/p4-<candidata>-<caso>.json`. `keys` se lanza aparte y en primer plano (`open -n <app> --args --case keys --report <json> --exit-after 60`, pasos en el relevo de la prueba). El `keys` de `wv_flutter` que hay en `Temp/p9-flutter/` se lanzó sin pulsar teclas y no cuenta.
+
+- **Versiones:** `webview_all` 1.5.2 (`webview_all_wkwebview` 1.5.2) y `webview_flutter` 4.14.1 (`webview_flutter_wkwebview` 3.27.2). Las dos exponen `loadFlutterAsset`, `loadFile`, `setUserAgent` y `setOnConsoleMessage`; solo `webview_all` tiene `OffscreenWebViewSession` (`isOffscreenWebViewSupported=true`; en `webview_flutter`, `n/a`).
+- **Condiciones:** release, ventana 800×600, partitura de prueba servida con `loadFlutterAsset` (`file://`, lectura concedida a la carpeta del asset), una ejecución por caso. La prueba corre desde una copia en `/private/tmp/p9p4`.
+- **`jsErrors`, `webErrors` y `badMessages`:** 0 en todos los informes de las dos candidatas.
+
+| Caso | Medida (campo) | `webview_all` | `webview_flutter` |
+| --- | --- | --- | --- |
+| `tab` | `ok` · `bravuraLoaded` | sí · sí (familia «alphaTab») | sí · sí (familia «alphaTab») |
+| `tab` | `timeToReadyMs` · `scoreLoadToRenderedMs` | 176 · 131 | 185 · 135 |
+| `messages` | `timeToReadyMs` | 158 | 163 |
+| `messages` | ida y vuelta de 1000 (`rttMs`): mediana / p99 / máx (ms) | 0,182 / 0,811 / 9,141 | 0,125 / 0,661 / 4,209 |
+| `messages` | ida y vuelta: perdidos / duplicados / fuera de orden | 0 / 0 / 0 | 0 / 0 / 0 |
+| `messages` | ráfaga JS → Dart de 1000 (`totalMs`) y perdidos / duplicados / fuera de orden | 1117 ms · 0 / 0 / 0 | 1049 ms · 0 / 0 / 0 |
+| `messages` | ráfaga Dart → JS de 1000 (`issueMs`) y perdidos / duplicados / fuera de orden | 38 ms · 0 / 0 / 0 | 48 ms · 0 / 0 / 0 |
+| `overlay` | `ok` · `scoreLoadToRenderedMs` | sí · 127 | sí · 141 |
+| `resize` | `allInnerMatch` · `alphaTabRerenderedEveryStep` | sí · sí | sí · sí |
+| `resize` | `scoreLoadToRenderedMs` · anchos de `surfaceWidth` (800, 560, 400) | 126 · 783 / 543 / 383 | 125 · 783 / 543 / 383 |
+| `songsterr` visible | `secondsToPageFinished` · `htmlBytesAtFinish` · `htmlBytesAfter4s` | 1,379 s · 228.417 · 230.390 | 1,251 s · 202.765 · 229.964 |
+| `songsterr` oculto `offstage` | `msToPageReady` · `htmlBytes` · `jsTicksIn2s` | 1418 · 230.706 · 7 | 1390 · 230.278 · 7 |
+| `songsterr` oculto `zero` | `msToPageReady` · `htmlBytes` · `jsTicksIn2s` | 1529 · 230.707 · 19 | 1365 · 230.278 · 19 |
+| `songsterr` oculto `offscreen` | `msToPageReady` · `htmlBytes` · `jsTicksIn2s` | 1485 · 230.706 · 7 | sin medir (no existe en esta candidata) |
+| `occluded` visible | `rafFps` · `ticksPerSecond` (esperado 10) | 72,09 · 9,65 | 71,96 · 9,65 |
+| `occluded` oculta (retardo de 8 s) | `rafFps` · `ticksPerSecond` · `vis` | 0,0 · 0,94 · `hidden` | 0,0 · 0,95 · `hidden` |
+
+- **Songsterr:** en las dos candidatas y en todos los modos devolvió su HTML (título «Guitar Tabs with Rhythm | Songsterr», `readyState` `complete` en los modos ocultos), con el UA de Safari fijado (`uaMatches: true`, `Version/17.5 Safari/605.1.15`). El JS sigue vivo en los tres modos ocultos (`jsAlive: true`). El informe `songsterr` usa el modo `none`; los demás modos van con `--mode`. `hiddenModesLocalTest` (página local) también pasa en los cuatro modos de las dos (48-161 ms).
+- **Teclado y foco:** sin medir (`keys`, pendiente de Jorge). La condición «ninguna tecla de edición perdida ni duplicada» sigue abierta en las dos.
+- **Aspecto de las capturas:** `internalSnapshot` (captura de `RepaintBoundary`) no recoge el contenido del WebView (`webContentCaptured: false`, 0 píxeles distintos del fondo salvo en `overlay`, 522 de la caja naranja). Que la caja naranja queda encima de la partitura se juzga con la captura externa (`p4-<candidata>-overlay.png`); esa mirada no consta aquí.
+
+Hallazgos para la ola 0:
+
+- **`shim.js` es necesario.** El plugin entrega `message.body.toString()`, así que el JS debe enviar `JSON.stringify(...)` o llega texto no JSON. Con el shim, `shimOk: true` y 0 mensajes no JSON en las dos. El canal `webkit.messageHandlers.tf` existe en `WKWebView` y el shim no cambió entre candidatas.
+- **`fetch` y XHR de `file://` a `file://` fallan en `WKWebView`** (`TypeError: Load failed` / `onerror`), tanto para `font/Bravura.woff2` como para `soundfont/sonivox.sf2`. `@font-face` sí carga (`document.fonts`: familia «alphaTab», estado `loaded`; no aparece como «Bravura»). Los recursos que alphaTab pide con `fetch` (SoundFont) hay que entregarlos por otra vía (bytes por el canal Dart ↔ JS o esquema propio); no se ha probado ninguna.
+- **TCC de volumen extraíble.** Lanzada con `open` desde `/Volumes/SSD Mac`, la app queda parada en el arranque con el diálogo «quiere acceder a los archivos de un volumen extraible»; sin conceder, Dart ni arranca y no hay informe. Por eso la prueba corre desde `/private/tmp/p9p4`. Tras reconstruir cambia la firma ad hoc y TCC puede volver a preguntar.
+- **Ventana tapada y oculta:** con `vis: hidden`, `rafFps` cae a 0 y los temporizadores a 0,94-0,95 por segundo (los de 100 ms pasan a ~1 s; hasta ~2 s entre muestras al final). Un reloj de reproducción en JS no sirve con la ventana oculta; la sincronía la debe llevar Dart o el núcleo. Con la ventana visible: rAF ~72 y 9,65 tics/s de 10.
+- **La oclusión no siempre se aplica.** Una ejecución de `all` dio `rafFps` 72 en `occluded-hidden` (oclusión no efectiva); repetido solo dio 0 en las dos. El informe que consta es el repetido.
+- **`material_ui`** aparece en el `pubspec` de las dos apps; el código de la prueba solo usa `widgets.dart`. Sin comprobar si lo añadió `flutter create`.
+
+Diferencias entre candidatas (de los números):
+
+- Rendimiento prácticamente igual: tiempos de arranque y de render dentro de ~10 ms, mismo comportamiento con la ventana tapada y mismo redimensionado.
+- `webview_flutter` tiene la ida y vuelta algo menor (mediana 0,125 frente a 0,182 ms; máx 4,2 frente a 9,1 ms), con una sola ejecución cada una: no se distingue del ruido sin repetir.
+- `webview_all` tiene `OffscreenWebViewSession` y un cuarto modo oculto (`offscreen`); `webview_flutter` no. Los modos `offstage` y `zero` ya bastan en las dos para obtener el HTML de Songsterr.
+- En `songsterr` visible, el HTML al terminar la carga fue menor en `webview_flutter` (202.765 frente a 228.417 bytes), pero a los 4 s casi igual (229.964 frente a 230.390): la página aún se estaba rellenando.
+
+Sin decidir: la candidata se elige tras `keys` (ninguna tecla perdida ni duplicada, foco yendo y volviendo a un `TextField`) y la pasada de Windows (compilación con el Visual Studio del PC, DPI, repintado). Si empatan, decide Jorge.
+
+Sin medir: teclado y foco (`keys`); Windows; retardo con la ventana minimizada; carga de la SoundFont por una vía que funcione; versión de Flutter con la que se compiló cada app de `webview/` (`fvm flutter --version` desde la raíz da 3.44.5 y no 3.50.1; hay que confirmar el `.fvmrc` de cada una).
 
 ### Prueba 6 · Captura y tests (Mac) — PASA
 
