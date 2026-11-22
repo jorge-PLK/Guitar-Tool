@@ -1,6 +1,6 @@
 # P9 · Viabilidad de la interfaz Flutter
 
-**Estado: en ejecución (22/11/2026). Pruebas 1, 2 y 6 (Mac) pasadas; primera pasada en el PC x64 en curso.** Primera parte de la Fase 7f. Decide si se mantienen las decisiones marcadas (P9) en [ADR-021](../adr/ADR-021.md). Código en `Probes/P9-flutter/` (fuera de la puerta de tests); resultados, en este fichero, debajo de cada prueba.
+**Estado: en ejecución (22/11/2026). Pruebas 1, 2, 3 y 6 (Mac) pasadas; en el PC x64 pasan 7b y 7e y 7d está decidido (vía 1); pendientes 4, 5 y el resto de la 7.** Primera parte de la Fase 7f. Decide si se mantienen las decisiones marcadas (P9) en [ADR-021](../adr/ADR-021.md). Código en `Probes/P9-flutter/` (fuera de la puerta de tests); resultados, en este fichero, debajo de cada prueba.
 
 ## Reglas
 
@@ -97,6 +97,27 @@ Nativo → Dart (emisor sintético `tf_debug_emit`, mensajes de 300 bytes, laten
 
 ABI usada en la prueba (candidata; se congela al cerrar P9): `tf_core_start`, `tf_core_start_port`, `tf_core_init_dart_api`, `tf_core_send`, `tf_core_free`, `tf_core_shutdown`; `optionsJSON` = `{"args": [...]}` que pasa por `LaunchOptions.parse`; códigos de `start`: 0 bien, 1 ya arrancado, 2 opciones inválidas, 3 falló `Bridge.init`. `tf_debug_live_buffers`, `tf_debug_now_ns` y `tf_debug_emit` son solo de la prueba.
 
+### Prueba 3 · Fotogramas (Mac) — PASA
+
+Código: `Probes/P9-flutter/AppCoreFFI/Sources/AppCoreFFI/Frames.swift` (generador sintético BGRA), `app/macos/Runner/TfTextureHost.swift`, `app/lib/probe3_frames.dart` y `Probes/P9-flutter/run-probe3.sh`. Commits `1ff5935` (lado nativo) y `0f0d1ba` (lado Dart). Repetir: `Probes/P9-flutter/run-probe3.sh all` (con `SKIP_BUILD=1` no recompila); informes en `Temp/p9-flutter/p3-<modo>-<tamaño>.json`.
+
+- **Condiciones:** 60 s por combinación, ventana 800×600, dpr 1.0, medido tras el primer segundo. Fotogramas a 30 fps.
+
+| Combinación | Producidos / presentados | Descartes | CPU % de un núcleo (getrusage; `ps`) | RSS a 5 / 30 / 60 s (MB) | Vigilante máx (ms) |
+| --- | --- | --- | --- | --- | --- |
+| textura · 720 | 1770 / 1770 | 0 | 12,0 (12,4) | 114,2 / 117,1 / 118,3 | 14,8 |
+| textura · 1080 | 1770 / 1770 | 0 | 12,7 (12,3) | 123,2 / 126,1 / 127,2 | 15,1 |
+| BGRA · 720 | 1770 / 1770 | 0 | 28,7 (26,2) | 126,2 / 127,6 / 128,2 | 17,0 |
+| BGRA · 1080 | 1770 / 1770 | 0 | 42,3 (38,2) | 148,4 / 150,8 / 142,8 | 16,3 |
+
+- **BGRA:** build p99 0,24 / 0,27 ms (720 / 1080); raster p99 1,27 / 2,54 ms; 0 de 1801 fotogramas por encima de 16,7 ms; copia FFI p50/p99 0,59/0,66 ms (720) y 1,32/1,53 ms (1080); decode p50/p99 3,03/3,49 ms (720) y 5,74/6,48 ms (1080); hueco máximo de secuencia 1.
+- **Generador sintético:** 394-870 µs por fotograma.
+- **Copias por fotograma:** textura, 0 hacia Dart; BGRA, 3 en CPU más la subida a GPU.
+- **Humo de 3a** (`ffi-smoke --frames`): 30,00 y 29,98 fps; generador 0,39 y 0,75 ms; copia BGRA 0,45 y 1,11 ms.
+- **Resultado: gana textura externa (provisional; falta Windows).** Las dos pasan 0 descartes con memoria estable; la textura cuesta menos de la mitad de CPU a 720p y casi una cuarta parte a 1080p.
+- **Sin medir:** raster de la textura (`FrameTiming` no la cubre: 0 fotogramas de framework); hueco de secuencia en textura; ±1 de borde al parar (último fotograma producido y no copiado). El vigilante de 14,8-17,0 ms queda sin investigar (roza 16 ms).
+- Juicio visual del orquestador (captura de `texture 720` a los 8 s, `Temp/p9-flutter/p3-texture-720.png`): correcto. Fotograma 16:9 centrado con bandas en la ventana 800×600, fondo liso, barra blanca de bordes nítidos, sin desgarro ni franjas. Sin verificar a la vista: orden de canales (el fondo rota de color; una captura no distingue BGRA de RGBA). Se comprueba con un color fijo en la prueba de textura de Windows.
+
 ### Prueba 6 · Captura y tests (Mac) — PASA
 
 Adelantada a la primera pasada del PC porque es Dart puro y no depende de la vía de hilos. Código: `Probes/P9-flutter/app/lib/probe6_snapshot.dart`, `app/test/` y `Probes/P9-flutter/test-probe.sh`. Commit `53559df`. Repetir: `open -g -n -W <tf_probe.app> --args --snapshot <png>` (build release) y `bash Probes/P9-flutter/test-probe.sh`.
@@ -122,7 +143,7 @@ Código: `Probes/P9-flutter/pc.sh` (`sync`, `core`, `smoke`, `fetch`) y `Probes/
 - **Sin medir todavía:** retraso del hilo principal y procesos hijos en Windows; `pc.sh fetch` sin probar; `P9_STATIC=1` sin probar; DLL cargada desde un hilo que no es el principal (el caso de Flutter; lo cubre 7d).
 - **Escape fuera de la carpeta:** `C:\Users\Jorge\.swiftpm\` (`configuration\` vacía, `security\fingerprints\` con 2 JSON, `cache` como enlace a `Temp\p9\tmp\org.swift.swiftpm`). Jorge (22/11): se deja como está.
 
-#### 7d · App Flutter en el PC e hilos — SIN DECIDIR (diagnóstico pendiente)
+#### 7d · App Flutter en el PC e hilos — PASAN LAS DOS VÍAS; DECIDIDO: VÍA 1
 
 Código: `Probes/P9-flutter/pc.sh` (`app`, `run`, `threads`), `win/app.ps1`, `win/run.ps1` (tarea programada interactiva `tf-p9-run`, se crea, ejecuta y borra en cada uso) y `pc-table.py`. Commit `534bb12`. Repetir: `Probes/P9-flutter/pc.sh sync && Probes/P9-flutter/pc.sh app && Probes/P9-flutter/pc.sh threads` (10-25 min). Informes en `Temp/p9-flutter/pc/p2-<threads>-<sink>.json`.
 
@@ -139,9 +160,22 @@ Código: `Probes/P9-flutter/pc.sh` (`app`, `run`, `threads`), `win/app.ps1`, `wi
 | vía 2 · `listener` | p99 0,51, máx 15,7; vigilante 6,1 ms; cierre 10 ms limpio; RSS +12 MB entre 4000 y 8000 | p99 28,1, máx 9822; vigilante 5861 ms; cierre 6416 ms limpio |
 
 - **Único informe completo** (vía 1 · puerto, tanda A): nativo→Dart a 60 Hz libre p99 199 µs, ocupado p99 8066 µs; ráfaga de 5000 a 10,1 µs por mensaje; 0 pérdidas, 0 fuera de orden; RSS 78 → 108 MB; eventos de fondo de `import.file` recibidos (5 de progreso, 6 `library.changed`). En el resto, el probe para en el primer umbral que falla y no llega a esas fases.
-- **Lectura:** ninguna vía cumple «ningún bloqueo del hilo de UI > 16 ms» de forma fiable. La tanda A lo roza con una ejecución por combinación; la tanda B tiene bloqueos de ~5 s en las dos vías y con los dos mecanismos por igual, así que no distingue la vía 1 de la 2. Dos factores sin controlar en la tanda B: Jorge estaba usando el PC, y `run.ps1` cambió entre tandas (redirección de stdout/stderr, espera por `Handle`).
-- **Decisión de Jorge (22/11):** diagnóstico acotado antes de pasar al respaldo (proceso núcleo aparte): 3 repeticiones de vía 1 · puerto y de vía 2 · puerto con el PC quieto, fase exacta de cada pico del vigilante, y lanzador de la tanda A frente al de la B. Pendiente.
 - **Defectos conocidos del lanzador:** `run.ps1` espera 300 s y devuelve 125 aunque la app muriera con 124; un informe local viejo no se sobrescribe si la ejecución no dejó informe.
+
+**Diagnóstico (22/11 21:40, PC quieto, carga 0-9 %).** `--sink port`, 4000 llamadas, 3 ejecuciones por vía; el probe ya no para en el primer umbral (`--no-fail-fast`) y el vigilante anota la fase de cada pico.
+
+- **Resultado: las dos vías pasan 3 de 3.** 0 errores, `threadsOk`, 0 pérdidas ni desorden, cierre limpio en 23-35 ms en las seis.
+- **Ida y vuelta (med / p99 / máx, ms):** vía 1, 0,18 / 0,30-0,32 / 1,51-1,75; vía 2, 0,18-0,19 / 0,34-0,36 / 1,88-3,01.
+- **`watchdogMaxExclBusy` (ms, umbral 16):** vía 1, 6,3 / 13,7 / 10,0; vía 2, 11,8 / 11,4 / 5,7. El máximo global, 172-191 ms, cae siempre en la fase `decode` (banco síncrono, esperado).
+- **Nativo→Dart:** 60 Hz libre, p99 141-251 µs; ocupado, ~8080-8099 µs; ráfaga, 9,6-12,8 µs por mensaje.
+- **RSS:** 74 → 102-105 MB. El criterio extra «RSS > +8 MB entre 4000 y 8000» falla en via1-1 (+11) y via1-2 (+10) y no en vía 2: con puerto los búferes los libera el GC. Sin concluir; se vigila con una ejecución larga.
+- **Picos por fase:** los mayores en `idle` (~1,5 s) y `free_60hz`, nunca por encima de 14 ms; ninguno en `startup`.
+- **Conclusión:** los bloqueos de ~5 s de la tanda B eran carga del PC (Jorge lo usaba), no de la vía.
+- **Repetir:** `Probes/P9-flutter/pc.sh diag [extra]` (con `run.ps1 -NoRedirect`); informes en `Temp/p9-flutter/pc/diag-<via>-<n>.json`. La DLL del PC ya incluye las funciones de fotogramas (26 `tf_*`).
+
+**Decisión de Jorge (22/11): vía 1.** Motivo: empate en números, y la vía 2 depende de símbolos privados `_4CF` de libdispatch, frágiles ante cambios de toolchain; la vía 1 es la de `WinApp` (probada en la 7c). Consecuencia: la ABI no lleva `tf_core_pump` ni `tf_core_main_queue_handle`; el principal queda en `tf_core_run_main()`.
+
+- **Pendiente en el resto de la 7:** `listener` contra puerto con el PC quieto, RSS de vía 1 en ejecución larga, STA tras Media Foundation.
 
 #### 7e · Compilación de las candidatas de WebView — PASAN LAS TRES (una con ajustes de entorno)
 
