@@ -133,8 +133,8 @@ Pendiente del área: ninguno.
 | `tab.cancel` | Cancela la transcripción en curso. | `Empty` | `CancelResult {cancelled: Bool}` (`AC/ImportMethods.swift:70`) | :21 |
 | `tab.beatClick` | Clic de la página en un pulso (con `shift` extiende el tramo). | `TabClickParams` | `TabState` | :22 |
 | `tab.beatDrag` | Arrastre sobre pulsos: extiende el tramo. | `TabClickParams` | `TabState` | :26 |
-| `tab.noteClick` | Clic en una nota (`string` base 0 del JSON; se convierte). Ignorado con `shift`. | `TabClickParams` | `TabState` | :30 |
-| `tab.select` | Selecciona un punto de la rejilla (`beat` índice global, `tick` 0..<`TabScore.ticksPerBeat`) y salta el reproductor. | `TabSelectParams` | `TabState` | :34 |
+| `tab.noteClick` | Clic en una nota (`string` base 0 del JSON; se convierte). Ignorado con `shift`; `string` ausente se toma como 0. | `TabClickParams` | `TabState` | :30 |
+| `tab.select` | Selecciona un punto de la rejilla (`beat` índice global, `tick` 0...11, es decir `0..<12`) y salta el reproductor. | `TabSelectParams` | `TabState` | :34 |
 | `tab.span` | Acción sobre el tramo seleccionado. | `TabSpanParams` | `TabState` | :37 |
 | `tab.toggleMute` | Mute de la pista (`track` obligatorio). | `TabTrackParams` | `TabState` | :38 |
 | `tab.toggleSolo` | Solo de la pista (`track` obligatorio). | `TabTrackParams` | `TabState` | :43 |
@@ -158,13 +158,13 @@ Pendiente del área: ninguno.
 
 ### DTO de `tab` (`TT/`)
 
-- `TabState` (:48): `projectId: String`, `phase: String` (`waitingAnalysis|empty|working|ready|failed|choosingSource`), `error: String?` (solo `failed`), `header: String?` («4/4 · 120 BPM»), `source: String?` (`automatic|songsterr`; ausente = sin elegir), `tracks: [TabTrackInfo]`, `selectedTrack: String?`, `notices: [String]`, `canUndo`, `canRedo`, `editMode`, `graceMode: Bool`, `listenMode: String` (`stems|transcription|mixed`), `anySolo: Bool`, `selection: TabSelectionInfo?`, `span: TabSpanInfo?`, `revision: Int`, `flash: String?`, `handled: Bool?` (solo `tab.edit op:"key"`).
+- `TabState` (:54): `projectId: String`, `phase: String` (`waitingAnalysis|empty|working|ready|failed|choosingSource`), `error: String?` (solo `failed`), `header: String?` («4/4 · 120 BPM»), `source: String?` (`automatic|songsterr`; ausente = sin elegir), `tracks: [TabTrackInfo]`, `selectedTrack: String?`, `notices: [String]`, `canUndo: Bool`, `canRedo: Bool`, `editMode: Bool`, `graceMode: Bool`, `listenMode: String` (`stems|transcription|mixed`), `anySolo: Bool`, `selection: TabSelectionInfo?`, `span: TabSpanInfo?`, `revision: Int`, `flash: String?`, `handled: Bool?` (solo `tab.edit op:"key"`).
 - `TabTrackInfo` (:12): `id`, `name`, `kind` (`guitar|bass|drums|vocal`), `tuning: TabTuningInfo?`, `customTuning: TabTuningInfo?`, `origin` (`songsterr|stem|extra`), `playerTrack: String?` (id del canal de `study`), `transcription` (`ready|queued|transcribing|missing|failed`), `progress: Double?`, `error: String?`, `fingerprint: TrackSourceFingerprint?` (`{path: String, size: Int64, modifiedMillis: Int64, modelVersion: String, parametersVersion: Int}`, TabKit), `noteCount: Int`, `muted`, `solo`, `dimmed`, `listening: Bool`, `synth: String?` (`rendering|ready|failed`).
 - `TabTuningInfo` (:6) `{preset: String, name: String, strings: [Int]}` (MIDI de la cuerda 1, la más aguda, a la última).
-- `TabSelectionInfo` (:25) `{track: String, beat: Int, tick: Int, string: Int?, summary: String?, barRange: TabBarRange?}`; `TabBarRange` (:35) `{bar: Int (0-based), start: Double, end: Double}`. `TabSpanInfo` (:41) `{startTick: Int, endTick: Int}`.
-- `TabScoreResult` (:70) `{json: String (cadena JSON), trackIndex: Int, trackIDs: [String], revision: Int}`.
-- `TabProgressEvent` (:78) `{state: String (transcribing|done|failed|cancelled), track: String, fraction: Double, error: String?}`.
-- `TabSelectionEvent` (:85) `{bar: Int, fraction: Double}`; `TabRangeEvent` (:86) `{startBar: Int, startFraction: Double, endBar: Int, endFraction: Double}`.
+- `TabSelectionInfo` (:33) `{track: String, beat: Int, tick: Int, string: Int?, summary: String?, barRange: TabBarRange?}`; `TabBarRange` (:43) `{bar: Int (0-based), start: Double, end: Double}`. `TabSpanInfo` (:49) `{startTick: Int, endTick: Int}`.
+- `TabScoreResult` (:77) `{json: String (cadena JSON), trackIndex: Int, trackIDs: [String], revision: Int}`.
+- `TabProgressEvent` (:84) `{state: String (transcribing|done|failed|cancelled), track: String, fraction: Double, error: String?}`.
+- `TabSelectionEvent` (:92) `{bar: Int, fraction: Double}`; `TabRangeEvent` (:93) `{startBar: Int, startFraction: Double, endBar: Int, endFraction: Double}`.
 - `TabQueuedResult {queued: [String]}`; `TabExportNameResult {fileName}`; `TabExportResult {saved: Bool, path: String?}` (`saved:false` sin `path` = diálogo cancelado).
 - Params: `TabOpenParams {projectId}`, `TabTrackParams {track: String?}`, `TabSourceParams {source}`, `TabClickParams {track: Int, bar: Int, beat: Int, shift: Bool?, string: Int?}` (índices de alphaTab/JSON), `TabSelectParams {track: String, beat: Int, tick: Int, string: Int?}`, `TabSpanParams {action}`, `TabListeningParams {track: String?, on: Bool}`, `TabExportParams {data: String (base64), path: String?}`, `TabEditParams {op: String, value: Int?, up: Bool?, sign: Int?, piece: String?, name: String?, key: String?, shift: Bool?, ctrl: Bool?, alt: Bool?, forward: Bool?, track: String?, preset: String?, on: Bool?}`.
 
@@ -191,13 +191,13 @@ Todos devuelven `SongsterrSheetState` salvo `accept` y `automatic` (`TabState`).
 
 ### DTO de Songsterr (`SS/:210-345`)
 
-- `SongsterrSheetState` (:315): `open: Bool`, `stage: String` (`choosing|working|pairing|failed`), `query: String?` («Artista · Título»), `search: SongsterrSearchInfo?`, `results: [SongsterrResultInfo]`, `selected: SongsterrSongInfo?`, `loadingSongId: Int?`, `detailIssue: SongsterrIssueInfo?`, `linkIssue: SongsterrIssueInfo?`, `busy: Bool`, `canUse: Bool`, `workingText: String?` (con `working`), `failure: SongsterrIssueInfo?` (con `failed`), `pairing: SongsterrPairingInfo?` (con `pairing`). Cerrada: solo `open:false`, `stage` y los arrays vacíos (nil omitidos).
+- `SongsterrSheetState` (:315): `open: Bool`, `stage: String` (`choosing|working|pairing|failed`), `query: String?` («Artista · Título»), `search: SongsterrSearchInfo?`, `results: [SongsterrResultInfo]`, `selected: SongsterrSongInfo?`, `loadingSongId: Int?` (`-1` = se está leyendo el enlace pegado), `detailIssue: SongsterrIssueInfo?`, `linkIssue: SongsterrIssueInfo?`, `busy: Bool`, `canUse: Bool`, `workingText: String?` (con `working`), `failure: SongsterrIssueInfo?` (con `failed`), `pairing: SongsterrPairingInfo?` (con `pairing`). Cerrada: `{open:false, stage:"choosing", results:[], busy:false, canUse:false}`; `busy` y `canUse` son `Bool` no opcionales y salen siempre; el resto (nil) se omite.
 - `SongsterrSearchInfo` (:264) `{phase: String (idle|searching|results|failed), issue: SongsterrIssueInfo?}`.
 - `SongsterrIssueInfo` (:210) `{kind: String (noResults|rateLimited|offline|formatChanged|invalidLink|other), message: String, canRetry: Bool, suggestion: String?}`.
 - `SongsterrResultInfo` (:244) `{songId: Int, artist, title: String, selected: Bool, loading: Bool, previewUrl: String?}`.
 - `SongsterrSongInfo` (:255) `{songId: Int, revisionId: Int, artist, title: String, tracks: [SongsterrTrackInfo], previewUrl: String?}`; `SongsterrTrackInfo` (:234) `{partId: Int, name, instrument: String, tuning: [Int]?, tuningText: String}` («E A D G B E», «-» en batería).
 - `SongsterrPairingInfo` (:306) `{intro: String, slots: [SongsterrSlotInfo], extraNames: [String], extraText: String?, warnings: [String]}`.
-- `SongsterrSlotInfo` (:291) `{stemId, name, kind, role: String, track: Int?, confidence: Double?, confidenceText: String?, choices: [SongsterrChoiceInfo], solos: [SongsterrSoloRowInfo]}` (`role`: `lead` para guitarra solista, si no el raw de `SongsterrStemRole`; `solos` solo se rellena en el slot lead).
+- `SongsterrSlotInfo` (:291) `{stemId, name, kind, role: String, track: Int?, confidence: Double?, confidenceText: String?, choices: [SongsterrChoiceInfo], solos: [SongsterrSoloRowInfo]}` (`role` ∈ `guitar_L` · `guitar_R` · `guitar` · `bass` · `drums` · `lead`: `lead` sale cuando el stem es `SongsterrStemRole.guitarLead` (raw `guitar_lead`, que nunca se serializa: el DTO lo sustituye por `lead`); raw de `SongsterrStemRole`: `guitar_L`, `guitar_R`, `guitar_lead`, `guitar`, `bass`, `drums`. `kind` ∈ `guitar|bass|drums|vocal` (raw de `TabTrackKind`; `vocal` en singular, a diferencia de `StudyChannel.kind` que es `vocals`). `stemId` = `TabSource.id` (con guion): `guitar`, `guitar-rhythm`, `guitar-left`, `guitar-right`, `guitar-lead`, `bass`, `drums`; no coincide con los raw de `role`. Resuelto: la lista cerrada de ids y el `role` de un slot de voz se comprueban con los fixtures de `tab.songsterr.*` en la ola 2 (decisiones-interfaz.md). `solos` solo se rellena en el slot lead).
 - `SongsterrSoloRowInfo` (:278) `{index: Int, start: Double, end: Double, clock: String, track: Int?, confidence: Double?, confidenceText: String?, choices: [SongsterrChoiceInfo]}`.
 - `SongsterrChoiceInfo` (:270) `{track: Int, name: String, similarity: Double?, label: String}`.
 
@@ -212,7 +212,7 @@ Todos devuelven `SongsterrSheetState` salvo `accept` y `automatic` (`TabState`).
 
 ### Protocolo página (`tab.html` + `tf-bridge.js`) <-> anfitrión
 
-Transporte hoy (macOS): JS->anfitrión con `window.webkit.messageHandlers.tf.postMessage(obj)` (objeto, no cadena; `post` en `tf-bridge.js:370`); si falla se ignora. Anfitrión->JS: llamadas a `window.TF.<fn>(...)` (`App/Sources/TabWebHost.swift:92-113`). Para Flutter hay que reemplazar ese canal (decisión de diseño pendiente; no hay equivalente en el repo). Todos los mensajes JS->anfitrión llevan `event`.
+Transporte hoy (macOS): JS->anfitrión con `window.webkit.messageHandlers.tf.postMessage(obj)` (objeto, no cadena; `post` en `tf-bridge.js:370`); si falla se ignora. Anfitrión->JS: llamadas a `window.TF.<fn>(...)` (`App/Sources/TabWebHost.swift:92-113`). Para Flutter hay que reemplazar ese canal (Resuelto: el canal de mensajes JS del paquete de WebView, oculto tras `TfWebView`; lo fija P9, prueba 4 (decisiones-interfaz.md); no hay equivalente en el repo). Todos los mensajes JS->anfitrión llevan `event`.
 
 JS->anfitrión (`TabWebHost.swift:66-77` los decodifica):
 
@@ -244,8 +244,7 @@ Mapeo con eventos del núcleo: `tab.selection {bar, fraction}` -> `setSelection(
 
 ## Huecos
 
-- Nombre de `SongsterrStemRole` (valores crudos de `role`/`kind` en `SongsterrSlotInfo`) y de `kind` del slot: no volcados (en `SS/:568,744`, `slotKind`/`role(of:)`).
-- Semántica fina de `fraction` en `tab.selection` (`local tick / (beatCount*ticksPerBeat)`, `TS/:556`) y de `ticksPerBeat` (constante de TabKit): valor numérico no leído.
+- Semántica fina de `fraction` en `tab.selection` (`local tick / (beatCount*ticksPerBeat)`, `TS/:556`; = `local / (beatCount*12)`, 0..<1, con local = tick absoluto menos `firstBeat*12` del compás): `TabScore.ticksPerBeat = 12` (12 ticks por pulso).
 - Orden/frecuencia exactos de `tab.progress` `fraction` (:509) y los textos `flash`/`notices`: no volcados.
 - Esquema `tf-score` solo referenciado, no copiado.
 - `TabWebHost.swift` (macOS) fue leído solo por grep; el comportamiento de reintento de `load` antes de `ready` no está verificado.
