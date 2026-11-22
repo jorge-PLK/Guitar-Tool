@@ -1,6 +1,6 @@
 # P9 · Viabilidad de la interfaz Flutter
 
-**Estado: en ejecución (22/11/2026). Prueba 1 pasada; prueba 2 en curso.** Primera parte de la Fase 7f. Decide si se mantienen las decisiones marcadas (P9) en [ADR-021](../adr/ADR-021.md). Código en `Probes/P9-flutter/` (fuera de la puerta de tests); resultados, en este fichero, debajo de cada prueba.
+**Estado: en ejecución (22/11/2026). Pruebas 1 y 2 (Mac) pasadas; siguiente, primera pasada en el PC x64.** Primera parte de la Fase 7f. Decide si se mantienen las decisiones marcadas (P9) en [ADR-021](../adr/ADR-021.md). Código en `Probes/P9-flutter/` (fuera de la puerta de tests); resultados, en este fichero, debajo de cada prueba.
 
 ## Reglas
 
@@ -42,7 +42,7 @@ ABI de `AppCoreFFI` congelada; mecanismo nativo→Dart (`listener` o puerto nati
 - Fuentes: los 5 TTF de `App/Resources/Fonts/` (Inter 400/500/600, Space Grotesk 500/700) cargan tal cual como assets; sin conversión.
 - Builds: debug 40 s la primera vez (con `pub get` y artefactos), release 25 s. `flutter analyze` limpio.
 - Sandbox: la plantilla de macOS lo trae activado; con él la app no escribe fuera de su contenedor. Desactivado en los dos entitlements de la app de prueba. Para la ola 0: `FlutterApp/macos` necesita sandbox desactivado (como la app SwiftUI) para la carpeta de proyectos y los helpers.
-- Pendiente de aclarar (lo mira la prueba 2): tras cada build nuevo, el primer lanzamiento no dejó informe; los siguientes sí.
+- El primer lanzamiento tras cada build no dejó informe en esta prueba. No se reprodujo en la prueba 2 (3 lanzamientos tras recompilar, informe a los 0,54 s y 0,25 s). Hipótesis sin medir: `open` sin `-n` reutilizó una instancia anterior. Los scripts lanzan siempre con `open -g -n`.
 
 Diferencias de Flutter 3.50.1 frente a la documentación de 3.47:
 
@@ -55,3 +55,44 @@ Diferencias de Flutter 3.50.1 frente a la documentación de 3.47:
 | `analysis_options.yaml` | `pub get` lo actualiza para excluir `build` y las carpetas de plataforma. | Ninguno. |
 | Windows, runner | `main.cpp` con `CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED)` en la línea 18 y paso de argumentos. | Coincide con lo previsto en `arquitectura.md` («Hilos»). |
 | Impeller e hilos fusionados | Ni `Info.plist` ni `main.cpp` traen clave alguna. | Sin verificar por la plantilla; la prueba 2 mide en qué hilo corre el isolate de UI. |
+
+### Prueba 2 · FFI e hilos (Mac) — PASA
+
+Código: `Probes/P9-flutter/AppCoreFFI/` (paquete Swift propio con dependencia por ruta a `Packages/AppCore`; nada de `Packages/` cambió) y `Probes/P9-flutter/app/lib/ffi/tf_core.dart` + `probe2*.dart`. Commits `86a74be`, `57d280a`, `f4f949d`. Repetir: `Probes/P9-flutter/run-probe2.sh [listener|port] [ffi|ffi-study]` (informes en `Temp/p9-flutter/p2-<sink>-<probe>-<n>.json`) y, sin Flutter, `Probes/P9-flutter/AppCoreFFI/.build/release/ffi-smoke --projects-folder Temp/p9-flutter/run/projects --support-dir Temp/p9-flutter/run/support`. Build release, audio simulado, carpeta de proyectos de prueba vacía (y una copia de un tema de 1 GB para el cierre), `--support-dir` sin modelos.
+
+- **Hilos:** `pthread_main_np()` llamado desde Dart devuelve 1: en Flutter 3.50.1 el isolate de UI corre en el hilo principal del proceso sin configurar nada. El bucle de AppKit drena `DispatchQueue.main` y `@MainActor`; `audio.devices` responde.
+- **Nada `public` faltó en `AppCore`.**
+
+| Umbral | Medido (`listener` · `port`, dos ejecuciones cada uno) | |
+| --- | --- | --- |
+| 1000 llamadas seguidas sin error | 8000 idas y vueltas por ejecución (`app.info`, `library.list`, `settings.get`, `audio.devices`), 0 errores | pasa |
+| Sin fuga apreciable | RSS 109-129 MB al empezar, 130-131 MB tras 4000, 131-132 MB tras 8000 | pasa |
+| Ida y vuelta mediana < 5 ms | 0,049-0,051 ms · 0,051 ms | pasa |
+| Ida y vuelta p99 < 16 ms | 0,12-0,14 ms (máx 4,05) · 0,09 ms (máx 4,5) | pasa |
+| Ningún bloqueo del hilo de UI > 16 ms | vigilante de 5 ms durante las llamadas: máx 0,68-0,76 ms · 1,6-3,2 ms; build máx 0,4 ms | pasa |
+| Cierre limpio y asíncrono | `core.shutdown` a los 22-28 ms, `clean: true`, sin procesos hijos | pasa |
+| Cierre con un tema abierto en estudio | 29 ms · 28 ms, `clean: true`; vigilante máx 3,8 ms · 1,9 ms | pasa |
+
+Sin Dart (`ffi-smoke`, Swift → C → Swift): mediana 0,038 ms, p99 0,07-0,09 ms, retraso del hilo principal 1,3 ms.
+
+Eventos desde hilos de fondo: `import.file` de un WAV de 2 s → `import:running`, `import:done` (40-56 ms), `separation:queued`, `separation:running`, `separation:failed` (sin modelos, a propósito) y `library.changed`; llegan todos, el isolate sigue vivo.
+
+Nativo → Dart (emisor sintético `tf_debug_emit`, mensajes de 300 bytes, latencia medida con reloj monótono compartido):
+
+| Medida | `NativeCallable.listener` | Puerto nativo (`Dart_PostCObject_DL`, `kExternalTypedData`) |
+| --- | --- | --- |
+| 60 Hz, isolate libre: mediana / p99 / máx (µs) | 132-141 / 524-530 / 605-620 | 133-140 / 494-519 / 687-713 |
+| 60 Hz, isolate libre: jitter (desv. típica del intervalo, ms) | 1,44-1,55 | 1,34-1,55 |
+| 60 Hz, isolate ocupado (8 ms de CPU cada 16 ms): mediana (µs) | 97-482 | 76-304 |
+| 60 Hz, isolate ocupado: p99 / máx (µs) | 8090 / 8112-13977 | 8086-8090 / 13060-27680 |
+| Ráfaga de 5000: µs por mensaje / p99 (µs) | 6,3-6,5 / 37-44 | 6,65-6,7 / 98-105 |
+| Pérdidas / fuera de orden | 0 / 0 | 0 / 0 |
+| Búferes vivos tras 8000 llamadas | 0 (liberación explícita con `tf_core_free`) | 107-120 (los libera el finalizador cuando corre el GC; RSS plano) |
+
+- Los dos cumplen el objetivo (< 1 ms por mensaje, 0 pérdidas): **no hace falta isolate auxiliar ni canal binario.** Con el isolate ocupado la latencia de ~8 ms es la espera a la tarea de CPU de Dart, igual en los dos.
+- Empate técnico en latencia y jitter (diferencias dentro del ruido entre ejecuciones). **Elección provisional: puerto nativo**, por robustez: orden de entrega garantizado (el de `listener` no está documentado, aunque no se desordenó nada en 5000 mensajes), el núcleo sabe si el envío falló (`Dart_PostCObject_DL` devuelve `false` y libera) y Dart no puede olvidarse de liberar. Coste: `tf_core_init_dart_api` + `tf_core_start_port` en la ABI y las cabeceras `dart_api_dl` (API DL 2.7) copiadas en el paquete; la memoria se libera con el GC, no al instante. Se confirma con la misma medida en el PC x64 (prueba 7).
+- Decodificación de un mensaje de 300 bytes: `jsonDecode(utf8.decode(bytes))` 0,89 µs; `utf8.decoder.fuse(json.decoder)` 0,41-0,43 µs (2,1 veces más rápido). `CoreClient` usa la fusionada.
+- Aviso para la ola 0: una ráfaga de 5000 eventos seguidos ocupa el isolate ~30 ms (vigilante máx 27,8 ms en esa fase). Los eventos reales van a decenas por segundo; si alguno llegara en ráfaga, se agrupa en el núcleo.
+- No cubierto aquí: Windows, audio real y biblioteca grande (`library.list` con carpeta vacía).
+
+ABI usada en la prueba (candidata; se congela al cerrar P9): `tf_core_start`, `tf_core_start_port`, `tf_core_init_dart_api`, `tf_core_send`, `tf_core_free`, `tf_core_shutdown`; `optionsJSON` = `{"args": [...]}` que pasa por `LaunchOptions.parse`; códigos de `start`: 0 bien, 1 ya arrancado, 2 opciones inválidas, 3 falló `Bridge.init`. `tf_debug_live_buffers`, `tf_debug_now_ns` y `tf_debug_emit` son solo de la prueba.
