@@ -17,6 +17,13 @@ final _malloc = _libc.lookupFunction<Pointer<Uint8> Function(IntPtr),
 final _cfree = _libc.lookupFunction<Void Function(Pointer<Uint8>),
     void Function(Pointer<Uint8>)>('free');
 
+final _calloc = _libc.lookupFunction<Pointer<Uint8> Function(IntPtr, IntPtr),
+    Pointer<Uint8> Function(int, int)>('calloc');
+
+/// calloc de la libc (búfer nativo a cero); liberar con [nativeFree].
+Pointer<Uint8> nativeCalloc(int bytes) => _calloc(bytes, 1);
+void nativeFree(Pointer<NativeType> p) => _cfree(p.cast<Uint8>());
+
 Pointer<Uint8> _cString(String s) {
   final b = utf8.encode(s);
   final p = _malloc(b.length + 1);
@@ -71,7 +78,28 @@ class TfCore {
         _mainActorSelftest = lib.lookupFunction<Int32 Function(Int32),
             int Function(int)>('tf_debug_mainactor_selftest'),
         _emit = lib.lookupFunction<Int32 Function(Int32, Int32, Int32),
-            int Function(int, int, int)>('tf_debug_emit');
+            int Function(int, int, int)>('tf_debug_emit'),
+        textureCreate = lib.lookupFunction<Int64 Function(Int32),
+            int Function(int)>('tf_texture_create'),
+        textureDispose = lib.lookupFunction<Void Function(Int32),
+            void Function(int)>('tf_texture_dispose'),
+        framesStart = lib.lookupFunction<
+            Int32 Function(Int32, Int32, Int32, Int32),
+            int Function(int, int, int, int)>('tf_debug_frames_start'),
+        framesStop = lib.lookupFunction<Void Function(Int32),
+            void Function(int)>('tf_debug_frames_stop'),
+        frameBgra = lib.lookupFunction<
+            Int32 Function(Int32, Pointer<Uint8>, Int32, Pointer<Int32>,
+                Pointer<Int32>, Pointer<Int64>),
+            int Function(int, Pointer<Uint8>, int, Pointer<Int32>,
+                Pointer<Int32>, Pointer<Int64>)>('tf_debug_frame_bgra'),
+        _framesStats = lib.lookupFunction<
+            Void Function(Int32, Pointer<Int64>, Pointer<Int64>,
+                Pointer<Int64>, Pointer<Int64>),
+            void Function(int, Pointer<Int64>, Pointer<Int64>, Pointer<Int64>,
+                Pointer<Int64>)>('tf_debug_frames_stats'),
+        framesCostUs = lib.lookupFunction<Int64 Function(Int32),
+            int Function(int)>('tf_debug_frames_cost_us');
 
   /// `sink` = `listener` | `port`.
   factory TfCore.open(String libPath, String sink) =>
@@ -93,6 +121,28 @@ class TfCore {
   final int Function() apartment;
   final int Function(int) _mainActorSelftest;
   final int Function(int, int, int) _emit;
+
+  // Prueba 3 (fotogramas).
+  final int Function(int) textureCreate;
+  final void Function(int) textureDispose;
+  final int Function(int, int, int, int) framesStart;
+  final void Function(int) framesStop;
+  final int Function(int, Pointer<Uint8>, int, Pointer<Int32>, Pointer<Int32>,
+      Pointer<Int64>) frameBgra;
+  final void Function(int, Pointer<Int64>, Pointer<Int64>, Pointer<Int64>,
+      Pointer<Int64>) _framesStats;
+  final int Function(int) framesCostUs;
+
+  /// [producidos, copiasTextura, copiasTexturaDistintas, copiasBgra].
+  List<int> framesStats(int channel) {
+    final p = nativeCalloc(32).cast<Int64>();
+    try {
+      _framesStats(channel, p, p + 1, p + 2, p + 3);
+      return [p[0], p[1], p[2], p[3]];
+    } finally {
+      nativeFree(p);
+    }
+  }
 
   NativeCallable<TfMessageCb>? _callable;
   ReceivePort? _port;
