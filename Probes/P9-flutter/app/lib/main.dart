@@ -4,6 +4,9 @@ import 'dart:io';
 import 'package:flutter/widgets.dart';
 import 'package:flutter/services.dart';
 
+import 'probe2.dart';
+import 'probe2_util.dart';
+
 const _sample = 'Wxilmg 0123 Afinador';
 
 String? _opt(List<String> args, String name) {
@@ -13,6 +16,15 @@ String? _opt(List<String> args, String name) {
 
 void main(List<String> args) {
   WidgetsFlutterBinding.ensureInitialized();
+  final probe = _opt(args, '--probe');
+  if (probe != null && probe.startsWith('ffi')) {
+    final wd = Watchdog()..start();
+    final fs = FrameStats()..start();
+    runApp(ProbeAnim(label: 'P9 $probe ${_opt(args, '--sink')}'));
+    // Tras el primer fotograma, para que la ventana ya esté pintando.
+    WidgetsBinding.instance.addPostFrameCallback((_) => runProbe2(args, wd, fs));
+    return;
+  }
   runApp(ProbeApp(args: args));
 }
 
