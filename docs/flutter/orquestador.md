@@ -33,7 +33,9 @@ No se usa `tf-engineer` ni `tf-ml` (Opus) como mano de obra en esta fase. Si una
 3. **Encargos** con la plantilla de abajo, en paralelo cuando no se pisen.
 4. **Integrar.** Leer los informes (no el código salvo sospecha), resolver preguntas, registrar desvíos.
 5. **Validar cada pantalla** con la lista de abajo. El juicio visual es del orquestador, mirando las dos imágenes; no se delega.
-6. **Cierre de ola.** `tf-qa` (una vez): `Tools/test.sh` entero + capturas de todos los estados de la ola. `Tools/flutter/pc.sh` en el PC x64 (avisar a Jorge antes: tiene que estar encendido). `tf-docs`: casillas, CODEMAP, `desvios.md`. Enseñar a Jorge las parejas referencia/Flutter de la ola y su lista de diferencias aceptadas; con su visto bueno, commit (en inglés, imperativo, sin `Co-Authored-By`, sin push).
+6. **Cierre de ola.** `tf-qa` (una vez): `Tools/test.sh` entero + capturas de todos los estados de la ola. `Tools/flutter/pc.sh` en el PC x64 (avisar a Jorge antes: tiene que estar encendido). `tf-docs`: casillas, CODEMAP, `desvios.md`. Enseñar a Jorge las parejas referencia/Flutter de la ola y su lista de diferencias aceptadas; su visto bueno cierra la ola (casilla del plan).
+
+**Commits** (Jorge, 22/11/2026): pequeños y frecuentes, con `git push` a `fase-7f` tras cada uno y sin preguntar, para que el PC valide en paralelo. Uno por parte integrada, con `Tools/test.sh FlutterApp` (o el paquete tocado) verde; no se espera al cierre de la ola. En inglés, imperativo, sin `Co-Authored-By`. Nunca a `main` ni forzado.
 
 ## Plantilla de encargo
 

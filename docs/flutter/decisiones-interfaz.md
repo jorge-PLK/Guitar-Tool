@@ -91,8 +91,27 @@ Hueco claro: `tf-implementer` lo arregla en `AppCore` con test y fixture en la o
 | Espejo de la cámara | SwiftUI no lo fija y la documentación no aclara el valor por defecto en macOS. Captura de SwiftUI con cámara real en la ola 3 (hardware de Jorge); la textura replica lo que salga. |
 | `framingFrame` en el Mac (desvío M1, resuelto en código) | Jorge, con vídeo real, en la ola 4. |
 
+## Revisión ampliada: lo que se decidió sin preguntar
+
+Repaso del 22/11/2026 con el criterio 0. «Se mantiene» = revisado y sin cambio.
+
+| Decisión | Resolución | Por qué |
+| --- | --- | --- |
+| ABI: texturas | El runner registra la textura y pide el fotograma al núcleo (`tf_texture_host`, `tf_frame_copy`); el núcleo no recibe el registro de Flutter. Propuesta hasta P9, prueba 3. | El paquete Swift no enlaza el motor de Flutter; subir de versión no toca el núcleo. |
+| ABI: propiedad de búferes | `tf_core_send` copia antes de volver (búfer de Dart); lo que entrega el núcleo es suyo hasta `tf_core_free`, que Dart llama siempre. Id de textura `int64`. | Sin vidas compartidas entre los dos lados. |
+| ABI: cierre | `tf_core_shutdown` asíncrono, con evento `core.shutdown` y un tope sobre el cierre entero. | Síncrono se bloquea en el Mac (`closeStudy` salta a `@MainActor` desde el hilo principal); hoy solo `jobs.shutdown()` tiene tope. |
+| ABI: orden de arranque | `send` y `host` asignados antes de `Bridge.start()`. | `WinApp` lo hace al revés y puede perder un evento. |
+| `{hostRequest}` / `{hostResponse}` | Se mantiene. Los `host.*` del puente no cambian. | Un solo camino para los diálogos; el núcleo conserva su lógica (primer arranque, mover biblioteca). |
+| Límite de 15 s de `CoreClient` | Por defecto 15 s; excepciones en una tabla por método con los valores de la web; las llamadas que esperan a un diálogo, sin límite. Lista en `arquitectura.md`, regla 3. | La web tiene 16 excepciones repartidas por el código; con el límite fijo fallarían calibración, importación y mover biblioteca. |
+| Ficheros ≤ ~300 líneas | Se mantiene, como orientación. | Un encargo cabe en el contexto de un agente Sonnet. |
+| Estructura de `FlutterApp/` | Se mantiene. | — |
+| Umbrales de P9 | Ida y vuelta: se añade p99 < 16 ms a la mediana < 5 ms. 16 ms de bloqueo y 300 ms tras salto, se mantienen. | Una mediana sola esconde los tirones. |
+| Contenido de las olas | Se mantiene. | — |
+| Commits | Pequeños y frecuentes con push (Jorge); ADR-021 decisión 24, `orquestador.md` y `plan.md` corregidos. | Decían «un commit por ola, sin push». |
+| Agentes `tf-flutter*` | Se mantienen. | No citan nada de lo enmendado. |
+
 ## Dudas reales, para Jorge
 
-1. Rama `fase-7f` y commit de la documentación (regla del proyecto: a mitad de fase, solo si Jorge lo pide).
+Ninguna abierta. La rama `fase-7f` existe y la documentación está subida.
 
 Lo demás quedó resuelto arriba. Jorge puede revocar cualquier fila; las que cambian algo que hoy ve o oye en el Mac son: salida de audio del visor, Supr en Backing, aviso de `audioError`, acento del slider del visor.

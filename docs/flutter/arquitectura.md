@@ -26,16 +26,19 @@ Un proceso. Los helpers (yt-dlp, ffmpeg, Deno, `tf-separate`) siguen siendo proc
 
 ## AppCoreFFI (Swift)
 
-Producto nuevo `AppCoreFFI` (`type: .dynamic`) en `Packages/AppCore`, objetivo `Sources/AppCoreFFI/`. Solo traduce; no añade comportamiento. ABI propuesta (se congela al cerrar P9; la firma de `tf_core_start` cambia según la decisión 8, que pasa el registro de texturas):
+Producto nuevo `AppCoreFFI` (`type: .dynamic`) en `Packages/AppCore`, objetivo `Sources/AppCoreFFI/`. Solo traduce; no añade comportamiento. ABI propuesta (se congela al cerrar P9):
 
 | Función C | Qué hace |
 | --- | --- |
-| `int32_t tf_core_start(const char *optionsJSON, tf_message_cb onMessage, void *textureRegistry)` | Crea el `Bridge` con `LaunchOptions`; registra el callback de mensajes y recibe el registro de texturas obtenido en el runner (`registrar(forPlugin:).textures` en Mac; `GetRegistrarForPlugin` en Windows, nulo hasta que el motor arranca). Se llama una vez. Devuelve 0 o un código de error. |
-| `void tf_core_send(const uint8_t *utf8, int32_t len)` | Entrega un mensaje `{id, method, params}` (o una respuesta de anfitrión) a `Bridge.receive`. No bloquea. `Bridge` y `Router` no son `@MainActor` y `send` no reencola: el reencolado al hilo que haga falta es trabajo de `AppCoreFFI`. |
-| `void tf_core_free(const uint8_t *ptr)` | Libera un búfer que el núcleo entregó por callback (o lo libera el finalizador, si P9 elige el puerto nativo). |
-| `int32_t tf_texture_create(int32_t channel, int32_t width, int32_t height)` | Registra la textura de un canal y devuelve su id para el widget `Texture`. En Mac se llama desde el hilo de plataforma. |
-| `int32_t tf_core_shutdown(int32_t timeoutMs)` | `shutdownAsync` con tope; cierre ordenado. |
+| `int32_t tf_core_start(const char *optionsJSON, tf_message_cb onMessage, const tf_texture_host *textures)` | Crea el `Bridge` con `LaunchOptions` y registra el callback de mensajes. `textures` es una tabla de tres punteros a función C que implementa el runner (`register(channel) → int64_t id`, `frame_available(id)`, `unregister(id)`); nulo = sin texturas (respaldo BGRA y tests). `AppCoreFFI` asigna `send` y `host` **antes** de `Bridge.start()` (en `WinApp` `send` se asigna después: hueco 4 de `contrato-anfitrion-hilos.md`). Se llama una vez; la segunda devuelve error. Devuelve 0 o un código de error. |
+| `void tf_core_send(const uint8_t *utf8, int32_t len)` | Entrega un mensaje `{id, method, params}` (o una respuesta de anfitrión) a `Bridge.receive`. No bloquea. El núcleo copia los bytes antes de volver: el búfer es de Dart. `Bridge` y `Router` no son `@MainActor` y `send` no reencola: el reencolado al hilo que haga falta es trabajo de `AppCoreFFI`. |
+| `void tf_core_free(const uint8_t *ptr)` | Libera un búfer que el núcleo entregó por callback. Con `NativeCallable.listener`, Dart la llama tras decodificar, siempre (también si la decodificación falla); con puerto nativo la llama el finalizador. |
+| `int64_t tf_texture_create(int32_t channel)` | Pide al runner, por la tabla, que registre la textura del canal y devuelve su id (`int64`, como `Texture.textureId`). El tamaño lo lleva cada fotograma. En Mac se llama desde el hilo de plataforma. |
+| `void *tf_frame_copy(int32_t channel)` | La llama la textura del runner al pintar: último fotograma del canal, o nulo. Mac: `CVPixelBuffer` retenido (+1, lo suelta Flutter). Windows: HANDLE compartido de la textura D3D11. |
+| `void tf_core_shutdown(int32_t timeoutMs)` | **Asíncrono**: vuelve enseguida; al acabar `shutdownAsync`, o al vencer el tope (que cubre el cierre entero, no solo `jobs.shutdown()`), emite `{event: "core.shutdown", payload: {clean}}` y Dart cierra la ventana. No puede ser síncrono: en el Mac el hilo de Dart es el principal y `closeStudy` salta a `@MainActor`. |
 | `void tf_core_pump(void)` | Vía 2 de hilos en Windows (ver abajo): drena la cola principal de Swift desde el bucle del runner. Solo existe si la vía 1 falla en P9. |
+
+Texturas, por qué una tabla y no el registro de Flutter: si `AppCoreFFI` recibiera el registro tendría que enlazar `FlutterMacOS.framework` y `flutter_windows.dll`; con la tabla el paquete Swift no depende del motor y una subida de Flutter no toca el núcleo. Coste: una clase de textura pequeña en cada runner (Swift en Mac, C++ en Windows) que llama a `tf_frame_copy`. Alternativa si P9 (prueba 3) la mide mejor: pasar el registro (`registrar(forPlugin:).textures` en Mac; `GetRegistrarForPlugin` en Windows, nulo hasta que arranca el motor) y registrar desde el núcleo.
 
 Callback de mensajes (lo invoca el núcleo desde cualquier hilo):
 
@@ -94,7 +97,7 @@ Contract/fixtures/<área>/ JSON dorado: <método>.params.json, <método>.result.
 
 1. **Sin generación de código** salvo `gen-l10n`: nada de `build_runner`, `freezed`, `json_serializable` ni `riverpod_generator`. DTO y providers a mano.
 2. **Riverpod 3.x**: un `Notifier` por área. Estado inmutable. El store se suscribe a los eventos `*.state` de su área y expone métodos que llaman a `CoreClient.call`. Ningún widget llama al puente.
-3. **`CoreClient`** es la única puerta: `Future<T> call<T>(String method, Object? params, T Function(Json) decode)` y `Stream<T> on<T>(String event, …)`. Límite de 15 s por llamada, como `bridge.js`. En tests se sustituye por `MockCore`, que responde con los fixtures.
+3. **`CoreClient`** es la única puerta: `Future<T> call<T>(String method, Object? params, T Function(Json) decode)` y `Stream<T> on<T>(String event, …)`. Límite por llamada: 15 s por defecto, como `bridge.js`; las excepciones viven en una sola tabla por método (`core/call_timeouts.dart`), nunca en el sitio de la llamada. Valores de `WinApp/Web`: `link.classify` 3 s; hoja de Songsterr (`tab.songsterr.*`) 10 s; `link.search` y hoja de lista 30 s; `audio.calibrate` 60 s; `link.resolve` y `link.addManual` 120 s (`link.resolve` de una lista, 300 s); `tools.updateYtDlp` 200 s; `tab.export` 10 min; `import.file` y `library.relocate` 60 min. Las que esperan a un diálogo del usuario (`host.pickAudioFile(s)`, `host.chooseFolder`, `host.pickProjectsFolder`) van **sin límite**: el diálogo es de Dart y siempre termina (la web ponía 10 min y perdía la elección si se tardaba más). Una respuesta que llega tras vencer el límite se descarta. En tests se sustituye por `MockCore`, que responde con los fixtures.
 4. **Tokens, nunca literales**: ningún color, tipografía, radio ni espaciado fuera de `theme/`. Los hex sueltos que tiene SwiftUI fuera de `TF` se convierten en tokens con nombre.
 5. **Textos, nunca literales**: todo texto visible sale de `AppLocalizations`. Clave = `<área>_<elemento>` en camelCase. Español copiado literal de SwiftUI; inglés traducido.
 6. **Errores del núcleo**: `{code, message, args}`. Dart traduce por `code` (`error_<code>` en ARB) y cae a `message` si no conoce el código.
