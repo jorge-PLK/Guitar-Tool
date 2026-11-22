@@ -85,6 +85,9 @@ public func ffiTextureDispose(_ channel: Int32) {
 
 @_cdecl("tf_frame_copy")
 public func ffiFrameCopy(_ channel: Int32) -> UnsafeMutableRawPointer? {
+    #if canImport(AVFoundation)
+    if let v = videoProbes.get(channel) { return v.copyForTexture() }
+    #endif
     #if canImport(CoreVideo)
     return frameSources.get(channel)?.copyForTexture()
     #else
@@ -145,6 +148,44 @@ public func ffiDebugFramesCostUs(_ channel: Int32) -> Int64 {
     return 0
     #endif
 }
+
+#if canImport(AVFoundation)
+// P9.5b prueba 5 (vídeo de tomas, candidata nativa). Solo Apple. Los JSON se devuelven con malloc: liberar con free().
+
+@_cdecl("tf_debug_video_open")
+public func ffiDebugVideoOpen(_ channel: Int32, _ path: UnsafePointer<CChar>?) -> Int32 {
+    guard let path, let p = VideoProbe(channel: channel, path: String(cString: path)) else { return 1 }
+    videoProbes.replace(channel, with: p)?.stop()
+    return 0
+}
+
+@_cdecl("tf_debug_video_close")
+public func ffiDebugVideoClose(_ channel: Int32) {
+    videoProbes.replace(channel, with: nil)?.stop()
+}
+
+@_cdecl("tf_debug_video_clock")
+public func ffiDebugVideoClock(_ channel: Int32, _ seconds: Double, _ rate: Double, _ playing: Int32, _ epochJump: Int32) {
+    videoProbes.get(channel)?.setClock(seconds: seconds, rate: rate, playing: playing != 0, jump: epochJump != 0)
+}
+
+@_cdecl("tf_debug_video_loop")
+public func ffiDebugVideoLoop(_ channel: Int32, _ start: Double, _ end: Double, _ enabled: Int32) {
+    videoProbes.get(channel)?.setLoop(start: start, end: end, enabled: enabled != 0)
+}
+
+@_cdecl("tf_debug_video_info")
+public func ffiDebugVideoInfo(_ channel: Int32) -> UnsafeMutablePointer<UInt8>? {
+    guard let p = videoProbes.get(channel) else { return nil }
+    return UnsafeMutableRawPointer(strdup(p.infoJSON))?.assumingMemoryBound(to: UInt8.self)
+}
+
+@_cdecl("tf_debug_video_stats")
+public func ffiDebugVideoStats(_ channel: Int32, _ reset: Int32) -> UnsafeMutablePointer<UInt8>? {
+    guard let p = videoProbes.get(channel) else { return nil }
+    return UnsafeMutableRawPointer(strdup(p.statsJSON(reset: reset != 0)))?.assumingMemoryBound(to: UInt8.self)
+}
+#endif
 
 @_cdecl("tf_debug_mainactor_selftest")
 public func ffiDebugMainActorSelftest(_ timeoutMs: Int32) -> Int32 {

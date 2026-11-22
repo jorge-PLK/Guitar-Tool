@@ -3,6 +3,9 @@ import CAppCoreFFI
 import Darwin
 #endif
 import Foundation
+#if canImport(AVFoundation)
+import AppCoreFFI
+#endif
 
 // Humo de P9 prueba 2: ejercita solo la ABI C de tf_core.h. Hilo principal en dispatchMain(); trabajo en otro hilo.
 // Umbrales (docs/flutter/arquitectura.md + encargo P9 2.1): 0 errores, mediana < 5 ms, p99 < 16 ms, retraso principal <= 16 ms.
@@ -288,10 +291,156 @@ func runFrames() {
     exit(ok ? 0 : 1)
 }
 
+/// P9.5b prueba 5: reproductor de vídeo nativo esclavo de un reloj. Emula al runner: `tf_frame_copy` a 60 Hz desde un hilo.
+/// Uso: --video <fichero> [--case steady|seek|loop|all] [--report <json>]
+func runVideo() {
+    guard let path = argValue("--video") else { print("falta fichero"); exit(2) }
+    let cases = argValue("--case") ?? "all"
+    let toleranceMs = 1001.0 / 30000 * 1000 / 2  // medio fotograma
+    let frameMs = 1001.0 / 30000 * 1000
+    guard ffiDebugVideoOpen(0, path) == 0 else { print("FALLA: no abre \(path)"); exit(1) }
+    var info: [String: Any] = [:]
+    if let p = ffiDebugVideoInfo(0) {
+        info = (try? JSONSerialization.jsonObject(with: Data(String(cString: p).utf8))) as? [String: Any] ?? [:]
+        free(p)
+    }
+    let duration = info["duration"] as? Double ?? 0
+    print("info: \(info)")
+    var report: [String: Any] = ["file": path, "info": info]
+
+    struct Sample { var t: Double; var e: Double?; var n: Int; var item: Double }
+    func fetch() -> (samples: [Sample], events: [(Double, String)], stats: [String: Any]) {
+        guard let p = ffiDebugVideoStats(0, 1) else { return ([], [], [:]) }
+        defer { free(p) }
+        let j = (try? JSONSerialization.jsonObject(with: Data(String(cString: p).utf8))) as? [String: Any] ?? [:]
+        let s = (j["samples"] as? [[Any]] ?? []).map {
+            Sample(t: ($0[0] as? Double) ?? 0, e: $0[1] as? Double, n: ($0[2] as? Int) ?? -1, item: ($0[3] as? Double) ?? 0)
+        }
+        let ev = (j["events"] as? [[Any]] ?? []).map { (($0[0] as? Double) ?? 0, ($0[1] as? String) ?? "") }
+        return (s, ev, j)
+    }
+    /// Bombea tf_frame_copy a 60 Hz durante `ms`; `script` son (ms, acción) ordenadas.
+    func pump(_ ms: Double, _ script: [(Double, () -> Void)] = []) {
+        let t0 = nowMs(); var tick = 0; var pending = script[...]
+        while nowMs() - t0 < ms {
+            while let f = pending.first, nowMs() - t0 >= f.0 { f.1(); pending = pending.dropFirst() }
+            if let p = tf_frame_copy(0) { Unmanaged<AnyObject>.fromOpaque(p).release() }
+            tick += 1
+            let wait = t0 + Double(tick) * 1000.0 / 60.0 - nowMs()
+            if wait > 0 { Thread.sleep(forTimeInterval: wait / 1000) }
+        }
+    }
+    func pct(_ v: [Double], _ q: Double) -> Double {
+        guard !v.isEmpty else { return .nan }
+        let s = v.sorted(); return s[min(s.count - 1, Int(q * Double(s.count)))]
+    }
+    func outOfTol(_ e: Double?) -> Bool { guard let e else { return true }; return e < -toleranceMs || e >= 1.5 * frameMs }
+    func clean(_ x: Double) -> Any { x.isFinite ? (x * 100).rounded() / 100 : NSNull() }
+    func summarize(_ ss: [Sample]) -> [String: Any] {
+        let es = ss.compactMap { $0.e }
+        var rep = 0, skip = 0
+        for i in 1..<max(ss.count, 1) where ss[i].n >= 0 && ss[i - 1].n >= 0 {
+            let d = ss[i].n - ss[i - 1].n
+            if d <= 0 { rep += 1 } else if d > 1 { skip += d - 1 }
+        }
+        return ["n": ss.count, "unreadable": ss.count - es.count, "median": clean(pct(es, 0.5)), "p95": clean(pct(es, 0.95)),
+                "p99": clean(pct(es, 0.99)), "min": clean(es.min() ?? .nan), "max": clean(es.max() ?? .nan),
+                "outPct": clean(ss.isEmpty ? .nan : Double(ss.filter { outOfTol($0.e) }.count) / Double(ss.count) * 100),
+                "repeated": rep, "skipped": skip]
+    }
+    /// ms desde `from` hasta la primera muestra dentro de tolerancia que ya no se sale antes de `until`; nil si no se recupera.
+    func recovery(_ ss: [Sample], from: Double, until: Double) -> Double? {
+        let w = ss.filter { $0.t >= from && $0.t < until }
+        var idx = w.count
+        while idx > 0, !outOfTol(w[idx - 1].e) { idx -= 1 }
+        guard idx < w.count else { return nil }
+        return w[idx].t - from
+    }
+    var ok = true
+    var cpuAll: [String: Any] = [:]
+    func withCPU(_ name: String, _ body: () -> Void) {
+        let c0 = cpuSeconds(); let t0 = nowMs()
+        body()
+        let pctCPU = (cpuSeconds() - c0) / ((nowMs() - t0) / 1000) * 100
+        cpuAll[name] = clean(pctCPU)
+        print(String(format: "  CPU %@: %.1f %%", name, pctCPU))
+    }
+
+    if cases == "steady" || cases == "all" {
+        var out: [String: Any] = [:]
+        for rate in [1.0, 0.7, 0.5] {
+            _ = fetch()
+            withCPU("steady\(rate)") {
+                ffiDebugVideoClock(0, 0, rate, 1, 1)
+                pump(11000)
+            }
+            let r = fetch()
+            let first = r.samples.first
+            let kept = r.samples.filter { $0.t >= 1000 }
+            var s = summarize(kept)
+            s["resyncs"] = r.stats["resyncs"] ?? 0; s["driftResyncs"] = r.stats["driftResyncs"] ?? 0
+            s["firstItemTime"] = first?.item ?? NSNull()
+            out["rate\(rate)"] = s
+            print("steady rate \(rate): \(s)")
+            if let o = s["outPct"] as? Double, o > 1 { ok = false }
+            if (s["n"] as? Int ?? 0) == 0 { ok = false }
+        }
+        report["steady"] = out
+    }
+    if cases == "seek" || cases == "all" {
+        let start = 5.0
+        let targets = [20.0, 8.0, 0.0, 25.0, 2.0, max(0, duration - 2)]
+        _ = fetch()
+        ffiDebugVideoClock(0, start, 1, 1, 1)
+        pump(2000)
+        _ = fetch()
+        var script: [(Double, () -> Void)] = []
+        for (i, tg) in targets.enumerated() { script.append((Double(i) * 2500, { ffiDebugVideoClock(0, tg, 1, 1, 1) })) }
+        withCPU("seek") { pump(Double(targets.count) * 2500, script) }
+        let r = fetch()
+        let jumps = r.events.filter { $0.1 == "clock" }.map { $0.0 }
+        var recs: [Any] = []
+        var worst = 0.0
+        for (i, j) in jumps.enumerated() {
+            let until = i + 1 < jumps.count ? jumps[i + 1] : (jumps.last ?? 0) + 2500
+            if let ms = recovery(r.samples, from: j, until: until) { recs.append(clean(ms)); worst = max(worst, ms) } else { recs.append(NSNull()); worst = .infinity }
+        }
+        print("seek: saltos a \(targets), recuperacion ms \(recs), eventos \(r.events.count), resyncs \(r.stats["resyncs"] ?? 0)")
+        report["seek"] = ["targets": targets, "recoveryMs": recs, "resyncs": r.stats["resyncs"] ?? 0, "driftResyncs": r.stats["driftResyncs"] ?? 0]
+        if worst >= 300 { ok = false }
+    }
+    if cases == "loop" || cases == "all" {
+        _ = fetch()
+        ffiDebugVideoLoop(0, 4, 6, 1)
+        ffiDebugVideoClock(0, 4, 1, 1, 1)
+        withCPU("loop") { pump(12500) }
+        ffiDebugVideoLoop(0, 0, 0, 0)
+        let r = fetch()
+        let wraps = r.events.filter { $0.1 == "clock" }.map { $0.0 }.dropFirst()
+        var recs: [Any] = []
+        let wl = Array(wraps)
+        for (i, j) in wl.enumerated() {
+            let until = i + 1 < wl.count ? wl[i + 1] : j + 2000
+            if let ms = recovery(r.samples, from: j, until: until) { recs.append(clean(ms)) } else { recs.append(NSNull()) }
+        }
+        let s = summarize(r.samples.filter { $0.t >= 1000 })
+        print("loop: vueltas \(wl.count), recuperacion ms \(recs), \(s), resyncs \(r.stats["resyncs"] ?? 0)")
+        report["loop"] = ["wraps": wl.count, "recoveryMs": recs, "e": s, "resyncs": r.stats["resyncs"] ?? 0, "driftResyncs": r.stats["driftResyncs"] ?? 0]
+    }
+    report["cpuPercent"] = cpuAll
+    ffiDebugVideoClose(0)
+    if let rp = argValue("--report"), let d = try? JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys]) {
+        try? d.write(to: URL(fileURLWithPath: rp))
+    }
+    print(ok ? "RESULTADO: OK" : "RESULTADO: FALLA")
+    exit(ok ? 0 : 1)
+}
 #endif
 
 #if canImport(Darwin)
-if CommandLine.arguments.contains("--frames") {
+if CommandLine.arguments.contains("--video") {
+    Thread.detachNewThread { runVideo() }
+} else if CommandLine.arguments.contains("--frames") {
     Thread.detachNewThread { runFrames() }
 } else {
     Thread.detachNewThread { run() }
