@@ -1,0 +1,37 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="color-scheme" content="light dark">
+<script src="shim.js"></script>
+<style>
+  html, body { margin: 0; padding: 0; background: transparent; overflow-x: hidden; }
+  #alphaTab { padding: 8px; box-sizing: border-box; }
+</style>
+<script>
+  // Errores de script y de carga hacia Swift (evento «error»).
+  window.addEventListener('error', function (e) {
+    try { window.webkit.messageHandlers.tf.postMessage({ event: 'error', message: String(e.message) + ' @' + String(e.filename).split('/').pop() + ':' + e.lineno + '\n' + (e.error && e.error.stack || '') }); } catch (x) {}
+  });
+  window.addEventListener('unhandledrejection', function (e) {
+    try { window.webkit.messageHandlers.tf.postMessage({ event: 'error', message: 'unhandledrejection: ' + String(e.reason) + '\n' + (e.reason && e.reason.stack || '') }); } catch (x) {}
+  });
+</script>
+<!-- Todo local: sin CDN. Cargar con loadFileURL(allowingReadAccessTo: carpeta alphaTab). -->
+<script src="alphaTab.min.js"></script>
+<script src="tf-bridge.js"></script>
+<script src="probe.js"></script>
+</head>
+<body>
+<div id="alphaTab"></div>
+<script>
+  // Swift llama: TF.load(json, trackIndex), TF.setCursor(bar, fraction), TF.setCursorTime(seconds),
+  // TF.exportGpBase64(options). Eventos a webkit.messageHandlers.tf (ready, rendered, beatClick, noteClick, cursor, error).
+  try {
+    window.webkit.messageHandlers.tf.postMessage({ event: 'ready', alphaTab: typeof alphaTab });
+  } catch (e) {
+    try { window.webkit.messageHandlers.tf.postMessage({ event: 'error', message: 'init: ' + String(e) }); } catch (x) {}
+  }
+</script>
+</body>
+</html>
