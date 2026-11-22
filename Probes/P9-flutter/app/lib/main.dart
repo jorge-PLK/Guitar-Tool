@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'probe2.dart';
 import 'probe2_util.dart';
 import 'probe3_frames.dart';
+import 'probe5_video.dart';
 import 'probe6_snapshot.dart';
 
 const _sample = 'Wxilmg 0123 Afinador';
@@ -26,6 +27,10 @@ void main(List<String> args) {
   final probe = _opt(args, '--probe');
   if (probe == 'frames') {
     startProbe3(args);
+    return;
+  }
+  if (probe == 'video') {
+    startProbe5(args);
     return;
   }
   if (probe != null && probe.startsWith('ffi')) {

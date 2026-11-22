@@ -33,6 +33,72 @@ Pointer<Uint8> _cString(String s) {
   return p;
 }
 
+/// Prueba 5 (vídeo, solo Apple): lookups perezosos al construir, no al cargar.
+class TfVideo {
+  TfVideo._(DynamicLibrary lib)
+      : open = lib.lookupFunction<Int32 Function(Int32, Pointer<Uint8>),
+            int Function(int, Pointer<Uint8>)>('tf_debug_video_open'),
+        close = lib.lookupFunction<Void Function(Int32), void Function(int)>(
+            'tf_debug_video_close'),
+        _clock = lib.lookupFunction<
+            Void Function(Int32, Double, Double, Int32, Int32),
+            void Function(int, double, double, int, int)>('tf_debug_video_clock'),
+        _loop = lib.lookupFunction<Void Function(Int32, Double, Double, Int32),
+            void Function(int, double, double, int)>('tf_debug_video_loop'),
+        _info = lib.lookupFunction<Pointer<Uint8> Function(Int32),
+            Pointer<Uint8> Function(int)>('tf_debug_video_info'),
+        _stats = lib.lookupFunction<Pointer<Uint8> Function(Int32, Int32),
+            Pointer<Uint8> Function(int, int)>('tf_debug_video_stats'),
+        textureCreate = lib.lookupFunction<Int64 Function(Int32),
+            int Function(int)>('tf_texture_create'),
+        textureDispose = lib.lookupFunction<Void Function(Int32),
+            void Function(int)>('tf_texture_dispose');
+
+  factory TfVideo.open(String libPath) => TfVideo._(DynamicLibrary.open(libPath));
+
+  final int Function(int, Pointer<Uint8>) open;
+  final void Function(int) close;
+  final void Function(int, double, double, int, int) _clock;
+  final void Function(int, double, double, int) _loop;
+  final Pointer<Uint8> Function(int) _info;
+  final Pointer<Uint8> Function(int, int) _stats;
+  final int Function(int) textureCreate;
+  final void Function(int) textureDispose;
+
+  /// 0 bien, 1 falla.
+  int openFile(int ch, String path) {
+    final p = _cString(path);
+    try {
+      return open(ch, p);
+    } finally {
+      _cfree(p);
+    }
+  }
+
+  void clock(int ch, double seconds, double rate, bool playing, bool jump) =>
+      _clock(ch, seconds, rate, playing ? 1 : 0, jump ? 1 : 0);
+  void loop(int ch, double start, double end, bool enabled) =>
+      _loop(ch, start, end, enabled ? 1 : 0);
+
+  Map<String, Object?> _json(Pointer<Uint8> p) {
+    if (p == nullptr) return {};
+    try {
+      var n = 0;
+      while (p[n] != 0) {
+        n++;
+      }
+      final m = json.decode(utf8.decode(p.asTypedList(n)));
+      return m is Map ? m.cast<String, Object?>() : {};
+    } finally {
+      _cfree(p); // strdup: free() de libc
+    }
+  }
+
+  Map<String, Object?> info(int ch) => _json(_info(ch));
+  Map<String, Object?> stats(int ch, {bool reset = false}) =>
+      _json(_stats(ch, reset ? 1 : 0));
+}
+
 class CoreEvent {
   CoreEvent(this.name, this.payload, this.recvNs);
   final String name;
