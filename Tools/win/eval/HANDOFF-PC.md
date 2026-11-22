@@ -27,7 +27,21 @@ Estado que deja el Mac para cerrar la Fase 7c en el PC. El prompt de la sesión 
 - Push peor (Mac): 0,0014 / 0,0005 / 0,033 ms.
 
 ## 2004 Remix (Mac, Core ML frente a VM, ONNX)
-__REMIX__
+Mismo `audio/song.wav` (SHA-256 89c68d12…, 319,27 s, 44,1 kHz) y mismo modelo `bs-roformer-sw@gridshift-fp16`; medido con
+copia literal de `StemLevelMeter` (sobre los stems de la VM reproduce las cifras de la VM).
+
+| stem | Mac Core ML RMS / pico (dBFS) | VM ONNX CPU RMS / pico | `isEmpty` Mac / VM |
+|---|---|---|---|
+| piano | −104,1 / −73,0 | −77,3 / −31,0 | true / true |
+| otros | −85,3 / −40,5 | −75,3 / −36,6 | true / true |
+
+- Conclusión: la fuga es del camino Windows/ONNX, no del tema (piano 42 dB de diferencia en el pico; otros 3,9 dB, menos rotundo).
+- Picos de la VM (ventanas de 50 ms > −50 dBFS): piano en 71,3 s y 73,7 s; otros en una cola de 317,5 a 318,3 s (último trozo). En
+  el Mac, nada en piano por encima de −50 y un pico suelto de −40,5 en otros a 280,0 s.
+- Sin decidir si es kernel de ONNX Runtime o troceado/relleno del último trozo en Windows (la cola final apunta a lo segundo). El
+  PC lo discrimina separando el mismo `song.wav` en CPU y DirectML (material en `remix-2004.zip`, que trae Jorge).
+- Mac: 19,6 s/min (Core ML `.cpuAndGPU`, 50 trozos, con la suite corriendo en paralelo).
+- Estado completo en el Mac: `Temp/win/remix-coreml-state.md`; WAV de escucha `Temp/win/remix/CHECK_remix_*.wav`.
 
 ## Decisiones de Jorge (22/11)
 - La 7c se cierra tras la pasada en el PC, y se cierra desde el PC (`/phase-close` en `pcx64tests`).
