@@ -111,7 +111,7 @@ Widget propio `TfWebView` (`lib/widgets/tf_web_view.dart`) que oculta el paquete
 
 ## Vídeo de tomas
 
-Motor por decidir en P9 (ADR-021, decisión 9); `video_player` y `video_player_win` están descartados. Candidatas: (a) `fvp` con su callback de reloj externo `onSync`; (b) reproductor nativo en el núcleo, esclavo del reloj de audio (`AVPlayer.setRate(_:time:atHostTime:)`, `AVPlayerItemVideoOutput` → `CVPixelBuffer` → textura del canal de fotogramas). En Windows, (b) exige un pipeline propio de Media Foundation, porque `IMFMediaEngine` no admite reloj externo. El audio suena en el núcleo; el vídeo va en silencio y sigue `takeview.position {seconds, playing, at, epoch}`. Tolerancia: medio fotograma. El seguidor de reloj en Dart (`VideoFollower`) ya no es el plan.
+Motor por decidir en P9 (ADR-021, decisión 9); `video_player` y `video_player_win` están descartados. Candidatas: (a) `fvp` con su callback de reloj externo `onSync`; (b) reproductor nativo en el núcleo, esclavo del reloj de audio (`AVPlayer.setRate(_:time:atHostTime:)`, `AVPlayerItemVideoOutput` → `CVPixelBuffer` → textura del canal de fotogramas). En Windows, (b) exige un pipeline propio de Media Foundation, porque `IMFMediaEngine` no admite reloj externo. El audio suena en el núcleo; el vídeo va en silencio y sigue `takeview.position {seconds, playing, at, epoch, rate}`. Tolerancia: medio fotograma. El seguidor de reloj en Dart (`VideoFollower`) ya no es el plan.
 
 ## Arranque, capturas y desarrollo
 

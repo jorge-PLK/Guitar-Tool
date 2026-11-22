@@ -30,7 +30,7 @@ Códigos no literales: `SourceMessages.code(for:)` (`LinkImportSession.swift:206
 |---|---|---|---|---|---|
 | 167, 178 | bad-params | core_id_not_uuid | «id» no es un UUID. | - | error (library/projects open-folder y afines) |
 | 171 | not-found | library_folder_missing | La carpeta del tema no existe. | - | error |
-| 184 | bad-params | core_ids_not_uuid | «id» y «takeId» deben ser UUID. | - | error |
+| 184 | bad-params | core_ids_not_uuid | «\(first)» y «\(second)» deben ser UUID. | first:String, second:String (nombres de parámetro; aquí `id`, `takeId`) | error |
 | 200 | internal | core_open_folder_failed | No se pudo abrir la carpeta: \(error) | error:String | error |
 | 208 | no-projects-folder | library_no_projects_folder | No hay carpeta de proyectos configurada. | - | error |
 | 212 | no-projects-folder | library_projects_folder_missing | La carpeta de proyectos no existe: \(root.path) | path:String | error |
@@ -253,7 +253,7 @@ Vía: error del método `record.*` indicado.
 | 345 | busy | record_busy_adjusting_offset | No se puede ajustar el desfase grabando. | - |
 | 347 | no-video | record_take_no_video | Esa toma no tiene vídeo. | - |
 | 352 | no-offset | record_no_offset_sheet | No hay ninguna hoja de desfase abierta. | - |
-| 374 | internal | record_delete_take_failed | `deleteTake` devuelve el texto (kit/controlador) | message:String |
+| 374 | internal | record_delete_take_failed | Ver `mensajes-nucleo-3.md` (`RecordController`, mismo código) | message:String |
 | 389 | not-open | record_not_open | La pantalla Grabar no está abierta. | - |
 | 397 | bad-params | core_take_id_not_uuid | «takeId» no es un UUID. | - |
 | 398 | not-found | take_not_found | No hay ninguna toma con id \(s). | s:String |

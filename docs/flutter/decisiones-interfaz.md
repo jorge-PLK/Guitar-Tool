@@ -139,6 +139,7 @@ Dudas que devolvieron las auditorías de fichas y contratos (`Temp/flutter/audit
 | Canal entre Dart y `tf-bridge.js` | El canal de mensajes JS del paquete de WebView, oculto tras `TfWebView`. Lo fija P9, prueba 4. | Se mide. |
 | `frames.montage`: ¿BGRA o JPEG? | El núcleo emite JPEG en base64 salvo que el anfitrión registre `setMontageFrameSink`; `AppCoreFFI` lo registra y entrega a la textura. | Código (`MontageMethods.swift:762-766`). |
 | Tablatura: texto genérico de `tabWebError` | El literal que use SwiftUI para ese fallo; si no hay, «No se pudo mostrar la tablatura.» Se fija en la ola 2. | 1:1. |
+| `core_ids_not_uuid` con dos textos (`id`/`takeId` y `projectId`/`takeId`) | Un solo código con argumentos `first` y `second` (los nombres de parámetro). | Un código por fallo, no por punto de llamada; el ARB tiene una sola clave. |
 
 ## Dudas reales, para Jorge
 

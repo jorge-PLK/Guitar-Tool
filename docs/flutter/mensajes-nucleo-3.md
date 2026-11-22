@@ -121,7 +121,7 @@ Notación como en `mensajes-nucleo.md`. Ruta: `Packages/AppCore/Sources/AppCore/
 | 28, 361 | no-offset | takeview_no_offset_sheet | No hay ninguna hoja de desfase abierta. | - | error de offset.* |
 | 175-177 | audio-unavailable | takeview_audio_unavailable | No se pudo reproducir: la salida de audio no abre (\(error)). | error:String (kit, `describe`) | error de takeview.play |
 | 270 | bad-params | takeview_bad_seconds | «seconds» no es un número. | - | error de takeview.seek |
-| 302 | bad-params | core_ids_not_uuid | «projectId» y «takeId» deben ser UUID. | - | error de takeview.open |
+| 302 | bad-params | core_ids_not_uuid | «\(first)» y «\(second)» deben ser UUID. | first:String, second:String (nombres de parámetro; aquí `projectId`, `takeId`). Mismo código que en `mensajes-nucleo.md` | error de takeview.open |
 | 308 | internal | montage_project_read_failed | No se pudo leer project.json: \(error) (repetido de MontageMethods:540) | error:String | error |
 | 348, 372 | load-failed | takeview_prepare_failed | No se pudo preparar la toma (\(error)). | error:String (kit) | error de takeview.open / offset.open |
 | 404 | sin código | takeview_output_failed | No se pudo abrir la salida de audio (\(error)). | error:String (kit) | `takeview.state.audioError` (campo en 101/295) |
