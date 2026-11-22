@@ -40,6 +40,8 @@ class TfVideo {
             int Function(int, Pointer<Uint8>)>('tf_debug_video_open'),
         close = lib.lookupFunction<Void Function(Int32), void Function(int)>(
             'tf_debug_video_close'),
+        state = lib.lookupFunction<Int32 Function(Int32), int Function(int)>(
+            'tf_debug_video_state'),
         _clock = lib.lookupFunction<
             Void Function(Int32, Double, Double, Int32, Int32),
             void Function(int, double, double, int, int)>('tf_debug_video_clock'),
@@ -58,6 +60,9 @@ class TfVideo {
 
   final int Function(int, Pointer<Uint8>) open;
   final void Function(int) close;
+
+  /// 0 abriendo, 1 listo, 2 fallo, -1 sin canal.
+  final int Function(int) state;
   final void Function(int, double, double, int, int) _clock;
   final void Function(int, double, double, int) _loop;
   final Pointer<Uint8> Function(int) _info;
@@ -65,7 +70,7 @@ class TfVideo {
   final int Function(int) textureCreate;
   final void Function(int) textureDispose;
 
-  /// 0 bien, 1 falla.
+  /// 0 arrancó la apertura (asíncrona; ver [state]), 1 ruta nula.
   int openFile(int ch, String path) {
     final p = _cString(path);
     try {

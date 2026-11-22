@@ -299,6 +299,8 @@ func runVideo() {
     let toleranceMs = 1001.0 / 30000 * 1000 / 2  // medio fotograma
     let frameMs = 1001.0 / 30000 * 1000
     guard ffiDebugVideoOpen(0, path) == 0 else { print("FALLA: no abre \(path)"); exit(1) }
+    for _ in 0..<500 where ffiDebugVideoState(0) == 0 { Thread.sleep(forTimeInterval: 0.01) }
+    guard ffiDebugVideoState(0) == 1 else { print("FALLA: apertura no llega a listo (estado \(ffiDebugVideoState(0)))"); exit(1) }
     var info: [String: Any] = [:]
     if let p = ffiDebugVideoInfo(0) {
         info = (try? JSONSerialization.jsonObject(with: Data(String(cString: p).utf8))) as? [String: Any] ?? [:]

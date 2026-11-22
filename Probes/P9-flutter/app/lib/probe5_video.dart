@@ -124,17 +124,26 @@ Future<void> _measure(List<String> args, ValueNotifier<_Surf?> surf, Watchdog wd
   final v = TfVideo.open(libPath); // lookups perezosos: solo en este modo
   final sw = Stopwatch()..start();
   final file = _opt(args, '--file')!;
-  var orc = v.openFile(_ch, file);
+  final orc = v.openFile(_ch, file);
   report['openRc'] = orc;
   report['fileExists'] = File(file).existsSync();
-  for (var i = 0; i < 3 && orc != 0; i++) {
-    // Diagnóstico: ¿es cuestión de tiempo (carga del asset)?
-    await _wait(0.5);
-    orc = v.openFile(_ch, file);
-    report['openRetry$i'] = orc;
-  }
   if (orc != 0) {
     failed.add('videoOpen');
+    core.shutdown(5000);
+    return;
+  }
+  // Apertura asíncrona: sondeo sin bloquear el isolate (tope 5 s).
+  var st = v.state(_ch);
+  while (st == 0 && sw.elapsedMilliseconds < 5000) {
+    await _wait(0.01);
+    st = v.state(_ch);
+  }
+  report['openMs'] = sw.elapsedMilliseconds;
+  report['openState'] = st;
+  if (st != 1) {
+    report['openInfo'] = v.info(_ch);
+    failed.add('videoOpen state=$st');
+    v.close(_ch);
     core.shutdown(5000);
     return;
   }

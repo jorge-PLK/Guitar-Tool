@@ -154,9 +154,16 @@ public func ffiDebugFramesCostUs(_ channel: Int32) -> Int64 {
 
 @_cdecl("tf_debug_video_open")
 public func ffiDebugVideoOpen(_ channel: Int32, _ path: UnsafePointer<CChar>?) -> Int32 {
-    guard let path, let p = VideoProbe(channel: channel, path: String(cString: path)) else { return 1 }
-    videoProbes.replace(channel, with: p)?.stop()
+    guard let path else { return 1 }
+    // Apertura asíncrona: devuelve ya; consultar tf_debug_video_state.
+    videoProbes.replace(channel, with: VideoProbe(channel: channel, path: String(cString: path)))?.stop()
     return 0
+}
+
+/// 0 abriendo, 1 listo, 2 fallo, -1 sin canal.
+@_cdecl("tf_debug_video_state")
+public func ffiDebugVideoState(_ channel: Int32) -> Int32 {
+    videoProbes.get(channel)?.state ?? -1
 }
 
 @_cdecl("tf_debug_video_close")
@@ -176,8 +183,8 @@ public func ffiDebugVideoLoop(_ channel: Int32, _ start: Double, _ end: Double, 
 
 @_cdecl("tf_debug_video_info")
 public func ffiDebugVideoInfo(_ channel: Int32) -> UnsafeMutablePointer<UInt8>? {
-    guard let p = videoProbes.get(channel) else { return nil }
-    return UnsafeMutableRawPointer(strdup(p.infoJSON))?.assumingMemoryBound(to: UInt8.self)
+    guard let json = videoProbes.get(channel)?.infoOrNil else { return nil }
+    return UnsafeMutableRawPointer(strdup(json))?.assumingMemoryBound(to: UInt8.self)
 }
 
 @_cdecl("tf_debug_video_stats")

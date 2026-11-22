@@ -54,10 +54,26 @@ final class VideoProbe: @unchecked Sendable {
     private var events: [(t: Double, kind: String)] = []
     private var resyncs = 0, driftResyncs = 0, calls = 0, deliveries = 0, unreadable = 0
 
-    init?(channel: Int32, path: String) {
+    /// Apertura asíncrona (el hilo que llama nunca espera): 0 abriendo, 1 listo, 2 fallo. Bajo lock.
+    private var openState: Int32 = 0
+    private var failReason = ""
+    private var stopped = false
+    private let asset: AVURLAsset
+
+    var state: Int32 { lock.lock(); defer { lock.unlock() }; return openState }
+    /// nil mientras abre; JSON con la info al estar listo; `{"error":...}` si falló.
+    var infoOrNil: String? {
+        lock.lock(); defer { lock.unlock() }
+        switch openState {
+        case 1: return infoJSON
+        case 2: return "{\"error\":\"" + failReason.replacingOccurrences(of: "\"", with: "'") + "\"}"
+        default: return nil
+        }
+    }
+
+    init(channel: Int32, path: String) {
         self.channel = channel
-        let asset = AVURLAsset(url: URL(fileURLWithPath: path))
-        guard let track = asset.tracks(withMediaType: .video).first else { return nil }
+        asset = AVURLAsset(url: URL(fileURLWithPath: path))
         item = AVPlayerItem(asset: asset)
         let attrs: [String: Any] = [
             kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
@@ -69,39 +85,68 @@ final class VideoProbe: @unchecked Sendable {
         player.replaceCurrentItem(with: item)
         player.automaticallyWaitsToMinimizeStalling = false
         player.isMuted = true
-        // El reloj de la toma va de 0 a la duración; el PTS inicial del fichero se suma aquí.
-        // La toma real trae una edición vacía inicial (155,547 s) y el item no muestra nada hasta ahí: el desplazamiento
-        // es el inicio en la línea de tiempo del item del primer segmento no vacío, menos su inicio en el medio.
-        if let seg = track.segments.first(where: { !$0.isEmpty }) {
-            startPts = max(0, seg.timeMapping.target.start.seconds - seg.timeMapping.source.start.seconds)
+        Task { [self] in await openAsync() }
+    }
+
+    private func fail(_ why: String) {
+        lock.lock(); openState = 2; failReason = why; lock.unlock()
+    }
+
+    private func openAsync() async {
+        do {
+            guard let track = try await asset.loadTracks(withMediaType: .video).first else { return fail("sin pista de vídeo") }
+            let dur = try await asset.load(.duration).seconds
+            let segments = try await track.load(.segments)
+            let tr = try await track.load(.preferredTransform)
+            let sz = try await track.load(.naturalSize)
+            let fps = try await track.load(.nominalFrameRate)
+            let fds = try await track.load(.formatDescriptions)
+            // El reloj de la toma va de 0 a la duración; el PTS inicial del fichero se suma aquí.
+            // La toma real trae una edición vacía inicial (155,547 s) y el item no muestra nada hasta ahí: el desplazamiento
+            // es el inicio en la línea de tiempo del item del primer segmento no vacío, menos su inicio en el medio.
+            var pts = 0.0
+            if let seg = segments.first(where: { !$0.isEmpty }) {
+                pts = max(0, seg.timeMapping.target.start.seconds - seg.timeMapping.source.start.seconds)
+            }
+            var rot = Int((atan2(Double(tr.b), Double(tr.a)) * 180 / .pi).rounded())
+            if rot < 0 { rot += 360 }
+            let swap = rot == 90 || rot == 270
+            var hw = false
+            if let fd = fds.first { hw = VTIsHardwareDecodeSupported(CMFormatDescriptionGetMediaSubType(fd)) }
+            // setRate(atHostTime:) exige el item listo (sondeo con sleep async: no bloquea ningún hilo).
+            let deadline = Date().addingTimeInterval(5)
+            while item.status == .unknown, Date() < deadline { try await Task.sleep(nanoseconds: 10_000_000) }
+            finishOpen(pts: pts, dur: dur, rot: rot, sz: sz, swap: swap, fps: fps, hw: hw)
+        } catch {
+            fail("\(error.localizedDescription)")
         }
-        duration = asset.duration.seconds - startPts
-        let tr = track.preferredTransform
-        var rot = Int((atan2(Double(tr.b), Double(tr.a)) * 180 / .pi).rounded())
-        if rot < 0 { rot += 360 }
-        let sz = track.naturalSize
-        let swap = rot == 90 || rot == 270
-        var hw = false
-        if let fd = track.formatDescriptions.first {
-            hw = VTIsHardwareDecodeSupported(CMFormatDescriptionGetMediaSubType(fd as! CMFormatDescription))
+    }
+
+    private func finishOpen(pts: Double, dur: Double, rot: Int, sz: CGSize, swap: Bool, fps: Float, hw: Bool) {
+        guard item.status == .readyToPlay else {
+            return fail("item no listo: \(item.error?.localizedDescription ?? "status \(item.status.rawValue)")")
         }
+        lock.lock()
+        if stopped { lock.unlock(); return }
+        startPts = pts
+        duration = dur - pts
         infoJSON = String(format: "{\"width\":%d,\"height\":%d,\"displayWidth\":%d,\"displayHeight\":%d,\"rotationDegrees\":%d,\"fps\":%.4f,\"duration\":%.4f,\"startPts\":%.4f,\"hardwareDecode\":%@}",
                           Int(sz.width), Int(sz.height), Int(swap ? sz.height : sz.width), Int(swap ? sz.width : sz.height),
-                          rot, Double(track.nominalFrameRate), duration, startPts, hw ? "true" : "false")
-        // setRate(atHostTime:) exige el item listo.
-        let deadline = Date().addingTimeInterval(5)
-        while item.status == .unknown, Date() < deadline { Thread.sleep(forTimeInterval: 0.01) }
-        guard item.status == .readyToPlay else { return nil }
+                          rot, Double(fps), duration, pts, hw ? "true" : "false")
+        openState = 1
+        lock.unlock()
+        // setClock/setLoop anteriores quedaron guardados: se aplican aquí.
         resync(reason: "open", drift: false)
         let t = DispatchSource.makeTimerSource(flags: .strict, queue: queue)
         t.schedule(deadline: .now(), repeating: .nanoseconds(Int(tickSeconds * 1e9)), leeway: .nanoseconds(0))
         t.setEventHandler { [self] in tick() }
-        timer = t
+        lock.lock(); timer = t; lock.unlock()
         t.resume()
     }
 
     func stop() {
-        timer?.cancel(); timer = nil
+        lock.lock(); stopped = true; let t = timer; timer = nil; lock.unlock()
+        t?.cancel()
         queue.sync {}
         player.pause()
         player.replaceCurrentItem(with: nil)
@@ -130,6 +175,7 @@ final class VideoProbe: @unchecked Sendable {
     /// Como `takeview.position`: se aplica al reproductor solo si cambia playing/rate/epoch; deriva > medio fotograma también.
     private func publish() {
         lock.lock()
+        if openState != 1 { lock.unlock(); return }
         let cur = (playing: cPlaying, rate: cRate, epoch: cEpoch)
         let changed = applied == nil || applied! != cur
         lock.unlock()
