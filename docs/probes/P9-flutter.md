@@ -1,6 +1,6 @@
 # P9 · Viabilidad de la interfaz Flutter
 
-**Estado: en ejecución (22/11/2026). Pruebas 1, 2, 3 y 6 (Mac) pasadas; prueba 4 con los casos automáticos pasados en las dos candidatas y `keys` pendiente de Jorge; prueba 5 en curso; en el PC x64 pasan 7b y 7e y 7d está decidido (vía 1); pendiente el resto de la 7.** Primera parte de la Fase 7f. Decide si se mantienen las decisiones marcadas (P9) en [ADR-021](../adr/ADR-021.md). Código en `Probes/P9-flutter/` (fuera de la puerta de tests); resultados, en este fichero, debajo de cada prueba.
+**Estado: en ejecución (22/11/2026). Pruebas 1, 2, 3 y 6 (Mac) pasadas; prueba 4 con los casos automáticos pasados en las dos candidatas y `keys` pendiente de Jorge; prueba 5 medida en el Mac: gana el reproductor nativo (provisional, falta Windows); en el PC x64 pasan 7b y 7e y 7d está decidido (vía 1); pendientes `keys` de la 4 y el resto de la 7.** Primera parte de la Fase 7f. Decide si se mantienen las decisiones marcadas (P9) en [ADR-021](../adr/ADR-021.md). Código en `Probes/P9-flutter/` (fuera de la puerta de tests); resultados, en este fichero, debajo de cada prueba.
 
 ## Reglas
 
@@ -168,6 +168,46 @@ Diferencias entre candidatas (de los números):
 Sin decidir: la candidata se elige tras `keys` (ninguna tecla perdida ni duplicada, foco yendo y volviendo a un `TextField`) y la pasada de Windows (compilación con el Visual Studio del PC, DPI, repintado). Si empatan, decide Jorge.
 
 Sin medir: teclado y foco (`keys`); Windows; retardo con la ventana minimizada; carga de la SoundFont por una vía que funcione; versión de Flutter con la que se compiló cada app de `webview/` (`fvm flutter --version` desde la raíz da 3.44.5 y no 3.50.1; hay que confirmar el `.fvmrc` de cada una).
+
+### Prueba 5 · Vídeo (Mac) — PASA EL NATIVO; fvp NO CUMPLE EL ERROR A/V
+
+Código nativo: `Probes/P9-flutter/AppCoreFFI/Sources/AppCoreFFI/VideoProbe.swift` (`AVPlayer` esclavo de un reloj externo → `AVPlayerItemVideoOutput` → `CVPixelBuffer` BGRA → textura), exports `tf_debug_video_{open,state,close,clock,loop,info,stats}` en `Exports.swift`, `app/lib/probe5_video.dart` y `app/lib/probe5_measure.dart`. fvp: `Probes/P9-flutter/video/vp_fvp/` (fvp 0.40.0, mdk 0.40.1). Commits `5f6adeb`, `db75682`, `8c7a79f`, `d8503d6`, `6c2e319` y `e01fea4`. Repetir: `bash Probes/P9-flutter/run-probe5.sh <native|fvp> all` (con `SKIP_BUILD=1` el nativo no recompila); humo sin Flutter: `ffi-smoke --video <fichero> --case steady`. Informes en `Temp/p9-flutter/p5-<candidata>-<caso>-<fichero>.json`.
+
+- **Condiciones:** las dos se lanzan desde una copia en `/private/tmp/p9p5` (TCC de volumen extraíble, como la prueba 4). Vídeos: `code-hevc.mov` y `code-h264.mp4` (1080p30, 30 s, sintéticos con el número de fotograma incrustado; son los únicos en los que se mide el error A/V) y, de toma real, `take-hevc.mov`, `take-hevc-rot90.mov` y `take-h264-rot90.mp4` (sin índice incrustado: error A/V no medible).
+- **Resultado: gana el nativo (provisional; falta Windows).** Cumple todos los umbrales. fvp no cumple el error en régimen (mediana 17-20 ms, p95 de ~1 fotograma) ni, con VideoToolbox, la recuperación tras salto (hasta 505 ms).
+- **Aviso de método:** las dos medidas no son idénticas. El nativo mide en el núcleo, por entrega de fotograma; fvp se muestrea con `toImage` sobre lo pintado, y la CPU de ~50 % de sus casos `steady`/`seek`/`loop` incluye ese muestreo (por eso su CPU válida es la del caso `cpu`).
+
+Error A/V en ms (mediana / p95 / máx; umbral ≤ 16,7 en régimen, recuperación < 300):
+
+| Caso | Nativo HEVC | Nativo H.264 | fvp HEVC | fvp H.264 |
+| --- | --- | --- | --- | --- |
+| Régimen 100 % | 8,06 / 13,16 / 15,14 | 7,65 / 12,56 / 14,03 | 19,4 / 34,6 / 38,5 | 19,8 / 34,9 / 39,0 |
+| Régimen 70 % | 5,44 / 9,16 / 12,47 | 5,54 / 9,19 / 10,06 | 17,6 / 32,5 / 35,1 | 17,7 / 32,7 / 35,0 |
+| Régimen 50 % | 3,9 / 6,46 / 7,2 | 3,93 / 6,57 / 7,38 | 17,1 / 32,1 / 34,1 | 17,2 / 32,1 / 34,1 |
+| En bucle | 7,48 / 12,66 / 14,21 | 7,57 / 12,84 / 14,63 | 19,7 / 34,7 / 38,7 | 19,5 / 34,6 / 37,4 |
+| Recuperación tras salto (ms) | 15-76 | 21-133 | 41-470 | 61-505 |
+| Recuperación en la vuelta del bucle (ms) | 0-20,9 | 0-20,9 | 47-462 | 49-494 |
+| Repetidos / saltados (régimen) | 0 / 0 | 0 / 0 | sin dato | sin dato |
+| CPU % de un núcleo | 11,9 régimen; 16,5 salto; 17,1 bucle | 12,7; 16,8; 16,6 | 14,3 (caso `cpu`, VT) | sin medir aparte |
+| Vigilante máx del hilo de UI (ms) | 18,9 régimen; 10,9 salto; 6,7 bucle | 14,0; 23,8; 2,5 | sin dato | sin dato |
+
+- **Tomas reales, nativo:** `take-hevc-rot90.mov` rotación 270°, 1080×1920, PTS inicial 0, primera entrega 39 ms, vigilante 2,0 ms, CPU 15 %; `take-h264-rot90.mp4` 270°, 1080×1920, PTS 0, 38 ms, 1,8 ms, 14 %; `take-hevc.mov` 0°, 1920×1080, PTS inicial 155,547 s (edición vacía inicial, resuelta con el segmento no vacío), primera entrega 61 ms, vigilante 1,6 ms.
+- **Tomas reales, fvp:** mdk da `rotation=270` y textura 1080×1920 en los dos `rot90`.
+- **Juicio visual del orquestador:** rotación del nativo correcta en `take-hevc-rot90.mov`: la captura `Temp/p9-flutter/p5-native-rotation-take-hevc-rot90.png` tiene la misma orientación que la miniatura de Quick Look del fichero. Sin mirar: el H.264 girado y las capturas de fvp.
+
+Lo aprendido de fvp:
+
+- El fotograma congelado con una sola llamada a `onSync` eran dos fallos del probe: `SeekFlag.frame` hace que la posición sean fotogramas (el salto caía tras el final y mdk se paraba); con `minInterval=0` mdk no espera al reloj (30 s en 0,9 s), con 10 lo sigue a 105-126 Hz desde un hilo que no es el principal.
+- Decodificador: con `VT,FFmpeg` HEVC baja de 45,6 % a 14,3 % de CPU; con solo FFmpeg la recuperación tras salto era 75-183 ms y el error igual (`Temp/p9-flutter/ffmpeg-run/`).
+- En Windows el callback tendría que ser un shim C de ~30 líneas en el runner (`NativeCallable.isolateGroupBound` exige `--experimental-shared-data`); sin probar.
+
+Hallazgos para la ola 0 (nativo):
+
+- **La apertura tiene que ser asíncrona.** La primera versión sondeaba `item.status` con `Thread.sleep` y dentro de Flutter devolvía fallo (el isolate de UI es el hilo principal); con apertura asíncrona y estado abriendo/listo/fallo abre. La causa no se midió antes del arreglo: el resultado la respalda sin probarla. `setClock`/`setLoop` anteriores a «listo» se guardan y se aplican al abrir.
+- **Defecto del probe arreglado:** sin índice incrustado la mediana era NaN, `jsonEncode` lanzaba y el temporizador de `--exit-after` no llegaba a `exit()` (app colgada 9 min, hilo principal ocioso). Ahora NaN → `null` y la salida es incondicional.
+- **Coste en Windows:** pipeline propio de Media Foundation (`IMFMediaEngine` no admite reloj externo), como ya dice `docs/flutter/arquitectura.md` («Vídeo de tomas»). Sin estimar ni probar; es del resto de la prueba 7.
+
+Sin medir / sin explicar: vigilante de 18,9 ms (régimen HEVC) y 23,8 ms (salto H.264), por encima de los 16 ms de la prueba 2, sin investigar; error A/V con tomas reales; `openMs`; repetidos/saltados y vigilante en fvp; `open -g -n` de fvp desde la copia local (el script lo usa y dejó informes, no se comprobó aparte); nada en Windows.
 
 ### Prueba 6 · Captura y tests (Mac) — PASA
 
