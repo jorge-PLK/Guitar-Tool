@@ -24,7 +24,49 @@ Future<Json> _testHidden(Ctx c, String mode) async {
   }
 }
 
+/// Songsterr real con un modo oculto fijo (--mode): ms hasta pagina lista, bytes, titulo y JS vivo.
+Future<void> _runHiddenReal(Ctx c, String mode) async {
+  c.report['hiddenModeUsed'] = mode;
+  final sw = Stopwatch()..start();
+  try {
+    await c.newWeb(userAgent: safariUa);
+    c.st.hidden = mode;
+    c.st.status = 'songsterr (oculto: $mode)';
+    c.st.changed();
+    await WidgetsBinding.instance.endOfFrame;
+    await c.loadAndWait(() => c.web.loadUrl('https://www.songsterr.com/'), const Duration(seconds: 15));
+  } on TimeoutException {
+    c.report['msToPageReady'] = null;
+    c.fail('no cargo en 15 s (modo $mode)');
+    return;
+  } catch (e) {
+    c.fail('carga fallo ($mode): $e');
+    return;
+  }
+  c.report['msToPageReady'] = sw.elapsedMilliseconds;
+  try {
+    var s = await c.web.eval('document.documentElement.outerHTML');
+    if (s.startsWith('"') && s.endsWith('"')) s = jsonDecode(s) as String;
+    c.report['htmlBytes'] = utf8.encode(s).length;
+    c.report['title'] = await c.web.eval('document.title');
+    c.report['readyState'] = await c.web.eval('document.readyState');
+    await c.web.run('window.__n=0;setInterval(function(){window.__n++},100);');
+    await Future<void>.delayed(const Duration(seconds: 2));
+    final raw = await c.web.eval('String(window.__n)');
+    c.report['jsTicksRaw'] = raw;
+    final n = int.tryParse(raw.replaceAll('"', '')) ?? 0;
+    c.report['jsTicksIn2s'] = n;
+    c.report['jsAlive'] = n >= 5;
+    c.report['navigatorUserAgent'] = await c.web.eval('navigator.userAgent');
+    c.report['ok'] = (c.report['htmlBytes'] as int) > 0;
+  } catch (e) {
+    c.fail('eval fallo ($mode): $e');
+  }
+}
+
 Future<void> runSongsterr(Ctx c) async {
+  final fixed = c.args.get('--mode');
+  if (fixed != null) return _runHiddenReal(c, fixed);
   c.report['offscreenApi'] = await (() async {
     try {
       await c.newWeb();

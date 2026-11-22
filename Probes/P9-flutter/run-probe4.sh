@@ -93,6 +93,10 @@ one() {
       HIDE=1 run_one occluded occluded-hidden 50 --occluded-delay 8; local b=$?
       return $((a + b)) ;;
     keys) run_keys ;;
+    songsterr-hidden)
+      local modes="offstage zero"; [ "$CAND" = "wv_all" ] && modes="$modes offscreen"; local rc=0
+      for m in $modes; do run_one songsterr "songsterr-$m" 40 --mode "$m"; rc=$((rc + $?)); done
+      return $rc ;;
     *) run_one "$1" "$1" "$(secs_for "$1")" ;;
   esac
 }
