@@ -61,18 +61,20 @@ class ExtClock {
   /// Re-emisión periódica (mismo estado, `at` nuevo) como haría el núcleo a 30 Hz.
   void heartbeat() => emit();
 
-  void attach(Player player) {
+  void attach(Player player, [int minInterval = 0]) {
     _write();
     final fn = DynamicLibrary.process().lookup<NativeFunction<Double Function(Pointer<Void>)>>('vp_onsync_clock');
     final api = Pointer<mdkPlayerAPI>.fromAddress(player.nativeHandle);
     final cb = calloc<mdkSyncCallback>();
     cb.ref.cb = fn;
     cb.ref.opaque = Pointer<Void>.fromAddress(_p.address);
-    api.ref.onSync.asFunction<void Function(Pointer<mdkPlayer>, mdkSyncCallback, int)>()(api.ref.object, cb.ref, 0);
+    api.ref.onSync.asFunction<void Function(Pointer<mdkPlayer>, mdkSyncCallback, int)>()(api.ref.object, cb.ref, minInterval);
   }
 
   Map<String, Object?> syncStats() => {
         'calls': _p[6].toInt(),
+        'firstRet': _p[13],
+        'lastRet': _p[14],
         'spanS': _p[8] - _p[7],
         'hz': _p[6] > 1 ? (_p[6] - 1) / (_p[8] - _p[7]) : 0,
         'maxGapMs': _p[9] * 1e3,

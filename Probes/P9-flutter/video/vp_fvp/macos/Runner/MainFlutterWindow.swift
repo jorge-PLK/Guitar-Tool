@@ -66,5 +66,8 @@ public func vpOnSyncClock(_ opaque: UnsafeMutableRawPointer?) -> Double {
     sec = p[1]; play = p[2]; at = p[3]; rate = p[4]
     if s1 == p[0] && s1.truncatingRemainder(dividingBy: 2) == 0 { break }
   }
-  return play != 0 ? sec + (now - at) * rate : sec
+  let r = play != 0 ? sec + (now - at) * rate : sec
+  if n == 0 { p[13] = r }
+  p[14] = r
+  return r
 }

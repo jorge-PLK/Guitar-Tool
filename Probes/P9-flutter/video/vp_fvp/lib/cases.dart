@@ -21,7 +21,7 @@ double cpuS() {
 }
 
 Future<Map<String, Object?>> steady(Rig r, double secs) async {
-  r.jump(1.0);
+  await r.jump(1.0);
   r.play();
   r.startSampling();
   final out = <String, Object?>{};
@@ -106,7 +106,7 @@ Future<Map<String, Object?>> rotation(Rig r, double secs) async {
 Future<Map<String, Object?>> startPts(Rig r) async {
   r.play();
   final out = <Map<String, Object?>>[];
-  for (final fl in [SeekFlag.fromStart | SeekFlag.frame, SeekFlag.from0 | SeekFlag.frame]) {
+  for (final fl in [SeekFlag.fromStart, SeekFlag.from0]) {
     r.seekFlags = fl;
     for (final c in [0.0, 155.547, 160.0]) {
       final reply = await r.jump(c);

@@ -17,13 +17,18 @@ mkdir -p "$LOGS" "$OUT"
 if [ "$CAND" = native ]; then
   # Candidata nativa (AVPlayer en AppCoreFFI + Texture en tf_probe --probe video).
   P9="$ROOT/Probes/P9-flutter"; RUN="$OUT/run"
-  NAPP="$P9/app/build/macos/Build/Products/Release/tf_probe.app"
-  DYLIB="$P9/AppCoreFFI/.build/release/libAppCoreFFI.dylib"
-  mkdir -p "$RUN/projects"
+  BUILT="$P9/app/build/macos/Build/Products/Release/tf_probe.app"
+  # Todo se lanza desde /private/tmp (no desde /Volumes: evita el diálogo TCC de volumen extraíble que cuelga el dlopen).
+  TMPD="/private/tmp/p9p5"; NAPP="$TMPD/tf_probe.app"; DYLIB="$TMPD/libAppCoreFFI.dylib"; TVID="$TMPD/video"; TOUT="$TMPD/out"
+  RUN="$TMPD/run"
   if [ "${SKIP_BUILD:-0}" != "1" ]; then
     swift build --package-path "$P9/AppCoreFFI" -c release >"$LOGS/p9-p5-native-swift.log" 2>&1 || { echo "swift build falló: $LOGS/p9-p5-native-swift.log"; exit 1; }
     (cd "$P9/app" && fvm flutter build macos --release >"$LOGS/p9-p5-native.log" 2>&1) || { echo "flutter build falló: $LOGS/p9-p5-native.log"; exit 1; }
   fi
+  rm -rf "$NAPP"; mkdir -p "$TOUT" "$TVID" "$RUN/projects"
+  ditto "$BUILT" "$NAPP" || { echo "ditto falló"; exit 1; }
+  cp "$P9/AppCoreFFI/.build/release/libAppCoreFFI.dylib" "$DYLIB" || { echo "cp dylib falló"; exit 1; }
+  cp -n "$VID"/* "$TVID"/ 2>/dev/null
   nsummary() {
 python3 -I - "$1" <<'PY'
 import json, sys
@@ -46,15 +51,16 @@ PY
   }
   nrun() { # caso fichero captura_s
     local kase="$1" file="$2" shot="$3" base="${2%.*}"
-    local report="$OUT/p5-native-$kase-$base.json" png="$OUT/p5-native-$kase-$base.png"
+    local report="$TOUT/p5-native-$kase-$base.json" png="$TOUT/p5-native-$kase-$base.png"
     rm -f "$report" "$png"; rm -rf "$RUN/support" && mkdir -p "$RUN/support"
     if [ "$shot" != 0 ]; then
       ( for _ in $(seq 1 40); do pgrep -f 'MacOS/tf_probe' >/dev/null && break; sleep 0.5; done
         sleep "$shot"; screencapture -x -l "$("$WINID" tf_probe)" "$png" 2>/dev/null ) &
     fi
-    open -g -n -W "$NAPP" --args --probe video --case "$kase" --file "$VID/$file" --core-lib "$DYLIB" \
+    open -g -n -W "$NAPP" --args --probe video --case "$kase" --file "$TVID/$file" --core-lib "$DYLIB" \
       --projects-folder "$RUN/projects" --support-dir "$RUN/support" --report "$report" --exit-after 80
     wait 2>/dev/null
+    cp "$report" "$png" "$OUT/" 2>/dev/null
     if [ ! -f "$report" ]; then echo "SIN INFORME: $kase $file"; return 2; fi
     nsummary "$report"
   }
@@ -78,8 +84,17 @@ case "$CAND" in
   native) echo "candidata native: sin implementar"; exit 3 ;;
   *) echo "candidata desconocida: $CAND"; exit 3 ;;
 esac
-APP="$DIR/build/macos/Build/Products/Release/$BIN.app"
+BUILT_APP="$DIR/build/macos/Build/Products/Release/$BIN.app"
 LOG="$LOGS/p9-p5-$CAND.log"
+# Rama fvp: todo se lanza desde /private/tmp (en /Volumes LaunchServices dispara el diálogo TCC y Dart no arranca).
+FT="/private/tmp/p9p5"; APP="$FT/$BIN.app"; FOUT="$FT/out"
+stage_fvp() {
+  mkdir -p "$FOUT" "$FT/video"; rm -rf "$APP"
+  ditto "$BUILT_APP" "$APP" || { echo "ditto falló"; exit 1; }
+  for f in code-hevc.mov code-h264.mp4 take-hevc.mov take-h264.mp4 take-hevc-rot90.mov take-h264-rot90.mp4; do
+    [ -f "$FT/video/$f" ] || cp "$VID/$f" "$FT/video/$f" 2>/dev/null
+  done
+}
 
 build() {
   [ "${SKIP_BUILD:-0}" = "1" ] && return 0
@@ -118,10 +133,10 @@ PY
 run_one() { # caso fichero espera_captura
   local kase="$1" file="$2" shot="$3"
   local base="${file%.*}"
-  local report="$OUT/p5-$CAND-$kase-$base.json" ps="$OUT/p5-$CAND-$kase-$base.ps" png="$OUT/p5-$CAND-$kase-$base.png"
+  local report="$FOUT/p5-$CAND-$kase-$base.json" ps="$FOUT/p5-$CAND-$kase-$base.ps" png="$FOUT/p5-$CAND-$kase-$base.png"
   local maxs=70; [ "$kase" != steady ] && maxs=45
   rm -f "$report" "$ps" "$png"
-  open -g -n "$APP" --args --case "$kase" --file "$VID/$file" --report "$report" --exit-after "$maxs" --regime-s "${REGIME_S:-10}"
+  open -g -n "$APP" --args --case "$kase" --file "$FT/video/$file" --report "$report" --exit-after "$maxs" --regime-s "${REGIME_S:-10}"
   local pid="" i
   for i in $(seq 1 40); do pid=$(pgrep -f "MacOS/$BIN" | head -1); [ -n "$pid" ] && break; sleep 0.5; done
   local t=0 shotdone=0
@@ -135,10 +150,12 @@ run_one() { # caso fichero espera_captura
   sleep 1
   pkill -f "MacOS/$BIN" 2>/dev/null
   if [ ! -f "$report" ]; then echo "SIN INFORME: $kase $file"; return 2; fi
+  cp "$report" "$ps" "$OUT/" 2>/dev/null; [ -f "$png" ] && cp "$png" "$OUT/"
   summary "$report" "$ps"
 }
 
 build
+stage_fvp
 if [ "$CASE" = all ]; then
   for f in code-hevc.mov code-h264.mp4; do
     run_one steady "$f" 12

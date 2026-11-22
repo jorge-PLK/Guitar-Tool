@@ -1,5 +1,6 @@
 // Banco: Player de fvp (API mdk directa) + Texture + tira de código + muestreador por toImage.
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
@@ -22,13 +23,21 @@ class Rig {
   Timer? _hb;
   bool _sampling = false;
   bool strip = true;
-  int seekFlags = SeekFlag.fromStart | SeekFlag.frame;
+  // OJO: SeekFlag.frame hace que position sean FOTOGRAMAS, no ms (con él el seek a 1000 "ms" cae tras el final: end/stopped).
+  int seekFlags = SeekFlag.fromStart;
   String log = '';
 
   Future<Map<String, Object?>> open(String path) async {
     clock.emit(seconds: 0, playing: false);
-    clock.attach(player);
+    if (_env('VP_ATTACH', 'open') == 'open') clock.attach(player, _minInt);
+    final dec = _env('VP_DEC', 'VT,FFmpeg');
+    if (dec.isNotEmpty) player.videoDecoders = dec.split(',');
     player.mute = true;
+    if (_env('VP_DBG', '') == '1') {
+      player.onStateChanged.listen((e) => stderr.writeln('[dbg] state ${e.oldValue} -> ${e.newValue} @${nowS()}'));
+      player.onMediaStatus.listen((e) => stderr.writeln('[dbg] status ${e.oldValue} -> ${e.newValue}'));
+      player.onEvent.listen((e) => stderr.writeln('[dbg] ev ${e.category} ${e.detail} ${e.error}'));
+    }
     player.media = path;
     final r = await player.prepare(flags: SeekFlag(seekFlags));
     final mi = player.mediaInfo;
@@ -50,9 +59,25 @@ class Rig {
     };
   }
 
+  static String _env(String k, String d) => Platform.environment[k] ?? d;
+  int get _minInt => int.parse(_env('VP_MININT', '10'));
+
   void play() {
+    if (_env('VP_ATTACH', 'open') == 'play') clock.attach(player, _minInt);
     player.state = PlaybackState.playing;
     clock.emit(playing: true);
+    if (_env('VP_DBG', '') == '1') {
+      for (var i = 1; i <= 40; i++) {
+        Future.delayed(Duration(milliseconds: i * 50), () => stderr.writeln('[dbg] +${i * 50}ms mdkPos=${player.position} clock=${(clock.pos() * 1000).round()} lastRet=${clock.syncStats()['lastRet']} calls=${clock.syncStats()['calls']}'));
+      }
+      for (var i = 1; i <= 4; i++) {
+        Future.delayed(Duration(seconds: i), () {
+          final m = '[dbg] t=$i state=${player.state} pos=${player.position} tex=${player.textureId.value} calls=${clock.syncStats()['calls']}';
+          log += '$m\n';
+          stderr.writeln(m);
+        });
+      }
+    }
   }
 
   Future<int> jump(double s) {
