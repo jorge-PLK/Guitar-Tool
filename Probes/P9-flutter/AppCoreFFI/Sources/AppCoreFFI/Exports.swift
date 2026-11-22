@@ -30,3 +30,14 @@ public func ffiCoreShutdown(_ timeoutMs: Int32) {
 public func ffiDebugLiveBuffers() -> Int64 {
     coreState.live()
 }
+
+@_cdecl("tf_core_start_port")
+public func ffiCoreStartPort(_ optionsJSON: UnsafePointer<CChar>?, _ port: Int64) -> Int32 {
+    guard let optionsJSON else { return 2 }
+    return coreState.start(optionsJSON: String(cString: optionsJSON), sink: .port(port))
+}
+
+@_cdecl("tf_debug_emit")
+public func ffiDebugEmit(_ hz: Int32, _ count: Int32, _ bytes: Int32) -> Int32 {
+    coreState.debugEmit(hz: hz, count: count, bytes: bytes)
+}

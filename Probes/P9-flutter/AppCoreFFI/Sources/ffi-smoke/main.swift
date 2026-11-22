@@ -23,6 +23,10 @@ final class Inbox: @unchecked Sendable {
     var shutdownAt = 0.0
     var watchStop = false
     var maxDelay = 0.0
+    var tickSeqs: [Int] = []
+    var tickSizes: [Int] = []
+    var doneCount: Int?
+    let probeSem = DispatchSemaphore(value: 0)
 }
 let inbox = Inbox()
 
@@ -30,6 +34,7 @@ nonisolated(unsafe) let onMessage: tf_message_cb = { ptr, len in
     let t = nowMs()
     guard let ptr else { return }
     let data = Data(bytes: ptr, count: Int(len))
+    let size = Int(len)
     tf_core_free(ptr)
     guard let obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return }
     if let event = obj["event"] as? String {
@@ -39,6 +44,17 @@ nonisolated(unsafe) let onMessage: tf_message_cb = { ptr, len in
             inbox.shutdownAt = t
             inbox.lock.unlock()
             inbox.shutdownSem.signal()
+        }
+        if event == "probe.tick" {
+            inbox.lock.lock()
+            inbox.tickSeqs.append(((obj["payload"] as? [String: Any])?["seq"] as? Int) ?? -1)
+            inbox.tickSizes.append(size)
+            inbox.lock.unlock()
+        } else if event == "probe.done" {
+            inbox.lock.lock()
+            inbox.doneCount = (obj["payload"] as? [String: Any])?["count"] as? Int
+            inbox.lock.unlock()
+            inbox.probeSem.signal()
         }
         return
     }
@@ -157,6 +173,19 @@ func run() {
     check(median < medianLimitMs, "mediana < \(medianLimitMs) ms")
     check(p99 < p99LimitMs, "p99 < \(p99LimitMs) ms")
     check(delay <= mainDelayLimitMs, "retraso principal <= \(mainDelayLimitMs) ms")
+
+    // Pasada del emisor sintético por callback.
+    let emitRC = tf_debug_emit(60, 120, 300)
+    check(emitRC == 0, "tf_debug_emit == 0")
+    let emitDone = emitRC == 0 && inbox.probeSem.wait(timeout: .now() + 10) == .success
+    inbox.lock.lock()
+    let seqs = inbox.tickSeqs; let sizes = inbox.tickSizes; let done = inbox.doneCount
+    inbox.lock.unlock()
+    let emitOK = emitDone && seqs == Array(0..<120) && sizes.allSatisfy { $0 == 300 } && done == 120
+    print("emisor: \(seqs.count) ticks, done \(done.map { "\($0)" } ?? "?"), tamanos \(Set(sizes).sorted()), orden \(seqs == Array(0..<120))")
+    check(emitDone, "probe.done recibido")
+    check(emitOK, "120 ticks en orden, 300 bytes, done=120")
+    check(tf_debug_live_buffers() == 0, "emisor: live_buffers == 0")
 
     let tShutdown = nowMs()
     tf_core_shutdown(5000)

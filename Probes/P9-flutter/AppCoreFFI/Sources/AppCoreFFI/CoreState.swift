@@ -2,10 +2,11 @@ import AppCore
 import CAppCoreFFI
 import Foundation
 
-/// Sumidero de salida enchufable: la siguiente parte añadirá la variante por puerto nativo de Dart.
+/// Sumidero de salida enchufable: callback C o puerto nativo de Dart (`Dart_PostCObject_DL`).
 enum Sink: @unchecked Sendable {
     case none
     case callback(tf_message_cb)
+    case port(Int64)
 }
 
 /// Estado global del núcleo tras un lock. Todo acceso pasa por `lock`.
@@ -16,6 +17,7 @@ final class CoreState: @unchecked Sendable {
     private var started = false
     private var closed = false
     private var liveBuffers: Int64 = 0
+    private var emitting = false
 
     /// 0 ok; 1 ya arrancado; 2 opciones inválidas; 3 falló Bridge.init.
     func start(optionsJSON: String, sink newSink: Sink) -> Int32 {
@@ -60,7 +62,48 @@ final class CoreState: @unchecked Sendable {
             utf8.withUnsafeBytes { if !$0.isEmpty { memcpy(raw, $0.baseAddress!, $0.count) } }
             lock.lock(); liveBuffers += 1; lock.unlock()
             cb(raw.assumingMemoryBound(to: UInt8.self), Int32(utf8.count))
+        case .port(let port):
+            let utf8 = Array(json.utf8)
+            guard let raw = malloc(max(utf8.count, 1)) else { return }
+            utf8.withUnsafeBytes { if !$0.isEmpty { memcpy(raw, $0.baseAddress!, $0.count) } }
+            lock.lock(); liveBuffers += 1; lock.unlock()
+            let ptr = raw.assumingMemoryBound(to: UInt8.self)
+            // Sin copia: Dart toma el búfer y llama al finalizador C (-> tf_core_free). Si falla, lo liberamos aquí.
+            if !tf_post_external(port, ptr, utf8.count) { free(UnsafePointer(ptr)) }
         }
+    }
+
+    /// Solo prueba. 0 lanzado; 1 núcleo no arrancado; 2 ya hay una emisión en curso.
+    func debugEmit(hz: Int32, count: Int32, bytes: Int32) -> Int32 {
+        lock.lock()
+        if !started { lock.unlock(); return 1 }
+        if emitting { lock.unlock(); return 2 }
+        emitting = true
+        lock.unlock()
+        let thread = Thread { [self] in
+            let periodNs: Int64 = hz > 0 ? 1_000_000_000 / Int64(hz) : 0
+            let start = tf_debug_now_ns()
+            for n in 0..<Int(max(count, 0)) {
+                if periodNs > 0 {
+                    // Temporización absoluta: el instante n es start + n * periodo (sin deriva).
+                    let wait = start + Int64(n) * periodNs - tf_debug_now_ns()
+                    if wait > 0 {
+                        var ts = timespec(tv_sec: Int(wait / 1_000_000_000), tv_nsec: Int(wait % 1_000_000_000))
+                        nanosleep(&ts, nil)
+                    }
+                }
+                let t = tf_debug_now_ns()
+                let head = "{\"event\":\"probe.tick\",\"payload\":{\"seq\":\(n),\"t\":\(t),\"pad\":\""
+                let tail = "\"}}"
+                let padLen = max(0, Int(bytes) - head.utf8.count - tail.utf8.count)
+                emit(head + String(repeating: "x", count: padLen) + tail)
+            }
+            emit("{\"event\":\"probe.done\",\"payload\":{\"count\":\(max(count, 0))}}")
+            lock.lock(); emitting = false; lock.unlock()
+        }
+        thread.name = "tf-debug-emit"
+        thread.start()
+        return 0
     }
 
     func free(_ ptr: UnsafePointer<UInt8>) {

@@ -13,7 +13,7 @@ let package = Package(
         .package(path: "../../../Packages/AppCore"),
     ],
     targets: [
-        .target(name: "CAppCoreFFI"),
+        .target(name: "CAppCoreFFI", cSettings: [.headerSearchPath("dart")]),
         .target(name: "AppCoreFFI", dependencies: ["CAppCoreFFI", .product(name: "AppCore", package: "AppCore")]),
         .executableTarget(name: "ffi-smoke", dependencies: ["CAppCoreFFI", "AppCoreFFI"]),
     ]
