@@ -13,6 +13,8 @@ metadata:
 - Export TorchScript de ONNX (torch 2.7, opset 17) de lr_common.make_core a T=301: 3,8 s, 339 MB, sin problemas.
 
 - **ssh tf-win abre PowerShell 5**: nada de `&&` ni `cd /d`; llamar `& C:\ort\run\arm64\ort-smoke.exe <dir>` (la DLL se toma de la carpeta del exe). La salida va en cp850: en Python `errors="replace"`. Cerrojo a mano: `mkdir Temp/win/vm.lock` + `owner`, soltarlo en finally (guion de ejemplo: vmpass.py, en el scratchpad de la sesión del 19/11).
+- **ssh/scp a tf-win desde el sandbox falla con «Could not resolve hostname»**: hace falta `dangerouslyDisableSandbox`. Comando PowerShell entre comillas simples (zsh expande `$_` dentro de dobles). scp acepta `"tf-win:C:/ruta con espacios/f.wav"`. Para esperar a un proceso largo en segundo plano sin sondear: `caffeinate -w <pid>`.
+- Medir stems como StemLevelMeter sin tocar Packages: copia con AVAudioFile en `Temp/win/remix/measure.swift` (swiftc -O); cuadra al 0,1 dB con lo medido en la VM.
 - ort-smoke solo pasa float32: a los ONNX con entrada int (MoveNet int32) se les añade un `Cast` a la entrada (pose.py).
 - Pose sin Core ML: `Xenova/movenet-singlepose-thunder` (tf2onnx, opset 11, Apache-2.0, 25 MB), entrada (1,256,256,3) con relleno a cuadrado, salida (1,1,17,3) y,x,conf. Las tomas de `Temp/fase-7/rescate/takes/*/video.mov` son planos cerrados: Vision apenas detecta (cabeza fuera).
 - Exports de modelos pequeños: dar `dynamic_axes` (BTC lote n, ADTOF tiempo T) para que casen con el Core ML (RangeDim). ADTOF es GRU bidireccional: con otra T las tramas compartidas cambian (normal).
