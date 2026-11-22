@@ -45,6 +45,11 @@ public final class Bridge: @unchecked Sendable {
     let montageService: MontageService
     /// Visor de tomas con el audio en el núcleo (W2-V, `TakeViewMethods.swift`).
     let takeViewService: TakeViewService
+    /// Cancelaciones que `shutdownAsync` hace antes de cerrar nada (descargas por enlace, lista); como el
+    /// `linkImport?.cancel()` y `playlistImport?.cancel()` de `AppModel.flushForTermination` del Mac.
+    private var _shutdownHooks: [@Sendable () async -> Void] = []
+    func addShutdownHook(_ hook: @escaping @Sendable () async -> Void) { lock.withLock { _shutdownHooks.append(hook) } }
+    var shutdownHooks: [@Sendable () async -> Void] { lock.withLock { _shutdownHooks } }
     private var _host: (any HostServices)?
     /// Grabar (`RecordMethods.swift`); lo usa el cambio de carpeta para saber si hay una toma en curso.
     nonisolated(unsafe) var recordService: RecordService?

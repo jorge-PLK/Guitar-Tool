@@ -625,6 +625,38 @@ final class MontageTests: XCTestCase {
         c.close()
     }
 
+    /// Relevo 10 caso 6: cancelar DURANTE la mezcla (aún sin `mixResult`) dejaba la carpeta `-pistas` vacía.
+    func testExportCancelledDuringMixLeavesNoEmptyTracksFolder() async throws {
+        let rig = try makeRig()
+        var services = MontageServices.simulated()
+        final class Flag: @unchecked Sendable {
+            private let lock = NSLock()
+            private var value = false
+            func set() { lock.withLock { value = true } }
+            var isSet: Bool { lock.withLock { value } }
+        }
+        let realMix = services.mix, exportMixStarted = Flag()
+        services.mix = { job, progress in
+            guard job.trackDirectory != nil else { return try await realMix(job, progress) }   // mezcla de la vista previa
+            exportMixStarted.set()
+            while !Task.isCancelled { try? await Task.sleep(for: .milliseconds(5)) }
+            throw CancellationError()                                                           // no escribe ningún WAV
+        }
+        let c = try makeController(rig, services: services)
+        await openReady(c)
+        c.updateExport { $0.trackWAVs = true }
+        let tracks = rig.layout.montageTracksDirectory(layout: c.state.layout)
+        c.startExport()
+        let began = await waitUntil { exportMixStarted.isSet }
+        XCTAssertTrue(began)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: tracks.path), "la carpeta se crea antes de mezclar")
+        c.cancelExport()
+        await waitUntil { c.exportPhase == .cancelled }
+        XCTAssertEqual(c.exportPhase, .cancelled)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: tracks.path), "carpeta -pistas vacía tras cancelar")
+        c.close()
+    }
+
     func testExportFailureUsesMacLiteral() async throws {
         let rig = try makeRig()
         struct Boom: Error, CustomStringConvertible { var description: String { "disco lleno" } }

@@ -46,14 +46,15 @@ final class BackingController {
 
     // MARK: Carga
 
-    /// Carga los stems audibles y reaplica mezcla y ajustes guardados.
-    func loadTracks() {
+    /// Carga los stems audibles y reaplica mezcla y ajustes guardados. `excluding` (rutas estandarizadas) deja fuera
+    /// ficheros que otro va a sustituir o borrar: el reproductor los cierra al recargar (NTFS, `MoveFileEx` error 5).
+    func loadTracks(excluding: Set<String> = []) {
         // Un stem sin fichero (p. ej. a medio medir) se salta en vez de impedir toda la carga.
         // Con pistas de guitarra separadas suenan ellas en lugar de `stems/guitar.wav` (no se suman dos veces).
         let layout = session.layout
         let guitarTracks = session.guitarTracks.map { Track(id: $0.role.trackID, url: layout.guitarURL($0.role)) }
         let tracks = (session.mixerStems.map { Track(id: $0.rawValue, url: layout.stemURL($0)) } + guitarTracks + extraTracks)
-            .filter { FileManager.default.fileExists(atPath: $0.url.path) }
+            .filter { FileManager.default.fileExists(atPath: $0.url.path) && !excluding.contains($0.url.standardizedFileURL.path) }
         guard let first = tracks.first else { loadError = nil; return }
         do {
             try player.load(tracks: tracks)

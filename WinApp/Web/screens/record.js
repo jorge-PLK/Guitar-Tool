@@ -52,6 +52,15 @@ function Body() {
   const [menu, setMenu] = useState(null);       // { take, number, best, x, y }
   const [deleting, setDeleting] = useState(null);
   const [viewing, setViewing] = useState(null); // { takeId, title }
+  // «Eliminar toma» desde el visor: se borra cuando el visor ya se desmontó (su limpieza suelta el `<video>` de
+  // `video.mov` y manda `takeview.close`), no antes: en NTFS no se borra un fichero abierto. El núcleo cierra además el
+  // visor de esa toma antes de borrar (RecordController.deleteTake).
+  const [deleteAfterView, setDeleteAfterView] = useState(null);
+  useEffect(() => {
+    if (!deleteAfterView || viewing) return;
+    setDeleteAfterView(null);
+    deleteTake(deleteAfterView);
+  }, [deleteAfterView, viewing]);
   // «Ver toma» pedido desde la Biblioteca: se abre al estar lista la pantalla.
   useEffect(() => {
     const r = viewRequest.value;
@@ -86,7 +95,7 @@ function Body() {
     ${viewing && viewed ? html`<${TakeViewer} key=${viewing.takeId} title=${viewing.title} take=${viewed}
       isBest=${viewedPart?.bestTakeId === viewing.takeId}
       onMarkBest=${() => markBest(viewing.takeId)}
-      onDelete=${() => { const id = viewing.takeId; setViewing(null); deleteTake(id); }}
+      onDelete=${() => { setDeleteAfterView(viewing.takeId); setViewing(null); }}
       onClose=${() => setViewing(null)} />` : null}
   </div>`;
 }

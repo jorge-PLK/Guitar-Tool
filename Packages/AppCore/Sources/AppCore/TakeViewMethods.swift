@@ -385,6 +385,12 @@ final class TakeViewService {
         if current?.isOffset == true { await close() }
     }
 
+    /// Antes de borrar una toma: si el visor (o la hoja de desfase) la tiene abierta, la cierra y suelta sus ficheros.
+    /// En NTFS no se borra un fichero con un lector abierto, y el `takeview.close` de la página puede llegar después.
+    func release(takeId: UUID) async {
+        if current?.takeId == takeId { await close() }
+    }
+
     /// Salida del perfil (canales de backing), como Montaje y Estudio.
     private func makeAudio() -> StudyAudio {
         let profile = (try? profileStore?.load()) ?? EquipmentProfile()

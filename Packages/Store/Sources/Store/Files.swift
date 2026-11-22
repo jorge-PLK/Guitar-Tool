@@ -35,6 +35,36 @@ enum FileOps {
     static func removeIfExists(_ url: URL) {
         try? FileManager.default.removeItem(at: url)
     }
+
+    /// Intentos del borrado con reintento (relevo 10 del paso 8 de la 7c, caso 5; no lo fija la spec): en Windows el
+    /// `<video>` de WebView2 recién desmontado o el antivirus pueden retener un fichero un instante (`MoveFileEx` error 5).
+    static let removeRetryAttempts = 5
+    /// Primera espera entre intentos (s); se dobla en cada reintento: 50 + 100 + 200 + 400 ms = 750 ms de tope (≤ ~1 s).
+    static let removeRetryFirstDelay = 0.05
+
+    /// Borra `url` (fichero o carpeta) reintentando hasta `attempts` veces con espera creciente si falla. Si entre
+    /// intentos ya no existe, da el borrado por hecho. Agotados los intentos, lanza el último error. Devuelve los intentos
+    /// usados (tests). `remove`/`sleep` inyectables para simular un lector que suelta el fichero tarde.
+    @discardableResult
+    static func removeRetrying(_ url: URL, attempts: Int = removeRetryAttempts, firstDelay: Double = removeRetryFirstDelay,
+                               remove: @Sendable (URL) throws -> Void = { try FileManager.default.removeItem(at: $0) },
+                               sleep: @Sendable (Double) async -> Void = { try? await Task.sleep(nanoseconds: UInt64($0 * 1e9)) })
+        async throws -> Int {
+        var delay = firstDelay
+        var n = 0
+        while true {
+            n += 1
+            do {
+                try remove(url)
+                return n
+            } catch {
+                if !FileManager.default.fileExists(atPath: url.path) { return n }
+                if n >= max(attempts, 1) { throw error }
+            }
+            await sleep(delay)
+            delay *= 2
+        }
+    }
 }
 
 /// Tamaños en disco.
@@ -237,6 +267,11 @@ public struct ProjectLayout: Sendable, Equatable {
         let size = (a[.size] as? NSNumber)?.int64Value ?? 0
         let mtime = (a[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
         return "\(size)-\(String(format: "%.6f", mtime))"
+    }
+
+    /// Tamaño en bytes que lleva una huella de `fileFingerprint` (lo que va antes del primer «-»); nil si no se lee.
+    static func fingerprintSize(_ fingerprint: String) -> Int64? {
+        fingerprint.split(separator: "-", maxSplits: 1).first.flatMap { Int64($0) }
     }
 
     /// Huella de la entrada del paso de guitarras: `stems/guitar.wav`.

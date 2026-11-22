@@ -244,6 +244,11 @@ final class RecordController {
     private(set) var cameraTask: Task<Void, Never>?
     private var pollTask: Task<Void, Never>?
     private var stopRequested = false
+    /// Aplanado del punch (`PunchFlattener.flattenFiles`); inyectable para que los tests comprueben que nadie tiene
+    /// abierto `processed.wav` al reescribirlo (NTFS, `MoveFileEx` error 5; relevo 10 caso 4).
+    var flattenPunch: @Sendable (_ base: URL, _ baseSongStart: Double, _ punches: [PunchFile], _ to: URL, _ sampleRate: Double) throws -> Void = {
+        try PunchFlattener.flattenFiles(base: $0, baseSongStart: $1, punches: $2, to: $3, sampleRate: $4)
+    }
     /// Reproductor de los clics de la cuenta (tests: uno que falla). Si lanza, la toma se aborta como en el Mac.
     var openCountInAudio: @MainActor (_ file: URL, _ mode: AudioMode, _ output: OutputSelection) throws -> StudyAudio = { file, mode, output in
         let a = StudyAudio(mode: mode, output: output)
@@ -1044,9 +1049,13 @@ final class RecordController {
     func deleteTake(_ takeID: UUID) async -> String? {
         guard phase == .idle else { return nil }
         await flush()
+        // El reproductor puede tener abierta la toma como canal «Tú · parte» (mejor toma de otra parte). En Windows no se
+        // borra un fichero con un lector abierto: se suelta antes (como en `commitPunch`). Si el borrado falla, vuelve.
+        reloadTakeTracks(excluding: takeID)
         do {
             try await deleteTakeFiles(takeID)
         } catch {
+            reloadTakeTracks()
             let m = "No se pudo borrar la toma (\(error))."
             messages = [m]
             return m
@@ -1100,10 +1109,9 @@ final class RecordController {
         // otra frecuencia se remuestrea al leerla (su copia en `base/` queda intacta) y la toma pasa a esa
         // frecuencia; `songStart` va en segundos y las latencias en muestras de `calibrationKey`, no cambian.
         let file = PunchFile(start: p.start, end: p.end, url: plan.audioURL, songStart: rec.songStart)
-        let rate = rec.sampleRate
+        let rate = rec.sampleRate, flatten = flattenPunch
         try await Task.detached {
-            try PunchFlattener.flattenFiles(base: processed, baseSongStart: start, punches: [file], to: processed,
-                                            sampleRate: rate)
+            try flatten(processed, start, [file], processed, rate)
         }.value
         t.sampleRate = rate
         let rel = ProjectLayout.punchRelativeDirectory(takeId: t.id, n: p.n)

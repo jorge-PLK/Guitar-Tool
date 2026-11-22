@@ -145,7 +145,10 @@ extension Bridge {
     }
 
     public func shutdownAsync() async {
-        await closeMontage()   // W2-E2: guarda el montaje y para su relevo al cerrar la ventana (los dos anfitriones)
+        // Primero se corta lo que descarga o lee (yt-dlp, ffmpeg); en Windows los hijos que sigan vivos mueren con el
+        // job object «kill on close» de `ChildProcess` al salir el proceso (equivale a `ChildProcesses.terminateAll`).
+        for hook in shutdownHooks { await hook() }
+        await closeMontage()  // W2-E2: guarda el montaje y para su relevo al cerrar la ventana (los dos anfitriones)
         await closeTakeView()   // W2-V: suelta la salida del visor de tomas
         await closeTab()
         await closeStudy()

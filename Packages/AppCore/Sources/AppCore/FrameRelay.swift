@@ -63,6 +63,8 @@ public final class FrameRelay: @unchecked Sendable {
     private let encode: @Sendable (FramePixelBuffer) throws -> JPEGFrame
     private let emit: @Sendable (String, FrameEvent) -> Void
     private let now: @Sendable () -> Double
+    /// Temporizador del hueco de `latestWins`: `after(retardo en s, disparo)`. Por defecto, `asyncAfter` en la cola del relevo.
+    private let after: @Sendable (Double, @escaping @Sendable () -> Void) -> Void
     private let interval: Double
     private let queue: DispatchQueue
     private let lock = NSLock()
@@ -89,11 +91,13 @@ public final class FrameRelay: @unchecked Sendable {
                   emit: emit)
     }
 
-    /// Tests: codificador y reloj (s, monótono) a medida.
+    /// Tests: codificador, reloj (s, monótono) y temporizador a medida. Con reloj y temporizador simulados, la cadencia,
+    /// el descarte y el hueco de `latestWins` no dependen del reloj real ni de la velocidad de la máquina.
     init(channel: String, maxFPS: Double, maxWidth: Int, latestWins: Bool = false,
          encode: @escaping @Sendable (FramePixelBuffer) throws -> JPEGFrame,
          emit: @escaping @Sendable (String, FrameEvent) -> Void,
-         now: @escaping @Sendable () -> Double = { Double(DispatchTime.now().uptimeNanoseconds) / 1e9 }) {
+         now: @escaping @Sendable () -> Double = { Double(DispatchTime.now().uptimeNanoseconds) / 1e9 },
+         after: (@Sendable (Double, @escaping @Sendable () -> Void) -> Void)? = nil) {
         precondition(maxFPS > 0, "FrameRelay: maxFPS ≤ 0")
         self.channel = channel
         self.maxFPS = maxFPS
@@ -104,7 +108,9 @@ public final class FrameRelay: @unchecked Sendable {
         self.now = now
         interval = 1 / maxFPS
         // Por debajo del escritor de la toma (`.userInitiated`): la vista previa cede antes que la grabación.
-        queue = DispatchQueue(label: "ToneForge.FrameRelay.\(channel)", qos: .default)
+        let queue = DispatchQueue(label: "ToneForge.FrameRelay.\(channel)", qos: .default)
+        self.queue = queue
+        self.after = after ?? { delay, fire in queue.asyncAfter(deadline: .now() + max(0, delay), execute: fire) }
         FrameRelayRegistry.shared.add(self)
     }
 
@@ -155,7 +161,7 @@ public final class FrameRelay: @unchecked Sendable {
         if timerArmed { lock.unlock(); return }
         timerArmed = true
         lock.unlock()
-        queue.asyncAfter(deadline: .now() + max(0, delay)) { [weak self] in
+        after(max(0, delay)) { [weak self] in
             guard let self else { return }
             lock.lock()
             timerArmed = false

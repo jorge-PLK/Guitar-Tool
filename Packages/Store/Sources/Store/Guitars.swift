@@ -138,13 +138,18 @@ public extension Project {
 /// Qué opciones y qué `stems/guitar.wav` produjeron las pistas actuales (persistido, `guitarApplied`). Si cambia
 /// cualquiera de las dos cosas, se rehace el paso de guitarras.
 public struct GuitarAppliedState: Codable, Sendable, Equatable {
-    /// Huella de `stems/guitar.wav` al procesar (`ProjectLayout.guitarInputFingerprint`).
+    /// Huella de `stems/guitar.wav` al procesar (`ProjectLayout.guitarInputFingerprint`: tamaño + fecha).
     public var inputFingerprint: String
+    /// SHA-256 del contenido de `stems/guitar.wav` al procesar. Si la huella cambia solo de fecha (mismo tamaño, p. ej.
+    /// proyecto copiado a otra máquina), se compara el contenido antes de rehacer. Opcional en el JSON: los proyectos
+    /// anteriores no lo llevan y se rellena la primera vez que se abren con la huella al día.
+    public var inputSHA256: String?
     public var options: GuitarOptions
     public var finishedAt: Date
 
-    public init(inputFingerprint: String, options: GuitarOptions, finishedAt: Date = Date()) {
+    public init(inputFingerprint: String, inputSHA256: String? = nil, options: GuitarOptions, finishedAt: Date = Date()) {
         self.inputFingerprint = inputFingerprint
+        self.inputSHA256 = inputSHA256
         self.options = options
         self.finishedAt = finishedAt
     }

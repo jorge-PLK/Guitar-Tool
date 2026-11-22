@@ -115,6 +115,7 @@ extension StudyService {
         jobs.setLibraryObserver { [weak self] e in
             Task { @MainActor in self?.libraryEvent(e) }
         }
+        jobs.setFileReleaser { [weak self] id, files in await self?.releaseFiles(id, files) }
     }
 
     nonisolated func registerEdits(on router: Router) {
@@ -280,6 +281,16 @@ extension StudyService {
         return r
     }
 
+    /// La biblioteca va a sustituir o borrar `files` del proyecto `id` (aplicar guitarras): si es el tema abierto, el
+    /// reproductor los suelta antes de volver (NTFS no deja sustituir un fichero abierto, `MoveFileEx` error 5). Al
+    /// llegar `guitarSplitFinished`/`guitarSplitFailed`, `reloadTracksIfChanged` los vuelve a abrir.
+    func releaseFiles(_ id: UUID, _ files: [URL]) {
+        guard let o = current, o.session.projectID == id else { return }
+        let drop = Set(files.map(\.standardizedFileURL.path))
+        guard o.controller.player.tracks.contains(where: { drop.contains($0.url.standardizedFileURL.path) }) else { return }
+        o.controller.loadTracks(excluding: drop)
+    }
+
     /// Igual que `BackingView`: si cambian los stems o las pistas de guitarra, se recargan en el reproductor.
     func reloadTracksIfChanged(_ o: StudyOpen) {
         let layout = o.session.layout
@@ -368,7 +379,9 @@ extension StudyService {
             emitGuitars("idle", nil)
             stateChanged()
         case .guitarSplitFailed(let id, let message):
-            if id == s.projectID { notifyGuitars(id, "failed", message) }
+            guard id == s.projectID else { return }
+            reloadTracksIfChanged(o)   // si falló tras soltar las pistas (`releaseFiles`), se vuelven a abrir
+            notifyGuitars(id, "failed", message)
         default:
             break
         }

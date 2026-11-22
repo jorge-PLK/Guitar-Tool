@@ -126,6 +126,29 @@ public final class TakePreview: @unchecked Sendable {
                   })
     }
 
+    /// Fotograma (girado, a tamaño completo) que se ve en `time` s de la vista previa con ese desfase; `nil` en un tramo
+    /// sin imagen. Mismo contrato que el `frame(at:videoOffset:)` de Windows (`WindowsMontage.swift`); lo usa la hoja
+    /// «Encuadre» de Montaje en AppCore. Exacto: tolerancia cero, el fotograma de ese instante y no el clave más cercano.
+    public func frame(at time: Double, videoOffset: Double, punchOffsets: [Double]? = nil) async throws -> CGImage? {
+        guard let p = pieces(videoOffset: videoOffset, punchOffsets: punchOffsets).last(where: { time >= $0.start && time < $0.end }) else {
+            return nil
+        }
+        let source: Source? = switch p.source {
+        case .base: base
+        case .punch(let i): punchSources[i]
+        }
+        guard let source else { return nil }
+        // Instante del fichero (PTS = tiempo del tema), dentro de lo que el fichero tiene.
+        let pts = min(max(p.sourceStart + (time - p.start), source.available.lowerBound), source.available.upperBound - 1e-4)
+        let gen = AVAssetImageGenerator(asset: source.asset)
+        gen.appliesPreferredTrackTransform = true
+        gen.requestedTimeToleranceBefore = .zero
+        gen.requestedTimeToleranceAfter = .zero
+        let image = try await gen.image(at: CMTime(seconds: pts, preferredTimescale: 90_000)).image
+        // La caja del encuadre está en coordenadas de la imagen ya girada.
+        return rotation.apply(image)
+    }
+
     /// Tramos de imagen: base en todo el tramo de la toma, cada punch encima en el suyo (el último manda), y cada
     /// tramo recortado a lo que su fichero tiene. El cálculo es `TakePreviewPlan` (puro, también en Windows).
     static func plan(songStart: Double, duration: Double, base: ClosedRange<Double>?, baseOffset: Double,

@@ -94,6 +94,7 @@ final class JobEngine: @unchecked Sendable {
         let lib = Library(root: root, profile: profileStore, index: index, importer: s.importer, separator: s.separator,
                           levelMeter: s.levelMeter, analyzer: s.analyzer, guitarSplitter: s.guitarSplitter)
         lock.withLock { hasAnalyzer = s.analyzer != nil }
+        await lib.setFileReleaser { [weak self] id, files in await self?.releaseFiles(id, files) }
         let events = lib.events
         let pumpTask = Task { [self] in
             for await e in events { await self.handle(e, library: lib) }
@@ -186,6 +187,14 @@ final class JobEngine: @unchecked Sendable {
     /// Cada evento de `Library` también llega aquí (el estudio abierto refresca análisis y guitarras, 8.5b).
     private var _libraryObserver: (@Sendable (LibraryEvent) -> Void)?
     func setLibraryObserver(_ f: (@Sendable (LibraryEvent) -> Void)?) { lock.withLock { _libraryObserver = f } }
+    /// Quien tenga abiertos ficheros de un proyecto los suelta aquí antes de que la biblioteca los sustituya o borre
+    /// (`Library.FileReleaser`; NTFS, `MoveFileEx` error 5).
+    private var _fileReleaser: Library.FileReleaser?
+    func setFileReleaser(_ f: Library.FileReleaser?) { lock.withLock { _fileReleaser = f } }
+    var fileReleaser: Library.FileReleaser? { lock.withLock { _fileReleaser } }
+    func releaseFiles(_ id: UUID, _ files: [URL]) async {
+        if let f = lock.withLock({ _fileReleaser }) { await f(id, files) }
+    }
 
     func handle(_ e: LibraryEvent, library: Library) async {
         func key(_ id: UUID) -> String { id.uuidString }

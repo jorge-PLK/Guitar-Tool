@@ -234,6 +234,8 @@ final class RecordService {
     nonisolated(unsafe) var willOpenCamera: (@MainActor @Sendable () -> Void)?
     /// W2-O: antes de cerrar la hoja de desfase (guardar o descartar) y de cerrar Grabar: suelta el reproductor de la hoja.
     nonisolated(unsafe) var willFinishOffset: (@MainActor @Sendable () async -> Void)?
+    /// Justo antes de borrar los ficheros de una toma (Grabar ya soltó sus pistas): el visor suelta esa toma si la tiene.
+    nonisolated(unsafe) var willDeleteTake: (@MainActor @Sendable (UUID) async -> Void)?
     private(set) var cameraRelay: FrameRelay?
     private(set) var controller: RecordController?
     private var ticker: Task<Void, Never>?
@@ -447,8 +449,9 @@ final class RecordService {
         let jobs = studyService.edits.jobs
         let projectID = o.session.projectID
         let c = RecordController(session: o.session, audio: host, mode: options.audio, cameras: cameraSource(),
-                                 deleteTake: { takeID in
+                                 deleteTake: { [weak self] takeID in
             guard let jobs else { throw RPCError(code: "internal", message: "No hay biblioteca.") }
+            await self?.willDeleteTake?(takeID)
             try await jobs.library().deleteTake(projectID: projectID, takeID: takeID)
         })
         c.onChange = { [weak self] in self?.stateChanged() }
@@ -722,5 +725,6 @@ extension Bridge {
             return TakeViewOffsetSource(projectId: c.session.projectID, takeId: r.takeID, audioURL: r.audioURL, songStart: r.songStart)
         }
         service.willFinishOffset = { [weak takeView] in await takeView?.closeOffset() }
+        service.willDeleteTake = { [weak takeView] takeID in await takeView?.release(takeId: takeID) }
     }
 }

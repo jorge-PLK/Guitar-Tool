@@ -414,6 +414,48 @@ final class RecordTests: XCTestCase {
 
     // MARK: Punch-in
 
+    /// Relevo 10 caso 4: durante el punch el reproductor tiene abierta la toma (`take-self`). En NTFS reescribir
+    /// `processed.wav` con un lector abierto falla (`MoveFileEx` error 5): al aplanar no debe quedar ningún descriptor.
+    func testPunchFlattensWithNoReaderOpenOnProcessed() async throws {
+        final class Seen: @unchecked Sendable {
+            private let lock = NSLock()
+            private var v: [[String]?] = []
+            func add(_ x: [String]?) { lock.withLock { v.append(x) } }
+            var all: [[String]?] { lock.withLock { v } }
+        }
+        let sec = Section(name: "Estrofa", start: 0, end: 2.0)
+        let r = try await makeRig(sections: [sec], cameras: .simulated(provider: SimulatedCameraProvider(cameras: [])))
+        _ = try await openRecord(r, camera: "none")
+        _ = try await snap(r, "record.setPreRoll", "{\"bars\":0}")
+        _ = try await snap(r, "record.setStartSection", "{\"sectionId\":\"\(sec.id.uuidString)\"}")
+        _ = try await snap(r, "record.start")
+        var s = try await until(r, timeout: 8) { $0.phase == "idle" && ($0.parts.first?.takes.count ?? 0) == 1 }
+        let takeID = try XCTUnwrap(UUID(uuidString: try XCTUnwrap(s.parts.first?.takes.first).id))
+        let processed = r.layout.processedURL(takeId: takeID)
+        let c = try XCTUnwrap(r.svc.controller)
+        let seen = Seen(), real = c.flattenPunch
+        c.flattenPunch = { base, start, punches, to, rate in
+            seen.add(OpenFiles.stillOpen([base, to]))
+            try real(base, start, punches, to, rate)
+        }
+        s = try await snap(r, "record.setPunch", "{\"enabled\":true}")
+        s = try await snap(r, "record.setPunch", "{\"in\":0.5,\"out\":1.2,\"free\":true}")
+        s = try await snap(r, "record.start")
+        _ = try await until(r, timeout: 4) { $0.phase != "idle" }
+        let openWhilePunching = OpenFiles.stillOpen([processed])
+        s = try await until(r, timeout: 8) { $0.phase == "idle" }
+        let why = "messages=\(s.messages) notices=\(s.notices)"
+        _ = await call(r.router, "record.close")
+        XCTAssertEqual(try r.project.takes.first?.punches?.count, 1, why)
+        if let open = openWhilePunching {
+            XCTAssertEqual(open.count, 1, "el reproductor tiene abierta la toma durante el punch (si no, el test no prueba nada)")
+        }
+        XCTAssertEqual(seen.all.count, 1, "se aplana una vez")
+        if let open = seen.all.first ?? nil { XCTAssertEqual(open, [], "ningún descriptor sobre processed.wav al aplanar") }
+        print("A1 caso 4: abiertas durante el punch \(openWhilePunching.map { "\($0.count)" } ?? "n/d"), al aplanar "
+              + "\((seen.all.first ?? nil).map { "\($0.count)" } ?? "n/d")")
+    }
+
     func testPunchInReplacesSpanAndKeepsBase() async throws {
         let sec = Section(name: "Estrofa", start: 0, end: 2.0)
         let r = try await makeRig(sections: [sec], cameras: .simulated(provider: SimulatedCameraProvider(cameras: [])))

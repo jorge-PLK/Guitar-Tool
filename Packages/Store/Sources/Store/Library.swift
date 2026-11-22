@@ -206,6 +206,17 @@ public actor Library {
     func setProjectDeleter(_ f: @escaping @Sendable (URL) throws -> Void) { projectDeleter = f }
     func setProjectTrasher(_ f: @escaping @Sendable (URL) throws -> Void) { projectTrasher = f }
     func setStemFileRemover(_ f: @escaping @Sendable (URL) throws -> Void) { stemFileRemover = f }
+    /// Borrado de la carpeta de una toma (`deleteTake`, con reintento corto); inyectable para simular un lector abierto.
+    var takeFolderRemover: @Sendable (URL) throws -> Void = { url in try FileManager.default.removeItem(at: url) }
+    func setTakeFolderRemover(_ f: @escaping @Sendable (URL) throws -> Void) { takeFolderRemover = f }
+
+    /// Se llama antes de sustituir o borrar ficheros de un proyecto que alguien puede tener abiertos (p. ej. las pistas
+    /// de guitarra en el reproductor de Backing). En Windows NTFS no deja sustituir ni borrar un fichero abierto
+    /// (`MoveFileEx` error 5): quien los tenga debe soltarlos antes de volver. Al acabar llega el evento de siempre
+    /// (`guitarSplitFinished`/`guitarSplitFailed`) y el oyente los vuelve a abrir.
+    public typealias FileReleaser = @Sendable (_ projectID: UUID, _ files: [URL]) async -> Void
+    private var fileReleaser: FileReleaser?
+    public func setFileReleaser(_ f: FileReleaser?) { fileReleaser = f }
 
     private var queue: [UUID] = []
     private var worker: Task<Void, Never>?
@@ -250,11 +261,11 @@ public actor Library {
     }
 
     @discardableResult
-    private func mutate(_ id: UUID, _ change: (inout Project) -> Void) async throws -> Project {
+    private func mutate(_ id: UUID, touch: Bool = true, _ change: (inout Project) -> Void) async throws -> Project {
         guard let folder = await locate(id) else { throw LibraryError.projectNotFound(id) }
         var p = try ProjectFile.load(folder: folder)
         change(&p)
-        p.updatedAt = Date()
+        if touch { p.updatedAt = Date() }
         try ProjectFile.save(p, to: folder)
         try await index.upsert(project: p, folder: folder)
         return p
@@ -671,7 +682,9 @@ public actor Library {
         guard guitarSplitter != nil, !shuttingDown, let folder = await locate(id) else { return }
         let project = try ProjectFile.load(folder: folder)
         guard project.separation.state == .done, !queue.contains(id), currentID != id, migrations[id] == nil else { return }
-        guard guitarSplitNeeded(project, layout: ProjectLayout(folder: folder)) else { return }
+        let layout = ProjectLayout(folder: folder)
+        let checked = await reconcileGuitarFingerprint(id, project: project, layout: layout)
+        guard guitarSplitNeeded(checked, layout: layout) else { return }
         guitarStates[id] = .pending
         continuation.yield(.guitarSplitQueued(id))
         if currentPostID == id { guitarRerun.insert(id); return }
@@ -709,7 +722,9 @@ public actor Library {
 
     /// Borra una toma: su carpeta `takes/<id>/` (con salvaguarda de ruta: tiene que ser hija directa de `takes/` del
     /// proyecto y llamarse como la toma; si no, lanza `unsafeDeletion` y no toca nada) y la quita de `takes` y de su
-    /// parte, reasignando la mejor. Si la toma no existe en el proyecto, lanza `takeNotFound`.
+    /// parte, reasignando la mejor. Si la toma no existe en el proyecto, lanza `takeNotFound`. Quien tenga abierta la toma
+    /// (reproductor de Grabar, visor) la suelta antes de llamar; aun así la carpeta se borra con reintento corto
+    /// (`FileOps.removeRetrying`): en Windows el `<video>` de WebView2 o el antivirus pueden tardar un instante en soltarla.
     public func deleteTake(projectID: UUID, takeID: UUID) async throws {
         guard let folder = await locate(projectID) else { throw LibraryError.projectNotFound(projectID) }
         let project = try ProjectFile.load(folder: folder)
@@ -720,7 +735,7 @@ public actor Library {
               dir.deletingLastPathComponent().standardizedFileURL.path == layout.takesDir.standardizedFileURL.path else {
             throw LibraryError.unsafeDeletion(dir)
         }
-        if FileManager.default.fileExists(atPath: dir.path) { try FileManager.default.removeItem(at: dir) }
+        if FileManager.default.fileExists(atPath: dir.path) { try await FileOps.removeRetrying(dir, remove: takeFolderRemover) }
         FileOps.removeIfExists(layout.framingCacheURL(takeId: takeID))
         try await mutate(projectID) { $0.removeTake(takeID); $0.montage?.removeFraming(takeID) }
     }
@@ -745,12 +760,15 @@ public actor Library {
     @discardableResult
     public func ensureAnalysis(id: UUID) async throws -> AnalysisState {
         guard let folder = await locate(id) else { throw LibraryError.projectNotFound(id) }
-        let project = try ProjectFile.load(folder: folder)
+        var project = try ProjectFile.load(folder: folder)
         guard project.separation.state == .done, !queue.contains(id), currentID != id else { return .missing }
         if postQueue.contains(id) || currentPostID == id { return analyzer == nil ? .missing : .analyzing }
         // Durante la reconversión no se toca: al terminar `open` vuelve a pedirlo.
         guard migrations[id] == nil else { return .missing }
         let layout = ProjectLayout(folder: folder)
+        project = await reconcileGuitarFingerprint(id, project: project, layout: layout)
+        // El hash cede el actor: si mientras tanto otro lo encoló, no se duplica.
+        if postQueue.contains(id) || currentPostID == id { return analyzer == nil ? .missing : .analyzing }
         let guitarNeeded = guitarSplitNeeded(project, layout: layout)
         if guitarNeeded, guitarStates[id] == nil { guitarStates[id] = .pending; continuation.yield(.guitarSplitQueued(id)) }
         let needsMeasure = needsStemWork(project, layout: layout) || guitarNeeded
@@ -818,6 +836,7 @@ public actor Library {
         }
         // Orden: niveles → guitarras → análisis.
         let guitarsOnly = guitarOnlyJobs.remove(id) != nil
+        project = await reconcileGuitarFingerprint(id, project: project, layout: layout)
         if guitarSplitNeeded(project, layout: layout) {
             project = await splitGuitars(id, folder: folder, project: project)
         } else if case .pending? = guitarStates[id] {
@@ -857,6 +876,49 @@ public actor Library {
         return project.guitars.contains { g in g.file.map { !fm.fileExists(atPath: layout.url(relative: $0).path) } ?? false }
     }
 
+    /// SHA-256 de un fichero fuera del actor (un stem de ~4 min son ~90 MB); nil si no se puede leer.
+    private static func contentHash(_ url: URL) async -> String? {
+        await Task.detached(priority: .utility) { try? Library.sha256(of: url) }.value
+    }
+
+    /// Antes de decidir si se rehacen las guitarras: si la huella de `stems/guitar.wav` cambió solo de fecha (mismo
+    /// tamaño), se comprueba el contenido y, si es el mismo, se da por buena y se guarda la fecha nueva (no se vuelve
+    /// a hashear). Sin hash guardado (proyectos anteriores):
+    /// - huella igual → se calcula y se guarda el hash (una vez), para que una copia posterior no rehaga;
+    /// - solo cambió la fecha → se da por buena si la separación que escribió `guitar.wav` terminó antes que las
+    ///   guitarras (`separation.finishedAt <= guitarApplied.finishedAt`, fechas del JSON, que viajan con la copia).
+    ///   Una reseparación posterior deja el mismo tamaño (depende solo de la duración) y por eso no basta el tamaño.
+    /// No toca `updatedAt`. Devuelve el proyecto (actualizado o tal cual).
+    private func reconcileGuitarFingerprint(_ id: UUID, project: Project, layout: ProjectLayout) async -> Project {
+        guard guitarSplitter != nil, !guitarSplitFailed.contains(project.id), project.guitarOptions.needsProcessing,
+              let st = project.guitarApplied, let current = layout.guitarInputFingerprint else { return project }
+        let url = layout.stemURL(.guitar)
+        let sha: String
+        if st.inputFingerprint == current {
+            guard st.inputSHA256 == nil, let h = await Self.contentHash(url) else { return project }
+            sha = h
+        } else {
+            guard let was = ProjectLayout.fingerprintSize(st.inputFingerprint),
+                  was == ProjectLayout.fingerprintSize(current) else { return project }
+            if let stored = st.inputSHA256 {
+                guard let h = await Self.contentHash(url), h == stored else { return project }
+                sha = h
+            } else {
+                guard let separated = project.separation.finishedAt, separated <= st.finishedAt,
+                      let h = await Self.contentHash(url) else { return project }
+                sha = h
+            }
+        }
+        // Si el fichero cambió mientras se hasheaba, o el paso de guitarras escribió otro estado, no se toca nada.
+        guard layout.guitarInputFingerprint == current else { return project }
+        let updated = try? await mutate(id, touch: false) { p in
+            guard p.guitarApplied?.inputFingerprint == st.inputFingerprint else { return }
+            p.guitarApplied?.inputFingerprint = current
+            p.guitarApplied?.inputSHA256 = sha
+        }
+        return updated ?? project
+    }
+
     /// Rehace las pistas con las opciones guardadas ahora. Si fallan, el proyecto queda como estaba.
     private func splitGuitars(_ id: UUID, folder: URL, project: Project) async -> Project {
         guard let guitarSplitter else { return project }
@@ -872,6 +934,7 @@ public actor Library {
                     p.guitars = p.guitars.map { Guitar(role: $0.role, name: $0.name) }
                     p.guitarApplied = nil
                 }
+                await fileReleaser?(id, GuitarRole.allCases.map { layout.guitarURL($0) })
                 for role in GuitarRole.allCases { FileOps.removeIfExists(layout.guitarURL(role)) }
                 guitarStates[id] = nil
                 cont.yield(.guitarSplitFinished(id))
@@ -879,6 +942,7 @@ public actor Library {
             }
             guitarStates[id] = .processing
             cont.yield(.guitarSplitStarted(id))
+            let inputSHA = await Self.contentHash(layout.stemURL(.guitar))
             let out = layout.guitarsPartialDir
             FileOps.removeIfExists(out)
             try fm.createDirectory(at: out, withIntermediateDirectories: true)
@@ -894,11 +958,15 @@ public actor Library {
                 }
             }
             try fm.createDirectory(at: layout.stemsDir, withIntermediateDirectories: true)
+            // Soltar lo que se va a sustituir o borrar (el reproductor de Backing lo tiene abierto si el tema está abierto).
+            let replaced = result.tracks.map { layout.stemsDir.appendingPathComponent($0.file) }
+            let dropped = GuitarRole.allCases.filter { r in !result.tracks.contains { $0.role == r } }.map { layout.guitarURL($0) }
+            await fileReleaser?(id, replaced + dropped)
             for t in result.tracks {
                 try FileOps.atomicReplace(layout.stemsDir.appendingPathComponent(t.file), with: out.appendingPathComponent(t.file))
             }
             let tracks = result.tracks
-            let applied = GuitarAppliedState(inputFingerprint: fingerprint, options: options)
+            let applied = GuitarAppliedState(inputFingerprint: fingerprint, inputSHA256: inputSHA, options: options)
             // project.json antes de borrar los WAV de los papeles que ya no salen.
             let updated = try await mutate(id) { p in
                 var guitars = p.guitars.map { Guitar(role: $0.role, name: $0.name) }

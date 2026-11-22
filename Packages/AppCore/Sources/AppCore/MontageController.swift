@@ -962,8 +962,9 @@ final class MontageController {
             if let r = mixResult {
                 for f in r.trackFiles { try? fm.removeItem(at: f.url) }
                 try? fm.removeItem(at: r.mixURL)
-                if out.trackWAVs, (try? fm.contentsOfDirectory(atPath: tracksDir.path))?.isEmpty == true { try? fm.removeItem(at: tracksDir) }
             }
+            // La carpeta `-pistas` se crea antes de mezclar: si se cancela durante la mezcla (sin `mixResult`) queda vacía.
+            if out.trackWAVs, (try? fm.contentsOfDirectory(atPath: tracksDir.path))?.isEmpty == true { try? fm.removeItem(at: tracksDir) }
             setExport(Task.isCancelled || error is CancellationError ? .cancelled : .failed("No se pudo exportar el vídeo (\(error))."))
         }
     }

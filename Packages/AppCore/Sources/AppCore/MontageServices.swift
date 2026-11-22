@@ -70,6 +70,12 @@ struct MontageServices: Sendable {
             let preview = try await TakePreview.load(audioURL: audioURL, songStart: video.take.start, videoURL: video.url,
                                                      punches: video.punches, rotation: video.rotation)
             return try preview.frame(at: t - video.take.start, videoOffset: video.videoOffset)
+            #elseif canImport(AVFoundation)
+            // M1 (parte 3): en el Mac, el mismo `TakePreview` (plan de tramos, punches, giro) con `AVAssetImageGenerator`.
+            let preview = try await TakePreview.load(audioURL: audioURL, songStart: video.take.start, videoURL: video.url,
+                                                     punches: video.punches, rotation: video.rotation)
+            guard let image = try await preview.frame(at: t - video.take.start, videoOffset: video.videoOffset) else { return nil }
+            return try MacMontageComposer.bgra(image)
             #else
             return nil
             #endif

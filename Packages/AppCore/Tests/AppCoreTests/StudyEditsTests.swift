@@ -76,7 +76,8 @@ final class StudyEditsTests: XCTestCase {
         var box: AnalyzerBox
     }
 
-    func makeRig(analysis: Bool = true, separated: Bool = true, analyzer: Bool = true, guitars: Bool = false) throws -> Rig {
+    func makeRig(analysis: Bool = true, separated: Bool = true, analyzer: Bool = true, guitars: Bool = false,
+                 guitarSplitter: (any GuitarSplitting)? = nil) throws -> Rig {
         let base = FileManager.default.temporaryDirectory.appendingPathComponent("edits-\(UUID().uuidString)", isDirectory: true)
         let root = base.appendingPathComponent("projects", isDirectory: true)
         let support = base.appendingPathComponent("support", isDirectory: true)
@@ -117,7 +118,7 @@ final class StudyEditsTests: XCTestCase {
         }
         try ProjectFile.save(p, to: folder)
         let services = JobServices(importer: EditsImporter(), separator: EditsSeparator(), levelMeter: nil,
-                                   analyzer: analyzer ? EditsAnalyzer(box: box) : nil, guitarSplitter: nil)
+                                   analyzer: analyzer ? EditsAnalyzer(box: box) : nil, guitarSplitter: guitarSplitter)
         let events = Events()
         let bridge = try Bridge(options: LaunchOptions(projectsFolder: root, supportDir: support, audio: .simulated),
                                 mediaBase: "https://tf.media/", reveal: nil, services: services)
@@ -506,6 +507,68 @@ final class StudyEditsTests: XCTestCase {
         XCTAssertTrue(failEvent, "fallar pide study.state")
         snap = try await ok(r, "study.snapshot")
         XCTAssertEqual((snap["guitars"] as? [String: Any])?["process"] as? String, "failed")
+    }
+
+    /// Separador falso: escribe L y R con los mismos nombres que ya hay en `stems/` (la cola los sustituye).
+    struct StereoSplitterFake: GuitarSplitting {
+        func split(projectFolder: URL, input: URL, outputDirectory: URL, options: GuitarOptions,
+                   progress: @escaping @Sendable (Double) -> Void) async throws -> GuitarSplitResult {
+            let layout = ProjectLayout(folder: projectFolder)
+            var tracks: [SeparatedGuitar] = []
+            for (role, f) in [(GuitarRole.left, 300.0), (GuitarRole.right, 350.0)] {
+                let name = layout.guitarURL(role).lastPathComponent
+                let url = outputDirectory.appendingPathComponent(name)
+                try await MainActor.run { try StudyTests.writeSine(url, frequency: f) }
+                tracks.append(SeparatedGuitar(role: role, file: name))
+            }
+            return GuitarSplitResult(tracks: tracks)
+        }
+    }
+
+    final class ReleaseProbe: @unchecked Sendable {
+        struct Call { var files: [URL]; var stillLoaded: [String]; var stillOpen: [String]? }
+        private let lock = NSLock()
+        private var items: [Call] = []
+        func add(_ c: Call) { lock.withLock { items.append(c) } }
+        var calls: [Call] { lock.withLock { items } }
+    }
+
+    /// Relevo 10 caso 1: aplicar guitarras con el tema abierto en Backing. El reproductor tiene abiertas las pistas que la
+    /// cola sustituye y en NTFS `MoveFileEx` falla (error 5): las suelta antes (sin descriptor abierto al sustituir) y
+    /// las vuelve a abrir al acabar.
+    func testApplyingGuitarsReleasesOpenTracksBeforeReplacing() async throws {
+        let r = try makeRig(guitars: true, guitarSplitter: StereoSplitterFake())
+        _ = try await open(r)
+        let layout = ProjectLayout(folder: r.folder)
+        let guitarFiles = [layout.guitarURL(.left), layout.guitarURL(.right)]
+        let svc = r.bridge.studyService
+        let guitarIDs: Set<String> = [GuitarRole.left.trackID, GuitarRole.right.trackID]
+        let loadedIDs = { Set(svc.current?.controller.player.tracks.map(\.id) ?? []) }
+        XCTAssertTrue(loadedIDs().isSuperset(of: guitarIDs), "pistas cargadas: \(loadedIDs())")
+        if let open = OpenFiles.stillOpen(guitarFiles) {
+            XCTAssertEqual(open.count, 2, "el reproductor tiene abiertas las dos pistas antes de aplicar (si no, el test no prueba nada)")
+        }
+        let jobs = r.bridge.jobs
+        let real = try XCTUnwrap(jobs.fileReleaser, "StudyService conecta el liberador al adjuntarse a la cola")
+        let probe = ReleaseProbe()
+        jobs.setFileReleaser { id, files in
+            await real(id, files)
+            let paths = Set(files.map(\.standardizedFileURL.path))
+            let loaded = await MainActor.run {
+                svc.current?.controller.player.tracks.filter { paths.contains($0.url.standardizedFileURL.path) }.map(\.id) ?? []
+            }
+            probe.add(.init(files: files, stillLoaded: loaded, stillOpen: OpenFiles.stillOpen(files)))
+        }
+        _ = try await jobs.library().saveGuitarStereoSplit(id: r.project.id, true)
+        let applied = await waitFor(10) { (try? self.saved(r))?.guitarApplied != nil && loadedIDs().isSuperset(of: guitarIDs) }
+        XCTAssertTrue(applied, "guitarApplied=\(String(describing: try? saved(r).guitarApplied)) pistas=\(loadedIDs())")
+        let calls = probe.calls
+        XCTAssertEqual(calls.count, 1, "se suelta una vez, justo antes de sustituir")
+        guard let c = calls.first else { return }
+        XCTAssertTrue(Set(c.files.map(\.standardizedFileURL.path)).isSuperset(of: guitarFiles.map(\.standardizedFileURL.path)))
+        XCTAssertEqual(c.stillLoaded, [], "el reproductor ya no tiene esas pistas al sustituir")
+        if let open = c.stillOpen { XCTAssertEqual(open, [], "ningún descriptor abierto sobre lo que se sustituye") }
+        print("A1 caso 1: soltadas \(c.files.map(\.lastPathComponent)), abiertas al sustituir: \(c.stillOpen.map { "\($0.count)" } ?? "n/d")")
     }
 
     /// B2 (decisión de Jorge): `library.relocate` cierra el estudio abierto y suelta sus ficheros antes de mover.

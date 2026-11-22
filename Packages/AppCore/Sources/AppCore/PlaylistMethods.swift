@@ -386,6 +386,7 @@ extension Bridge {
         let engine = PlaylistEngine(jobs: jobs, sources: sources, root: root)
         engine.setSink { [weak self] in self?.emit("playlist.changed", $0) }
         liveList = { await engine.liveSnapshot() }
+        addShutdownHook { _ = await engine.close(force: true) }   // cancela lectura y cola de la lista
         link.setPlaylistHooks(
             open: { text in try await engine.open(text) },
             cancelLoading: { await engine.cancelLoading() })

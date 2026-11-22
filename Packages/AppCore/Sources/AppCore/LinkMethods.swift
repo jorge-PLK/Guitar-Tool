@@ -316,6 +316,16 @@ final class LinkEngine: @unchecked Sendable {
         return true
     }
 
+    /// Cierre de la app: cancela todas las descargas (en cola y en marcha) y la resolución viva.
+    func cancelAll() async {
+        let tasks = lock.withLock { Array(running.values) }
+        for t in tasks { t.cancel() }
+        await cancelResolve()
+    }
+
+    /// Descargas vivas (solo tests).
+    var runningCount: Int { lock.withLock { running.count } }
+
     private func finish(_ f: LinkFinished) {
         let emit = lock.withLock { running[f.jobId] = nil; return _emitFinished }
         emit(f)
@@ -416,6 +426,7 @@ extension Bridge {
         let engine = LinkEngine(jobs: jobs, sources: sources, root: root)
         engine.setSink { [weak self] in self?.emit("link.finished", $0) }
         registerPlaylistMethods(link: engine, sources: sources, root: root)
+        addShutdownHook { await engine.cancelAll() }
 
         router.register("link.classify") { (p: LinkURLParams) -> LinkClassifyResult in Self.classify(p.url) }
         router.register("link.resolve") { (p: LinkURLParams) in try await engine.resolve(url: p.url) }

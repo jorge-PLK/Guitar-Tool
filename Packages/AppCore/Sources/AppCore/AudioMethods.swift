@@ -184,7 +184,7 @@ final class AudioService {
     private let emitRaw: @Sendable (String) -> Void
     /// Cómo se crea el controlador la primera vez (los tests lo sustituyen antes de usarlo).
     var factory: (@MainActor (LaunchOptions) -> AudioController) = AudioService.defaultController
-    private var created: AudioController?
+    private(set) var created: AudioController?
     private var statePending = false
 
     nonisolated init(options: LaunchOptions, emit: @escaping @Sendable (String) -> Void) {
@@ -458,6 +458,15 @@ extension Bridge {
         let service = AudioService(options: options, emit: { [weak self] in self?.send($0) })
         service.register(on: router)
         studyService.audioService = service
+        // B6: al cerrar, corta grabación y calibración en curso (Mac y Windows).
+        addShutdownHook { [weak service] in
+            guard let s = service else { return }
+            await MainActor.run {
+                guard let c = s.created else { return }
+                if c.isRecording { c.stopRecording() }
+                if c.calibrationIsRunning { c.cancelCalibration() }
+            }
+        }
         // W2-E2: las cámaras de Ajustes las pone `SettingsService.resolvedCameras` (Media Foundation en Windows salvo
         // `--camera simulated`/`--audio simulated`), no aquí.
     }
