@@ -28,6 +28,19 @@ $env:HOME = $FakeHome
 $SpmDir = Join-Path $P9 "swiftpm"
 New-Item -ItemType Directory -Force $SpmDir | Out-Null
 
+# Flutter/Dart (P9 7d): TODO su estado y caches viven en $P9 (un solo sitio; lo usa app.ps1).
+$Flutter = Join-Path $P9 "flutter\bin\flutter.bat"
+$AppDir = Join-Path $Src "Probes\P9-flutter\app"
+function Set-FlutterEnv() {
+    $env:PUB_CACHE = Join-Path $P9 "pub-cache"
+    $env:APPDATA = Join-Path $P9 "appdata"
+    $env:LOCALAPPDATA = Join-Path $P9 "localappdata"
+    $env:FLUTTER_SUPPRESS_ANALYTICS = "true"
+    $env:BOT = "true"
+    $env:DART_DISABLE_TELEMETRY = "1"
+    New-Item -ItemType Directory -Force $env:PUB_CACHE, $env:APPDATA, $env:LOCALAPPDATA | Out-Null
+}
+
 # Flags de swift build para x64 (los de Tools/win/remote/common.ps1 adaptados a D:\).
 function Get-SwiftArgs() {
     $a = @("-c", "release", "--arch", "x86_64", "--package-path", $Pkg,
