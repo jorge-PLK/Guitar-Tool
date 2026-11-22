@@ -1,6 +1,6 @@
 # Retoques de interfaz (mini-spec de la Fase 7b)
 
-Rama `fase-7b` desde `main` (Fases 5c y 7 ya cerradas allí). Lista de Jorge del 17/11/2026 (`docs/plan.md`, «Fase 7b»), numerada como allí. Decidido con Jorge el 17/11 y, las dudas de la mini-spec, el 18/11/2026.
+Rama `fase-7b` desde `main` (Fases 5c y 7 ya cerradas allí). Lista de Jorge del 17/11/2026 (`docs/plan/fase-7b.md`), numerada como allí. Decidido con Jorge el 17/11 y, las dudas de la mini-spec, el 18/11/2026.
 
 ## Condición de paso
 

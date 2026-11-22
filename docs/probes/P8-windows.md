@@ -250,7 +250,7 @@ Todos en `Probes/P8-windows/`.
 
 ## Capa de plataforma (paso 6)
 
-Resultado (19/11/2026): los 13 paquetes compilan y pasan sus tests en la VM, ARM64 y x64, con 0 fallos; la suite entera del Mac y `App` en verde. Lo que queda para el paso 7 son 114 saltos `[paso 7]` y hay 5 saltos `[windows]` permanentes (ver `docs/plan.md`, «Corte del paso 6»).
+Resultado (19/11/2026): los 13 paquetes compilan y pasan sus tests en la VM, ARM64 y x64, con 0 fallos; la suite entera del Mac y `App` en verde. Lo que queda para el paso 7 son 114 saltos `[paso 7]` y hay 5 saltos `[windows]` permanentes (ver `docs/plan/fase-7c.md`, «Corte del paso 6»).
 
 ### Tests en la VM
 
@@ -274,7 +274,7 @@ Resultado (19/11/2026): los 13 paquetes compilan y pasan sus tests en la VM, ARM
 
 ## Piezas de Windows (paso 7)
 
-Resultado (21/11/2026), solo x64: VM x64 Debug, 13 paquetes, 0 fallos y 0 saltos `[paso 7]`; suite del Mac verde. Detalle de cifras, tabla de tiempos Debug x64, release x64 y Mac, y pendientes en `docs/plan.md` («Pendiente tras el paso 7»).
+Resultado (21/11/2026), solo x64: VM x64 Debug, 13 paquetes, 0 fallos y 0 saltos `[paso 7]`; suite del Mac verde. Detalle de cifras, tabla de tiempos Debug x64, release x64 y Mac, y pendientes en `docs/plan/fase-7c.md` («Pendiente tras el paso 7»).
 
 ### Hilos de ONNX Runtime (separación)
 
