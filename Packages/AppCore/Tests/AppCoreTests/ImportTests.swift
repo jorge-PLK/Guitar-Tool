@@ -464,6 +464,45 @@ final class ImportTests: XCTestCase {
         await bridge.shutdownAsync()
     }
 
+    func testTestPickFolderVariableSkipsDialog() async throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("appcore-envpick-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let support = dir.appendingPathComponent("Support", isDirectory: true)
+        let injected = dir.appendingPathComponent("Inyectada", isDirectory: true)
+        let services = JobServices(importer: FakeImporter(), separator: FakeSeparator(gate: Gate(), fail: false, hang: false),
+                                   levelMeter: nil, analyzer: nil, guitarSplitter: nil)
+        func run(env: [String: String]) async throws -> (RemapHost, [String: Any], [String: Any]) {
+            let bridge = try Bridge(options: LaunchOptions(projectsFolder: nil, supportDir: support),
+                                    mediaBase: "https://tf.media/", reveal: nil, services: services)
+            bridge.proposedFolder = dir.appendingPathComponent("Music/ToneForge", isDirectory: true)
+            bridge.environment = { env }
+            let host = RemapHost()
+            host.folder = dir.appendingPathComponent("Dialogo", isDirectory: true)
+            bridge.host = host
+            func call(_ m: String) async -> [String: Any] {
+                let r = await bridge.router.handle("{\"id\":1,\"method\":\"\(m)\",\"params\":{}}")
+                return ((try? JSONSerialization.jsonObject(with: Data(r.utf8))) as? [String: Any])?["result"] as? [String: Any] ?? [:]
+            }
+            let chosen = await call("host.chooseFolder")
+            let picked = await call("host.pickProjectsFolder")
+            await bridge.shutdownAsync()
+            return (host, chosen, picked)
+        }
+        let (hostEnv, chosenEnv, pickedEnv) = try await run(env: [Bridge.testPickFolderVariable: injected.path])
+        XCTAssertEqual(chosenEnv["path"] as? String, injected.path)
+        XCTAssertEqual(pickedEnv["path"] as? String, injected.path)
+        XCTAssertTrue(hostEnv.initials.isEmpty, "con la variable no se abre el diálogo")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: injected.path))
+        let profile = try ProfileStore(url: support.appendingPathComponent("profile.json")).load()
+        XCTAssertEqual(profile.projectsFolder?.standardizedFileURL.path, injected.standardizedFileURL.path)
+
+        try? FileManager.default.removeItem(at: support)
+        let (hostNo, chosenNo, pickedNo) = try await run(env: [:])
+        XCTAssertEqual(hostNo.initials.count, 2, "sin la variable se llama al diálogo")
+        XCTAssertEqual(chosenNo["path"] as? String, dir.appendingPathComponent("Dialogo").path)
+        XCTAssertEqual(pickedNo["path"] as? String, dir.appendingPathComponent("Dialogo").path)
+    }
+
     func testHostMethods() async throws {
         let noHost = try Rig()
         defer { noHost.cleanup() }

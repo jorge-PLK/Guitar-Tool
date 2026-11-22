@@ -55,6 +55,10 @@ public final class Bridge: @unchecked Sendable {
     nonisolated(unsafe) var recordService: RecordService?
     /// Carpeta que propone el primer arranque; los tests la apuntan a un temporal.
     nonisolated(unsafe) public var proposedFolder: URL = Bridge.defaultProposedFolder
+    /// Lector del entorno; los tests inyectan uno propio en lugar de tocar el del proceso.
+    nonisolated(unsafe) public var environment: @Sendable () -> [String: String] = { ProcessInfo.processInfo.environment }
+    /// Variable SOLO PARA PRUEBAS: si trae una ruta, los selectores de carpeta la devuelven sin abrir el diálogo nativo.
+    public static let testPickFolderVariable = "TF_TEST_PICK_FOLDER"
 
     /// Diálogos nativos; los pone el anfitrión (8.3a, `ImportMethods.swift`). Sin él, `host.*` da `unsupported`.
     public var host: (any HostServices)? {

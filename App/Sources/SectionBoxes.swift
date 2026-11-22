@@ -234,20 +234,25 @@ struct SectionBoxes: View {
         }
     }
 
-    /// Índices de acorde que la caja envuelve: el de inicio más cercano al principio y el de fin más cercano al final.
-    private func chordSpan(_ s: SongSection) -> ClosedRange<Int>? {
-        guard let first = chords.first, let last = chords.last, s.end > first.start, s.start < last.end else { return nil }
-        let a = chords.indices.min { abs(chords[$0].start - s.start) < abs(chords[$1].start - s.start) }
-        let b = chords.indices.min { abs(chords[$0].end - s.end) < abs(chords[$1].end - s.end) }
-        guard let a, let b, a <= b else { return nil }
-        return a...b
+    /// X de un instante dentro de la tira: interpolado dentro del chip que lo contiene (los extremos de acorde
+    /// caen en el borde del chip); entre dos chips, el borde del siguiente (inicio) o del anterior (fin).
+    private func x(at t: Double, isStart: Bool) -> (x: CGFloat, maxY: CGFloat)? {
+        let idx: Int?
+        if isStart { idx = chords.indices.first { chords[$0].end > t && frames[$0] != nil } }
+        else { idx = chords.indices.last { chords[$0].start < t && frames[$0] != nil } }
+        guard let i = idx, let f = frames[i] else { return nil }
+        let c = chords[i], span = c.end - c.start
+        let k = span > 0 ? CGFloat(min(max((t - c.start) / span, 0), 1)) : (isStart ? 0 : 1)
+        return (f.minX + f.width * k, f.maxY)
     }
 
-    /// Caja de la sección en la tira (x desde el primer chip hasta el último, alto hasta el pie de los chips).
+    /// Caja de la sección en la tira: x según los tiempos de inicio/fin de la sección (no según los acordes que
+    /// envuelva, así una sección corta entre dos acordes también tiene caja); alto hasta el pie de los chips.
     private func rect(_ s: SongSection) -> CGRect? {
-        guard let span = chordSpan(s), let f0 = frames[span.lowerBound], let f1 = frames[span.upperBound] else { return nil }
-        let x0 = f0.minX - Self.inset, x1 = f1.maxX + Self.inset
-        return CGRect(x: x0, y: 0, width: max(x1 - x0, 8), height: max(f0.maxY, f1.maxY) + Self.inset)
+        guard let first = chords.first, let last = chords.last, s.end > first.start, s.start < last.end,
+              let p0 = x(at: s.start, isStart: true), let p1 = x(at: s.end, isStart: false) else { return nil }
+        let x0 = p0.x - Self.inset, x1 = max(p1.x + Self.inset, x0 + 8)
+        return CGRect(x: x0, y: 0, width: x1 - x0, height: max(p0.maxY, p1.maxY) + Self.inset)
     }
 
     @ViewBuilder private func box(_ s: SongSection) -> some View {

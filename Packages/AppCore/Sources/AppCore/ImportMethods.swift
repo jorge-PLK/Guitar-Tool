@@ -244,7 +244,7 @@ extension Bridge {
         // B2: solo elegir la carpeta (abre en la actual); aplicarla es `library.relocate`.
         router.register("host.chooseFolder") { [weak self] (_: Empty) in
             guard let host = self?.host else { throw Bridge.noHost }
-            let picked = await host.pickFolder(initial: root.url)
+            let picked = await self?.requestFolder(host, initial: root.url)
             return ChosenFolderResult(path: picked?.path)
         }
         // B2: cambiar la carpeta en caliente. `mode`: «move» (copia, verifica y borra el original) o «point» (solo apunta).
@@ -275,7 +275,7 @@ extension Bridge {
             // Como `chooseFirstRunFolder` del Mac: abre en la propuesta (`~/Music/ToneForge`, creada antes).
             let proposed = self?.proposedFolder
             if let proposed { try? FileManager.default.createDirectory(at: proposed, withIntermediateDirectories: true) }
-            guard let url = await host.pickFolder(initial: root.url ?? proposed) else {
+            guard let url = await self?.requestFolder(host, initial: root.url ?? proposed) else {
                 return PickedFolderResult(path: nil, restartRequired: false)
             }
             let firstRun = root.url == nil
@@ -287,6 +287,16 @@ extension Bridge {
             _ = await host.projectsFolderChanged(url)
             return PickedFolderResult(path: url.path, restartRequired: false)
         }
+    }
+
+    /// Único punto donde se pide un selector de carpeta al anfitrión (`host.chooseFolder` y `host.pickProjectsFolder`).
+    /// SOLO PARA PRUEBAS: si `TF_TEST_PICK_FOLDER` está definida y no vacía, se devuelve esa ruta como si el usuario la
+    /// hubiera elegido, sin abrir el diálogo; el resto del camino es el normal. Sin la variable, todo igual que siempre.
+    func requestFolder(_ host: any HostServices, initial: URL?) async -> URL? {
+        if let path = environment()[Bridge.testPickFolderVariable], !path.isEmpty {
+            return URL(fileURLWithPath: path, isDirectory: true)
+        }
+        return await host.pickFolder(initial: initial)
     }
 
     /// Carpeta que se propone en el primer arranque (`AppModel.proposedFolder` del Mac: `~/Music/ToneForge`).

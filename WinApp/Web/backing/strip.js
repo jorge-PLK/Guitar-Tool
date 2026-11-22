@@ -35,15 +35,16 @@ export function barNumbers(chords, downbeats, bpm) {
   return out;
 }
 
-/// Mac (SectionBoxes.chordSpan): de inicio más cercano al principio a fin más cercano al final.
-function chordSpan(chords, s) {
-  if (!chords.length || !(s.end > chords[0].start && s.start < chords[chords.length - 1].end)) return null;
-  let a = 0, b = 0;
-  chords.forEach((c, i) => {
-    if (Math.abs(c.start - s.start) < Math.abs(chords[a].start - s.start)) a = i;
-    if (Math.abs(c.end - s.end) < Math.abs(chords[b].end - s.end)) b = i;
-  });
-  return a <= b ? [a, b] : null;
+/// Mac (SectionBoxes.x(at:)): x de un instante en la tira, interpolado dentro del chip que lo contiene; entre dos
+/// chips, borde del siguiente (inicio) o del anterior (fin). La caja sigue los tiempos de la sección, no los acordes.
+function xAtTime(chords, L, t, isStart) {
+  let i = -1;
+  if (isStart) i = chords.findIndex(c => c.end > t);
+  else for (let k = chords.length - 1; k >= 0; k--) if (chords[k].start < t) { i = k; break; }
+  if (i < 0) return null;
+  const c = chords[i], span = c.end - c.start;
+  const k = span > 0 ? Math.min(Math.max((t - c.start) / span, 0), 1) : (isStart ? 0 : 1);
+  return L.xs[i] + L.ws[i] * k;
 }
 /// Mac (ChordGridView.clickSlop): menos de esto es un clic, no un arrastre.
 const CLICK_SLOP = 4;
@@ -144,10 +145,10 @@ export function ChordStrip({ chords, sections, analysis, transpose, loop, edit, 
     L.boxes = [];
     const sel = props.current.selected;
     for (const s of preview.current ?? sections) {
-      const span = chordSpan(chords, s);
-      if (!span) continue;
-      const [i0, i1] = span;
-      const x0 = L.xs[i0] - INSET, x1 = L.xs[i1] + L.ws[i1] + INSET;
+      if (!chords.length || !(s.end > chords[0].start && s.start < chords[chords.length - 1].end)) continue;
+      const p0 = xAtTime(chords, L, s.start, true), p1 = xAtTime(chords, L, s.end, false);
+      if (p0 == null || p1 == null) continue;
+      const x0 = p0 - INSET, x1 = Math.max(p1 + INSET, x0 + 8);
       if (x1 < L.scroll || x0 > L.scroll + w) { L.boxes.push({ s, x0, x1 }); continue; }
       const tint = sectionTint(s, C.accent);
       const isLoop = loop && Math.abs(loop.start - s.start) < 0.01 && Math.abs(loop.end - s.end) < 0.01;
