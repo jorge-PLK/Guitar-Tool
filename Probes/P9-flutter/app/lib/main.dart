@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import 'probe2.dart';
 import 'probe2_util.dart';
+import 'probe6_snapshot.dart';
 
 const _sample = 'Wxilmg 0123 Afinador';
 
@@ -16,6 +17,11 @@ String? _opt(List<String> args, String name) {
 
 void main(List<String> args) {
   WidgetsFlutterBinding.ensureInitialized();
+  final snap = SnapshotArgs.parse(args);
+  if (snap != null) {
+    runSnapshot(snap);
+    return;
+  }
   final probe = _opt(args, '--probe');
   if (probe != null && probe.startsWith('ffi')) {
     final wd = Watchdog()..start();
