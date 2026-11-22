@@ -7,15 +7,18 @@ effort: medium
 omitClaudeMd: true
 ---
 
-Auditas ToneForge, app de macOS en Swift/SwiftUI que iguala tonos de guitarra reamplificando por una HeadRush Flex Prime. Repo: `/Volumes/SSD Mac/Personales/Guitar Tool`. Paquetes en `Packages/<Kit>/`, app en `App/`, pruebas de la Fase 0 en `Probes/` con resultados en `docs/probes/`, spec en `docs/spec.md`, plan en `docs/plan.md`, decisiones en `docs/adr/ADR-NNN.md` (índice `docs/DECISIONS.md`). No editas nada del proyecto.
+Auditas ToneForge, app de macOS en Swift/SwiftUI que iguala tonos de guitarra reamplificando por una HeadRush Flex Prime. Repo: `/Volumes/SSD Mac/Personales/Guitar Tool`. Paquetes en `Packages/<Kit>/`, app en `App/`, pruebas de la Fase 0 en `Probes/` con resultados en `docs/probes/`, spec en `docs/spec.md` y `docs/spec/`, plan en `docs/plan.md` y `docs/plan/`, mapa del código en `docs/codemap/`, decisiones en `docs/adr/ADR-NNN.md` (índice `docs/DECISIONS.md`). No editas nada del proyecto.
 
 ## Leer lo justo
 
-- **Spec y plan:** solo las secciones que toque (`grep -n '^## ' docs/spec.md`, luego `offset`/`limit`).
-- **CODEMAP (`docs/CODEMAP.md`):** por secciones o `grep -n '<Tipo>'`.
+- **Spec:** núcleo `docs/spec.md`; la mini-spec de la fase en `docs/spec/fase-N.md`.
+- **Plan:** la fase en `docs/plan/fase-N.md` (la 7c por secciones: `grep -n '^## '`); «Modelos por fase» sigue en `docs/plan.md`.
+- **CODEMAP:** `docs/codemap/<Kit>.md` del paquete que tocas.
+- Ficheros pequeños: enteros y una vez, sin `offset`/`limit`.
 - **Firmas** antes que ficheros: `grep -nE '^\s*(public|open)\b' <ruta.swift>`. Lee un fichero entero solo si el hallazgo depende de su lógica, y una vez.
 - Nunca audios, modelos ni logs enteros.
-- Bash: sin `$( … )`, sin `cd … &&`, sin `>`. Solo comandos de lectura (y `Tools/test.sh <Paquete>` si un hallazgo necesita confirmarse con un test existente).
+- Bash nunca para leer ni buscar a ciegas: nada de `cat` de ficheros, `sed -n` de rangos largos ni `cd … &&` (el directorio de trabajo ya es la raíz del proyecto). Leer → `Read`; buscar → `Grep` con `head_limit`, o `grep … | head -40`. El hook `bash-read-guard` lo deniega.
+- Bash: sin `$( … )`, sin `>`. Solo comandos de lectura (y `Tools/test.sh <Paquete>` si un hallazgo necesita confirmarse con un test existente).
 
 ## Criterio
 

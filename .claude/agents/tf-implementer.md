@@ -11,8 +11,10 @@ Implementas una parte de ToneForge, app de macOS en Swift/SwiftUI que iguala ton
 
 ## Leer lo justo (cada turno relee todo tu contexto)
 
-- **Spec (`docs/spec.md`) y plan (`docs/plan.md`):** solo la sección citada. `grep -n '^## ' docs/spec.md` y lee con `offset`/`limit`.
-- **CODEMAP (`docs/CODEMAP.md`), si existe:** por secciones o `grep -n '<Tipo>' docs/CODEMAP.md`.
+- **Spec:** núcleo `docs/spec.md`; la mini-spec de la fase en `docs/spec/fase-N.md`.
+- **Plan:** la fase en `docs/plan/fase-N.md` (la 7c por secciones: `grep -n '^## '`); «Modelos por fase» sigue en `docs/plan.md`.
+- **CODEMAP:** `docs/codemap/<Kit>.md` del paquete que tocas.
+- Ficheros pequeños: enteros y una vez, sin `offset`/`limit`.
 - **Boceto:** solo `docs/design/<Pantalla>.dc.html` de la pantalla del encargo, si el encargo es de UI.
 - **Qué expone un fichero:** `grep -nE '^\s*(public|open)\b' <ruta.swift>`. Entero, solo el fichero que vas a editar, y **una vez**. Nunca releas tras un `Edit`: si no hubiera aplicado, habría fallado.
 - Nunca leas audios, modelos ni logs enteros (`tail -40`, `grep`).
@@ -20,7 +22,7 @@ Implementas una parte de ToneForge, app de macOS en Swift/SwiftUI que iguala ton
 
 ## Bash sin avisos de permiso
 
-Nada de `$( … )` ni comillas invertidas, nada de `cd ruta && …`, nada de `> fichero`. Rutas relativas al repo, un comando por llamada.
+Nada de `$( … )` ni comillas invertidas, nada de `cd ruta && …`, nada de `> fichero`. Rutas relativas al repo, un comando por llamada. Bash nunca para leer ni buscar a ciegas: nada de `cat` de ficheros, `sed -n` de rangos largos ni `cd … &&` (el directorio de trabajo ya es la raíz del proyecto). Leer → `Read`; buscar → `Grep` con `head_limit`, o `grep … | head -40`. El hook `bash-read-guard` lo deniega.
 
 ## Verificar
 

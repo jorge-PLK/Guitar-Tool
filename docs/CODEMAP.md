@@ -2,7 +2,7 @@
 
 Última actualización: 2026-11-22 · Fase 7c, paso 8, ola 2 (ADR-020): Grabar, Montaje, Ajustes, «Ver toma», Songsterr y playlists en la interfaz WebView2 (`Packages/AppCore`, `WinApp`, `Tools/webdev`), WASAPI con identidad de aparato, `endTime` en el reproductor y hilo de UI en STA.
 
-Una sección por paquete (nombres de `docs/plan.md`, «Forma de trabajo»), más la app, las pruebas y las herramientas. Fila por fichero: `| Fichero | qué hace (ADR-NNN): APIs públicas |`. Se lee por secciones: `grep -n '^## ' docs/CODEMAP.md`.
+Una sección por paquete (nombres de `docs/plan.md`, «Forma de trabajo»), más la app, las pruebas y las herramientas. Fila por fichero: `| Fichero | qué hace (ADR-NNN): APIs públicas |`. Cada paquete tiene su ficha en `docs/codemap/`; se lee solo la del paquete que se toca.
 
 Tests del Mac (`tf-qa`, 22/11/2026; entre paréntesis, omitidos): AnalysisKit 1, AppCore 227, AudioKit 251 (3; 256 ejecutados tras el arreglo de `endTime`), HeadRushKit 1, MatchKit 1, ModelKit 20 (4), NativeKit 56 (1), SourceKit 116, StemKit 81 (13), Store 205, StudyKit 46 (4), TabKit 233 (22), Tone3000Kit 1, VideoKit 84 (1); 0 fallos y build de la app OK.
 

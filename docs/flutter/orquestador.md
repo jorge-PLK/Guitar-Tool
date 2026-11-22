@@ -4,7 +4,7 @@ Para la sesión Opus que dirige la fase. El orquestador **no programa**: corta, 
 
 ## Qué leer al empezar una sesión
 
-1. `docs/plan.md`, sección «Fase 7f» (casillas: por dónde va).
+1. `docs/plan/fase-7f.md` (casillas: por dónde va).
 2. Este fichero.
 3. `docs/flutter/arquitectura.md`.
 4. Solo la ficha de la pantalla de la ola en curso (`pantallas/<pantalla>.md`) y, por secciones (`grep -n '^## '`), `contrato.md`.
@@ -50,6 +50,8 @@ Hecho cuando: <tests que deben existir y pasar> · Tools/test.sh FlutterApp <fil
 Referencia visual: docs/flutter/ref/<pantalla>/<estado>.png
 Devuelve: formato del agente (≤ 15 líneas) + desvíos + lo que te faltó del kit
 ```
+
+El encargo cita secciones exactas (fichero y encabezado `##`) de `pantallas/<p>.md`, `pantallas/<p>-interaccion.md` y de los `contrato-tipos-*.md` que use la parte; nunca "lee la ficha". Si lo necesario supera ~3k tokens, el orquestador pega en el encargo solo las líneas que hacen falta. Objetivo: que el agente arranque con menos de 15k de lectura.
 
 Un encargo = un trabajo que quepa en 100k de contexto. Una pantalla grande son varias partes (store, cuerpo, cada `CustomPainter`, cada hoja).
 

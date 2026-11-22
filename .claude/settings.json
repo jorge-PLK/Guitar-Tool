@@ -5,6 +5,16 @@
       "Bash(Tools/test.sh *)"
     ]
   },
+  "skillOverrides": {
+    "unity-project-setup": "off",
+    "anthropic-skills:unity-game-developer": "off",
+    "anthropic-skills:unity-project-setup": "off",
+    "anthropic-skills:docx": "off",
+    "anthropic-skills:pptx": "off",
+    "anthropic-skills:xlsx": "off",
+    "anthropic-skills:morning": "off",
+    "anthropic-skills:import-memory": "off"
+  },
   "hooks": {
     "PreToolUse": [
       {
@@ -13,6 +23,10 @@
           {
             "type": "command",
             "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/commit-gate.sh\""
+          },
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/bash-read-guard.js\""
           }
         ]
       }

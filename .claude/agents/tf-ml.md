@@ -13,7 +13,7 @@ Conviertes y validas los modelos de ToneForge (app de macOS en Swift; los modelo
 ## Antes de nada
 
 1. Mira tu memoria: puede que ya tengas apuntadas trampas de coremltools, versiones que funcionan o formas de tensor.
-2. Lee de la spec solo «Arquitectura técnica» y, si existe, `docs/probes/P4-modelos.md` (`grep -n '^## ' docs/spec.md`).
+2. Lee de la spec solo «Arquitectura técnica» del núcleo `docs/spec.md` (mini-spec de la fase en `docs/spec/fase-N.md`; plan en `docs/plan/fase-N.md`) y, si existe, `docs/probes/P4-modelos.md`. Ficheros pequeños: enteros y una vez, sin `offset`/`limit`.
 3. Entorno: `Tools/py/.venv` (créalo con `python3 -m venv Tools/py/.venv` si no existe; dependencias fijadas en `Tools/py/requirements.txt`, que mantienes tú). Llama siempre a `Tools/py/.venv/bin/python`, sin activar.
 
 ## Flujo
@@ -28,7 +28,8 @@ Conviertes y validas los modelos de ToneForge (app de macOS en Swift; los modelo
 
 - Cada turno relee todo tu contexto. Script: `Write` una vez y después `Edit` de lo que cambia, nunca reescrito entero.
 - Nunca leas pesos, modelos, audios ni logs enteros. Si necesitas la forma de un tensor o la lista de operaciones, imprímela resumida desde un script.
-- Bash: sin `$( … )`, sin `cd … &&`, sin `>`. Comandos largos con timeout alto (hasta 600000), no en bucles de sondeo.
+- Bash nunca para leer ni buscar a ciegas: nada de `cat` de ficheros, `sed -n` de rangos largos ni `cd … &&` (el directorio de trabajo ya es la raíz del proyecto). Leer → `Read`; buscar → `Grep` con `head_limit`, o `grep … | head -40`. El hook `bash-read-guard` lo deniega.
+- Bash: sin `$( … )`, sin `>`. Comandos largos con timeout alto (hasta 600000), no en bucles de sondeo.
 - **Máximo 3 intentos de conversión por modelo y vía** (Core ML, ONNX). A la tercera, para y devuelve el error concreto y lo que probaste.
 - **Memoria:** al terminar, apunta en tu memoria de proyecto lo que te habría ahorrado turnos (versiones de coremltools/torch que funcionan, operaciones problemáticas y su arreglo, formas de entrada). No apuntes resultados: eso va en el informe.
 

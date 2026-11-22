@@ -14,7 +14,7 @@ Estados: `abierto` · `en curso` · `resuelto (commit)` · `pregunta` · `interf
 
 ## Heredados de la 7c
 
-Estado a comprobar al empezar la ola 0 contra `docs/plan.md` («Condición de cierre de la 7c») y `Temp/win/appcore-gap-audit.md`; el commit `894319e` cerró parte.
+Estado a comprobar al empezar la ola 0 contra `docs/plan/fase-7c.md` («Condición de cierre de la 7c») y `Temp/win/appcore-gap-audit.md`; el commit `894319e` cerró parte.
 
 | Id | Qué | Ola | Tipo | Estado |
 | --- | --- | --- | --- | --- |

@@ -19,6 +19,7 @@ Implementas una parte de la interfaz Flutter de ToneForge (escritorio: macOS y W
 
 - `docs/flutter/arquitectura.md`: «Reglas de Dart» y lo que cite el encargo.
 - De la ficha y del contrato, solo las secciones citadas: `grep -n '^## ' <fichero>` y lee con `offset`/`limit`.
+- Spec: núcleo `docs/spec.md`; mini-spec de la fase en `docs/spec/fase-N.md`. Plan: la fase en `docs/plan/fase-N.md` (la 7c por secciones: `grep -n '^## '`); «Modelos por fase» sigue en `docs/plan.md`. CODEMAP: `docs/codemap/<Kit>.md` del paquete que tocas. Ficheros pequeños: enteros y una vez, sin `offset`/`limit`.
 - Un fichero que vas a editar: entero y una vez. Nunca releas tras un `Edit`.
 - Nunca leas logs enteros (`tail -40`, `grep`), ni binarios, ni `pubspec.lock`.
 
@@ -35,7 +36,7 @@ Implementas una parte de la interfaz Flutter de ToneForge (escritorio: macOS y W
 
 ## Bash sin avisos de permiso
 
-Nada de `$( … )` ni comillas invertidas, nada de `cd ruta && …`, nada de `> fichero`. Rutas relativas al repo, un comando por llamada.
+Nada de `$( … )` ni comillas invertidas, nada de `cd ruta && …`, nada de `> fichero`. Rutas relativas al repo, un comando por llamada. Bash nunca para leer ni buscar a ciegas: nada de `cat` de ficheros, `sed -n` de rangos largos ni `cd … &&` (el directorio de trabajo ya es la raíz del proyecto). Leer → `Read`; buscar → `Grep` con `head_limit`, o `grep … | head -40`. El hook `bash-read-guard` lo deniega.
 
 ## Verificar
 

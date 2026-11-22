@@ -10,12 +10,13 @@ Después: actualizador (7d) → instalador de Windows → fase de cambios de UX 
 
 ## Contexto: leer solo lo que haga falta
 
-- **Spec `docs/spec.md` (~7k tokens) y plan `docs/plan.md` (~3k).** Mandan estas copias, no el doc de Claude Docs (ADR-002). Lee solo la sección que toque: `grep -n '^## ' docs/spec.md` y luego `offset`/`limit`.
+- **Spec y plan, un fichero por fase.** Mandan estas copias, no el doc de Claude Docs (ADR-002). `docs/spec.md` (~9k tokens) es el núcleo; cada mini-spec en `docs/spec/fase-N.md`. `docs/plan.md` (~4k) es el índice con «Modelos por fase»; cada fase en `docs/plan/fase-N.md` (la 7c, ~15k: por secciones). Lee entero solo el fichero de la fase que toca.
 - **Bocetos `docs/design/<Pantalla>.dc.html`** (~3-4k tokens cada uno: Main, Tab, Edit, Backing, Record, Tone, Settings): solo el de la pantalla en la que se trabaja.
 - **Decisiones:** `docs/DECISIONS.md` es un índice de una línea por ADR; el texto está en `docs/adr/ADR-NNN.md`. Nuevo ADR = fichero nuevo + su línea en el índice.
-- **Fase 7f (Flutter): `docs/flutter/`.** Al empezar sesión: «Fase 7f» de `docs/plan.md`, `docs/flutter/orquestador.md` y `docs/flutter/arquitectura.md`; el índice del resto está en `docs/flutter/README.md`. Fichas (`pantallas/<pantalla>.md`) y contrato (`contrato*.md`), solo los de la ola en curso y por secciones. Decisiones cerradas de interfaz: `docs/flutter/decisiones-interfaz.md` (`grep` antes de preguntar).
+- **Fase 7f (Flutter): `docs/flutter/`.** Al empezar sesión: `docs/plan/fase-7f.md`, `docs/flutter/orquestador.md` y `docs/flutter/arquitectura.md`; el índice del resto está en `docs/flutter/README.md`. Fichas (`pantallas/<pantalla>.md`) y contrato (`contrato*.md`), solo los de la ola en curso y por secciones. Decisiones cerradas de interfaz: `docs/flutter/decisiones-interfaz.md` (`grep` antes de preguntar).
 - **Resultados de la Fase 0:** `docs/probes/P<n>-<tema>.md`, uno por prueba.
-- **Mapa del código: `docs/CODEMAP.md`**, una sección por paquete. Consúltalo antes de explorar, por secciones (`grep -n '^## '`).
+- **Mapa del código: `docs/CODEMAP.md`** (índice); una ficha por paquete en `docs/codemap/<Kit>.md`. Consulta la del paquete antes de explorar.
+- **Bash no lee ficheros.** Ni `cat`, ni `sed -n` de rangos largos, ni `cd … &&` (el cwd ya es la raíz): `Read` para leer, `Grep` con `head_limit` o `grep … | head -40` para buscar. El hook `.claude/hooks/bash-read-guard.js` lo deniega, también en subagentes.
 - **Qué expone un fichero Swift, sin leerlo entero:** `grep -nE '^\s*(public|open)\b' <ruta.swift>` (la API entre paquetes es `public` por fuerza). Entero, solo el fichero que vas a editar, y una vez.
 - **Nunca leer** audios, modelos (`.mlpackage`, `.mlmodel`, `.onnx`, `.pt`, `.safetensors`) ni logs enteros: `tail`/`grep`.
 - **Localizar código** ("dónde está X", "quién llama a Y") → subagente `caveman:cavecrew-investigator`, no una cadena de greps en el hilo principal.
@@ -40,6 +41,8 @@ Después: actualizador (7d) → instalador de Windows → fase de cambios de UX 
 
 Nunca `general-purpose`, `claude` ni un agente "Lead": el hook global `agent-route.js` los rechaza (en BeatBeat eran el 44 % del gasto de subagentes, ~830k ponderados por llamada). El hilo principal es el orquestador de la fase: escribe la mini-spec, la corta en partes, lanza un agente por parte (en paralelo si no se pisan), integra y comprueba la condición de paso; no programa las partes. Qué parte va a Opus y cuál a Sonnet lo dice `docs/plan.md`, «Modelos por fase». No pases `model` al lanzar: cada agente fija el suyo. En la 7f la mano de obra es solo Sonnet y Haiku (ADR-021, decisión 21): ni `tf-engineer` ni `tf-ml`; el Swift de `AppCore`/`AppCoreFFI` es de `tf-implementer`. Ciclo de ola, plantilla de encargo y lista de validación: `docs/flutter/orquestador.md`.
 
+**Encargo que no obliga a explorar** (los subagentes son el 68 % del gasto, y de él el 76 % es releer su propio contexto): cada encargo trae los ficheros a tocar, las firmas o tipos que necesita ya copiados, las secciones exactas de docs que leer (fichero + encabezado, nunca «lee la ficha») y el criterio de hecho con el comando de test. Una parte debe caber en unas 40-60 peticiones y en el tope de 100k; si no, se parte en dos.
+
 | Trabajo | Agente |
 | --- | --- |
 | Implementar una parte que el plan asigna a Sonnet: pantallas, cableado, conectores, scripts de prueba | `tf-implementer` (Sonnet) |
@@ -60,5 +63,5 @@ Nunca `general-purpose`, `claude` ni un agente "Lead": el hook global `agent-rou
 - **Mac y Windows, paridad sobre Flutter.** Toda función o cambio de comportamiento va a `AppCore` y a `FlutterApp/`, que es la misma en las dos plataformas, y se comprueba en el Mac y en el PC x64 (`Tools/flutter/pc.sh`). Flutter habla solo con `AppCore`; un hueco de núcleo se arregla en `AppCore` con test y se anota en `docs/flutter/desvios.md`. Lo que no pueda igualarse en función se lista a Jorge.
 - **Port 1:1 (ADR-021).** Aspecto e interacción = SwiftUI; comportamiento = `AppCore`. Robustez, fiabilidad y rendimiento mandan sobre el 1:1 y sobre cualquier ADR previo (Jorge, 22/11/2026). Añadir o cambiar un plugin, o tocar la ABI congelada, es una pregunta a Jorge.
 - Fase a fase, una rama por fase (`fase-N`). Preguntar antes de inventar reglas que no estén en la spec.
-- Al cerrar una fase (`/phase-close`), en el mismo commit: `docs/CODEMAP.md`, "Estado actual" de este fichero (máximo 3 líneas: lo cargan todas las sesiones), casillas y condición de paso en `docs/plan.md`, lo aprendido en `docs/spec.md` y el ADR.
+- Al cerrar una fase (`/phase-close`), en el mismo commit: `docs/codemap/<Kit>.md` y la línea 3 de `docs/CODEMAP.md`, "Estado actual" de este fichero (máximo 3 líneas: lo cargan todas las sesiones), casillas y condición de paso en `docs/plan/fase-N.md`, lo aprendido en `docs/spec.md` o `docs/spec/fase-N.md` y el ADR.
 - Commits en inglés, imperativo, estilo de `git log`; sin trailer `Co-Authored-By`. Desde la Fase 7f (Jorge, 22/11/2026): commits pequeños y frecuentes con `git push` a la rama de la fase tras cada uno, sin pedir confirmación, para que Jorge valide en paralelo en el PC. Nunca push a `main` ni forzado.

@@ -287,4 +287,4 @@ Notas de texto:
 - Código muerto no listado: `RecordButton`, `ComparePanel`, `TakeChannel` (`BackingRecord.swift`) y `takeError`/`takeSaveError` (`BackingController.swift:309`, `StudySession.swift:316`) porque solo los alimenta la grabación/toma, que ya no sale en Backing.
 - Hay textos de depuración (`#if DEBUG`, `--grid-hit-selftest`, `--select-section`, `DebugLog`) que no se portan.
 - No hay diálogos de confirmación en Backing: eliminar sección y quitar bucle son inmediatos (sin `.alert` ni `confirmationDialog`).
-- Los mensajes de error en ARB deben conservar `{error}` tal como el núcleo lo manda; `AppCore` ya devuelve `saveError` («No se pudo guardar el estudio: …», ver `docs/CODEMAP.md`).
+- Los mensajes de error en ARB deben conservar `{error}` tal como el núcleo lo manda; `AppCore` ya devuelve `saveError` («No se pudo guardar el estudio: …», ver `docs/codemap/AppCore.md`).

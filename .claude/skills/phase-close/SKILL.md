@@ -24,13 +24,13 @@ En la Fase 0 no hay suite: comprueba en su lugar que cada prueba cerrada tiene s
 
 ## 3. Condición de paso
 
-Lee en `docs/plan.md` la condición de paso de la fase. Si se demuestra con un test, nómbralo. Si pide hardware u oído (audio por USB, latencia con la Flex Prime, "suena reconocible", separación A/B que convence), **pregúntaselo a Jorge**: sin su confirmación, la fase no se cierra.
+Lee en `docs/plan/fase-N.md` la condición de paso de la fase. Si se demuestra con un test, nómbralo. Si pide hardware u oído (audio por USB, latencia con la Flex Prime, "suena reconocible", separación A/B que convence), **pregúntaselo a Jorge**: sin su confirmación, la fase no se cierra.
 
 ## 4. Docs (por `tf-docs`, con la lista del paso 1 y los informes de la fase)
 
-- `docs/CODEMAP.md`: cada `.swift` nuevo o renombrado con su API pública, cada paquete nuevo, cada recurso (modelos, audios de prueba) y cada script de `Probes/`. Que no quede la entrada de lo borrado. Línea *Última actualización*.
-- `docs/plan.md`: `[x]` solo lo demostrado (test nombrado en cursiva) o confirmado por Jorge; lo demás `[ ]` con nota de lo que falta.
-- `docs/spec.md`: lo aprendido en la fase, en su sección (el plan lo pide: «la spec queda actualizada con lo aprendido»).
+- CODEMAP: filas en `docs/codemap/<Kit>.md` para cada `.swift` nuevo o renombrado con su API pública, cada recurso (modelos, audios de prueba) y cada script de `Probes/`; paquete nuevo = fichero nuevo + línea en la lista de `docs/CODEMAP.md`. Que no quede la entrada de lo borrado. Línea *Última actualización* en la línea 3 de `docs/CODEMAP.md`.
+- `docs/plan/fase-N.md`: `[x]` solo lo demostrado (test nombrado en cursiva) o confirmado por Jorge; lo demás `[ ]` con nota de lo que falta. Fase nueva = fichero nuevo + línea en la lista de `docs/plan.md`.
+- Spec: lo aprendido en la fase, en `docs/spec.md` (núcleo) o en `docs/spec/fase-N.md` (el plan lo pide: «la spec queda actualizada con lo aprendido»). Mini-spec nueva = fichero nuevo + encabezado con enlace en `docs/spec.md`.
 - ADR de cierre `docs/adr/ADR-NNN.md` (formato de los anteriores: `# ADR-NNN · AAAA-MM-DD · Título (Fase N)`, viñetas en negrita, **Tests**, **Pendiente de Jorge**, **Estado**) y su línea en `docs/DECISIONS.md`. Toda referencia `ADR-NNN` nueva apunta a un ADR que existe.
 - "Estado actual" de `CLAUDE.md`, máximo 3 líneas.
 

@@ -5,7 +5,7 @@
 | Fichero | Qué contiene | Quién lo lee |
 | --- | --- | --- |
 | [../adr/ADR-021.md](../adr/ADR-021.md) | Las 25 decisiones de Jorge, lo descartado, riesgos y condición de paso | Orquestador, una vez |
-| [../plan.md](../plan.md) § «Fase 7f» | Olas, casillas y condición de paso | Orquestador, al empezar cada sesión |
+| [../plan/fase-7f.md](../plan/fase-7f.md) | Olas, casillas y condición de paso | Orquestador, al empezar cada sesión |
 | [orquestador.md](orquestador.md) | Agentes, ciclo de una ola, plantilla de encargo, lista de validación, cuándo preguntar | Orquestador |
 | [arquitectura.md](arquitectura.md) | `AppCoreFFI`, hilos, canal de fotogramas, estructura de `FlutterApp/`, reglas de Dart, WebView, vídeo, arranque y empaquetado | Todos (la sección que cite el encargo) |
 | [contrato.md](contrato.md) | Métodos, eventos y tipos del puente por área; servicios de anfitrión; hilos | Agentes, solo su área (`grep -n '^## '`) |
