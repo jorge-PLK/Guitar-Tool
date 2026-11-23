@@ -98,7 +98,7 @@ step_app() {
   { echo "=== stray DESPUES (desde $t0) ==="; stray -Since "'$t0'"; } >>"$LOG"
   grep -E '^TF:|^error:' "$LOG" | tail -8
   echo "rutas escapadas (STRAY desde $t0):"
-  awk '/=== stray DESPUES/{f=1} f && /^STRAY/' "$LOG" | head -6
+  awk '/=== stray DESPUES/{f=1} f && /^STRAY/ && !/\\.claude\\/' "$LOG" | head -6
   return $rc
 }
 
@@ -305,11 +305,90 @@ step_webview() {
   run_bg webview.ps1 webview 3000; local rc=$?
   { echo "=== stray DESPUES (desde $t0) ==="; stray -Since "'$t0'"; } >>"$LOG"
   grep -E '^TF:|^error:' "$LOG" | grep -v 'TF:start' | cut -c1-230 | head -13
-  echo "rutas escapadas: $(awk '/=== stray DESPUES/{f=1} f && /^STRAY/' "$LOG" | wc -l | tr -d ' ') (ver log)"
+  echo "rutas escapadas: $(awk '/=== stray DESPUES/{f=1} f && /^STRAY/ && !/\\.claude\\/' "$LOG" | wc -l | tr -d ' ') (ver log)"
   return $rc
 }
 
+# pc.sh wvrun <wv_all|wv_flutter> <caso|all> [--tag sufijo] [--rebuild] [--keep-data]: P9 7j. Compila si falta el .exe (o --rebuild),
+# lanza cada caso con ventana por la tarea interactiva (run.ps1 -ExePath), trae informe + captura + log a
+# Temp/p9-flutter/pc/wv-<app>-<caso>[-sufijo].{json,png,out,err,keys.txt} y anota la carga previa en wv-load.txt.
+# Casos: tab messages overlay resize-on resize-off capture songsterr songsterr-offstage songsterr-zero keys-raw keys-flutter.
+# Sin --keep-data borra el perfil de WebView (Temp\p9\run\wvdata\<app>) antes de cada caso (arranque en frio).
+wv_args() { # caso -> argumentos de la app (sin --report/--user-data-dir) y segundo de captura en $WV_SHOT
+  WV_SHOT=3; WV_ARGS=""
+  case "$1" in
+    tab|messages|overlay) WV_ARGS="--case $1 --exit-after 40"; WV_SHOT=2 ;;
+    resize-on) WV_ARGS="--case resize --raf-loop on --exit-after 40" ;;
+    resize-off) WV_ARGS="--case resize --raf-loop off --exit-after 40" ;;
+    capture) WV_ARGS="--case capture --exit-after 40"; WV_SHOT=10 ;;
+    songsterr) WV_ARGS="--case songsterr --exit-after 40" ;;
+    songsterr-offstage) WV_ARGS="--case songsterr --mode offstage --exit-after 40" ;;
+    songsterr-zero) WV_ARGS="--case songsterr --mode zero --exit-after 40" ;;
+    keys-raw) WV_ARGS="--case keys --keys-mode raw --keys-script --keys-wait 8 --exit-after 40"; WV_SHOT=0 ;;
+    keys-flutter) WV_ARGS="--case keys --keys-mode flutter --keys-script --keys-wait 8 --exit-after 40"; WV_SHOT=0 ;;
+    *) return 1 ;;
+  esac
+}
+WV_ALL_CASES="tab messages overlay resize-on resize-off capture songsterr songsterr-offstage songsterr-zero keys-raw keys-flutter"
+wv_dirs() { "${SSH[@]}" "powershell -NoProfile -Command \"(Get-ChildItem 'C:\\Users\\Jorge\\AppData\\Local','C:\\Users\\Jorge\\AppData\\Roaming','C:\\Users\\Jorge\\AppData\\LocalLow' -Directory -ErrorAction SilentlyContinue).FullName\"" 2>/dev/null | tr -d '\r' | sort; }
+
+step_wvrun() {
+  local app="${1:-}" want="${2:-}"; shift 2 2>/dev/null
+  local suffix="" rebuild=0 keep=0
+  while [ $# -gt 0 ]; do
+    case "$1" in --tag) suffix="-$2"; shift 2 ;; --rebuild) rebuild=1; shift ;; --keep-data) keep=1; shift ;; *) shift ;; esac
+  done
+  case "$app" in wv_all|wv_flutter) ;; *) echo "uso: pc.sh wvrun <wv_all|wv_flutter> <caso|all> [--tag s] [--rebuild] [--keep-data]"; return 1 ;; esac
+  [ -n "$want" ] || { echo "falta caso (o all)"; return 1; }
+  [ "$want" = "all" ] && want="$WV_ALL_CASES"
+  local dst="$ROOT/Temp/p9-flutter/pc"; mkdir -p "$dst"
+  local reldir="$PC_ROOT/src/Probes/P9-flutter/webview/$app/build/windows/x64/runner/Release"
+  local relwin="$PC_ROOT_WIN\\src\\Probes\\P9-flutter\\webview\\$app\\build\\windows\\x64\\runner\\Release"
+  local exe="$relwin\\$app.exe" outwin="$PC_ROOT_WIN\\out\\wv"
+  if [ "$rebuild" = 1 ] || ! "${SSH[@]}" "test -f $reldir/$app.exe" 2>/dev/null; then
+    echo "compilando $app ..."
+    remote "mkdir -p $PC_ROOT/out && echo '$app:build' > $PC_ROOT/out/webview.arg" || return 1
+    run_bg webview.ps1 webview 3000 || true
+    grep -E "^TF:$app|^error:" "$LOG" | cut -c1-230 | tail -6
+    "${SSH[@]}" "test -f $reldir/$app.exe" 2>/dev/null || { echo "no hay $app.exe tras compilar"; return 1; }
+  fi
+  local t0; t0="$("${SSH[@]}" "powershell -NoProfile -Command \"(Get-Date).AddMinutes(-1).ToString('yyyy-MM-dd HH:mm:ss')\"" | tr -d '\r')"
+  wv_dirs >"$dst/wv-dirs-before-$app.txt"
+  remote "mkdir -p $PC_ROOT/out/wv $PC_ROOT/run/wvdata"
+  local c a b64 load rc f
+  for c in $want; do
+    wv_args "$c" || { echo "caso desconocido: $c"; continue; }
+    local shot="$WV_SHOT" name="wv-$app-$c$suffix" rep="$outwin\\$app-$c$suffix.json" keysarg=""
+    local repu="$PC_ROOT/out/wv/$app-$c$suffix"
+    [ "${c%%-*}" = "keys" ] && keysarg="$rep.ready"
+    [ "$keep" = 1 ] || remote "rm -rf $PC_ROOT/run/wvdata/$app"
+    remote "rm -f $repu.json $repu.ready $repu.png $repu.out $repu.err $repu.code $repu.keys.txt $repu.shot.txt"
+    load="$("${SSH[@]}" 'wmic cpu get loadpercentage' 2>/dev/null | tr -d '\r' | grep -E '^[0-9]+' | head -1 | tr -d ' ')"
+    echo "$name $load" >>"$dst/wv-load.txt"
+    local line="$WV_ARGS --report $rep --user-data-dir $PC_ROOT_WIN\\run\\wvdata\\$app"
+    b64="$(printf %s "$line" | base64 | tr -d '\n')"
+    echo "=== $name (carga previa ${load}%) ===" | tee -a "$LOG"
+    "${SSH[@]}" "powershell -NoProfile -ExecutionPolicy Bypass -File '$WINDIR_REMOTE\\run.ps1' -Tag '$app-$c$suffix' -ArgsB64 '$b64' -Timeout 60 -ExePath '$exe' -RunOut '$outwin' -ShotAt $shot -Keys '$keysarg'" 2>&1 | tr -d '\r' >>"$LOG"
+    rc=${PIPESTATUS[0]}
+    grep 'TF:code' "$LOG" | tail -1
+    rm -f "$dst/$name".{json,png,out,err,keys.txt}
+    for f in json png keys.txt; do scp -q -o BatchMode=yes "$PC_HOST:$PC_ROOT_SCP/out/wv/$app-$c$suffix.$f" "$dst/$name.$f" >>"$LOG" 2>&1; done
+    scp -q -o BatchMode=yes "$PC_HOST:$PC_ROOT_SCP/out/wv/$app-$c$suffix.log" "$dst/$name.out" >>"$LOG" 2>&1
+    scp -q -o BatchMode=yes "$PC_HOST:$PC_ROOT_SCP/out/wv/$app-$c$suffix.err" "$dst/$name.err" >>"$LOG" 2>&1
+  done
+  wv_dirs >"$dst/wv-dirs-after-$app.txt"
+  echo "carpetas nuevas bajo AppData (despues - antes):"; comm -13 "$dst/wv-dirs-before-$app.txt" "$dst/wv-dirs-after-$app.txt" | head -10
+  { echo "=== stray (desde $t0) ==="; stray -Since "'$t0'"; echo "=== AppData modificado desde $t0 ==="; "${SSH[@]}" "find /c/Users/Jorge/AppData /c/Users/Jorge/Documents -newermt \"$t0\" -type f 2>/dev/null" | tr -d "\r" | grep -vE "D3DSCache|claude|Temp|Edge|Chrome|Google|NVIDIA|Crashpad|Packages|Microsoft|Discord|Spotify"; } >>"$LOG"
+  echo "ficheros escapados: $(awk '/=== stray \(desde/{f=1} f && /^STRAY/ && !/\\.claude\\/' "$LOG" | wc -l | tr -d ' ')"
+  awk '/=== stray \(desde/{f=1} f && /^STRAY/ && !/\\.claude\\/' "$LOG" | head -6
+  echo "AppData/Documents modificado durante la pasada: $(awk '/=== AppData modificado/{f=1} f && /^\/c\//' "$LOG" | wc -l | tr -d ' ')"
+  awk '/=== AppData modificado/{f=1} f && /^\/c\//' "$LOG" | head -6
+  python3 -I "$ROOT/Probes/P9-flutter/pc-wv-table.py" "$dst" "$app" "$suffix" 2>&1 | tee -a "$LOG"
+  return 0
+}
+
 case "$STEP" in
+  wvrun) shift; step_wvrun "$@"; rc=$? ;;
   soak) shift; step_soak "$@"; rc=$? ;;
   mf) shift; step_mf "$@"; rc=$? ;;
   frames) shift; step_frames "$@"; rc=$? ;;

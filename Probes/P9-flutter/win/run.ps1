@@ -2,12 +2,17 @@
 # Uso: run.ps1 -Tag <tag> -ArgsB64 <base64 UTF-8> [-Timeout 240] [-EnvVars "A=1;B=2"] [-ShotAt N] (captura out\run\<tag>.png a los N s)
 # Escribe out\run\<tag>.log (stdout+stderr), out\run\<tag>.code (codigo; 124 si se mato por tope) y sale con ese codigo.
 # Se ejecuta EN EL PC. Todo fichero vive bajo $P9.
-param([string]$Tag, [string]$ArgsB64, [int]$Timeout = 240, [switch]$NoRedirect, [string]$EnvVars = "", [int]$ShotAt = 0)
+#   P9 7j: -ExePath <ruta .exe> lanza otra app (las de WebView; -RunOut <dir> cambia donde van log/code/png);
+#   -Keys <ruta .ready> lanza ademas win\keys.ps1 (inyector SendInput) en vez de la captura -ShotAt.
+param([string]$Tag, [string]$ArgsB64, [int]$Timeout = 240, [switch]$NoRedirect, [string]$EnvVars = "", [int]$ShotAt = 0,
+      [string]$ExePath = "", [string]$RunOut = "", [string]$Keys = "")
 . "$PSScriptRoot\common.ps1"
-$RunOut = Join-Path $Out "run"
+if (-not $RunOut) { $RunOut = Join-Path $Out "run" }
 New-Item -ItemType Directory -Force $RunOut | Out-Null
 $rel = Join-Path $AppDir "build\windows\x64\runner\Release"
 $exe = Join-Path $rel "tf_probe.exe"
+if ($ExePath) { $exe = $ExePath; $rel = Split-Path $ExePath -Parent }
+$procName = [IO.Path]::GetFileNameWithoutExtension($exe)
 if (-not (Test-Path $exe)) { "error: falta $exe (pc.sh app)"; exit 1 }
 $argLine = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($ArgsB64))
 $logF = Join-Path $RunOut "$Tag.log"
@@ -30,6 +35,10 @@ if ($ShotAt -gt 0) {
   Remove-Item $png -ErrorAction SilentlyContinue
   $shotLines = "Start-Sleep -Seconds $ShotAt`r`n& '$PSScriptRoot\shot.ps1' -ProcId `$p.Id -Png '$png' *> '$(Join-Path $RunOut "$Tag.shot.txt")'`r`n"
 }
+if ($Keys) {
+  Remove-Item $Keys -ErrorAction SilentlyContinue
+  $shotLines = "& '$PSScriptRoot\keys.ps1' -ProcId `$p.Id -Ready '$Keys' -Log '$(Join-Path $RunOut "$Tag.keys.txt")' *> `$null`r`n"
+}
 @"
 $envLines`$p = Start-Process -FilePath '$exe' -ArgumentList '$($argLine -replace "'", "''")' -WorkingDirectory '$rel' -PassThru $redir
 `$null = `$p.Handle
@@ -49,9 +58,9 @@ while (-not (Test-Path $codeF) -and $sw.Elapsed.TotalSeconds -lt $limit) { Start
 schtasks /Delete /TN $tn /F 2>&1 | Out-Null
 $code = 125
 if (Test-Path $codeF) { $code = [int](Get-Content $codeF | Select-Object -First 1) }
-else { Get-Process tf_probe -ErrorAction SilentlyContinue | Stop-Process -Force }
+else { Get-Process $procName -ErrorAction SilentlyContinue | Stop-Process -Force }
 Start-Sleep -Milliseconds 800
-$left = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.ProcessName -match '^tf_probe|AppCoreFFI|ffi-smoke' })
+$left = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.ProcessName -match "^$procName|AppCoreFFI|ffi-smoke" })
 "TF:code=$code secs=$([math]::Round($sw.Elapsed.TotalSeconds,1)) leftover=$($left.Count)"
 if ($left.Count -gt 0) { $left | ForEach-Object { "TF:leftover $($_.ProcessName) $($_.Id)" }; $left | Stop-Process -Force -ErrorAction SilentlyContinue }
 exit $code

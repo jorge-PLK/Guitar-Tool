@@ -35,6 +35,9 @@ try {
 
     $argF = Join-Path $Out "webview.arg"
     $want = if (Test-Path $argF) { ((Get-Content $argF -Raw) -replace '\s', '') } else { "" }
+    # P9 7j: sufijo ":build" = solo compilar (sin el arranque de humo de 5 s); lo usa pc.sh wvrun.
+    $buildOnly = $false
+    if ($want -match ':build$') { $buildOnly = $true; $want = $want -replace ':build$', '' }
     $cands = if ($want) { @($want) } else { @("wv_all", "wv_flutter", "wv_inapp") }
 
     foreach ($c in $cands) {
@@ -86,6 +89,7 @@ try {
         $warn = @(Select-String -Path $clog -Pattern 'warning' ).Count
         L "TF:$c compila=SI ${secs}s Release=${size}MB dlls=[$dlls] avisos_build=$warn"
 
+        if ($buildOnly) { continue }
         # Arranque de humo con ventana (tarea programada, sesion interactiva).
         $codeF = Join-Path $WvOut "$c.code"
         $inner = Join-Path $WvOut "task-$c.ps1"
