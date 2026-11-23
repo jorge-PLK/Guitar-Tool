@@ -98,6 +98,7 @@ Repaso del 22/11/2026 con el criterio 0. «Se mantiene» = revisado y sin cambio
 | Decisión | Resolución | Por qué |
 | --- | --- | --- |
 | ABI: texturas | El runner registra la textura y pide el fotograma al núcleo (`tf_texture_host`, `tf_frame_copy`); el núcleo no recibe el registro de Flutter. Propuesta hasta P9, prueba 3. | El paquete Swift no enlaza el motor de Flutter; subir de versión no toca el núcleo. |
+| Umbral de descartes del canal de fotogramas en Windows | ≤ 3 por minuto a 30 fps con `GpuSurfaceTexture`; 0 en el Mac. Respaldo `PixelBufferTexture`; copia BGRA descartada a 1080p. | Jorge, 23/11/2026, con la medida de P9 (7f): los descartes son peticiones tardías del motor, iguales en los dos caminos. |
 | ABI: propiedad de búferes | `tf_core_send` copia antes de volver (búfer de Dart); lo que entrega el núcleo es suyo hasta `tf_core_free`, que Dart llama siempre. Id de textura `int64`. | Sin vidas compartidas entre los dos lados. |
 | ABI: cierre | `tf_core_shutdown` asíncrono, con evento `core.shutdown` y un tope sobre el cierre entero. | Síncrono se bloquea en el Mac (`closeStudy` salta a `@MainActor` desde el hilo principal); hoy solo `jobs.shutdown()` tiene tope. |
 | ABI: orden de arranque | `send` y `host` asignados antes de `Bridge.start()`. | `WinApp` lo hace al revés y puede perder un evento. |
