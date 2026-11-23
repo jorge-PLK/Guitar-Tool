@@ -317,7 +317,7 @@ step_webview() {
 wv_args() { # caso -> argumentos de la app (sin --report/--user-data-dir) y segundo de captura en $WV_SHOT
   WV_SHOT=3; WV_ARGS=""
   case "$1" in
-    tab|messages|overlay) WV_ARGS="--case $1 --exit-after 40"; WV_SHOT=2 ;;
+    tab|messages|overlay) WV_ARGS="--case $1 --exit-after 40"; WV_SHOT="${P9_SHOT:-2}" ;;
     resize-on) WV_ARGS="--case resize --raf-loop on --exit-after 40" ;;
     resize-off) WV_ARGS="--case resize --raf-loop off --exit-after 40" ;;
     capture) WV_ARGS="--case capture --exit-after 40"; WV_SHOT=10 ;;
