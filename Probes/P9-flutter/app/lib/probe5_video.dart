@@ -220,6 +220,7 @@ Future<void> _measure(List<String> args, ValueNotifier<_Surf?> surf, Watchdog wd
         reg['driftResyncs'] = st['driftResyncs'];
         reg['unreadable'] = st['unreadable'];
         reg['deliveries'] = st['deliveries'];
+        if (st['win'] != null) reg['win'] = st['win']; // solo Windows (tf_mfvideo.c)
         res['rate_$r'] = reg;
         final pct = (reg['outOfTolPct'] as num?)?.toDouble() ?? 100;
         if (pct > worst) worst = pct;
@@ -234,7 +235,7 @@ Future<void> _measure(List<String> args, ValueNotifier<_Surf?> surf, Watchdog wd
         final st = v.stats(_ch);
         final xs = Sample.parse(st['samples']);
         final rec = recovery(xs, 0);
-        jumps.add({'target': t, ...rec, 'events': st['events']});
+        jumps.add({'target': t, ...rec, 'events': st['events'], if (st['win'] != null) 'win': st['win']});
         final stay = (rec['stayOkMs'] as num?)?.toDouble();
         if (stay == null || stay >= 300) failed.add('seek@$t=${stay ?? 'nunca'}');
       }
@@ -254,6 +255,7 @@ Future<void> _measure(List<String> args, ValueNotifier<_Surf?> surf, Watchdog wd
       res['lapStartsMs'] = laps;
       res['recovery'] = lapRec;
       res['events'] = st['events'];
+      if (st['win'] != null) res['win'] = st['win'];
       final ok = xs.where((s) {
         if (s.t < 1000) return false;
         return !laps.any((t) => s.t >= t && s.t < t + 300);
@@ -281,6 +283,7 @@ Future<void> _measure(List<String> args, ValueNotifier<_Surf?> surf, Watchdog wd
       res['clockCallAtMs'] = round3((tCall - 0) / 1000);
       res['events'] = st['events'];
       res['regime'] = regime(xs);
+      if (st['win'] != null) res['win'] = st['win'];
       if (xs.isEmpty) failed.add('sinEntregas');
   }
 

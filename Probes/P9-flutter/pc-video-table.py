@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-# P9 7h: tabla / veredicto de los informes de vp_fvp traidos por `pc.sh video` (Temp/p9-flutter/pc/vid-fvp-*.json).
+# P9 7h: tabla / veredicto de los informes traidos por `pc.sh video` (Temp/p9-flutter/pc/vid-fvp-*.json de vp_fvp y
+# vid-native-*.json de tf_probe --probe video con `--engine native`).
 # Uso: pc-video-table.py table <dir> <prefijo> [sufijo]   |   pc-video-table.py verdict <json>   (exit 0 pasa, 1 incumple)
 # Umbrales (spec P9, prueba 7h): error A/V mediana y p95 <= 16,7 ms (medio fotograma a 30 fps); recuperacion tras salto < 300 ms.
 import glob, json, os, sys
@@ -22,8 +23,15 @@ def checks(r):
         return ["sin informe"]
     if r.get("error"):
         bad.append("error: %s" % str(r["error"])[:80])
+    # Candidata nativa (probe5_video.dart): fallos duros de su lista `failed`; los de umbral se reevaluan aqui abajo.
+    if r.get("candidate") == "native":
+        for f in r.get("failed") or []:
+            if not str(f).startswith(("fuera=", "fueraBucle=", "seek@", "vuelta=")):
+                bad.append(str(f)[:80])
     res = r.get("result") or {}
     c = r.get("case")
+    if c == "steady" and not any(k.startswith("rate_") for k in res):
+        bad.append("sin regimen")
     if c == "steady":
         for k, v in res.items():
             if k.startswith("rate_"):
@@ -53,7 +61,14 @@ def row(name, r, load_pct):
     cpu = None
     if r.get("wallS"):
         cpu = round(100 * (r.get("cpuProcessS") or 0) / r["wallS"], 1)
-    tail = "dec=%s CPU %s%% vig %s ms carga %s%%" % (r.get("activeDecoder"), cpu, r.get("watchdogMaxMs"), load_pct)
+    dec = r.get("activeDecoder")
+    if r.get("candidate") == "native":  # informe de probe5_video.dart: info del lector MF y cpu.percentOfCore
+        info = r.get("info") or {}
+        cpu = (r.get("cpu") or {}).get("percentOfCore")
+        dec = "%s hw=%s" % (info.get("decoder"), info.get("hardwareDecode"))
+        o = {"textureSize": [info.get("width"), info.get("height")], "codec": info.get("codec"),
+             "rotation": "%s (mf %s, q %s)" % (info.get("rotationDegrees"), info.get("mfRotation"), r.get("quarterTurns"))}
+    tail = "dec=%s CPU %s%% vig %s ms carga %s%%" % (dec, cpu, r.get("watchdogMaxMs"), load_pct)
     out = []
     if c == "steady":
         for k, v in res.items():

@@ -14,7 +14,11 @@ let package = Package(
         .package(path: "../../../Packages/AppCore"),
     ],
     targets: [
-        .target(name: "CAppCoreFFI", cSettings: [.headerSearchPath("dart")]),
+        // P9 7h: tf_mfvideo.c/tf_d3d.c en Windows (además de sus #pragma comment, por si el enlazador los ignora).
+        .target(name: "CAppCoreFFI", cSettings: [.headerSearchPath("dart")],
+                linkerSettings: ["mfplat", "mfreadwrite", "mfuuid", "d3d11", "dxguid", "ole32"].map {
+                    .linkedLibrary($0, .when(platforms: [.windows]))
+                }),
         .target(name: "AppCoreFFI", dependencies: ["CAppCoreFFI", .product(name: "AppCore", package: "AppCore")]),
         .executableTarget(name: "ffi-smoke", dependencies: ["CAppCoreFFI", "AppCoreFFI"]),
         // P9 7b: humo de Windows; carga la DLL por LoadLibrary (no depende de AppCoreFFI, así prueba la DLL real).

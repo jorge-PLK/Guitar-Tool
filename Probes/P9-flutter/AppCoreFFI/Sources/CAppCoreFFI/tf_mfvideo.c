@@ -19,6 +19,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+// Define aquí (selectany) los GUID declarados con DEFINE_GUID en las cabeceras siguientes (atributos MF, IID de D3D11).
+#include <initguid.h>
 #include <d3d11_4.h>
 #include <mfapi.h>
 #include <mferror.h>
@@ -77,6 +79,8 @@ typedef struct mfv {
   char info[1024];
   double start_pts, duration;
   int w, h;  // tamaño copiado (= textura)
+  int out_h;    // filas de la salida del lector (para el stride negativo)
+  LONG stride;  // MF_MT_DEFAULT_STRIDE de la salida (solo camino Lock sin IMF2DBuffer)
   int force_alpha;
   // Reloj.
   double c_sec, c_at, c_rate;
@@ -184,7 +188,16 @@ static int mfv_readback(mfv *p, IMFSample *s, uint8_t *dst) {
     locked2d = 1;
   } else if (SUCCEEDED(IMFMediaBuffer_Lock(mb, &scan0, NULL, &len))) {
     locked = 1;
-    pitch = p->w * 4;
+    // Búfer contiguo: filas de la salida del lector (out_w, no el recorte), con el signo de MF_MT_DEFAULT_STRIDE
+    // (negativo = de abajo arriba: la fila superior es la última en memoria).
+    pitch = p->stride;
+    LONG ap = pitch < 0 ? -pitch : pitch;
+    if (ap < p->w * 4 || (size_t)len < (size_t)ap * (size_t)(p->h - 1) + (size_t)p->w * 4) {
+      IMFMediaBuffer_Unlock(mb);
+      locked = 0;
+    } else if (pitch < 0) {
+      scan0 += (size_t)ap * (size_t)(p->out_h - 1);
+    }
   }
   if (locked2d || locked) {
     const size_t rowb = (size_t)p->w * 4;
@@ -214,7 +227,9 @@ static void mfv_take_sample(mfv *p, IMFSample *s, LONGLONG ts, int gen) {
   int stale = p->seek_gen != gen;
   double pos = mfv_pos(p, now);
   int late = !stale && pts + kFrameDur <= pos;
-  if (late && pts + kFarSeconds < pos) {
+  // Tras un salto, MF entrega desde el fotograma clave anterior: lo previo al objetivo se descarta sin pedir otro
+  // salto (si no, con GOP > kFarSeconds se saltaría en bucle). Solo hay deriva si esta generación ya alcanzó el reloj.
+  if (late && p->seek_noted && pts + kFarSeconds < pos) {
     mfv_request_seek(p, now, "drift", 1);
     stale = 1;
   }
@@ -290,6 +305,7 @@ typedef struct {
   IMFDXGIDeviceManager *mgr;
   ID3D11Device *dev;
   int out_w, out_h, argb;
+  LONG stride;
   HRESULT d3d_hr;  // fallo del camino D3D (S_OK si se usó)
   int used_d3d;
 } mfv_open_res;
@@ -356,6 +372,14 @@ static HRESULT mfv_try_open(mfv *p, int use_d3d, mfv_open_res *o, const char **w
   UINT64 fs = 0;
   IMFMediaType_GetUINT64(cur, &MF_MT_FRAME_SIZE, &fs);
   o->out_w = (int)(fs >> 32); o->out_h = (int)(fs & 0xFFFFFFFFu);
+  UINT32 st32 = 0;
+  if (SUCCEEDED(IMFMediaType_GetUINT32(cur, &MF_MT_DEFAULT_STRIDE, &st32))) {
+    o->stride = (LONG)(INT32)st32;
+  } else {
+    GUID osub = GUID_NULL;
+    IMFMediaType_GetGUID(cur, &MF_MT_SUBTYPE, &osub);
+    if (FAILED(MFGetStrideForBitmapInfoHeader(osub.Data1, (DWORD)o->out_w, &o->stride))) o->stride = o->out_w * 4;
+  }
   o->used_d3d = use_d3d;
 done:
   if (a) IMFAttributes_Release(a);
@@ -483,6 +507,7 @@ static DWORD WINAPI mfv_decode(void *arg) {
     goto out_mf;
   }
   p->w = cw; p->h = chh;
+  p->out_h = o.out_h; p->stride = o.stride;
   p->force_alpha = 1;  // RGB32 trae X indefinido; ARGB32 del procesador de vídeo también se fuerza (coste medido en rb)
   p->start_pts = (double)ts / 1e7;
   p->duration = dur - p->start_pts;

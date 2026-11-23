@@ -434,6 +434,8 @@ step_tear() {
 # copia los videos a Temp\p9\run\video si faltan, lanza cada caso con ventana (run.ps1 -ExePath) y trae informe/captura/log a
 # Temp/p9-flutter/pc/vid-fvp-<caso>[-tag].{json,png,out,err}; carga previa en vid-load.txt.
 # --env "A=1;B=2" pasa variables al proceso (VP_DBG=1, VP_ATTACH=play, VP_MININT=n de la app).
+# --engine native|fvp (fvp por defecto): native lanza tf_probe --probe video (tf_mfvideo.c, --texture-kind gpu, TF_P9_WAIT=1)
+# del Release de app/ (pc.sh core + pc.sh app); informes vid-native-<caso>; si steady-hevc incumple no lanza nada mas.
 # Casos: steady-hevc seek-hevc loop-hevc steady-h264 seek-h264 loop-h264 rot-hevc rot-h264. `all` falla rapido: si steady de un video incumple
 # el umbral (pc-video-table.py verdict) se salta su seek/loop; tras el steady-hevc fallido hace UNA repeticion con --decoders FFmpeg (tag ffmpeg).
 # Antes de cada lanzamiento espera a que no haya otra prueba con ventana (wv_all, wv_flutter, tf_probe) en el PC.
@@ -455,18 +457,31 @@ vid_case() { # caso -> VC_CASE VC_FILE VC_SHOT
 vid_run() { # caso decoders suffix -> informe en $dst; devuelve 0 si el informe cumple los umbrales
   local c="$1" decs="$2" suffix="$3" dst="$ROOT/Temp/p9-flutter/pc"
   vid_case "$c" || { echo "caso desconocido: $c"; return 1; }
-  local name="vid-fvp-$c$suffix" tag="fvp-$c$suffix" w=0
+  local eng="${VID_ENGINE:-fvp}"
+  local name="vid-$eng-$c$suffix" tag="$eng-$c$suffix" w=0
   while [ "$(vid_busy)" != "0" ] && [ $w -lt 1800 ]; do echo "  PC ocupado, espero ($w s)"; sleep 30; w=$((w + 30)); done
   [ "$(vid_busy)" = "0" ] || { echo "PC sigue ocupado: no lanzo $name"; return 1; }
   local outwin="$PC_ROOT_WIN\\out\\vid" outu="$PC_ROOT/out/vid" exe="$PC_ROOT_WIN\\src\\Probes\\P9-flutter\\video\\vp_fvp\\build\\windows\\x64\\runner\\Release\\vp_fvp.exe"
+  local envv="$VID_ENV"
+  if [ "$eng" = native ]; then
+    exe="$REL_WIN\\tf_probe.exe"
+    # TF_P9_WAIT=1 (decisión 7n, tf_d3d.c): publicar la textura solo cuando la GPU confirma la subida.
+    envv="TF_P9_WAIT=1${VID_ENV:+;$VID_ENV}"
+    remote "rm -rf $PC_ROOT/run/vproj $PC_ROOT/run/vsup; mkdir -p $PC_ROOT/run/vproj $PC_ROOT/run/vsup"
+  fi
   remote "mkdir -p $outu; rm -f $outu/$tag.json $outu/$tag.png $outu/$tag.log $outu/$tag.err $outu/$tag.code $outu/$tag.shot.txt"
   local load; load="$("${SSH[@]}" 'wmic cpu get loadpercentage' 2>/dev/null | tr -d '\r' | grep -E '^[0-9]+' | head -1 | tr -d ' ')"
   echo "$name $load" >>"$dst/vid-load.txt"
-  local line="--case $VC_CASE --file $PC_ROOT_WIN\\run\\video\\$VC_FILE --report $outwin\\$tag.json --exit-after 80 --regime-s 10"
-  [ -z "$decs" ] || line="$line --decoders $decs"
+  local line="--case $VC_CASE --file $PC_ROOT_WIN\\run\\video\\$VC_FILE --report $outwin\\$tag.json --exit-after 80"
+  if [ "$eng" = native ]; then
+    line="--probe video $line --core-lib $REL_WIN\\AppCoreFFI.dll --projects-folder $PC_ROOT_WIN\\run\\vproj --support-dir $PC_ROOT_WIN\\run\\vsup --texture-kind gpu"
+  else
+    line="$line --regime-s 10"
+    [ -z "$decs" ] || line="$line --decoders $decs"
+  fi
   local b64; b64="$(printf %s "$line" | base64 | tr -d '\n')"
   echo "=== $name (carga previa ${load}%) ===" | tee -a "$LOG"
-  "${SSH[@]}" "powershell -NoProfile -ExecutionPolicy Bypass -File '$WINDIR_REMOTE\\run.ps1' -Tag '$tag' -ArgsB64 '$b64' -Timeout 100 -ExePath '$exe' -RunOut '$outwin' -ShotAt $VC_SHOT -EnvVars '$VID_ENV'" 2>&1 | tr -d '\r' >>"$LOG"
+  "${SSH[@]}" "powershell -NoProfile -ExecutionPolicy Bypass -File '$WINDIR_REMOTE\\run.ps1' -Tag '$tag' -ArgsB64 '$b64' -Timeout 100 -ExePath '$exe' -RunOut '$outwin' -ShotAt $VC_SHOT -EnvVars '$envv'" 2>&1 | tr -d '\r' >>"$LOG"
   grep 'TF:code' "$LOG" | tail -1
   rm -f "$dst/$name".{json,png,out,err}
   scp -q -o BatchMode=yes "$PC_HOST:$PC_ROOT_SCP/out/vid/$tag.json" "$dst/$name.json" >>"$LOG" 2>&1
@@ -481,13 +496,19 @@ vid_run() { # caso decoders suffix -> informe en $dst; devuelve 0 si el informe 
 
 step_video() {
   local want="${1:-all}"; shift 2>/dev/null
-  local suffix="" rebuild=0 decs=""; VID_ENV=""
+  local suffix="" rebuild=0 decs=""; VID_ENV=""; VID_ENGINE=fvp
   while [ $# -gt 0 ]; do
-    case "$1" in --tag) suffix="-$2"; shift 2 ;; --rebuild) rebuild=1; shift ;; --decoders) decs="$2"; shift 2 ;; --env) VID_ENV="$2"; shift 2 ;; *) shift ;; esac
+    case "$1" in --tag) suffix="-$2"; shift 2 ;; --rebuild) rebuild=1; shift ;; --decoders) decs="$2"; shift 2 ;; --env) VID_ENV="$2"; shift 2 ;; --engine) VID_ENGINE="$2"; shift 2 ;; *) shift ;; esac
   done
+  case "$VID_ENGINE" in fvp|native) ;; *) echo "--engine debe ser native o fvp"; return 1 ;; esac
   local dst="$ROOT/Temp/p9-flutter/pc" vsrc="$ROOT/Temp/p9-flutter/video"; mkdir -p "$dst"
   local reldir="$PC_ROOT/src/Probes/P9-flutter/video/vp_fvp/build/windows/x64/runner/Release"
-  if [ "$rebuild" = 1 ] || ! "${SSH[@]}" "test -f $reldir/vp_fvp.exe" 2>/dev/null; then
+  if [ "$VID_ENGINE" = native ]; then
+    # tf_probe.exe y AppCoreFFI.dll los dejan `pc.sh core` + `pc.sh app`; aquí no se compila.
+    reldir="$PC_ROOT/src/Probes/P9-flutter/app/build/windows/x64/runner/Release"
+    "${SSH[@]}" "test -f $reldir/tf_probe.exe -a -f $reldir/AppCoreFFI.dll" 2>/dev/null || { echo "falta tf_probe.exe o AppCoreFFI.dll: pc.sh core && pc.sh app"; return 1; }
+    [ "$want" = "build" ] && { echo "tf_probe.exe listo"; return 0; }
+  elif [ "$rebuild" = 1 ] || ! "${SSH[@]}" "test -f $reldir/vp_fvp.exe" 2>/dev/null; then
     echo "compilando vp_fvp ..."
     run_bg video.ps1 video 3000 || true
     grep -E '^TF:(vp_fvp|ERR|flutter)|^error:' "$LOG" | cut -c1-230 | tail -10
@@ -501,23 +522,25 @@ step_video() {
     "${SSH[@]}" "test -f $PC_ROOT/run/video/$f" 2>/dev/null || scp -q -o BatchMode=yes "$vsrc/$f" "$PC_HOST:$PC_ROOT_SCP/run/video/$f" >>"$LOG" 2>&1 || echo "fallo scp $f"
   done
   if [ "$want" = "all" ]; then
-    local v
+    local v gate=0
     for v in hevc h264; do
       if vid_run "steady-$v" "$decs" "$suffix"; then
         vid_run "seek-$v" "$decs" "$suffix"; vid_run "loop-$v" "$decs" "$suffix"
       else
         echo "steady-$v incumple: no sigo con seek/loop de $v"
-        [ "$v" = hevc ] && [ -z "$decs" ] && vid_run steady-hevc FFmpeg "-ffmpeg"
+        [ "$v" = hevc ] && [ -z "$decs" ] && [ "$VID_ENGINE" = fvp ] && vid_run steady-hevc FFmpeg "-ffmpeg"
+        # Nativo: steady-hevc es la puerta de 7h; si incumple no se gasta turno del PC en el resto.
+        [ "$VID_ENGINE" = native ] && [ "$v" = hevc ] && { echo "native: steady-hevc incumple, salto el resto"; gate=1; break; }
       fi
     done
-    vid_run rot-hevc "$decs" "$suffix"; vid_run rot-h264 "$decs" "$suffix"
+    [ "$gate" = 1 ] || { vid_run rot-hevc "$decs" "$suffix"; vid_run rot-h264 "$decs" "$suffix"; }
   else
     vid_run "$want" "$decs" "$suffix"
   fi
   echo "ficheros escapados:"; { echo "=== stray (desde $t0) ==="; stray -Since "'$t0'"; } >>"$LOG"
   awk '/=== stray \(desde/{f=1} f && /^STRAY/ && !/\\.claude\\/' "$LOG" | head -6
   echo "n escapados: $(awk '/=== stray \(desde/{f=1} f && /^STRAY/ && !/\\.claude\\/' "$LOG" | wc -l | tr -d ' ')"
-  python3 -I "$ROOT/Probes/P9-flutter/pc-video-table.py" table "$dst" "vid-fvp-" 2>&1 | tee -a "$LOG" | head -40
+  python3 -I "$ROOT/Probes/P9-flutter/pc-video-table.py" table "$dst" "vid-$VID_ENGINE-" 2>&1 | tee -a "$LOG" | head -40
   return 0
 }
 
