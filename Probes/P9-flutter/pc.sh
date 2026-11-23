@@ -104,14 +104,14 @@ step_app() {
 
 # pc.sh run [--tag T] [--timeout S] -- <args de tf_probe>
 step_run() {
-  local tag="run1" timeout=240 noredir=""
+  local tag="run1" timeout=240 noredir="" envv="" shot=0
   while [ $# -gt 0 ] && [ "$1" != "--" ]; do
-    case "$1" in --tag) tag="$2"; shift 2 ;; --timeout) timeout="$2"; shift 2 ;; --noredir) noredir="-NoRedirect"; shift ;; *) shift ;; esac
+    case "$1" in --tag) tag="$2"; shift 2 ;; --timeout) timeout="$2"; shift 2 ;; --noredir) noredir="-NoRedirect"; shift ;; --env) envv="$2"; shift 2 ;; --shot) shot="$2"; shift 2 ;; *) shift ;; esac
   done
   [ "${1:-}" = "--" ] && shift
   local b64; b64="$(printf %s "$*" | base64 | tr -d '\n')"
   "${SSH[@]}" "mkdir -p $PC_ROOT/out/run"
-  "${SSH[@]}" "powershell -NoProfile -ExecutionPolicy Bypass -File '$WINDIR_REMOTE\\run.ps1' -Tag '$tag' -ArgsB64 '$b64' -Timeout $timeout $noredir" 2>&1 | tr -d '\r' >>"$LOG"
+  "${SSH[@]}" "powershell -NoProfile -ExecutionPolicy Bypass -File '$WINDIR_REMOTE\\run.ps1' -Tag '$tag' -ArgsB64 '$b64' -Timeout $timeout $noredir -EnvVars '$envv' -ShotAt $shot" 2>&1 | tr -d '\r' >>"$LOG"
   local rc=${PIPESTATUS[0]}
   grep -E '^TF:|^error:|^SUCCESS|ERROR' "$LOG" | tail -6
   return $rc
@@ -177,6 +177,52 @@ step_diag() {
   return 0
 }
 
+# pc.sh frames: P9.7f-B prueba 7 (textura externa), 60 s por combinacion, via 1, fallando rapido.
+# Orden: gpu720 gpu1080 pixel720 pixel1080 bgra720 bgra1080; si gpu720 falla corre pixel720 de respaldo y para.
+# Luego solid-gpu y solid-pixel (10 s, TF_P9_SOLID=1, captura a los 6 s). Informes y PNG a Temp/p9-flutter/pc/.
+frames_one() { # tag mode size kind seconds [env] [shot]
+  local tag="$1" mode="$2" size="$3" kind="$4" secs="$5" envv="${6:-}" shot="${7:-0}" dst="$ROOT/Temp/p9-flutter/pc"
+  remote "rm -rf $PC_ROOT/run/projects $PC_ROOT/run/support $PC_ROOT/out/run/$tag.json && mkdir -p $PC_ROOT/run/projects $PC_ROOT/run/support"
+  local load; load="$("${SSH[@]}" 'wmic cpu get loadpercentage' 2>/dev/null | tr -d '\r' | grep -E '^[0-9]+' | head -1 | tr -d ' ')"
+  echo "$tag $load" >>"$dst/p3-load.txt"
+  echo "=== $tag (carga previa ${load}%) ===" >>"$LOG"
+  step_run --tag "$tag" --timeout $((secs + 60)) --env "$envv" --shot "$shot" -- --probe frames --mode "$mode" --size "$size" \
+    --seconds "$secs" --threads via1 --texture-kind "$kind" --core-lib "$REL_WIN\\AppCoreFFI.dll" \
+    --projects-folder "$PC_ROOT_WIN\\run\\projects" --support-dir "$PC_ROOT_WIN\\run\\support" \
+    --report "$PC_ROOT_WIN\\out\\run\\$tag.json" >/dev/null
+  local rc=$?
+  echo "$tag rc=$rc" | tee -a "$LOG"
+  local f
+  for f in json code log err shot.txt png; do
+    rm -f "$dst/p3-$tag.$f"
+    scp -q -o BatchMode=yes "$PC_HOST:$PC_ROOT_SCP/out/run/$tag.$f" "$dst/p3-$tag.$f" >>"$LOG" 2>&1
+  done
+  return $rc
+}
+
+step_frames() {
+  local dst="$ROOT/Temp/p9-flutter/pc"
+  mkdir -p "$dst"; : >"$dst/p3-load.txt"
+  local alive; alive="$("${SSH[@]}" 'tasklist /FI "IMAGENAME eq tf_probe.exe" /NH' 2>&1 | tr -d '\r' | grep -c tf_probe)"
+  [ "$alive" = "0" ] || { echo "hay tf_probe.exe vivo: no lanzo nada"; return 1; }
+  remote "mkdir -p $PC_ROOT/run $PC_ROOT/out/run" || return 1
+  # frames_one tag mode size kind segundos [env] [captura_a_los_s]
+  if ! frames_one gpu-720 texture 720 gpu 60 "" 30; then
+    echo "gpu-720 falla: corro pixel-720 de respaldo y paro"
+    frames_one pixel-720 texture 720 pixel 60 "" 30
+  else
+    frames_one gpu-1080 texture 1080 gpu 60
+    frames_one pixel-720 texture 720 pixel 60 "" 30
+    frames_one pixel-1080 texture 1080 pixel 60
+    frames_one bgra-720 bgra 720 gpu 60
+    frames_one bgra-1080 bgra 1080 gpu 60
+    frames_one solid-gpu texture 720 gpu 10 TF_P9_SOLID=1 6
+    frames_one solid-pixel texture 720 pixel 10 TF_P9_SOLID=1 6
+  fi
+  python3 -I "$ROOT/Probes/P9-flutter/pc-frames-table.py" "$dst" 2>&1 | tee -a "$LOG"
+  return 0
+}
+
 # pc.sh webview [wv_all|wv_flutter|wv_inapp]: compila y arranca las candidatas de WebView (P9.7e). Sin argumento, las tres.
 step_webview() {
   local cand="${1:-}" t0
@@ -191,6 +237,7 @@ step_webview() {
 }
 
 case "$STEP" in
+  frames) step_frames; rc=$? ;;
   webview) shift; step_webview "$@"; rc=$? ;;
   app) step_app; rc=$? ;;
   run) shift; step_run "$@"; rc=$? ;;

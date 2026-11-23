@@ -90,8 +90,33 @@ final _getrusage = Platform.isMacOS
         int Function(int, Pointer<Uint8>)>('getrusage')
     : null;
 
-/// CPU (usuario + sistema) acumulada del proceso, en segundos. NaN si no hay getrusage.
+typedef _GetProcessTimesC = Int32 Function(
+    IntPtr, Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>);
+typedef _GetProcessTimesD = int Function(
+    int, Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>);
+
+final _getProcessTimes = Platform.isWindows
+    ? DynamicLibrary.open('kernel32.dll')
+        .lookupFunction<_GetProcessTimesC, _GetProcessTimesD>('GetProcessTimes')
+    : null;
+
+/// CPU de proceso en Windows (kernel + usuario, FILETIME en unidades de 100 ns).
+double _cpuSecondsWindows(_GetProcessTimesD f) {
+  final p = nativeCalloc(64);
+  try {
+    // GetCurrentProcess() es el pseudo-handle -1. FILETIMEs: creacion, salida, kernel, usuario.
+    if (f(-1, p, p + 8, p + 16, p + 24) == 0) return double.nan;
+    final b = ByteData.sublistView(p.asTypedList(64));
+    return (b.getUint64(16, Endian.little) + b.getUint64(24, Endian.little)) / 1e7;
+  } finally {
+    nativeFree(p);
+  }
+}
+
+/// CPU (usuario + sistema) acumulada del proceso, en segundos. NaN si no hay medida.
 double cpuSeconds() {
+  final w = _getProcessTimes;
+  if (w != null) return _cpuSecondsWindows(w);
   final f = _getrusage;
   if (f == null) return double.nan;
   final p = nativeCalloc(256);

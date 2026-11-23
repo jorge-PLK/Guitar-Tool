@@ -217,20 +217,23 @@ Future<void> _measure(List<String> args, Probe3Surface surf, Watchdog wd,
   inWindow = false;
 
   final produced = s1[0] - s0[0];
-  final presented = bgra ? paintedInWindow : s1[2] - s0[2];
+  // Contador de textura: indice 2 (copias distintas) para gpu/macOS; indice 3 (copias BGRA) para pixel.
+  final ti = _opt(args, '--texture-kind') == 'pixel' ? 3 : 2;
+  final presented = bgra ? paintedInWindow : s1[ti] - s0[ti];
   final discarded = bgra ? skipped : produced - presented;
   final growth = (rss['60s'] ?? 0) - (rss['30s'] ?? 0);
   report['counts'] = {
     'produced': produced,
     'presented': presented,
     'discarded': discarded,
-    'discardedByStatsDelta': produced - (bgra ? s1[3] - s0[3] : s1[2] - s0[2]),
+    'discardedByStatsDelta':
+        produced - (bgra ? s1[3] - s0[3] : s1[ti] - s0[ti]),
     'maxSeqGap': bgra ? maxGap : null,
     'decodedTotal': decoded,
     'paintedTotal': painted,
     'producedTotal': s1[0],
     'distinctTextureCopiesTotal': s1[2],
-    'discardedTotalRun': s1[0] - (bgra ? s1[3] : s1[2]),
+    'discardedTotalRun': s1[0] - (bgra ? s1[3] : s1[ti]),
     'note': 'ventana = tras el primer segundo; margen +-1 en los bordes',
   };
   report['statsRaw'] = {'atWindowStart': s0, 'atEnd': s1};
@@ -243,8 +246,7 @@ Future<void> _measure(List<String> args, Probe3Surface surf, Watchdog wd,
     };
   }
   final wall = wall1 - wallW0, cpu = cpu1 - cpuW0;
-  // cpuSeconds() solo existe en macOS (getrusage): en Windows es NaN y jsonEncode lo rechazaría. La CPU en
-  // Windows es la parte B.
+  // cpuSeconds(): getrusage en macOS, GetProcessTimes en Windows; NaN (otro SO) no se puede codificar a JSON.
   final cpuOk = !cpu.isNaN && !cpu1.isNaN && !cpu0.isNaN;
   report['cpu'] = {
     'percentOfCoreWindow': cpuOk ? round3(cpu / wall * 100) : null,
@@ -252,7 +254,7 @@ Future<void> _measure(List<String> args, Probe3Surface surf, Watchdog wd,
         cpuOk ? round3((cpu1 - cpu0) / (wall1 - wall0 / 1e6) * 100) : null,
     'cpuSeconds': cpuOk ? round3(cpu) : null,
     'wallSeconds': round3(wall),
-    if (!cpuOk) 'note': 'sin medida de CPU en ${Platform.operatingSystem} (parte B)',
+    if (!cpuOk) 'note': 'sin medida de CPU en ${Platform.operatingSystem}',
   };
   report['rssMb'] = {...rss, 'growth30to60': round3(growth)};
   report['watchdogMaxMs'] = round3(wdMax);

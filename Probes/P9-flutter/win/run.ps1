@@ -1,8 +1,8 @@
 # Lanza tf_probe.exe CON VENTANA en la sesion interactiva (tarea programada tf-p9-run, creada y borrada en cada uso).
-# Uso: run.ps1 -Tag <tag> -ArgsB64 <argumentos en base64 UTF-8> [-Timeout 240]
+# Uso: run.ps1 -Tag <tag> -ArgsB64 <base64 UTF-8> [-Timeout 240] [-EnvVars "A=1;B=2"] [-ShotAt N] (captura out\run\<tag>.png a los N s)
 # Escribe out\run\<tag>.log (stdout+stderr), out\run\<tag>.code (codigo; 124 si se mato por tope) y sale con ese codigo.
 # Se ejecuta EN EL PC. Todo fichero vive bajo $P9.
-param([string]$Tag, [string]$ArgsB64, [int]$Timeout = 240, [switch]$NoRedirect)
+param([string]$Tag, [string]$ArgsB64, [int]$Timeout = 240, [switch]$NoRedirect, [string]$EnvVars = "", [int]$ShotAt = 0)
 . "$PSScriptRoot\common.ps1"
 $RunOut = Join-Path $Out "run"
 New-Item -ItemType Directory -Force $RunOut | Out-Null
@@ -19,10 +19,21 @@ Remove-Item $logF, $errF, $codeF -ErrorAction SilentlyContinue
 $redir = "-RedirectStandardOutput '$logF' -RedirectStandardError '$errF'"
 if ($NoRedirect) { $redir = "" }
 # Script interno (se ejecuta en la sesion interactiva).
+$envLines = ""
+foreach ($kv in ($EnvVars -split ';' | Where-Object { $_ -match '^[A-Za-z_][A-Za-z0-9_]*=' })) {
+  $k, $v = $kv -split '=', 2
+  $envLines += "`$env:$k = '$($v -replace "'", "''")'`r`n"
+}
+$shotLines = ""
+if ($ShotAt -gt 0) {
+  $png = Join-Path $RunOut "$Tag.png"
+  Remove-Item $png -ErrorAction SilentlyContinue
+  $shotLines = "Start-Sleep -Seconds $ShotAt`r`n& '$PSScriptRoot\shot.ps1' -ProcId `$p.Id -Png '$png' *> '$(Join-Path $RunOut "$Tag.shot.txt")'`r`n"
+}
 @"
-`$p = Start-Process -FilePath '$exe' -ArgumentList '$($argLine -replace "'", "''")' -WorkingDirectory '$rel' -PassThru $redir
+$envLines`$p = Start-Process -FilePath '$exe' -ArgumentList '$($argLine -replace "'", "''")' -WorkingDirectory '$rel' -PassThru $redir
 `$null = `$p.Handle
-if (`$p.WaitForExit($($Timeout * 1000))) { `$c = `$p.ExitCode } else { Stop-Process -Id `$p.Id -Force -ErrorAction SilentlyContinue; `$c = 124 }
+$shotLines if (`$p.WaitForExit($($Timeout * 1000))) { `$c = `$p.ExitCode } else { Stop-Process -Id `$p.Id -Force -ErrorAction SilentlyContinue; `$c = 124 }
 Set-Content -Path '$codeF' -Value `$c
 "@ | Out-File $inner -Encoding ascii
 
