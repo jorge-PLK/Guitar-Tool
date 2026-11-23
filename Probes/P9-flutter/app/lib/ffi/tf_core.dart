@@ -146,6 +146,8 @@ class TfCore {
             'tf_debug_is_main_thread'),
         apartment = lib.lookupFunction<Int32 Function(), int Function()>(
             'tf_debug_apartment'),
+        mfStep = lib.lookupFunction<Int32 Function(Int32), int Function(int)>(
+            'tf_debug_mf_step'),
         _mainActorSelftest = lib.lookupFunction<Int32 Function(Int32),
             int Function(int)>('tf_debug_mainactor_selftest'),
         _emit = lib.lookupFunction<Int32 Function(Int32, Int32, Int32),
@@ -195,6 +197,8 @@ class TfCore {
   final int Function() isMainThread;
   /// Windows: 0 STA, 1 MTA, 2 NA, 3 MAINSTA, -1 sin COM; otras = -2.
   final int Function() apartment;
+  /// P9 7g, ver tf_core.h (tf_debug_mf_step): 1 MFStartup, 2 enumerar dispositivos de vídeo, 3 MFShutdown.
+  final int Function(int) mfStep;
   final int Function(int) _mainActorSelftest;
   final int Function(int, int, int) _emit;
 

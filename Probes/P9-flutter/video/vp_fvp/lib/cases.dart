@@ -1,24 +1,10 @@
-import 'dart:ffi';
 import 'dart:io';
-import 'package:ffi/ffi.dart';
 import 'package:fvp/mdk.dart';
 import 'clock.dart';
 import 'rig.dart';
 import 'stats.dart';
 
 Future<void> wait(double s) => Future.delayed(Duration(microseconds: (s * 1e6).round()));
-
-typedef _Gru = int Function(int, Pointer<Int64>);
-final _gru = DynamicLibrary.process().lookupFunction<Int32 Function(Int32, Pointer<Int64>), _Gru>('getrusage');
-
-/// CPU de proceso acumulado (s).
-double cpuS() {
-  final p = calloc<Int64>(40);
-  _gru(0, p);
-  final v = p[0] + p[1] / 1e6 + p[2] + p[3] / 1e6;
-  calloc.free(p);
-  return v;
-}
 
 Future<Map<String, Object?>> steady(Rig r, double secs) async {
   await r.jump(1.0);

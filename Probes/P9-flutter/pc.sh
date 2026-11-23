@@ -153,17 +153,20 @@ step_diag() {
   [ "$alive" = "0" ] || { echo "hay tf_probe.exe vivo: no lanzo nada"; return 1; }
   remote "mkdir -p $PC_ROOT/run $PC_ROOT/out/run" || return 1
   scp -q -o BatchMode=yes "$wav" "$PC_HOST:$PC_ROOT_SCP/run/in.wav" >>"$LOG" 2>&1 || { echo "fallo scp in.wav"; return 1; }
-  local seq="via1:1 via2:1 via1:2 via2:2 via1:3 via2:3" extra="" item th n tag load rc
+  local seq="via1:1 via2:1 via1:2 via2:2 via1:3 via2:3" extra="" item th n tag load rc sink="port" pfx="diag"
   [ "$mode" = "extra" ] && { seq="via1:x1 via1:x2"; extra="--noredir"; }
+  # P9 7g medida 1: via 1, listener contra port, 3 ejecuciones alternadas. Tags sink-<sink>-<n>.
+  [ "$mode" = "sink" ] && { seq="listener:1 port:1 listener:2 port:2 listener:3 port:3"; pfx="sink"; }
   local loadf="$dst/diag-load${mode:+-$mode}.txt"; : >"$loadf"
   for item in $seq; do
     th="${item%%:*}"; n="${item##*:}"; tag="diag-$th-$n"
+    if [ "$mode" = "sink" ]; then sink="$th"; th="via1"; tag="sink-$sink-$n"; fi
     load="$("${SSH[@]}" 'wmic cpu get loadpercentage' 2>/dev/null | tr -d '\r' | grep -E '^[0-9]+' | head -1 | tr -d ' ')"
     echo "$tag $load" >>"$loadf"
     echo "=== $tag (carga previa ${load}%) ===" | tee -a "$LOG"
     rm -f "$dst/$tag.json" "$dst/$tag.code" "$dst/$tag.log" "$dst/$tag.err"
     remote "rm -rf $PC_ROOT/run/projects $PC_ROOT/run/support $PC_ROOT/out/run/$tag.json && mkdir -p $PC_ROOT/run/projects $PC_ROOT/run/support"
-    step_run --tag "$tag" --timeout 240 $extra -- --probe ffi --sink port --threads "$th" --no-fail-fast \
+    step_run --tag "$tag" --timeout 240 $extra -- --probe ffi --sink "$sink" --threads "$th" --no-fail-fast \
       --core-lib "$REL_WIN\\AppCoreFFI.dll" --projects-folder "$PC_ROOT_WIN\\run\\projects" \
       --support-dir "$PC_ROOT_WIN\\run\\support" --wav "$PC_ROOT_WIN\\run\\in.wav" \
       --report "$PC_ROOT_WIN\\out\\run\\$tag.json" >/dev/null
@@ -173,7 +176,7 @@ step_diag() {
       scp -q -o BatchMode=yes "$PC_HOST:$PC_ROOT_SCP/out/run/$tag.$f" "$dst/$tag.$f" >>"$LOG" 2>&1
     done
   done
-  python3 -I "$ROOT/Probes/P9-flutter/pc-table.py" "$dst" diag 2>&1 | tee -a "$LOG"
+  python3 -I "$ROOT/Probes/P9-flutter/pc-table.py" "$dst" diag "$pfx" 2>&1 | tee -a "$LOG"
   return 0
 }
 
@@ -200,8 +203,33 @@ frames_one() { # tag mode size kind seconds [env] [shot]
   return $rc
 }
 
+# pc.sh frames --only gpu-1080,bgra-720 (o gpu:1080,...): P9 7g medida 4. Solo esas combinaciones (tags de arriba, sin
+# las -precise), sin respaldo; no vacia p3-load.txt. Informes en Temp/p9-flutter/pc/p3-<tag>.json.
+step_frames_only() {
+  local dst="$ROOT/Temp/p9-flutter/pc" t
+  mkdir -p "$dst"
+  local alive; alive="$("${SSH[@]}" 'tasklist /FI "IMAGENAME eq tf_probe.exe" /NH' 2>&1 | tr -d '\r' | grep -c tf_probe)"
+  [ "$alive" = "0" ] || { echo "hay tf_probe.exe vivo: no lanzo nada"; return 1; }
+  remote "mkdir -p $PC_ROOT/run $PC_ROOT/out/run" || return 1
+  local list; list="$(echo "$1" | tr ':' '-' | tr ',' ' ')"
+  for t in $list; do
+    case "$t" in
+      gpu-720)    frames_one "$t" texture 720 gpu 60 "" 30 ;;
+      gpu-1080)   frames_one "$t" texture 1080 gpu 60 ;;
+      pixel-720)  frames_one "$t" texture 720 pixel 60 "" 30 ;;
+      pixel-1080) frames_one "$t" texture 1080 pixel 60 ;;
+      bgra-720)   frames_one "$t" bgra 720 gpu 60 ;;
+      bgra-1080)  frames_one "$t" bgra 1080 gpu 60 ;;
+      *) echo "combinacion desconocida: $t" ;;
+    esac
+  done
+  python3 -I "$ROOT/Probes/P9-flutter/pc-frames-table.py" "$dst" 2>&1 | tee -a "$LOG"
+  return 0
+}
+
 step_frames() {
   local dst="$ROOT/Temp/p9-flutter/pc"
+  if [ "${1:-}" = "--only" ]; then step_frames_only "${2:-}"; return $?; fi
   mkdir -p "$dst"; : >"$dst/p3-load.txt"
   local alive; alive="$("${SSH[@]}" 'tasklist /FI "IMAGENAME eq tf_probe.exe" /NH' 2>&1 | tr -d '\r' | grep -c tf_probe)"
   [ "$alive" = "0" ] || { echo "hay tf_probe.exe vivo: no lanzo nada"; return 1; }
@@ -224,6 +252,50 @@ step_frames() {
   return 0
 }
 
+# Una ejecucion de `--probe <probe>` (via 1, port) con carga previa anotada en Temp/p9-flutter/pc/g7-load.txt.
+# g7_one tag timeout probe [args extra de tf_probe...]; trae <tag>.json/.code/.log/.err a Temp/p9-flutter/pc/.
+g7_one() {
+  local tag="$1" timeout="$2" probe="$3"; shift 3
+  local dst="$ROOT/Temp/p9-flutter/pc" wav="$ROOT/Temp/p9-flutter/run/in.wav" load f rc
+  mkdir -p "$dst"
+  local alive; alive="$("${SSH[@]}" 'tasklist /FI "IMAGENAME eq tf_probe.exe" /NH' 2>&1 | tr -d '\r' | grep -c tf_probe)"
+  [ "$alive" = "0" ] || { echo "hay tf_probe.exe vivo: no lanzo nada"; return 1; }
+  remote "mkdir -p $PC_ROOT/run $PC_ROOT/out/run" || return 1
+  [ -f "$wav" ] && scp -q -o BatchMode=yes "$wav" "$PC_HOST:$PC_ROOT_SCP/run/in.wav" >>"$LOG" 2>&1
+  load="$("${SSH[@]}" 'wmic cpu get loadpercentage' 2>/dev/null | tr -d '\r' | grep -E '^[0-9]+' | head -1 | tr -d ' ')"
+  echo "$tag $load" >>"$dst/g7-load.txt"
+  echo "=== $tag (carga previa ${load}%) ===" | tee -a "$LOG"
+  rm -f "$dst/$tag".{json,code,log,err}
+  remote "rm -rf $PC_ROOT/run/projects $PC_ROOT/run/support $PC_ROOT/out/run/$tag.json && mkdir -p $PC_ROOT/run/projects $PC_ROOT/run/support"
+  step_run --tag "$tag" --timeout "$timeout" -- --probe "$probe" --threads via1 \
+    --core-lib "$REL_WIN\\AppCoreFFI.dll" --projects-folder "$PC_ROOT_WIN\\run\\projects" \
+    --support-dir "$PC_ROOT_WIN\\run\\support" --wav "$PC_ROOT_WIN\\run\\in.wav" \
+    --report "$PC_ROOT_WIN\\out\\run\\$tag.json" "$@" >/dev/null
+  rc=$?
+  echo "$tag rc=$rc" | tee -a "$LOG"
+  for f in json code log err; do
+    scp -q -o BatchMode=yes "$PC_HOST:$PC_ROOT_SCP/out/run/$tag.$f" "$dst/$tag.$f" >>"$LOG" 2>&1
+  done
+  return $rc
+}
+
+# pc.sh soak [segundos=660] [llamadas]: P9 7g medida 2. RSS y buferes vivos cada 10 s, via 1 con puerto.
+step_soak() {
+  local secs="${1:-660}" calls="${2:-0}"
+  g7_one soak-via1 $((secs + 300)) ffi-soak --sink port --soak-seconds "$secs" --calls "$calls"
+  python3 -I "$ROOT/Probes/P9-flutter/pc-table.py" "$ROOT/Temp/p9-flutter/pc" soak "$ROOT/Temp/p9-flutter/pc/soak-via1.json" 2>&1 | tee -a "$LOG"
+  return 0
+}
+
+# pc.sh mf: P9 7g medida 3. Apartamento COM del hilo de UI antes/despues de MFStartup y MFEnumDeviceSources.
+step_mf() {
+  g7_one mf-via1 200 ffi-mf --sink port
+  local j="$ROOT/Temp/p9-flutter/pc/mf-via1.json"
+  grep -A16 '"mf": {' "$j" | head -20 | tee -a "$LOG"
+  grep -E '"failed"' -A3 "$j" | head -5
+  return 0
+}
+
 # pc.sh webview [wv_all|wv_flutter|wv_inapp]: compila y arranca las candidatas de WebView (P9.7e). Sin argumento, las tres.
 step_webview() {
   local cand="${1:-}" t0
@@ -238,6 +310,8 @@ step_webview() {
 }
 
 case "$STEP" in
+  soak) shift; step_soak "$@"; rc=$? ;;
+  mf) shift; step_mf "$@"; rc=$? ;;
   frames) shift; step_frames "$@"; rc=$? ;;
   webview) shift; step_webview "$@"; rc=$? ;;
   app) step_app; rc=$? ;;

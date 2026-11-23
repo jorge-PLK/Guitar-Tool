@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 const double kT = 1001 / 30000; // s por fotograma
@@ -54,7 +55,23 @@ Map<String, Object?> regime(List<Sample> all, double t0, double t1, double rate)
     lastN = x.n;
     firstT = x.t;
   }
+  // Repetidos: fotogramas que permanecieron >= 2 periodos (el muestreo tiene ~25 ms de holgura).
+  var repeated = 0;
+  {
+    final per = kT / rate;
+    int? ln;
+    double ft = 0;
+    for (final x in valid) {
+      if (x.n == ln) continue;
+      if (ln != null && x.t - ft > 1.5 * per + 0.025) repeated += ((x.t - ft) / per).round() - 1;
+      ln = x.n;
+      ft = x.t;
+    }
+  }
+  final spanS = valid.length < 2 ? 0.0 : valid.last.t - valid.first.t;
   return {
+    'repeated': repeated,
+    'framesPerSec': spanS > 0 ? (shown * 100 / spanS).round() / 100 : null,
     'rate': rate,
     'samples': s.length,
     'invalid': s.length - valid.length,
@@ -83,6 +100,44 @@ Map<String, Object?> recovery(List<Sample> all, double tj, double tEnd) {
   }
   double? ms(double? x) => x == null ? null : (x * 1e4).round() / 10;
   return {'firstOkMs': ms(first), 'stayOkMs': ms(stay), 'samples': s.length};
+}
+
+/// Vigilante del hilo de UI: temporizador de 5 ms; retraso = llegada - prevista.
+class Watchdog {
+  final Stopwatch _sw = Stopwatch();
+  Timer? _t;
+  int ticks = 0, over16 = 0, over50 = 0, over100 = 0;
+  double maxMs = 0;
+  int _expectedUs = 0;
+
+  void start() {
+    _sw.start();
+    _expectedUs = 5000;
+    _t = Timer.periodic(const Duration(milliseconds: 5), (_) {
+      final late = (_sw.elapsedMicroseconds - _expectedUs) / 1000;
+      ticks++;
+      if (late > maxMs) maxMs = late;
+      if (late > 16) over16++;
+      if (late > 50) over50++;
+      if (late > 100) over100++;
+      // Si el hilo se atasca, el siguiente tick esperado es el real + 5 ms (no acumula el retraso).
+      _expectedUs = _sw.elapsedMicroseconds + 5000;
+    });
+  }
+
+  void stop() => _t?.cancel();
+
+  Map<String, Object?> toJson() =>
+      {'ticks': ticks, 'maxMs': (maxMs * 100).round() / 100, 'over16ms': over16, 'over50ms': over50, 'over100ms': over100};
+}
+
+/// NaN/Infinity -> null y claves a String, para que el informe sea JSON válido.
+Object? clean(Object? v) {
+  if (v is double) return v.isFinite ? v : null;
+  if (v is Map) return {for (final e in v.entries) '${e.key}': clean(e.value)};
+  if (v is Iterable) return [for (final e in v) clean(e)];
+  if (v == null || v is num || v is bool || v is String) return v;
+  return '$v';
 }
 
 double meanOf(List<double> v) => v.isEmpty ? 0 : v.reduce((a, b) => a + b) / v.length;

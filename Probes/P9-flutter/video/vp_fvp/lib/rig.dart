@@ -26,12 +26,21 @@ class Rig {
   // OJO: SeekFlag.frame hace que position sean FOTOGRAMAS, no ms (con él el seek a 1000 "ms" cae tras el final: end/stopped).
   int seekFlags = SeekFlag.fromStart;
   String log = '';
+  String? decodersArg; // --decoders
+  String decoders = '';
+  final List<String> decoderEvents = [];
 
   Future<Map<String, Object?>> open(String path) async {
     clock.emit(seconds: 0, playing: false);
     if (_env('VP_ATTACH', 'open') == 'open') clock.attach(player, _minInt);
-    final dec = _env('VP_DEC', 'VT,FFmpeg');
-    if (dec.isNotEmpty) player.videoDecoders = dec.split(',');
+    // Prioridad: --decoders > VP_DEC > por defecto de la plataforma (macOS: VT,FFmpeg; Windows: lista de fvp).
+    decoders = decodersArg ?? _env('VP_DEC', Platform.isWindows ? 'MFT:d3d=11,D3D11,DXVA,CUDA,FFmpeg' : 'VT,FFmpeg');
+    if (decoders.isNotEmpty) player.videoDecoders = decoders.split(',');
+    player.onEvent.listen((e) {
+      if (!e.category.startsWith('decoder')) return;
+      if (e.category == 'decoder.video') _active = e.detail;
+      if (decoderEvents.length < 20) decoderEvents.add('${e.category}: ${e.detail}');
+    });
     player.mute = true;
     if (_env('VP_DBG', '') == '1') {
       player.onStateChanged.listen((e) => stderr.writeln('[dbg] state ${e.oldValue} -> ${e.newValue} @${nowS()}'));
@@ -46,6 +55,9 @@ class Rig {
     texSize.value = await player.textureSize;
     _hb = Timer.periodic(const Duration(milliseconds: 33), (_) => clock.heartbeat());
     return {
+      'decodersRequested': decoders,
+      'decoderEvents': decoderEvents,
+      'activeDecoder': activeDecoder,
       'prepare': r,
       'textureId': player.textureId.value,
       'textureSize': [texSize.value?.width, texSize.value?.height],
@@ -58,6 +70,10 @@ class Rig {
       'fps': v?.codec.frameRate,
     };
   }
+
+  /// Decodificador que mdk abrió: detalle del último evento `decoder.video` (macOS: "VT").
+  String? get activeDecoder => _active;
+  String? _active;
 
   static String _env(String k, String d) => Platform.environment[k] ?? d;
   int get _minInt => int.parse(_env('VP_MININT', '10'));

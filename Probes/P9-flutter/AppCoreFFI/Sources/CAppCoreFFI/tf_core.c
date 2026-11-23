@@ -6,8 +6,13 @@
 #ifdef _WIN32
 #include <windows.h>
 #include <objbase.h>
-// CoGetApartmentType vive en ole32.
+#include <mfapi.h>
+#include <mfidl.h>
+// CoGetApartmentType vive en ole32; MFStartup en mfplat, MFEnumDeviceSources en mf, los GUID en mfuuid.
 #pragma comment(lib, "ole32.lib")
+#pragma comment(lib, "mfplat.lib")
+#pragma comment(lib, "mf.lib")
+#pragma comment(lib, "mfuuid.lib")
 #elif defined(__APPLE__)
 #include <pthread.h>
 #endif
@@ -69,6 +74,25 @@ int32_t tf_debug_apartment(void) {
   if (FAILED(CoGetApartmentType(&type, &qualifier))) return -1;
   return (int32_t)type;
 }
+
+int32_t tf_debug_mf_step(int32_t step) {
+  HRESULT hr;
+  if (step == 1) return (int32_t)MFStartup(MF_VERSION, MFSTARTUP_FULL);
+  if (step == 3) return (int32_t)MFShutdown();
+  if (step != 2) return -1;
+  IMFAttributes *attrs = NULL;
+  hr = MFCreateAttributes(&attrs, 1);
+  if (FAILED(hr)) return (int32_t)hr;
+  hr = attrs->lpVtbl->SetGUID(attrs, &MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE, &MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_VIDCAP_GUID);
+  IMFActivate **devs = NULL;
+  UINT32 count = 0;
+  if (SUCCEEDED(hr)) hr = MFEnumDeviceSources(attrs, &devs, &count);
+  attrs->lpVtbl->Release(attrs);
+  if (FAILED(hr)) return (int32_t)hr;
+  for (UINT32 i = 0; i < count; i++) devs[i]->lpVtbl->Release(devs[i]);
+  if (devs) CoTaskMemFree(devs);
+  return (int32_t)count;
+}
 #else
 void tf_internal_mark_main_thread(void) {}
 #ifdef __APPLE__
@@ -79,6 +103,7 @@ int32_t tf_debug_is_main_thread(void) { return 0; }
 void *tf_core_main_queue_handle(void) { return NULL; }
 void tf_core_pump(void) {}
 int32_t tf_debug_apartment(void) { return -2; }
+int32_t tf_debug_mf_step(int32_t step) { (void)step; return -2; }
 #endif
 
 /// Finalizador de Dart: mismo efecto que tf_core_free (free + decremento del contador).

@@ -77,6 +77,11 @@ TF_API int32_t tf_debug_mainactor_selftest(int32_t timeoutMs);
 /// Solo prueba: Windows = CoGetApartmentType del hilo que llama (0 STA, 1 MTA, 2 NA, 3 MAINSTA, -1 sin COM); otras = -2.
 TF_API int32_t tf_debug_apartment(void);
 
+/// Solo prueba (P9 7g): pasos de Media Foundation en el hilo que llama (Windows; otras = -2).
+/// 1 = MFStartup, 2 = MFCreateAttributes + MFEnumDeviceSources de vídeo (devuelve nº de dispositivos, sin abrirlos),
+/// 3 = MFShutdown. Errores: HRESULT (< 0).
+TF_API int32_t tf_debug_mf_step(int32_t step);
+
 /// Solo prueba: 1 si el hilo que llama es el principal del proceso, 0 si no.
 TF_API int32_t tf_debug_is_main_thread(void);
 

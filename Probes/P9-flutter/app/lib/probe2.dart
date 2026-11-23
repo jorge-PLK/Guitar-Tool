@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'ffi/tf_core.dart';
+import 'probe2_extra.dart';
 import 'probe2_measure.dart';
 import 'probe2_steps.dart';
 import 'probe2_util.dart';
@@ -30,7 +31,9 @@ Future<void> runProbe2(List<String> args, Watchdog wd, FrameStats fs) async {
   };
   final path = _opt(args, '--report');
   // Tope global: informe parcial y salida 3. Timer en el isolate de UI.
-  Timer(const Duration(seconds: 180), () {
+  // El tope sube con --soak-seconds (P9 7g).
+  final soakS = int.tryParse(_opt(args, '--soak-seconds') ?? '') ?? 0;
+  Timer(Duration(seconds: 180 + soakS), () {
     report['aborted'] = true;
     _finalize(report, wd, fs);
     if (path != null) File(path).writeAsStringSync(_enc.convert(report));
@@ -149,6 +152,21 @@ Future<void> _run(
 
   if (study) {
     await studyRun(core, report, wd, libraryList);
+    return;
+  }
+  final probeName = _opt(args, '--probe');
+  if (probeName == 'ffi-mf') {
+    await mfRun(core, report, failed);
+    wd.setPhase('shutdown');
+    report['h_shutdown'] = await shutdownCore(core, wd);
+    return;
+  }
+  if (probeName == 'ffi-soak') {
+    await soakRun(core, report, wd, methods, int.parse(_opt(args, '--soak-seconds') ?? '0'),
+        int.parse(_opt(args, '--calls') ?? '0'));
+    report['liveBuffersEnd'] = core.liveBuffers();
+    wd.setPhase('shutdown');
+    report['h_shutdown'] = await shutdownCore(core, wd);
     return;
   }
 
