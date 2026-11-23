@@ -11,6 +11,7 @@ const _textStyle = TextStyle(color: _white, fontSize: 13);
 class UiState extends ChangeNotifier {
   final boundaryKey = GlobalKey();
   final focusNode = FocusNode(debugLabel: 'campo-flutter');
+  final keyNode = FocusNode(debugLabel: 'reenvio-flutter');
   final fieldController = TextEditingController();
   bool showWeb = false;
   String? hidden; // null | none | offstage | zero | offscreen
@@ -20,6 +21,7 @@ class UiState extends ChangeNotifier {
   Size avail = Size.zero;
   String status = 'iniciando';
   void Function(String action)? onFocusAction;
+  KeyEventResult Function(KeyEvent e)? onKey;
 
   void changed() => notifyListeners();
 }
@@ -61,6 +63,7 @@ class Screen extends StatelessWidget {
         Text('${c.args.get('--case')} | ${st.status}'),
         const Spacer(),
         if (st.keys) ...[
+          Focus(focusNode: st.keyNode, onKeyEvent: (_, e) => st.onKey?.call(e) ?? KeyEventResult.ignored, child: const SizedBox.shrink()),
           _button('Foco: WebView', () => st.onFocusAction?.call('webview')),
           _button('Foco: campo', () => st.onFocusAction?.call('field')),
           const SizedBox(width: 8),

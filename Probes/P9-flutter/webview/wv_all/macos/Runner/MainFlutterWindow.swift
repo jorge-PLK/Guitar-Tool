@@ -17,6 +17,16 @@ class MainFlutterWindow: NSWindow {
 
     RegisterGeneratedPlugins(registry: flutterViewController)
 
+    // Recupera el foco de teclado para la vista de Flutter tras un clic en el WebView.
+    let focus = FlutterMethodChannel(name: "tf/focus", binaryMessenger: flutterViewController.engine.binaryMessenger)
+    focus.setMethodCallHandler { [weak self, weak flutterViewController] call, result in
+      if call.method == "reclaim" {
+        result(self?.makeFirstResponder(flutterViewController?.view) ?? false)
+      } else {
+        result(FlutterMethodNotImplemented)
+      }
+    }
+
     super.awakeFromNib()
   }
 

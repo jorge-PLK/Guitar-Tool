@@ -1,9 +1,6 @@
 // P9.4: casos messages y keys (pagina assets/web/probe.html).
 import 'dart:async';
 
-import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart';
-
 import 'case_tab.dart';
 import 'ctx.dart';
 
@@ -85,71 +82,4 @@ Future<void> runMessages(Ctx c) async {
       got.length != 1000 ||
       (c.report['burstDartToJs'] as Json)['received'] != 1000;
   if (bad) c.report['ok'] = false;
-}
-
-String _label(KeyEvent e) => e.logicalKey.keyLabel.isEmpty ? (e.logicalKey.debugName ?? '?') : e.logicalKey.keyLabel;
-
-Future<void> runKeys(Ctx c) async {
-  if (!await loadPage(c, 'probe.html')) return;
-  final flutterSeq = <Json>[];
-  final jsSeq = <Json>[];
-  int now() => DateTime.now().millisecondsSinceEpoch;
-  bool handler(KeyEvent e) {
-    if (flutterSeq.length < 5000) {
-      flutterSeq.add({
-        'type': e is KeyDownEvent ? 'down' : (e is KeyUpEvent ? 'up' : 'repeat'),
-        'key': _label(e),
-        'physical': e.physicalKey.debugName,
-        'ts': now(),
-        'primaryFocus': FocusManager.instance.primaryFocus?.debugLabel ?? 'none',
-      });
-    }
-    return false;
-  }
-
-  HardwareKeyboard.instance.addHandler(handler);
-  c.handlers['key'] = (m) {
-    if (jsSeq.length < 5000) jsSeq.add({...m, 'dartTs': now()});
-  };
-  c.st.keys = true;
-  c.st.onFocusAction = (action) {
-    flutterSeq.add({'type': 'focusAction', 'action': action, 'ts': now()});
-    if (action == 'webview') {
-      c.st.focusNode.unfocus();
-      unawaited(c.web.run("window.focus();document.body.tabIndex=0;document.body.focus();__post({event:'focusAction',action:'webview',ts:Date.now()})"));
-    } else {
-      c.st.focusNode.requestFocus();
-    }
-  };
-  c.handlers['focusAction'] = (m) => jsSeq.add({...m, 'type': 'focusAction'});
-  c.st.status = 'PULSA TECLAS (pasos en el encargo)';
-  c.st.changed();
-  final total = c.args.intOr('--exit-after', 60);
-  await Future<void>.delayed(Duration(seconds: total > 8 ? total - 4 : 4));
-  HardwareKeyboard.instance.removeHandler(handler);
-  try {
-    c.report['jsPageSideCount'] = (await c.evalJson('JSON.stringify(window.__keys)') as List).length;
-  } catch (e) {
-    c.report['jsPageSideCount'] = 'error: $e';
-  }
-  Json tally(List<Json> seq, String keyField) {
-    final t = <String, Json>{};
-    for (final e in seq) {
-      final type = '${e['type']}';
-      if (type == 'focusAction') continue;
-      final k = '${e[keyField]}';
-      final j = t[k] ??= {'down': 0, 'up': 0, 'repeat': 0};
-      final norm = type == 'keydown' ? 'down' : (type == 'keyup' ? 'up' : type);
-      j[norm] = (j[norm] as int) + 1;
-    }
-    return t;
-  }
-
-  c.report['jsSequence'] = jsSeq;
-  c.report['flutterSequence'] = flutterSeq;
-  c.report['jsTally'] = tally(jsSeq, 'key');
-  c.report['flutterTally'] = tally(flutterSeq, 'key');
-  c.report['jsEvents'] = jsSeq.where((e) => e['type'] != 'focusAction').length;
-  c.report['flutterEvents'] = flutterSeq.where((e) => e['type'] != 'focusAction').length;
-  c.report['fieldText'] = c.st.fieldController.text;
 }

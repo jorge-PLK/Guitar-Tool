@@ -84,11 +84,20 @@
   };
   root.probe = probe;
 
+  root.__preventKeys = false;
   ['keydown', 'keyup'].forEach(function (type) {
     root.addEventListener(type, function (e) {
       var o = { event: 'key', type: type, key: e.key, code: e.code, meta: e.metaKey, ctrl: e.ctrlKey, shift: e.shiftKey, alt: e.altKey, repeat: e.repeat, ts: Date.now() };
       if (root.__keys.length < 5000) root.__keys.push(o);
       post(o);
+      if (root.__preventKeys) { e.preventDefault(); e.stopPropagation(); }
     }, true);
   });
+  // Tecla reenviada por Dart (modo flutter): se apunta igual que la nativa.
+  root.__key = function (o) {
+    o.event = 'key'; o.via = 'dart'; o.ts = Date.now();
+    if (root.__keys.length < 5000) root.__keys.push(o);
+    post(o);
+  };
+  root.addEventListener('mousedown', function () { post({ event: 'mousedown', ts: Date.now() }); }, true);
 })(window);
