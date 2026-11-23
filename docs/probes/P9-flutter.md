@@ -1,6 +1,6 @@
 # P9 · Viabilidad de la interfaz Flutter
 
-**Estado: en ejecución (23/11/2026). Pruebas 1, 2, 3 y 6 (Mac) pasadas; prueba 4 (Mac) cerrada en lo medible: `keys` medido el 23/11, las dos candidatas incumplen con el WebView enfocado (fallo abierto de Flutter, flutter/flutter#184557) y las dos cumplen con el diseño «WebView sin foco»; elección de paquete pendiente de Windows; prueba 5 medida en el Mac: gana el reproductor nativo (provisional, falta Windows); en el PC x64 pasan 7b y 7e, 7d está decidido (vía 1) y la textura externa funciona con Impeller en los dos caminos (medida en curso). Pendiente: resto de la 7 (medida de textura, WebView, vídeo, `listener` contra puerto con el PC quieto, RSS largo de vía 1, STA tras Media Foundation).** Primera parte de la Fase 7f. Decide si se mantienen las decisiones marcadas (P9) en [ADR-021](../adr/ADR-021.md). Código en `Probes/P9-flutter/` (fuera de la puerta de tests); resultados, en este fichero, debajo de cada prueba.
+**Estado: en ejecución (23/11/2026). Pruebas 1, 2, 3 y 6 (Mac) pasadas; prueba 4 (Mac) cerrada en lo medible: `keys` medido el 23/11, las dos candidatas incumplen con el WebView enfocado (fallo abierto de Flutter, flutter/flutter#184557) y las dos cumplen con el diseño «WebView sin foco»; elección de paquete pendiente de Windows; prueba 5 medida en el Mac: gana el reproductor nativo (provisional, falta Windows); en el PC x64 pasan 7b y 7e, 7d está decidido (vía 1) y la textura externa funciona con Impeller en los dos caminos y está medida (0-3 descartes por minuto en `gpu` y `pixel`; umbral de 0 pendiente de decisión de Jorge). Pendiente: resto de la 7 (WebView, vídeo, `listener` contra puerto con el PC quieto, RSS largo de vía 1, STA tras Media Foundation).** Primera parte de la Fase 7f. Decide si se mantienen las decisiones marcadas (P9) en [ADR-021](../adr/ADR-021.md). Código en `Probes/P9-flutter/` (fuera de la puerta de tests); resultados, en este fichero, debajo de cada prueba.
 
 ## Reglas
 
@@ -307,20 +307,35 @@ Código: `Probes/P9-flutter/webview/{wv_all,wv_flutter,wv_inapp}` (app mínima c
 - `pc.sh sync` excluye ahora `ephemeral` (enlaces simbólicos a rutas del Mac que hacían fallar la extracción).
 - **Sin comprobar:** que el WebView pinte el HTML; build para macOS de estas apps mínimas; `pc.sh webview` entero de una sola vez con los últimos cambios (se validó por tandas).
 
-#### 7f · Textura externa con Impeller — FUNCIONAN LOS DOS CAMINOS; MEDIDA EN CURSO
+#### 7f · Textura externa con Impeller — FUNCIONAN LOS DOS CAMINOS; 0-3 DESCARTES POR MINUTO EN AMBOS (umbral de 0: pregunta a Jorge)
 
-- Código: `AppCoreFFI/Sources/AppCoreFFI/Frames+Windows.swift` (generador BGRA sin CoreVideo; `TF_P9_SOLID=1` = rojo puro con cuadrado azul 200×200), `FrameRegistry.swift`, `CAppCoreFFI/tf_d3d.c` (dispositivo D3D11 propio, textura `B8G8R8A8` compartida por canal con `D3D11_RESOURCE_MISC_SHARED`, handle clásico de `GetSharedHandle`, sin mutex ni doble búfer), `app/windows/runner/tf_texture_host.{h,cpp}` (`--texture-kind gpu|pixel`), `win/shot.ps1`, `pc.sh frames` y `pc-frames-table.py`. Commits `49e2113` y `f4d7861`. Repetir: `Probes/P9-flutter/pc.sh sync && Probes/P9-flutter/pc.sh core && Probes/P9-flutter/pc.sh app && Probes/P9-flutter/pc.sh frames`; informes y capturas en `Temp/p9-flutter/pc/p3-<kind>-<size>.json|png`.
+- Código: `AppCoreFFI/Sources/AppCoreFFI/Frames+Windows.swift` (generador BGRA sin CoreVideo; `TF_P9_SOLID=1` = rojo puro con cuadrado azul 200×200), `FrameRegistry.swift`, `CAppCoreFFI/tf_d3d.c` (dispositivo D3D11 propio, textura `B8G8R8A8` compartida por canal con `D3D11_RESOURCE_MISC_SHARED`, handle clásico de `GetSharedHandle`, sin mutex ni doble búfer), `app/windows/runner/tf_texture_host.{h,cpp}` (`--texture-kind gpu|pixel`), `win/shot.ps1`, `pc.sh frames [--no-fail-fast]` y `pc-frames-table.py`; exports nuevos `tf_debug_frames_extra`, `tf_debug_frames_reset` y `tf_hr_sleep_ns`; `TF_P9_PRECISE=1` (generador con reloj de alta resolución). Commits `49e2113`, `f4d7861` y `a7438bf`. Repetir: `Probes/P9-flutter/pc.sh sync && Probes/P9-flutter/pc.sh core && Probes/P9-flutter/pc.sh app && Probes/P9-flutter/pc.sh frames`; informes y capturas en `Temp/p9-flutter/pc/p3-<kind>-<size>.json|png`.
 - Impeller activo en Windows: el log del motor dice `Using the Impeller rendering backend (OpenGLESSDF)`. «Could not create external texture» no apareció.
 - Cabeceras de Flutter 3.50.1 (leídas en el PC): `gpu` = `kFlutterDesktopGpuSurfaceTypeDxgiSharedHandle`, pide el HANDLE de `IDXGIResource::GetSharedHandle` (`flutter_texture_registrar.h:35-38, 77-80`), formato BGRA8888 opcional; `pixel` = `FlutterDesktopPixelBuffer` sin campo de formato, el motor lo trata como RGBA y el runner convierte BGRA→RGBA por fotograma. `flutter::FlutterEngine` no expone `texture_registrar()`: se saca con `GetRegistrarForPlugin` + `FlutterDesktopRegistrarGetTextureRegistrar` (API C). `MarkTextureFrameAvailable` se puede llamar desde cualquier hilo (`texture_registrar.h:83-84`); se llama desde el hilo del generador, leído y no probado con carreras.
-- Tabla (60 s, 720p, vía 1, carga del PC 5 % y 0 % antes):
+- Primera medida (conteo desigual, descartada): `gpu` 720 1770/1766, `pixel` 720 1770/1770.
+- Segunda medida, con conteo por número de secuencia en los tres caminos (fotogramas distintos entregados), 60 s cada una, vía 1, Impeller:
 
-| Camino | Producidos / presentados | Descartes | CPU % de un núcleo (`GetProcessTimes`) | RSS 5 / 30 / 60 s (MB) | Vigilante máx (ms) |
-| --- | --- | --- | --- | --- | --- |
-| `gpu` 720 | 1770 / 1766 | 4 | 1,642 | 119,3 / 120,2 / 121,5 | 24,0 |
-| `pixel` 720 | 1770 / 1770 | 0 | 0,424 | 132,0 / 130,3 / 131,5 | 16,1 |
+| Combinación | Producidos / distintos | Descartes | Copias duplicadas | CPU % de un núcleo | RSS 5 / 30 / 60 s (MB) | Vigilante máx (ms) | Productor p99 / máx (ms) | Peticiones p99 / máx (ms) | Carga del PC antes |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `gpu` 720 | 1770 / 1769 | 1 | 15 | 0,689 | 119,5 / 120,3 / 121,6 | 15,4 | 47,5 / 52,9 | 61,5 / 71,0 | 4 % |
+| `gpu` 1080 | 1771 / 1768 | 3 | 12 | 0,742 | 132,5 / 133,4 / 134,5 | 20,1 | 47,3 / 61,5 | 57,0 / 71,3 | 85 % |
+| `pixel` 720 | 1770 / 1770 | 0 | 0 | 0,609 | 133,0 / 131,3 / 132,5 | 13,2 | 47,3 / 48,0 | 56,5 / 61,9 | 3 % |
+| `pixel` 1080 | 1771 / 1768 | 3 | 0 | 2,463 | 167,3 / 161,3 / 162,4 | 30,7 | 47,5 / 54,4 | 58,2 / 65,6 | 4 % |
+| `bgra` 720 | 1770 / 1771 | 2 | 0 | 0,609 | 118,9 / 119,1 / 121,3 | 13,4 | 47,5 / 48,1 | 5,5 / 112,1 | 100 % |
+| `bgra` 1080 | 1721 / 1603 | 120 | 0 | 7,071 | 146,0 / 147,2 / 147,9 | 29,6 | 62,7 / 82,7 | 10,7 / 2298,7 | 7 % |
+| `gpu` 720, reloj preciso | 1770 / 1771 | −1 | 14 | 0,238 | 119,3 / 120,2 / 121,3 | 15,7 | 33,8 / 49,0 | 48,3 / 54,8 | 8 % |
+| `pixel` 720, reloj preciso | 1771 / 1769 | 2 | 0 | 0,477 | 132,4 / 130,7 / 131,9 | 9,1 | 33,8 / 49,2 | 48,2 / 65,7 | 4 % |
 
-- **Aviso de método: la tabla no decide todavía.** `gpu` cuenta fotogramas distintos y `pixel` copias totales (un fotograma copiado dos veces tapa uno perdido); en pasadas de 10 s con color fijo `gpu` perdió 2 de 269 y `pixel` 1 de 270. Hipótesis sin medir: parte de los descartes son del generador (temporizador de Windows de ~15,6 ms: dos fotogramas dentro de un mismo refresco). En curso: conteo por secuencia en los tres caminos, intervalos del productor y de las peticiones del motor, variante con reloj preciso (`TF_P9_PRECISE=1`) y la matriz entera (1080 y BGRA).
+- **Ningún camino da 0 descartes en las dos resoluciones** (umbral de la prueba 3). `gpu`: 1 y 3; `pixel`: 0 y 3. `gpu` no pierde más que `pixel`. Memoria estable en los dos.
+- **Causa de los descartes de `gpu`, medida:** todos (1 de 1 y 3 de 3) son secuencias saltadas entre dos peticiones del motor (`fetches.skippedSeqs`); 1 de 1 y 2 de 3 con la petición tardía (> 40 ms; máximo 61-71 ms). No hay ninguno sin explicar por cadencia: no hay indicio de carrera en la textura compartida. Las copias duplicadas (15 y 12) son el mismo fotograma pedido dos veces, no pérdida.
+- **Generador:** con el reloj por defecto de Windows produce a ~31 ms de mediana con saltos de hasta 47 ms (mínimo 15,8 ms; ningún intervalo < 8 ms); con `TF_P9_PRECISE=1` la mediana es 33,33 ms y las peticiones > 50 ms bajan de 73-103 a 2. No quita los descartes (`pixel` 720: 2). El −1 de `gpu` preciso es el error de borde ±1 de la ventana de medida.
+- **Supuesto, sin aislar:** que los 1-3 descartes por minuto sean tirones del hilo de raster del motor.
+- **Copia BGRA por FFI no sirve a 1080p en Windows:** 120 descartes y una petición de 2,3 s. Queda como último respaldo solo a 720p.
+- **No limpias:** `gpu` 1080 (carga 85 %) y `bgra` 720 (100 %) se midieron con el PC cargado; repetir con el PC libre.
+- **Textura doble (dos texturas alternas):** no justificada por estos números; sin implementar.
 - La CPU de Windows no es comparable con la del Mac: solo cuenta el proceso, no driver ni GPU.
+- `fetchIntervalMs` se mide en el núcleo (`tf_frame_copy`), no en el runner.
+- **Pendiente de Jorge:** si se acepta un umbral de ≤ 3 descartes por minuto en Windows (latest-wins) y se queda `GpuSurfaceTexture`, o se exige 0.
 - Copia BGRA en Windows: funciona (10 s a 720p: 271 / 271, 0 descartes, CPU 1,736 %).
-- Orden de canales: correcto en `gpu` y en `pixel` según el agente (captura de pantalla con `CopyFromScreen`: fondo rojo y cuadrado azul); el orquestador aún no ha mirado los PNG. Desgarro: una captura suelta no lo descarta; sin medir.
+- **Juicio visual del orquestador** (capturas de pantalla con `CopyFromScreen`, `Temp/p9-flutter/pc/p3-solid-gpu.png`, `p3-solid-pixel.png`, `p3-gpu-720.png`): orden de canales correcto en los dos caminos (fondo rojo puro, cuadrado azul arriba a la izquierda, sin volteo vertical ni horizontal); en `gpu` 720 la barra blanca tiene bordes nítidos, sin franjas ni fotograma a medias. Una captura suelta no descarta el desgarro. Sin mirar: `p3-pixel-720.png` y las capturas de la segunda tanda.
 - El build de `AppCoreFFI.dll` con el código de la prueba 5 sigue compilando en Windows (26 exportaciones antes de esta parte; `VideoProbe.swift` va bajo `canImport(AVFoundation)`).
