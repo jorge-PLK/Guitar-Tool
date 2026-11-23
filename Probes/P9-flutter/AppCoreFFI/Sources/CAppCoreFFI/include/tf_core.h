@@ -139,6 +139,22 @@ TF_API int32_t tf_d3d_wait_stats(int32_t channel, int64_t *out);
 TF_API void tf_d3d_release(int32_t channel);
 /// Espera de alta resolución (CREATE_WAITABLE_TIMER_HIGH_RESOLUTION) en el hilo que llama. 0 bien.
 TF_API int32_t tf_hr_sleep_ns(int64_t ns);
+
+/// P9 7h, interno (Windows, tf_mfvideo.c): reproductor nativo Media Foundation (IMFSourceReader) esclavo del reloj
+/// externo; lo envuelven los tf_debug_video_* de Exports.swift. notify(channel) = hay fotograma nuevo subido.
+typedef void (*tf_mfv_notify_fn)(int32_t channel);
+/// Apertura asíncrona; 0 bien (consultar tf_mfv_state).
+TF_API int32_t tf_mfv_open(int32_t channel, const char *utf8Path, tf_mfv_notify_fn notify);
+/// 0 abriendo, 1 listo, 2 fallo, -1 sin reproductor.
+TF_API int32_t tf_mfv_state(int32_t channel);
+TF_API void tf_mfv_close(int32_t channel);
+TF_API void tf_mfv_clock(int32_t channel, double seconds, double rate, int32_t playing, int32_t epochJump);
+TF_API void tf_mfv_loop(int32_t channel, double start, double end, int32_t enabled);
+/// JSON con malloc (liberar con free) o NULL mientras abre / sin reproductor.
+TF_API char *tf_mfv_info(int32_t channel);
+TF_API char *tf_mfv_stats(int32_t channel, int32_t reset);
+/// Camino de textura: *active = 1 si el canal tiene reproductor; devuelve el HANDLE compartido o NULL.
+TF_API void *tf_mfv_copy(int32_t channel, int32_t *active);
 #endif
 
 #ifdef __cplusplus

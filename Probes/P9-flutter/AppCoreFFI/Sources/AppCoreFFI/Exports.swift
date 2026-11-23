@@ -90,6 +90,10 @@ public func ffiTextureDispose(_ channel: Int32) {
 public func ffiFrameCopy(_ channel: Int32) -> UnsafeMutableRawPointer? {
     #if canImport(AVFoundation)
     if let v = videoProbes.get(channel) { return v.copyForTexture() }
+    #elseif os(Windows)
+    var mfvActive: Int32 = 0
+    let mfvHandle = tf_mfv_copy(channel, &mfvActive)
+    if mfvActive != 0 { return mfvHandle }
     #endif
     #if canImport(CoreVideo) || os(Windows)
     return frameSources.get(channel)?.copyForTexture()
@@ -212,6 +216,43 @@ public func ffiDebugVideoInfo(_ channel: Int32) -> UnsafeMutablePointer<UInt8>? 
 public func ffiDebugVideoStats(_ channel: Int32, _ reset: Int32) -> UnsafeMutablePointer<UInt8>? {
     guard let p = videoProbes.get(channel) else { return nil }
     return UnsafeMutableRawPointer(strdup(p.statsJSON(reset: reset != 0)))?.assumingMemoryBound(to: UInt8.self)
+}
+#elseif os(Windows)
+// P9 7h: candidata nativa de Windows (tf_mfvideo.c, Media Foundation). Mismo contrato que la rama AVFoundation.
+private let mfvNotify: tf_mfv_notify_fn = { ch in
+    if let id = frameTextures.id(for: ch) { frameTextures.host?.frame_available?(id) }
+}
+
+@_cdecl("tf_debug_video_open")
+public func ffiDebugVideoOpen(_ channel: Int32, _ path: UnsafePointer<CChar>?) -> Int32 {
+    guard let path else { return 1 }
+    return tf_mfv_open(channel, path, mfvNotify)
+}
+
+@_cdecl("tf_debug_video_state")
+public func ffiDebugVideoState(_ channel: Int32) -> Int32 { tf_mfv_state(channel) }
+
+@_cdecl("tf_debug_video_close")
+public func ffiDebugVideoClose(_ channel: Int32) { tf_mfv_close(channel) }
+
+@_cdecl("tf_debug_video_clock")
+public func ffiDebugVideoClock(_ channel: Int32, _ seconds: Double, _ rate: Double, _ playing: Int32, _ epochJump: Int32) {
+    tf_mfv_clock(channel, seconds, rate, playing, epochJump)
+}
+
+@_cdecl("tf_debug_video_loop")
+public func ffiDebugVideoLoop(_ channel: Int32, _ start: Double, _ end: Double, _ enabled: Int32) {
+    tf_mfv_loop(channel, start, end, enabled)
+}
+
+@_cdecl("tf_debug_video_info")
+public func ffiDebugVideoInfo(_ channel: Int32) -> UnsafeMutablePointer<UInt8>? {
+    UnsafeMutableRawPointer(tf_mfv_info(channel))?.assumingMemoryBound(to: UInt8.self)
+}
+
+@_cdecl("tf_debug_video_stats")
+public func ffiDebugVideoStats(_ channel: Int32, _ reset: Int32) -> UnsafeMutablePointer<UInt8>? {
+    UnsafeMutableRawPointer(tf_mfv_stats(channel, reset))?.assumingMemoryBound(to: UInt8.self)
 }
 #endif
 
