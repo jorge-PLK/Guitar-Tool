@@ -6,7 +6,7 @@
 # Uso: tear.ps1 -Seconds 60 -Title <titulo de ventana o nombre de proceso> -Out <json> [-Region "x,y,w,h"]
 #   -Region: sub-rectangulo del area cliente donde esta la textura (por defecto, todo el area cliente).
 # Los PNG de hasta 5 capturas partidas se guardan junto al JSON (<Out sin extension>_tear<N>.png).
-param([int]$Seconds = 60, [string]$Title = "", [string]$Out = "tear.json", [string]$Region = "")
+param([int]$Seconds = 60, [string]$Title = "", [string]$Out = "tear.json", [string]$Region = "", [int]$Delay = 0)
 $ErrorActionPreference = "Stop"
 Add-Type -AssemblyName System.Drawing
 Add-Type -ReferencedAssemblies System.Drawing @"
@@ -33,6 +33,11 @@ public static class TfTear {
   [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern IntPtr FindWindow(string cls, string title);
   [DllImport("user32.dll")] public static extern bool GetClientRect(IntPtr h, out RECT r);
   [DllImport("user32.dll")] public static extern bool ClientToScreen(IntPtr h, ref PT p);
+  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+  [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int cmd);
+  [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int cx, int cy, uint flags);
+  // Al frente, sin tapar: HWND_TOPMOST (-1), SWP_NOMOVE|SWP_NOSIZE (3).
+  public static void Front(IntPtr h) { ShowWindow(h, 9); SetWindowPos(h, new IntPtr(-1), 0, 0, 0, 0, 3); SetForegroundWindow(h); }
 
   const int Rows = 32, Tolerance = 4, Thresh = 200, MaxSamples = 20, MaxPngs = 5;
 
@@ -56,6 +61,7 @@ public static class TfTear {
       while (sw.Elapsed.TotalSeconds < seconds) {
         g.CopyFromScreen(sx, sy, 0, 0, sz);
         res.Captures++;
+        if (res.Captures == 1 || res.Captures == 200) bmp.Save(pngBase + "_cap" + res.Captures + ".png", ImageFormat.Png);  // capturas normales de referencia
         BitmapData bd = bmp.LockBits(new Rectangle(0, 0, rw, rh), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
         int found = 0, min = int.MaxValue, max = -1;
         try {
@@ -96,15 +102,21 @@ public static class TfTear {
 
 [void][TfTear]::SetProcessDPIAware()
 $h = [IntPtr]::Zero
-if ($Title -ne "") {
-  $h = [TfTear]::FindWindow($null, $Title)
-  if ($h -eq [IntPtr]::Zero) {
-    $name = [IO.Path]::GetFileNameWithoutExtension($Title)
-    $p = Get-Process -Name $name -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero } | Select-Object -First 1
-    if ($p) { $h = $p.MainWindowHandle }
+$wait = [Diagnostics.Stopwatch]::StartNew()
+while ($h -eq [IntPtr]::Zero -and $wait.Elapsed.TotalSeconds -lt 30) {
+  if ($Title -ne "") {
+    $h = [TfTear]::FindWindow($null, $Title)
+    if ($h -eq [IntPtr]::Zero) {
+      $name = [IO.Path]::GetFileNameWithoutExtension($Title)
+      $p = Get-Process -Name $name -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero } | Select-Object -First 1
+      if ($p) { $h = $p.MainWindowHandle }
+    }
   }
+  if ($h -eq [IntPtr]::Zero) { Start-Sleep -Milliseconds 300 }
 }
 if ($h -eq [IntPtr]::Zero) { "TF:tear sin ventana para '$Title'"; exit 1 }
+[TfTear]::Front($h)
+if ($Delay -gt 0) { Start-Sleep -Seconds $Delay }
 $rx = 0; $ry = 0; $rw = 0; $rh = 0
 if ($Region -ne "") { $v = $Region.Split(",") | ForEach-Object { [int]$_ }; $rx = $v[0]; $ry = $v[1]; $rw = $v[2]; $rh = $v[3] }
 $outFull = [IO.Path]::GetFullPath($Out)

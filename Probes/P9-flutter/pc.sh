@@ -387,7 +387,49 @@ step_wvrun() {
   return 0
 }
 
+# pc.sh tear [--ring 0|1|2|3|4] [--size 720|1080] [--seconds 60] [--kind gpu|pixel] [--region x,y,w,h] [--tag sufijo]: P9 7l.
+# Prueba de fotogramas (via 1, TF_P9_TEAR=1) + detector de desgarro (win\tear.ps1) en la sesion interactiva (run.ps1 -Tear).
+# --ring 0 = textura unica; 1 = anillo por defecto (3); 2..4 = anillo de ese tamano (TF_P9_RING). La app corre seconds+TEAR_PAD s
+# y el detector mide `seconds` s tras TEAR_DELAY s. Trae a Temp/p9-flutter/pc/: tear-ring<R>-<size>[-kind][-tag].json (fotogramas),
+# ...-det.json (detector), ...-det_tearN.png / ...-det_capN.png; carga previa en tear-load.txt.
+TEAR_DELAY=6
+TEAR_PAD=14
+step_tear() {
+  local ring=1 size=720 secs=60 kind=gpu region="" suffix=""
+  while [ $# -gt 0 ]; do
+    case "$1" in --ring) ring="$2"; shift 2 ;; --size) size="$2"; shift 2 ;; --seconds) secs="$2"; shift 2 ;; --kind) kind="$2"; shift 2 ;;
+      --region) region="$2"; shift 2 ;; --tag) suffix="-$2"; shift 2 ;; *) shift ;; esac
+  done
+  local dst="$ROOT/Temp/p9-flutter/pc"; mkdir -p "$dst"
+  local alive; alive="$("${SSH[@]}" 'tasklist /FI "IMAGENAME eq tf_probe.exe" /NH' 2>&1 | tr -d '\r' | grep -c tf_probe)"
+  [ "$alive" = "0" ] || { echo "hay tf_probe.exe vivo: no lanzo nada"; return 1; }
+  remote "mkdir -p $PC_ROOT/run $PC_ROOT/out/run" || return 1
+  local tag="tear-ring$ring-$size"; [ "$kind" = "gpu" ] || tag="$tag-$kind"; tag="$tag$suffix"
+  local envv="TF_P9_TEAR=1"; case "$ring" in 0|2|3|4) envv="$envv;TF_P9_RING=$ring" ;; esac
+  local load; load="$("${SSH[@]}" 'wmic cpu get loadpercentage' 2>/dev/null | tr -d '\r' | grep -E '^[0-9]+' | head -1 | tr -d ' ')"
+  echo "$tag $load" >>"$dst/tear-load.txt"
+  echo "=== $tag (carga previa ${load}%) ===" | tee -a "$LOG"
+  remote "rm -rf $PC_ROOT/run/projects $PC_ROOT/run/support && mkdir -p $PC_ROOT/run/projects $PC_ROOT/run/support; rm -f $PC_ROOT/out/run/$tag.* $PC_ROOT/out/run/$tag-det*"
+  local b64; b64="$(printf %s "--probe frames --mode texture --size $size --seconds $((secs + TEAR_PAD)) --threads via1 --texture-kind $kind \
+--core-lib $REL_WIN\\AppCoreFFI.dll --projects-folder $PC_ROOT_WIN\\run\\projects --support-dir $PC_ROOT_WIN\\run\\support \
+--report $PC_ROOT_WIN\\out\\run\\$tag.json" | base64 | tr -d '\n')"
+  local tr="$secs;tf_probe;$PC_ROOT_WIN\\out\\run\\$tag-det.json;$region;$TEAR_DELAY"
+  "${SSH[@]}" "powershell -NoProfile -ExecutionPolicy Bypass -File '$WINDIR_REMOTE\\run.ps1' -Tag '$tag' -ArgsB64 '$b64' -Timeout $((secs + TEAR_PAD + 60)) -EnvVars '$envv' -Tear '$tr'" 2>&1 | tr -d '\r' >>"$LOG"
+  local rc=${PIPESTATUS[0]}
+  grep 'TF:code' "$LOG" | tail -1
+  local f
+  rm -f "$dst/$tag".* "$dst/$tag-det"*
+  for f in json code log err tear.txt; do scp -q -o BatchMode=yes "$PC_HOST:$PC_ROOT_SCP/out/run/$tag.$f" "$dst/$tag.$f" >>"$LOG" 2>&1; done
+  scp -q -o BatchMode=yes "$PC_HOST:$PC_ROOT_SCP/out/run/$tag-det.json" "$dst/$tag-det.json" >>"$LOG" 2>&1
+  for f in $("${SSH[@]}" "cd $PC_ROOT/out/run && ls $tag-det_*.png 2>/dev/null" | tr -d '\r'); do
+    scp -q -o BatchMode=yes "$PC_HOST:$PC_ROOT_SCP/out/run/$f" "$dst/$f" >>"$LOG" 2>&1
+  done
+  tr -d '\000\377\376' <"$dst/$tag.tear.txt" 2>/dev/null | tail -2 | cut -c1-200  # tear.txt sale en UTF-16
+  return $rc
+}
+
 case "$STEP" in
+  tear) shift; step_tear "$@"; rc=$? ;;
   wvrun) shift; step_wvrun "$@"; rc=$? ;;
   soak) shift; step_soak "$@"; rc=$? ;;
   mf) shift; step_mf "$@"; rc=$? ;;

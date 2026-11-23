@@ -13,7 +13,7 @@
 #pragma comment(lib, "dxguid.lib")
 
 #define TF_D3D_CHANNELS 2
-#define TF_D3D_RING_MAX 3
+#define TF_D3D_RING_MAX 4  // TF_P9_RING=2..4 elige el tamaño del anillo (por defecto 3)
 // Tras un cambio de tamaño, las texturas viejas se conservan este número de subidas (~1 s a 30 fps) por si el motor
 // aún no ha abierto su handle: abrir un handle clásico ya liberado falla.
 #define TF_D3D_RETIRE_UPLOADS 45
@@ -45,13 +45,14 @@ static CRITICAL_SECTION tf_d3d_lock;
 static ID3D11Device *tf_d3d_dev;
 static ID3D11DeviceContext *tf_d3d_ctx;
 static tf_d3d_slot tf_d3d_slots[TF_D3D_CHANNELS];
-static int tf_d3d_ring_on = 1;
+static int tf_d3d_ring_n = 3;
 
 static BOOL CALLBACK tf_d3d_init_lock(PINIT_ONCE once, PVOID param, PVOID *ctx) {
   (void)once; (void)param; (void)ctx;
   InitializeCriticalSection(&tf_d3d_lock);
   const char *e = getenv("TF_P9_RING");
-  tf_d3d_ring_on = !(e != NULL && e[0] == '0');
+  if (e != NULL && e[0] == '0') tf_d3d_ring_n = 1;
+  else if (e != NULL && e[0] >= '2' && e[0] <= '4') tf_d3d_ring_n = e[0] - '0';
   for (int i = 0; i < TF_D3D_CHANNELS; ++i) { tf_d3d_slots[i].published = -1; tf_d3d_slots[i].delivered = -1; }
   return TRUE;
 }
@@ -96,7 +97,7 @@ static int tf_d3d_ensure_texture(tf_d3d_slot *s, int32_t w, int32_t h) {
   d.Usage = D3D11_USAGE_DEFAULT;
   d.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET;
   d.MiscFlags = D3D11_RESOURCE_MISC_SHARED;  // handle clásico (no NT): GetSharedHandle
-  const int count = tf_d3d_ring_on ? TF_D3D_RING_MAX : 1;
+  const int count = tf_d3d_ring_n;
   for (int i = 0; i < count; ++i) {
     if (FAILED(ID3D11Device_CreateTexture2D(tf_d3d_dev, &d, NULL, &s->tex[i]))) { s->tex[i] = NULL; s->n = count; tf_d3d_slot_free(s); return 2; }
     IDXGIResource *res = NULL;
@@ -157,7 +158,7 @@ void *tf_d3d_handle(int32_t channel) {
 int32_t tf_d3d_ring_stats(int32_t channel, int64_t *ring, int64_t *flushes) {
   if (channel < 0 || channel >= TF_D3D_CHANNELS) return 1;
   InitOnceExecuteOnce(&tf_d3d_once, tf_d3d_init_lock, NULL, NULL);
-  if (ring) *ring = tf_d3d_ring_on ? 1 : 0;
+  if (ring) *ring = tf_d3d_ring_n > 1 ? tf_d3d_ring_n : 0;  // tamaño del anillo; 0 = textura única
   if (flushes) *flushes = (int64_t)InterlockedCompareExchange64(&tf_d3d_slots[channel].flushes, 0, 0);
   return 0;
 }

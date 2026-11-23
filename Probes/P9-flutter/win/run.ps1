@@ -5,7 +5,8 @@
 #   P9 7j: -ExePath <ruta .exe> lanza otra app (las de WebView; -RunOut <dir> cambia donde van log/code/png);
 #   -Keys <ruta .ready> lanza ademas win\keys.ps1 (inyector SendInput) en vez de la captura -ShotAt.
 param([string]$Tag, [string]$ArgsB64, [int]$Timeout = 240, [switch]$NoRedirect, [string]$EnvVars = "", [int]$ShotAt = 0,
-      [string]$ExePath = "", [string]$RunOut = "", [string]$Keys = "")
+      [string]$ExePath = "", [string]$RunOut = "", [string]$Keys = "",
+      [string]$Tear = "")  # P9 7l: "segundos;titulo;json;region" -> lanza win\tear.ps1 en la sesion interactiva en vez de la captura
 . "$PSScriptRoot\common.ps1"
 if (-not $RunOut) { $RunOut = Join-Path $Out "run" }
 New-Item -ItemType Directory -Force $RunOut | Out-Null
@@ -38,6 +39,12 @@ if ($ShotAt -gt 0) {
 if ($Keys) {
   Remove-Item $Keys -ErrorAction SilentlyContinue
   $shotLines = "& '$PSScriptRoot\keys.ps1' -ProcId `$p.Id -Ready '$Keys' -Log '$(Join-Path $RunOut "$Tag.keys.txt")' *> `$null`r`n"
+}
+if ($Tear) {
+  $t = $Tear -split ';'
+  $reg = ""
+  if ($t.Count -gt 3 -and $t[3]) { $reg = " -Region '$($t[3])'" }
+  $shotLines = "& '$PSScriptRoot\tear.ps1' -Seconds $($t[0]) -Title '$($t[1])' -Out '$($t[2])' -Delay $($t[4])$reg *> '$(Join-Path $RunOut "$Tag.tear.txt")'`r`n"
 }
 @"
 $envLines`$p = Start-Process -FilePath '$exe' -ArgumentList '$($argLine -replace "'", "''")' -WorkingDirectory '$rel' -PassThru $redir
