@@ -9,4 +9,6 @@
 - [Guitab / MuScriptor (Fase 5b)](guitab-muscriptor-eval.md) — Guitab sin instalar (6 ficheros); registro 100 % por construcción; MuScriptor gated; BP y silencio
 - [Songsterr como referencia](songsterr-reference.md) — API de búsqueda; 103 Early Hints→curl; CDN en gzip; alinear con saliencia CQT, no con onsets/croma
 - [ONNX Runtime en Windows](ort-windows.md) — NuGet; DLL de System32; ssh=PowerShell 5; Cast a float32; MoveNet; ejes dinámicos; VM pagina T≥575
+- [ORT DirectML: fallo del GLU](ort-directml.md) — GLU mal con fusión DML+NVIDIA→glu_slice.py; liberar una sesión DML tumba las demás; ADTOF T grande desborda la pila
+- [B1 L/R Windows frente al Mac](b1-guitar-split-windows.md) — sin tramos L/R es copia sin modelo; 48 kHz y otro remuestreador → ~55 dB en el tramo; test por JobServices
 - [Lead/Rhythm Mel-Band anónimo](lead-rhythm-contract.md) — weights_only OK, casa estricto; YAML con tupla→SafeLoader; MPS falla→CPU; Core ML sin scatter (K gathers); contrato spec→mask hop 441; app overlap 2; ONNX ya hecho
