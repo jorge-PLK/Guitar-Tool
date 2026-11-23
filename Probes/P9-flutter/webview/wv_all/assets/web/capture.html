@@ -1,0 +1,41 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html, body { margin: 0; height: 100%; background: #101418; color: #fff; overflow: hidden; }
+  #c { font: bold 240px/1 monospace; text-align: center; padding-top: 12vh; }
+  #bar { position: absolute; left: 0; bottom: 0; height: 40px; width: 80px; background: #ff6600; }
+</style>
+<script src="shim.js"></script>
+</head>
+<body>
+<div id="c">0</div>
+<div id="bar"></div>
+<script>
+(function (root) {
+  function post(o) { try { root.webkit.messageHandlers.tf.postMessage(JSON.stringify(o)); } catch (e) {} }
+  var el = document.getElementById('c'), bar = document.getElementById('bar');
+  var n = 0, running = false;
+  function loop() {
+    if (!running) return;
+    n++;
+    el.textContent = n;
+    bar.style.left = ((n * 7) % Math.max(1, root.innerWidth - 80)) + 'px';
+    post({ event: 'raf', t: 'raf', n: n, now: performance.now() });
+    root.requestAnimationFrame(loop);
+  }
+  root.cap = {
+    ping: function (k) { post({ event: 'pong', k: k, now: performance.now() }); },
+    start: function () { if (!running) { running = true; root.requestAnimationFrame(loop); } },
+    stop: function () { running = false; },
+    info: function () {
+      return JSON.stringify({ n: n, iw: root.innerWidth, ih: root.innerHeight, dpr: root.devicePixelRatio });
+    }
+  };
+  post({ event: 'ready', page: 'capture' });
+})(window);
+</script>
+</body>
+</html>

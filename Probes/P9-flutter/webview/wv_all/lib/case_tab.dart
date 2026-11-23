@@ -82,31 +82,57 @@ Future<void> runOverlay(Ctx c) async {
 
 Future<void> runResize(Ctx c) async {
   if (!await loadTab(c)) return;
+  // --raf-loop on|off: con on la pagina mantiene un bucle rAF vacio permanente durante todo el caso.
+  final raf = c.args.get('--raf-loop') == 'on';
+  c.report['rafLoop'] = raf;
+  if (raf) await c.web.run('window.__rl=0;(function l(){window.__rl++;requestAnimationFrame(l)})()');
+  final renderedAt = <double>[];
+  c.handlers['rendered'] = (_) => renderedAt.add(c.clock.elapsedMicroseconds / 1000.0);
   await Future<void>.delayed(const Duration(seconds: 1));
-  const fracs = [Size(1, 1), Size(0.7, 0.75), Size(0.5, 0.5)];
+  const widths = [800.0, 560.0, 400.0, 800.0];
   final steps = <Json>[];
-  var prevRendered = c.counts['rendered'] ?? 0;
-  for (final f in fracs) {
-    c.st.frac = f;
-    c.st.status = 'tamano ${f.width}x${f.height}';
+  final availW = c.st.avail.width;
+  for (final req in widths) {
+    final w = req < availW ? req : availW; // la ventana puede ser mas estrecha que el paso
+    final nBefore = renderedAt.length;
+    final t0 = c.clock.elapsedMicroseconds / 1000.0;
+    c.st.frac = Size(w / availW, 1);
+    c.st.status = 'ancho $w';
     c.st.changed();
-    await Future<void>.delayed(const Duration(seconds: 1));
-    final w = c.st.avail.width * f.width, h = c.st.avail.height * f.height;
+    double? toIw, toRe;
+    num iw = -1;
+    while (c.clock.elapsedMicroseconds / 1000.0 - t0 < 4000 && (toIw == null || renderedAt.length == nBefore)) {
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+      iw = await c.evalJson('window.innerWidth') as num;
+      final now = c.clock.elapsedMicroseconds / 1000.0;
+      if (toIw == null && (iw - w).abs() <= 1) toIw = now - t0;
+      if (toRe == null && renderedAt.length > nBefore) toRe = renderedAt[nBefore] - t0;
+    }
+    if (renderedAt.length > nBefore) toRe ??= renderedAt[nBefore] - t0;
+    await Future<void>.delayed(const Duration(milliseconds: 500));
     final s = await c.evalJson('probe.state()') as Json;
-    final rendered = c.counts['rendered'] ?? 0;
+    iw = s['iw'] as num;
+    final surf = (s['surfaceW'] as num).toDouble();
+    final rerendered = renderedAt.length > nBefore;
     steps.add({
-      'widgetSize': '${w.toStringAsFixed(1)}x${h.toStringAsFixed(1)}',
-      'innerSize': '${s['iw']}x${s['ih']}',
-      'innerMatchesWidget': ((s['iw'] as num) - w).abs() <= 1 && ((s['ih'] as num) - h).abs() <= 1,
-      'surfaceWidth': s['surfaceW'],
-      'renderedEventsSinceLast': rendered - prevRendered,
-      'renderedEventsTotal': rendered,
+      'requestedWidth': req,
+      'expectedInnerWidth': w,
+      'innerWidth': iw,
+      'innerWidthMatches': (iw - w).abs() <= 1,
+      'alphaTabRerendered': rerendered,
+      'msToInnerWidth': toIw,
+      'msToRerender': toRe,
+      'surfaceWidth': surf,
+      // Repintado: alphaTab volvio a renderizar y su superficie cabe en el ancho nuevo (no conserva el ancho anterior).
+      'repaintedAfterResize': rerendered && surf > 0 && surf <= iw + 1,
     });
-    prevRendered = rendered;
+    await Future<void>.delayed(const Duration(milliseconds: 500));
   }
+  if (raf) c.report['rafLoopFrames'] = await c.evalJson('window.__rl');
+  c.handlers.remove('rendered');
   c.report['steps'] = steps;
-  final allMatch = steps.every((s) => s['innerMatchesWidget'] == true);
-  final rerender = steps.skip(1).every((s) => (s['renderedEventsSinceLast'] as int) > 0);
+  final allMatch = steps.every((s) => s['innerWidthMatches'] == true);
+  final rerender = steps.skip(1).every((s) => s['alphaTabRerendered'] == true);
   c.report['allInnerMatch'] = allMatch;
   c.report['alphaTabRerenderedEveryStep'] = rerender;
   if (!allMatch || !rerender) c.report['ok'] = false;

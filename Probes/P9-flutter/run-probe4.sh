@@ -1,6 +1,7 @@
 #!/bin/bash
 # P9 prueba 4 (WebView en el Mac). Uso: run-probe4.sh <wv_all|wv_flutter> <tab|messages|overlay|resize|songsterr|occluded|all>
-#   all = tab (si falla se para) + messages, overlay, resize, songsterr, occluded visible y oculta. `keys` NO entra en all (lo ejecuta Jorge en primer plano).
+#   Casos tambien: capture; resize (= resize-raf-on + resize-raf-off, informes p4-<app>-resize-raf-on|off.json).
+#   all = tab (si falla se para) + messages, capture, overlay, resize (on y off), songsterr, occluded visible y oculta. `keys` NO entra en all (lo ejecuta Jorge en primer plano).
 #   SKIP_BUILD=1 no recompila.   Informes y capturas: Temp/p9-flutter/p4-<cand>-<caso>.{json,png}
 set -u
 CAND="${1:?candidata: wv_all|wv_flutter}"
@@ -37,9 +38,9 @@ summary() { # informe
 python3 -I - "$1" <<'EOF'
 import json, sys
 r = json.load(open(sys.argv[1]))
-keys = ["case", "ok", "failure", "timedOut", "timeToReadyMs", "scoreLoadToRenderedMs", "bravuraLoaded", "serving", "rafFps", "ticksPerSecond", "samplesReceived", "allInnerMatch", "alphaTabRerenderedEveryStep", "badMessages", "eventCounts"]
+keys = ["case", "ok", "failure", "timedOut", "timeToReadyMs", "scoreLoadToRenderedMs", "bravuraLoaded", "serving", "rafFps", "flutterFps", "rafLoop", "ticksPerSecond", "samplesReceived", "allInnerMatch", "alphaTabRerenderedEveryStep", "badMessages", "eventCounts"]
 print("  " + " | ".join("%s=%s" % (k, r[k]) for k in keys if k in r))
-for k in ("resources", "roundTrip", "burstJsToDart", "burstDartToJs", "jsErrors", "webErrors"):
+for k in ("resources", "roundTrip", "burstJsToDart", "burstDartToJs", "msgLatencyMs", "sequence", "buildMs", "rasterMs", "devicePixelRatios", "steps", "jsErrors", "webErrors"):
     if k in r and r[k] not in ([], None): print("  %s: %s" % (k, json.dumps(r[k])[:600]))
 sys.exit(0 if r.get("ok") else 1)
 EOF
@@ -93,6 +94,12 @@ one() {
       HIDE=1 run_one occluded occluded-hidden 50 --occluded-delay 8; local b=$?
       return $((a + b)) ;;
     keys) run_keys ;;
+    resize)
+      one resize-raf-on; local a=$?
+      one resize-raf-off; local b=$?
+      return $((a + b)) ;;
+    resize-raf-on) run_one resize resize-raf-on 40 --raf-loop on ;;
+    resize-raf-off) run_one resize resize-raf-off 40 --raf-loop off ;;
     songsterr-hidden)
       local modes="offstage zero"; [ "$CAND" = "wv_all" ] && modes="$modes offscreen"; local rc=0
       for m in $modes; do run_one songsterr "songsterr-$m" 40 --mode "$m"; rc=$((rc + $?)); done
@@ -106,7 +113,7 @@ if [ "$CASE" = "all" ]; then
   one tab; rc=$?
   [ $rc -ne 0 ] && { echo "tab no pasa: se para $CAND"; exit 1; }
   fail=0
-  for c in messages overlay resize songsterr occluded; do one "$c" || fail=1; done
+  for c in messages capture overlay resize songsterr occluded; do one "$c" || fail=1; done
   exit $fail
 else
   one "$CASE"; exit $?

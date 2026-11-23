@@ -1,6 +1,17 @@
 // P9.4: caso keys con variantes (--keys-mode raw|prevent|handled|flutter) y deteccion de tormenta de teclas.
+//
+// Modo sin persona --keys-script [--keys-wait <s>, por defecto 8] para un inyector externo (SendInput). Protocolo fijo:
+//   1. La app pone el foco en el WebView y escribe la linea `ready:webview` por stdout y en `<report>.ready` (flush).
+//   2. Inyector: teclea `1 2 3 q w e` (una vez cada una, 150 ms entre teclas), hace un clic de raton en el centro de
+//      la ventana y teclea `4 5 6`. Tiene --keys-wait s desde la marca.
+//   3. La app pone el foco en el campo de Flutter y escribe `ready:field`.
+//   4. Inyector: teclea `hola` (dentro de --keys-wait s). La app termina de esperar y escribe el informe.
+// El informe anade `expected` (down esperados por tecla: 1 2 3 q w e 4 5 6 h o l a, uno cada una) y
+// `verdict.js` / `verdict.flutter` por tecla: ok | lost | duplicated, ademas de contadores, tormenta y fieldText.
+// --exit-after debe ser > 2 * keys-wait + 12. Funciona con --keys-mode raw y flutter.
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
@@ -123,8 +134,13 @@ Future<void> runKeys(Ctx c) async {
     c.st.status = 'keys:$mode JS=${js.total} Flutter=${fl.total}${(js.storm || fl.storm) ? '  TORMENTA' : ''}';
     c.st.changed();
   });
-  final total = c.args.intOr('--exit-after', 60);
-  await Future<void>.delayed(Duration(seconds: total > 8 ? total - 4 : 4));
+  final script = c.args.has('--keys-script');
+  if (script) {
+    await _runScript(c);
+  } else {
+    final total = c.args.intOr('--exit-after', 60);
+    await Future<void>.delayed(Duration(seconds: total > 8 ? total - 4 : 4));
+  }
   ticker.cancel();
   HardwareKeyboard.instance.removeHandler(handler);
   try {
@@ -161,4 +177,52 @@ Future<void> runKeys(Ctx c) async {
     c.report['reclaimResults'] = reclaimResults;
   }
   c.report['fieldText'] = c.st.fieldController.text;
+  if (script) {
+    c.report['keysScript'] = true;
+    c.report['keysWait'] = c.args.intOr('--keys-wait', 8);
+    c.report['expected'] = _expected;
+    c.report['verdict'] = {'js': _verdicts(js.downs), 'flutter': _verdicts(fl.downs)};
+    c.report['fieldTextOk'] = c.st.fieldController.text == 'hola';
+  }
+}
+
+/// Pulsaciones (down) esperadas por tecla: 1 2 3 q w e 4 5 6 (WebView) y h o l a (campo).
+const _expected = {'1': 1, '2': 1, '3': 1, 'q': 1, 'w': 1, 'e': 1, '4': 1, '5': 1, '6': 1, 'h': 1, 'o': 1, 'l': 1, 'a': 1};
+
+/// ok si los down coinciden con lo esperado, lost si faltan (incluye 0), duplicated si sobran. Teclas en minuscula.
+Json _verdicts(Map<String, int> downs) {
+  final got = <String, int>{};
+  for (final e in downs.entries) {
+    final k = e.key.toLowerCase();
+    got[k] = (got[k] ?? 0) + e.value;
+  }
+  return {
+    for (final e in _expected.entries)
+      e.key: (got[e.key] ?? 0) == e.value ? 'ok' : ((got[e.key] ?? 0) < e.value ? 'lost' : 'duplicated'),
+  };
+}
+
+/// Modo --keys-script: marca ready:webview, espera --keys-wait s; marca ready:field, espera --keys-wait s.
+Future<void> _runScript(Ctx c) async {
+  final wait = Duration(seconds: c.args.intOr('--keys-wait', 8));
+  final rp = c.args.get('--report');
+  final ready = rp == null ? null : File('$rp.ready');
+  if (ready != null) {
+    await ready.parent.create(recursive: true);
+    if (await ready.exists()) await ready.delete();
+  }
+  Future<void> mark(String m) async {
+    stdout.writeln(m);
+    await stdout.flush();
+    await ready?.writeAsString('$m\n', mode: FileMode.append, flush: true);
+  }
+
+  c.st.onFocusAction!('webview');
+  await Future<void>.delayed(const Duration(milliseconds: 300));
+  await mark('ready:webview');
+  await Future<void>.delayed(wait);
+  c.st.onFocusAction!('field');
+  await Future<void>.delayed(const Duration(milliseconds: 300));
+  await mark('ready:field');
+  await Future<void>.delayed(wait);
 }

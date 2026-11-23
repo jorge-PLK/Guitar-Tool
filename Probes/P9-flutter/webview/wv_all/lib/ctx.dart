@@ -17,6 +17,8 @@ class Args {
     return (i >= 0 && i + 1 < list.length) ? list[i + 1] : null;
   }
 
+  bool has(String name) => list.contains(name);
+
   int intOr(String name, int d) => int.tryParse(get(name) ?? '') ?? d;
 }
 
