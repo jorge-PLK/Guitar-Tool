@@ -38,6 +38,8 @@ Future<void> _run(
   final report = <String, Object?>{
     'probe': 'frames',
     'mode': mode,
+    'textureKind': _opt(args, '--texture-kind') ?? 'gpu',
+    'platform': Platform.operatingSystem,
     'size': surf.height,
     'width': surf.width,
     'height': surf.height,
@@ -241,11 +243,16 @@ Future<void> _measure(List<String> args, Probe3Surface surf, Watchdog wd,
     };
   }
   final wall = wall1 - wallW0, cpu = cpu1 - cpuW0;
+  // cpuSeconds() solo existe en macOS (getrusage): en Windows es NaN y jsonEncode lo rechazaría. La CPU en
+  // Windows es la parte B.
+  final cpuOk = !cpu.isNaN && !cpu1.isNaN && !cpu0.isNaN;
   report['cpu'] = {
-    'percentOfCoreWindow': round3(cpu / wall * 100),
-    'percentOfCoreWhole': round3((cpu1 - cpu0) / (wall1 - wall0 / 1e6) * 100),
-    'cpuSeconds': round3(cpu),
+    'percentOfCoreWindow': cpuOk ? round3(cpu / wall * 100) : null,
+    'percentOfCoreWhole':
+        cpuOk ? round3((cpu1 - cpu0) / (wall1 - wall0 / 1e6) * 100) : null,
+    'cpuSeconds': cpuOk ? round3(cpu) : null,
     'wallSeconds': round3(wall),
+    if (!cpuOk) 'note': 'sin medida de CPU en ${Platform.operatingSystem} (parte B)',
   };
   report['rssMb'] = {...rss, 'growth30to60': round3(growth)};
   report['watchdogMaxMs'] = round3(wdMax);

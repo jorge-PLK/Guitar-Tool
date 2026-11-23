@@ -57,14 +57,14 @@ public func ffiCoreRunMain() {
 
 @_cdecl("tf_core_set_texture_host")
 public func ffiCoreSetTextureHost(_ host: UnsafePointer<tf_texture_host>?) {
-    #if canImport(CoreVideo)
+    #if canImport(CoreVideo) || os(Windows)
     frameTextures.set(host?.pointee)
     #endif
 }
 
 @_cdecl("tf_texture_create")
 public func ffiTextureCreate(_ channel: Int32) -> Int64 {
-    #if canImport(CoreVideo)
+    #if canImport(CoreVideo) || os(Windows)
     guard let reg = frameTextures.host?.register_texture else { return -1 }
     let id = reg(channel)
     frameTextures.setID(id, for: channel)
@@ -76,10 +76,13 @@ public func ffiTextureCreate(_ channel: Int32) -> Int64 {
 
 @_cdecl("tf_texture_dispose")
 public func ffiTextureDispose(_ channel: Int32) {
-    #if canImport(CoreVideo)
+    #if canImport(CoreVideo) || os(Windows)
     guard let id = frameTextures.id(for: channel) else { return }
     frameTextures.setID(nil, for: channel)
     frameTextures.host?.unregister_texture?(id)
+    #if os(Windows)
+    tf_d3d_release(channel)  // la textura D3D compartida del canal (Flutter ya no la pide tras unregister)
+    #endif
     #endif
 }
 
@@ -88,7 +91,7 @@ public func ffiFrameCopy(_ channel: Int32) -> UnsafeMutableRawPointer? {
     #if canImport(AVFoundation)
     if let v = videoProbes.get(channel) { return v.copyForTexture() }
     #endif
-    #if canImport(CoreVideo)
+    #if canImport(CoreVideo) || os(Windows)
     return frameSources.get(channel)?.copyForTexture()
     #else
     return nil
@@ -97,7 +100,7 @@ public func ffiFrameCopy(_ channel: Int32) -> UnsafeMutableRawPointer? {
 
 @_cdecl("tf_debug_frames_start")
 public func ffiDebugFramesStart(_ channel: Int32, _ width: Int32, _ height: Int32, _ fps: Int32) -> Int32 {
-    #if canImport(CoreVideo)
+    #if canImport(CoreVideo) || os(Windows)
     guard let s = FrameSource(channel: channel, width: Int(width), height: Int(height), fps: Int(fps)) else { return 1 }
     frameSources.replace(channel, with: s)?.stop()
     s.start()
@@ -109,7 +112,7 @@ public func ffiDebugFramesStart(_ channel: Int32, _ width: Int32, _ height: Int3
 
 @_cdecl("tf_debug_frames_stop")
 public func ffiDebugFramesStop(_ channel: Int32) {
-    #if canImport(CoreVideo)
+    #if canImport(CoreVideo) || os(Windows)
     frameSources.get(channel)?.stop()
     #endif
 }
@@ -118,7 +121,7 @@ public func ffiDebugFramesStop(_ channel: Int32) {
 public func ffiDebugFrameBGRA(_ channel: Int32, _ dst: UnsafeMutablePointer<UInt8>?, _ capacity: Int32,
                               _ outWidth: UnsafeMutablePointer<Int32>?, _ outHeight: UnsafeMutablePointer<Int32>?,
                               _ outSeq: UnsafeMutablePointer<Int64>?) -> Int32 {
-    #if canImport(CoreVideo)
+    #if canImport(CoreVideo) || os(Windows)
     guard let s = frameSources.get(channel), let dst else { return 0 }
     let n = s.copyBGRA(dst: dst, capacity: Int(capacity), seqInOut: outSeq)
     if n > 0 { outWidth?.pointee = Int32(s.width); outHeight?.pointee = Int32(s.height) }
@@ -131,7 +134,7 @@ public func ffiDebugFrameBGRA(_ channel: Int32, _ dst: UnsafeMutablePointer<UInt
 @_cdecl("tf_debug_frames_stats")
 public func ffiDebugFramesStats(_ channel: Int32, _ produced: UnsafeMutablePointer<Int64>?, _ textureCopies: UnsafeMutablePointer<Int64>?,
                                 _ distinctTextureCopies: UnsafeMutablePointer<Int64>?, _ bgraCopies: UnsafeMutablePointer<Int64>?) {
-    #if canImport(CoreVideo)
+    #if canImport(CoreVideo) || os(Windows)
     let st = frameSources.get(channel)?.stats() ?? (0, 0, 0, 0, 0)
     produced?.pointee = st.0; textureCopies?.pointee = st.1; distinctTextureCopies?.pointee = st.2; bgraCopies?.pointee = st.3
     #else
@@ -142,7 +145,7 @@ public func ffiDebugFramesStats(_ channel: Int32, _ produced: UnsafeMutablePoint
 /// Extra de prueba: coste medio del generador en µs por fotograma (solo relleno del búfer, sin la copia).
 @_cdecl("tf_debug_frames_cost_us")
 public func ffiDebugFramesCostUs(_ channel: Int32) -> Int64 {
-    #if canImport(CoreVideo)
+    #if canImport(CoreVideo) || os(Windows)
     return frameSources.get(channel)?.stats().4 ?? 0
     #else
     return 0

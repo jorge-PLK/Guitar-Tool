@@ -111,6 +111,19 @@ TF_API void tf_debug_frames_stats(int32_t channel, int64_t *produced, int64_t *t
 /// Coste medio del generador, µs por fotograma.
 TF_API int64_t tf_debug_frames_cost_us(int32_t channel);
 
+#ifdef _WIN32
+/// Interno (Windows, tf_d3d.c): textura D3D11 B8G8R8A8 compartida por canal (handle clásico de
+/// IDXGIResource::GetSharedHandle, el que pide kFlutterDesktopGpuSurfaceTypeDxgiSharedHandle).
+/// Sube un fotograma BGRA compacto (la recrea si cambia el tamaño). 0 bien.
+TF_API int32_t tf_d3d_upload(int32_t channel, const uint8_t *bgra, int32_t width, int32_t height);
+/// Tamaño de la textura del canal. 0 bien; 1 no hay textura.
+TF_API int32_t tf_d3d_size(int32_t channel, int32_t *width, int32_t *height);
+/// HANDLE compartido de la última textura subida del canal, o NULL.
+TF_API void *tf_d3d_handle(int32_t channel);
+/// Libera la textura del canal.
+TF_API void tf_d3d_release(int32_t channel);
+#endif
+
 #ifdef __cplusplus
 }
 #endif
