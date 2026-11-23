@@ -27,6 +27,9 @@
 #include <mfidl.h>
 #include <mfreadwrite.h>
 
+// GUID_NULL vive en <cguid.h>, que WIN32_LEAN_AND_MEAN no arrastra; uno propio evita depender de esa cabecera.
+static const GUID TF_GUID_NULL = {0};
+
 #pragma comment(lib, "mfplat.lib")
 #pragma comment(lib, "mfreadwrite.lib")
 #pragma comment(lib, "mfuuid.lib")
@@ -376,7 +379,7 @@ static HRESULT mfv_try_open(mfv *p, int use_d3d, mfv_open_res *o, const char **w
   if (SUCCEEDED(IMFMediaType_GetUINT32(cur, &MF_MT_DEFAULT_STRIDE, &st32))) {
     o->stride = (LONG)(INT32)st32;
   } else {
-    GUID osub = GUID_NULL;
+    GUID osub = TF_GUID_NULL;
     IMFMediaType_GetGUID(cur, &MF_MT_SUBTYPE, &osub);
     if (FAILED(MFGetStrideForBitmapInfoHeader(osub.Data1, (DWORD)o->out_w, &o->stride))) o->stride = o->out_w * 4;
   }
@@ -425,7 +428,7 @@ static DWORD WINAPI mfv_decode(void *arg) {
 
   // Tipo nativo: códec, tamaño, fps, rotación, apertura.
   IMFMediaType *nt = NULL;
-  GUID sub = GUID_NULL;
+  GUID sub = TF_GUID_NULL;
   UINT64 fs = 0, fr = 0;
   UINT32 rot = 0;
   int nw = 0, nh = 0, dw = 0, dh = 0;
@@ -548,7 +551,7 @@ static DWORD WINAPI mfv_decode(void *arg) {
       PropVariantInit(&v);
       v.vt = VT_I8;
       v.hVal.QuadPart = (LONGLONG)((tgt + p->start_pts) * 1e7);
-      hr = IMFSourceReader_SetCurrentPosition(r, &GUID_NULL, &v);
+      hr = IMFSourceReader_SetCurrentPosition(r, &TF_GUID_NULL, &v);
       EnterCriticalSection(&p->cs);
       p->seeks++;
       if (FAILED(hr)) { p->seek_fails++; p->last_hr = hr; }
