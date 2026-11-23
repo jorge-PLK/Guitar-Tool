@@ -1,6 +1,6 @@
 # P9 · Viabilidad de la interfaz Flutter
 
-**Estado: en ejecución (22/11/2026). Pruebas 1, 2, 3 y 6 (Mac) pasadas; prueba 4 con los casos automáticos pasados en las dos candidatas y `keys` pendiente de Jorge; prueba 5 medida en el Mac: gana el reproductor nativo (provisional, falta Windows); en el PC x64 pasan 7b y 7e y 7d está decidido (vía 1); pendientes `keys` de la 4 y el resto de la 7.** Primera parte de la Fase 7f. Decide si se mantienen las decisiones marcadas (P9) en [ADR-021](../adr/ADR-021.md). Código en `Probes/P9-flutter/` (fuera de la puerta de tests); resultados, en este fichero, debajo de cada prueba.
+**Estado: en ejecución (23/11/2026). Pruebas 1, 2, 3 y 6 (Mac) pasadas; prueba 4 (Mac) cerrada en lo medible: `keys` medido el 23/11, las dos candidatas incumplen con el WebView enfocado (fallo abierto de Flutter, flutter/flutter#184557) y las dos cumplen con el diseño «WebView sin foco»; elección de paquete pendiente de Windows; prueba 5 medida en el Mac: gana el reproductor nativo (provisional, falta Windows); en el PC x64 pasan 7b y 7e, 7d está decidido (vía 1) y la textura externa funciona con Impeller en los dos caminos (medida en curso). Pendiente: resto de la 7 (medida de textura, WebView, vídeo, `listener` contra puerto con el PC quieto, RSS largo de vía 1, STA tras Media Foundation).** Primera parte de la Fase 7f. Decide si se mantienen las decisiones marcadas (P9) en [ADR-021](../adr/ADR-021.md). Código en `Probes/P9-flutter/` (fuera de la puerta de tests); resultados, en este fichero, debajo de cada prueba.
 
 ## Reglas
 
@@ -118,9 +118,9 @@ Código: `Probes/P9-flutter/AppCoreFFI/Sources/AppCoreFFI/Frames.swift` (generad
 - **Sin medir:** raster de la textura (`FrameTiming` no la cubre: 0 fotogramas de framework); hueco de secuencia en textura; ±1 de borde al parar (último fotograma producido y no copiado). El vigilante de 14,8-17,0 ms queda sin investigar (roza 16 ms).
 - Juicio visual del orquestador (captura de `texture 720` a los 8 s, `Temp/p9-flutter/p3-texture-720.png`): correcto. Fotograma 16:9 centrado con bandas en la ventana 800×600, fondo liso, barra blanca de bordes nítidos, sin desgarro ni franjas. Sin verificar a la vista: orden de canales (el fondo rota de color; una captura no distingue BGRA de RGBA). Se comprueba con un color fijo en la prueba de textura de Windows.
 
-### Prueba 4 · WebView (Mac) — AUTOMÁTICOS PASAN EN LAS DOS; FALTA `keys` (Jorge)
+### Prueba 4 · WebView (Mac) — PASA CON EL WEBVIEW SIN FOCO DE TECLADO; CANDIDATAS EMPATADAS
 
-Código: `Probes/P9-flutter/webview/wv_all` y `Probes/P9-flutter/webview/wv_flutter` (una app por candidata, con `shim.js`, `probe.js`, `tab.html` y `ctx.dart` comunes). Commits `a867b60`, `bdada29` (`webview_all`), `fa88e6d` (`webview_flutter`) y `9a1839c` (modos ocultos de Songsterr). Repetir: `Probes/P9-flutter/run-probe4.sh <wv_all|wv_flutter> <caso|all>` con `caso` = `tab`, `messages`, `overlay`, `resize`, `songsterr`, `occluded`; informes en `Temp/p9-flutter/p4-<candidata>-<caso>.json`. `keys` se lanza aparte y en primer plano (`open -n <app> --args --case keys --report <json> --exit-after 60`, pasos en el relevo de la prueba). El `keys` de `wv_flutter` que hay en `Temp/p9-flutter/` se lanzó sin pulsar teclas y no cuenta.
+Código: `Probes/P9-flutter/webview/wv_all` y `Probes/P9-flutter/webview/wv_flutter` (una app por candidata, con `shim.js`, `probe.js`, `tab.html` y `ctx.dart` comunes). Commits `a867b60`, `bdada29` (`webview_all`), `fa88e6d` (`webview_flutter`) y `9a1839c` (modos ocultos de Songsterr). Repetir: `Probes/P9-flutter/run-probe4.sh <wv_all|wv_flutter> <caso|all>` con `caso` = `tab`, `messages`, `overlay`, `resize`, `songsterr`, `occluded`; informes en `Temp/p9-flutter/p4-<candidata>-<caso>.json`. `keys` se lanza aparte y en primer plano (ver el bloque `keys` al final de la sección). Un `keys` anterior de `wv_flutter` se lanzó sin pulsar teclas y no cuenta.
 
 - **Versiones:** `webview_all` 1.5.2 (`webview_all_wkwebview` 1.5.2) y `webview_flutter` 4.14.1 (`webview_flutter_wkwebview` 3.27.2). Las dos exponen `loadFlutterAsset`, `loadFile`, `setUserAgent` y `setOnConsoleMessage`; solo `webview_all` tiene `OffscreenWebViewSession` (`isOffscreenWebViewSupported=true`; en `webview_flutter`, `n/a`).
 - **Condiciones:** release, ventana 800×600, partitura de prueba servida con `loadFlutterAsset` (`file://`, lectura concedida a la carpeta del asset), una ejecución por caso. La prueba corre desde una copia en `/private/tmp/p9p4`.
@@ -146,7 +146,7 @@ Código: `Probes/P9-flutter/webview/wv_all` y `Probes/P9-flutter/webview/wv_flut
 | `occluded` oculta (retardo de 8 s) | `rafFps` · `ticksPerSecond` · `vis` | 0,0 · 0,94 · `hidden` | 0,0 · 0,95 · `hidden` |
 
 - **Songsterr:** en las dos candidatas y en todos los modos devolvió su HTML (título «Guitar Tabs with Rhythm | Songsterr», `readyState` `complete` en los modos ocultos), con el UA de Safari fijado (`uaMatches: true`, `Version/17.5 Safari/605.1.15`). El JS sigue vivo en los tres modos ocultos (`jsAlive: true`). El informe `songsterr` usa el modo `none`; los demás modos van con `--mode`. `hiddenModesLocalTest` (página local) también pasa en los cuatro modos de las dos (48-161 ms).
-- **Teclado y foco:** sin medir (`keys`, pendiente de Jorge). La condición «ninguna tecla de edición perdida ni duplicada» sigue abierta en las dos.
+- **Teclado y foco:** medido el 23/11 (bloque `keys` al final de la sección). Con el WebView enfocado las dos incumplen «ninguna tecla de edición perdida ni duplicada»; con el diseño «WebView sin foco» cumplen.
 - **Aspecto de las capturas:** `internalSnapshot` (captura de `RepaintBoundary`) no recoge el contenido del WebView (`webContentCaptured: false`, 0 píxeles distintos del fondo salvo en `overlay`, 522 de la caja naranja). Que la caja naranja queda encima de la partitura se juzga con la captura externa (`p4-<candidata>-overlay.png`); esa mirada no consta aquí.
 
 Hallazgos para la ola 0:
@@ -165,9 +165,29 @@ Diferencias entre candidatas (de los números):
 - `webview_all` tiene `OffscreenWebViewSession` y un cuarto modo oculto (`offscreen`); `webview_flutter` no. Los modos `offstage` y `zero` ya bastan en las dos para obtener el HTML de Songsterr.
 - En `songsterr` visible, el HTML al terminar la carga fue menor en `webview_flutter` (202.765 frente a 228.417 bytes), pero a los 4 s casi igual (229.964 frente a 230.390): la página aún se estaba rellenando.
 
-Sin decidir: la candidata se elige tras `keys` (ninguna tecla perdida ni duplicada, foco yendo y volviendo a un `TextField`) y la pasada de Windows (compilación con el Visual Studio del PC, DPI, repintado). Si empatan, decide Jorge.
+Sin decidir: `keys` no desempata (las dos se comportan igual); la candidata se elige tras la pasada de Windows (DPI, repintado, teclado). Si empatan, decide Jorge.
 
-Sin medir: teclado y foco (`keys`); Windows; retardo con la ventana minimizada; carga de la SoundFont por una vía que funcione; versión de Flutter con la que se compiló cada app de `webview/` (`fvm flutter --version` desde la raíz da 3.44.5 y no 3.50.1; hay que confirmar el `.fvmrc` de cada una).
+Sin medir: teclado y foco en Windows; Windows; retardo con la ventana minimizada; carga de la SoundFont por una vía que funcione; versión de Flutter con la que se compiló cada app de `webview/` (`fvm flutter --version` desde la raíz da 3.44.5 y no 3.50.1; hay que confirmar el `.fvmrc` de cada una).
+
+**`keys` (23/11/2026, Jorge al teclado).**
+
+- Código: `--keys-mode raw|prevent|handled|flutter` y `--reclaim makeFirstResponder` en `webview/<app>/lib/case_keys.dart`; detector de tormenta en el informe (`storm`, `maxDownsPerKey`, `jsKeyTotal`, `flutterKeyTotal`, `mouseDowns`, `reclaimCalls`, `reclaimResults`); canal `tf/focus` (`reclaim` → `window.makeFirstResponder(flutterViewController.view)`) en `macos/Runner/MainFlutterWindow.swift`. Commit `4f39a94`. Repetir (primer plano, desde la copia en `/private/tmp/p9p4`): `/private/tmp/p9p4/<app>.app/Contents/MacOS/<app> --case keys --keys-mode <modo> [--reclaim makeFirstResponder] --report <json> --exit-after 45`. Informes en `Temp/p9-flutter/p4-<app>-keys.json` (modo `raw`) y `Temp/p9-flutter/keys-<app>-<modo>.json`.
+- **Modo `raw` (el caso original): las dos candidatas incumplen el umbral.** Con el WKWebView como primer respondedor, cada tecla rebota en bucle. `webview_all`: 13.672 eventos de tecla en 86 s; lado JS `1` = 1.044 `keydown` y 1 `keyup`, ráfaga de 368 `keydown` en 0,12 s (~3.000/s). `webview_flutter`: 29.833 eventos; `q` = 738 `keydown` y 1 `keyup` (~1.700/s). El lado Flutter recibe cientos de pares down/up sintéticos con el mismo instante. Con el foco en el `EditableText` de Flutter cada tecla llega una vez y al JS no le llega nada.
+- Es un fallo conocido y abierto: flutter/flutter#184557 (P2, `p: webview-keyboard`, macOS). Diagnóstico del mantenedor según la búsqueda (`Temp/research/7f-webview-keys-macos.md`, no versionado): Flutter y WebKit procesan las teclas de forma asíncrona y al redespacharse el evento la guarda de WebKit ya está limpia; sin arreglo ni PR. `flutter_inappwebview` (respaldo) también es WKWebView: se asume igual, sin probar.
+- Variantes con `webview_flutter` (45 s cada una; pasos: foco al WebView, `1 2 3`, clic de ratón en la página, `4 5 6`, foco al campo, `hola`):
+
+| Modo | Qué hace | Tormenta | Teclas JS / Flutter | Resultado |
+| --- | --- | --- | --- | --- |
+| `flutter` + `makeFirstResponder` | El WebView nunca toma el foco; un `Focus` de Flutter captura y reenvía cada tecla al JS; tras cada `mousedown` de la página el runner devuelve el primer respondedor a la vista de Flutter | no | 104 / 140 | pasa |
+| `handled` | El handler de `HardwareKeyboard` devuelve `true` con el WebView enfocado | sí | 30.379 / 60.749 (`1` y `2`: 10.175 `down`) | falla |
+| `prevent` | La página hace `preventDefault()` y `stopPropagation()` | no | 60 / 30 | no rebota, pero unas teclas llegan solo a la página y otras a los dos lados según el primer respondedor |
+
+- Modo `flutter`, detalle: `webview_flutter` 4 clics de ratón, 4 `reclaim` con resultado `true`; `q` 19 en Flutter y 19 en JS, `w` 6 y 6, `e` 5 y 5; campo `hola`. `webview_all`: sin tormenta, 154 / 264, 5 clics y 5 `reclaim` `true`; dígitos Flutter/JS `1` 13/9, `2` 14/10, `3` 15/11, `4` 11/9, y la diferencia coincide con lo tecleado en el campo y con el grupo anterior a que el nodo tuviera el foco. Las letras de `webview_all` no se cuadraron una a una.
+- `FocusNode.requestFocus()` solo, sin `makeFirstResponder`: sin probar.
+- **Conclusión para la ola 2 (Tablatura):** `TfWebView` no toma nunca el foco de teclado en macOS; Flutter captura atajos y edición y los reenvía por el canal a `tf-bridge.js` (coincide con «Atajos por tecla lógica» de `docs/flutter/decisiones-interfaz.md`); tras cada clic en la partitura el runner hace `makeFirstResponder` de la vista de Flutter. Coste: sin IME ni copiar/pegar nativos dentro de la página.
+- Las dos candidatas siguen empatadas; la elección queda para la pasada de Windows (prueba 7).
+- Límites: una pasada por modo; `handled` y `prevent` solo en `webview_flutter`; nada en Windows.
+- Arreglo del probe: `applicationShouldTerminateAfterLastWindowClosed` devuelve `false` en las dos apps (cerrar la ventana mataba la app antes de escribir el informe; tres intentos sin informe por eso).
 
 ### Prueba 5 · Vídeo (Mac) — PASA EL NATIVO; fvp NO CUMPLE EL ERROR A/V
 
@@ -286,3 +306,21 @@ Código: `Probes/P9-flutter/webview/{wv_all,wv_flutter,wv_inapp}` (app mínima c
 - **Escritura fuera de `Temp\p9`:** `C:\Users\Jorge\AppData\Local\webview_all_windows\wv_all\EBWebView\` (datos de usuario de WebView2, 22/11 20:57), creada por `webview_all` al arrancar con el perfil real. Para la app: fijar la carpeta de datos de usuario de WebView2 dentro de `--support-dir`.
 - `pc.sh sync` excluye ahora `ephemeral` (enlaces simbólicos a rutas del Mac que hacían fallar la extracción).
 - **Sin comprobar:** que el WebView pinte el HTML; build para macOS de estas apps mínimas; `pc.sh webview` entero de una sola vez con los últimos cambios (se validó por tandas).
+
+#### 7f · Textura externa con Impeller — FUNCIONAN LOS DOS CAMINOS; MEDIDA EN CURSO
+
+- Código: `AppCoreFFI/Sources/AppCoreFFI/Frames+Windows.swift` (generador BGRA sin CoreVideo; `TF_P9_SOLID=1` = rojo puro con cuadrado azul 200×200), `FrameRegistry.swift`, `CAppCoreFFI/tf_d3d.c` (dispositivo D3D11 propio, textura `B8G8R8A8` compartida por canal con `D3D11_RESOURCE_MISC_SHARED`, handle clásico de `GetSharedHandle`, sin mutex ni doble búfer), `app/windows/runner/tf_texture_host.{h,cpp}` (`--texture-kind gpu|pixel`), `win/shot.ps1`, `pc.sh frames` y `pc-frames-table.py`. Commits `49e2113` y `f4d7861`. Repetir: `Probes/P9-flutter/pc.sh sync && Probes/P9-flutter/pc.sh core && Probes/P9-flutter/pc.sh app && Probes/P9-flutter/pc.sh frames`; informes y capturas en `Temp/p9-flutter/pc/p3-<kind>-<size>.json|png`.
+- Impeller activo en Windows: el log del motor dice `Using the Impeller rendering backend (OpenGLESSDF)`. «Could not create external texture» no apareció.
+- Cabeceras de Flutter 3.50.1 (leídas en el PC): `gpu` = `kFlutterDesktopGpuSurfaceTypeDxgiSharedHandle`, pide el HANDLE de `IDXGIResource::GetSharedHandle` (`flutter_texture_registrar.h:35-38, 77-80`), formato BGRA8888 opcional; `pixel` = `FlutterDesktopPixelBuffer` sin campo de formato, el motor lo trata como RGBA y el runner convierte BGRA→RGBA por fotograma. `flutter::FlutterEngine` no expone `texture_registrar()`: se saca con `GetRegistrarForPlugin` + `FlutterDesktopRegistrarGetTextureRegistrar` (API C). `MarkTextureFrameAvailable` se puede llamar desde cualquier hilo (`texture_registrar.h:83-84`); se llama desde el hilo del generador, leído y no probado con carreras.
+- Tabla (60 s, 720p, vía 1, carga del PC 5 % y 0 % antes):
+
+| Camino | Producidos / presentados | Descartes | CPU % de un núcleo (`GetProcessTimes`) | RSS 5 / 30 / 60 s (MB) | Vigilante máx (ms) |
+| --- | --- | --- | --- | --- | --- |
+| `gpu` 720 | 1770 / 1766 | 4 | 1,642 | 119,3 / 120,2 / 121,5 | 24,0 |
+| `pixel` 720 | 1770 / 1770 | 0 | 0,424 | 132,0 / 130,3 / 131,5 | 16,1 |
+
+- **Aviso de método: la tabla no decide todavía.** `gpu` cuenta fotogramas distintos y `pixel` copias totales (un fotograma copiado dos veces tapa uno perdido); en pasadas de 10 s con color fijo `gpu` perdió 2 de 269 y `pixel` 1 de 270. Hipótesis sin medir: parte de los descartes son del generador (temporizador de Windows de ~15,6 ms: dos fotogramas dentro de un mismo refresco). En curso: conteo por secuencia en los tres caminos, intervalos del productor y de las peticiones del motor, variante con reloj preciso (`TF_P9_PRECISE=1`) y la matriz entera (1080 y BGRA).
+- La CPU de Windows no es comparable con la del Mac: solo cuenta el proceso, no driver ni GPU.
+- Copia BGRA en Windows: funciona (10 s a 720p: 271 / 271, 0 descartes, CPU 1,736 %).
+- Orden de canales: correcto en `gpu` y en `pixel` según el agente (captura de pantalla con `CopyFromScreen`: fondo rojo y cuadrado azul); el orquestador aún no ha mirado los PNG. Desgarro: una captura suelta no lo descarta; sin medir.
+- El build de `AppCoreFFI.dll` con el código de la prueba 5 sigue compilando en Windows (26 exportaciones antes de esta parte; `VideoProbe.swift` va bajo `canImport(AVFoundation)`).
