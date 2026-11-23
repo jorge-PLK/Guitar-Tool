@@ -11,6 +11,8 @@ import Foundation
 // izquierda, para comprobar el orden de canales. Sin barra ni número de secuencia.
 
 private let solidSquare = 200
+private let tearBarW = 40   // P9.7k: ancho de la barra del patrón de desgarro
+private let tearStep = 16   // P9.7k: avance de x por fotograma
 
 // P9.7f-B: umbrales de la atribución de descartes (intervalos en µs).
 private let shortIntervalUs: Int64 = 8_000    // dos fotogramas casi seguidos (cadencia del generador)
@@ -45,6 +47,7 @@ final class FrameSource: @unchecked Sendable {
     let height: Int
     private let fps: Int
     private let solid: Bool
+    private let tear: Bool  // TF_P9_TEAR=1: patrón del detector de desgarro (tear.ps1)
     private var timer: DispatchSourceTimer?
     private let queue: DispatchQueue
     private let lock = NSLock()
@@ -75,6 +78,7 @@ final class FrameSource: @unchecked Sendable {
         guard width >= 16, height >= 2, fps > 0 else { return nil }
         self.channel = channel; self.width = width; self.height = height; self.fps = fps
         solid = getenv("TF_P9_SOLID").map { String(cString: $0) == "1" } ?? false
+        tear = getenv("TF_P9_TEAR").map { String(cString: $0) == "1" } ?? false
         precise = getenv("TF_P9_PRECISE").map { String(cString: $0) == "1" } ?? false
         queue = DispatchQueue(label: "tf-frames-\(channel)", qos: .userInteractive)
         work = .allocate(capacity: width * height)
@@ -145,6 +149,16 @@ final class FrameSource: @unchecked Sendable {
             return
         }
         let s = Int(seq)
+        if tear {
+            // P9.7k: fondo negro y barra blanca de 40 px de ancho y toda la altura; x avanza 16 px por fotograma y
+            // da la vuelta antes de salirse (la barra siempre entera). Sin número de secuencia ni nada más.
+            let black: UInt32 = 0xFF00_0000
+            work.update(repeating: black, count: width)
+            for row in 1..<height { memcpy(work + row * width, work, width * 4) }
+            let x = (s * tearStep) % max(1, width - tearBarW)
+            for row in 0..<height { (work + row * width + x).update(repeating: 0xFFFF_FFFF, count: min(tearBarW, width - x)) }
+            return
+        }
         let r = Self.tri(s * 3), g = Self.tri(s * 3 + 170), b = Self.tri(s * 3 + 340)
         let bg: UInt32 = b | (g << 8) | (r << 16) | (0xFF << 24)
         work.update(repeating: bg, count: width)
@@ -227,8 +241,11 @@ final class FrameSource: @unchecked Sendable {
 
     func extra() -> [Int64]? {
         lock.lock(); defer { lock.unlock() }
+        // P9.7k: [20] = 1 si anillo de 3 texturas (TF_P9_RING != 0), [21] = Flush emitidos por el productor.
+        var ring: Int64 = 0, flushes: Int64 = 0
+        _ = tf_d3d_ring_stats(channel, &ring, &flushes)
         return [bgraDistinct, fetches, repeatFetches, gapFetches, skippedSeqs, lateGapFetches]
-            + prodIv.summary() + fetchIv.summary()
+            + prodIv.summary() + fetchIv.summary() + [ring, flushes]
     }
 
     func stats() -> (Int64, Int64, Int64, Int64, Int64) {

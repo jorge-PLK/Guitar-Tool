@@ -216,12 +216,12 @@ class TfCore {
   /// Vacía la ventana de intervalos y los contadores de peticiones (P9.7f-B).
   final void Function(int) framesReset;
 
-  /// P9.7f-B, ver tf_core.h (tf_debug_frames_extra): 20 valores.
+  /// P9.7f-B, ver tf_core.h (tf_debug_frames_extra): 22 valores.
   List<int> framesExtra(int channel) {
-    final p = nativeCalloc(8 * 20).cast<Int64>();
+    final p = nativeCalloc(8 * 22).cast<Int64>();
     try {
-      _framesExtra(channel, p, 20);
-      return [for (var i = 0; i < 20; i++) p[i]];
+      _framesExtra(channel, p, 22);
+      return [for (var i = 0; i < 22; i++) p[i]];
     } finally {
       nativeFree(p);
     }

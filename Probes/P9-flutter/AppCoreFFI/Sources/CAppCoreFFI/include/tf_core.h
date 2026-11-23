@@ -130,6 +130,9 @@ TF_API int32_t tf_d3d_upload(int32_t channel, const uint8_t *bgra, int32_t width
 TF_API int32_t tf_d3d_size(int32_t channel, int32_t *width, int32_t *height);
 /// HANDLE compartido de la última textura subida del canal, o NULL.
 TF_API void *tf_d3d_handle(int32_t channel);
+/// P9.7k: *ring = 1 si el anillo de 3 texturas está activo (TF_P9_RING != 0), 0 textura única; *flushes = Flush
+/// emitidos por el productor de ese canal. 0 bien.
+TF_API int32_t tf_d3d_ring_stats(int32_t channel, int64_t *ring, int64_t *flushes);
 /// Libera la textura del canal.
 TF_API void tf_d3d_release(int32_t channel);
 /// Espera de alta resolución (CREATE_WAITABLE_TIMER_HIGH_RESOLUTION) en el hilo que llama. 0 bien.

@@ -266,6 +266,13 @@ Future<void> _measure(List<String> args, Probe3Surface surf, Watchdog wd,
     'note': 'ventana; peticion = llamada al callback de textura (gpu/pixel) o sondeo de Dart (bgra)',
   };
   report['preciseTimer'] = Platform.environment['TF_P9_PRECISE'] == '1';
+  // P9.7k: modo de textura compartida (Windows gpu). ring = anillo de 3 texturas; flushes solo si framesExtra
+  // devuelve >= 22 valores (hoy pide 20: ver tf_core.dart).
+  report['ring'] = {
+    'enabled': Platform.environment['TF_P9_RING'] != '0',
+    'flushes': x1.length >= 22 ? x1[21] : null,
+    'tearPattern': Platform.environment['TF_P9_TEAR'] == '1',
+  };
   report['statsRaw'] = {'atWindowStart': s0, 'atEnd': s1};
   report['frameTiming'] = ft.toJson();
   if (bgra) {
