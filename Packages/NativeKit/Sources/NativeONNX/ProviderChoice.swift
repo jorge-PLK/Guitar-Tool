@@ -86,6 +86,23 @@ public enum OnnxProviderPlan {
         return allowSoftware ? gpus.first(where: \.isSoftware) : nil
     }
 
+    /// Proveedores del orden automático que ni se intentan, con su motivo (para el registro). Con proveedor forzado, ninguno.
+    public static func omissions(gpus: [OnnxGPU], available: [String], forced: OnnxProvider?) -> [String] {
+        guard forced == nil else { return [] }
+        var list: [String] = []
+        if !available.contains(OnnxProvider.cuda.executionProviderName) {
+            list.append("cuda: no hay EP")
+        } else if !gpus.contains(where: { !$0.isSoftware && $0.vendorID == OnnxGPU.nvidiaVendorID }) {
+            list.append("cuda: sin GPU NVIDIA")
+        }
+        if !available.contains(OnnxProvider.directML.executionProviderName) {
+            list.append("directML: no hay EP")
+        } else if directMLAdapter(gpus, allowSoftware: false) == nil {
+            list.append("directML: sin GPU por hardware")
+        }
+        return list
+    }
+
     /// Intentos en orden. Con proveedor forzado, solo ese (sin caer a otro: es para medir).
     public static func candidates(architecture: OnnxArchitecture, gpus: [OnnxGPU], available: [String],
                                   forced: OnnxProvider?) -> [OnnxCandidate] {
@@ -233,6 +250,15 @@ public struct OnnxSelection: Sendable, Equatable {
     /// SNR de la comparación hecha ahora o recordada.
     public var snr: Double?
     public var fromMemory: Bool
+
+    /// Línea del log de la app: `onnx| bs_roformer -> directML (descartados: cuda: no hay EP; memoria: no)`.
+    /// La memoria es `onnx-providers.json` (veredicto de una comparación anterior); con SNR conocido se añade.
+    public func logLine(model: String) -> String {
+        var parts = ["descartados: " + (skipped.isEmpty ? "ninguno" : skipped.joined(separator: ", ")),
+                     "memoria: " + (fromMemory ? "sí" : "no")]
+        if let snr, snr.isFinite { parts.append(String(format: "SNR %.1f dB", snr)) }
+        return "onnx| \(model) -> \(candidate.provider.rawValue) (\(parts.joined(separator: "; ")))"
+    }
 }
 
 /// Recorre los intentos: el primero cuya sesión se crea y, si es GPU/NPU, cuadra con CPU (o ya cuadró antes en este
@@ -332,7 +358,18 @@ public enum OnnxDevelopmentModels {
 /// Carga de un modelo con el mejor proveedor del equipo (lo que usan StemKit, StudyKit y TabKit en Windows).
 public enum OnnxModelLoader {
     nonisolated(unsafe) private static var selections: [String: OnnxSelection] = [:]
+    nonisolated(unsafe) private static var logHandler: (@Sendable (String) -> Void)?
     private static let lock = NSLock()
+
+    /// Gancho al que la app conecta su log: recibe una línea por cada sesión creada (o que falla al crearse).
+    public static func setLogHandler(_ handler: (@Sendable (String) -> Void)?) {
+        lock.withLock { logHandler = handler }
+    }
+
+    private static func log(_ line: String) {
+        let handler = lock.withLock { logHandler }
+        handler?(line)
+    }
 
     /// Selección de la última carga del modelo (para registro y para la prueba de Jorge).
     public static func lastSelection(model: String) -> OnnxSelection? {
@@ -352,12 +389,22 @@ public enum OnnxModelLoader {
                                                      available: available, forced: forced)
         let selector = OnnxProviderSelector(candidates: candidates, forced: forced != nil, memory: memory,
                                             runtimeVersion: (try? OnnxRuntime.version) ?? "?")
-        let (session, selection) = try selector.select(model: model, probe: probe) { candidate in
-            var o = options
-            o.deviceID = candidate.deviceID
-            return try OnnxSession(modelURL: modelURL, provider: candidate.provider, options: o)
+        let (session, rawSelection): (OnnxSession, OnnxSelection)
+        do {
+            (session, rawSelection) = try selector.select(model: model, probe: probe) { candidate in
+                var o = options
+                o.deviceID = candidate.deviceID
+                return try OnnxSession(modelURL: modelURL, provider: candidate.provider, options: o)
+            }
+        } catch {
+            log("onnx| \(model) -> error: \(error)")
+            throw error
         }
+        var selection = rawSelection
+        selection.skipped = OnnxProviderPlan.omissions(gpus: OnnxRuntime.gpus, available: available, forced: forced)
+            + selection.skipped
         lock.withLock { selections[model] = selection }
+        log(selection.logLine(model: model))
         return session
     }
 }

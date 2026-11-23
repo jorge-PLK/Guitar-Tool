@@ -36,3 +36,11 @@ App/Resources/Models/LeadRhythmMelRoformer_fp16.mlpackage.zip
 .env
 .env.*
 !.env.example
+
+# Bundle del PC (Tools/win/make-pc-bundle.sh): modelos, helpers y manifiesto
+Vendor/models-win/
+Vendor/helpers-win/
+PC-BUNDLE.txt
+
+# Info.plist de recursos de tests que genera SwiftPM en Windows
+Packages/*/Info.plist

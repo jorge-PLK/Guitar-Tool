@@ -1,8 +1,10 @@
 # B3/B4, parte interna (sesion interactiva de tf, via schtasks /IT). Solo ASCII. Arranca ToneForge.exe sin activar la ventana,
 # espera "eval| DONE b34part" en el log o el tope, mata la app, escribe <Work>\<Name>.done (0 ok, 124 tope, 2 murio).
 # -DialogPath: si se da, maneja el selector nativo "Elegir carpeta" (UI Automation; sin probar en la VM) y deja <Name>.dialog.txt.
-param([string]$Name, [string]$Work = "C:\tf-qa\b34", [int]$LimitMin = 10, [string]$DialogPath = "")
-$exe = "C:\ToneForge\x64\ToneForge.exe"
+param([string]$Name, [string]$Work = "", [int]$LimitMin = 10, [string]$DialogPath = "")
+$TfDrive = if ($env:TF_DRIVE) { $env:TF_DRIVE.TrimEnd('\') } else { "C:" }   # pass.ps1 la pone a la unidad del clon
+if (-not $Work) { $Work = "$TfDrive\tf-qa\b34" }
+$exe = if ($env:TF_EXE) { $env:TF_EXE } else { "$TfDrive/ToneForge/x64/ToneForge.exe" }
 $log = Join-Path $Work "$Name.log"; $done = Join-Path $Work "$Name.done"; $dlg = Join-Path $Work "$Name.dialog.txt"
 Remove-Item -Force $done, $log, $dlg -ErrorAction SilentlyContinue
 $env:TF_LOG_FILE = $log

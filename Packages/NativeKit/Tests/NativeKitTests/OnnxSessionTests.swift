@@ -134,9 +134,51 @@ final class OnnxProviderChoiceTests: XCTestCase {
         XCTAssertEqual(r.provider, .directML)
         XCTAssertEqual(made, [.directML])
     }
+
+    // MARK: - Línea de registro (Fase 7c, mejora 2)
+
+    func testLogLineNamesDiscardedProviderWithItsReason() throws {
+        var made: [OnnxProvider] = []
+        let (_, sel) = try select([OnnxCandidate(provider: .cuda, deviceID: 0, gpu: rtx),
+                                   OnnxCandidate(provider: .directML, deviceID: 0, gpu: intel), .cpu],
+                                  memory: tempMemory(), gpuGain: 1, failing: [.cuda], made: &made)
+        let line = sel.logLine(model: "bs_roformer")
+        XCTAssertTrue(line.hasPrefix("onnx| bs_roformer -> directML (descartados: cuda: "), line)
+        XCTAssertTrue(line.contains("memoria: no"), line)
+    }
+
+    func testLogLineWhenSnrFallsBackToCpu() throws {
+        var made: [OnnxProvider] = []
+        let (_, sel) = try select([OnnxCandidate(provider: .directML, deviceID: 0, gpu: intel), .cpu],
+                                  memory: tempMemory(), gpuGain: 1.01, made: &made)
+        let line = sel.logLine(model: "btc")
+        XCTAssertEqual(line, "onnx| btc -> cpu (descartados: directML: 40.0 dB frente a CPU, < 60 dB; memoria: no)")
+    }
+
+    func testLogLineFromMemoryAndOmissions() throws {
+        let memory = tempMemory()
+        let candidates = [OnnxCandidate(provider: .directML, deviceID: 0, gpu: intel), .cpu]
+        var made: [OnnxProvider] = []
+        _ = try select(candidates, memory: memory, gpuGain: 1.0001, made: &made)
+        let (_, sel) = try select(candidates, memory: memory, gpuGain: 1.0001, made: &made)
+        XCTAssertTrue(sel.logLine(model: "m").contains("memoria: sí"), sel.logLine(model: "m"))
+        XCTAssertEqual(OnnxProviderPlan.omissions(gpus: [intel], available: ["DmlExecutionProvider", "CPUExecutionProvider"],
+                                                  forced: nil), ["cuda: no hay EP"])
+        XCTAssertEqual(OnnxProviderPlan.omissions(gpus: [warp], available: ["CPUExecutionProvider"], forced: nil),
+                       ["cuda: no hay EP", "directML: no hay EP"])
+        XCTAssertEqual(OnnxProviderPlan.omissions(gpus: [], available: allProviders, forced: .cpu), [])
+    }
+
 }
 
 #if os(Windows)
+final class LineBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _lines: [String] = []
+    var lines: [String] { lock.withLock { _lines } }
+    func add(_ l: String) { lock.withLock { _lines.append(l) } }
+}
+
 /// Sesión real en la VM: Basic Pitch (0,23 MB, Apache-2.0) frente a ORT CPU del Mac y Core ML de la app (parte 7.3).
 final class OnnxSessionTests: XCTestCase {
     let input = "serving_default_input_2:0"
@@ -149,6 +191,16 @@ final class OnnxSessionTests: XCTestCase {
     func floats(_ name: String) throws -> [Float] {
         let data = try Data(contentsOf: fixture(name))
         return data.withUnsafeBytes { Array($0.bindMemory(to: Float.self)) }
+    }
+
+    /// El cargador manda una línea al gancho del log por cada sesión.
+    func testLoaderLogsOneLinePerSession() throws {
+        let box = LineBox()
+        OnnxModelLoader.setLogHandler { box.add($0) }
+        defer { OnnxModelLoader.setLogHandler(nil) }
+        _ = try OnnxModelLoader.session(modelURL: fixture("model.onnx"), model: "basic_pitch",
+                                        environment: ["TF_ONNX_PROVIDER": "cpu"], memory: nil)
+        XCTAssertEqual(box.lines, ["onnx| basic_pitch -> cpu (descartados: ninguno; memoria: no)"])
     }
 
     func refName(_ prefix: String, _ output: String) -> String {

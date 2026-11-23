@@ -5,20 +5,22 @@
 # Uso: powershell -NoProfile -ExecutionPolicy Bypass -File C:\tf-qa\montage\montage-launch.ps1 -Mode full|cancel [-LimitMin 45]
 param(
     [string]$Mode = "full",
-    [string]$Work = "C:\tf-qa\montage",
-    [string]$Source = "C:\tf-qa\projects",
+    [string]$Work = "",
+    [string]$Source = "",
     [string]$Match = "*",
-    [string]$Models = "C:\tf-models",
+    [string]$Models = "",
     [int]$LimitMin = 45
 )
 $ErrorActionPreference = "Continue"
+$TfDrive = if ($env:TF_DRIVE) { $env:TF_DRIVE.TrimEnd('\') } else { "C:" }   # pass.ps1 la pone a la unidad del clon
+if (-not $Work) { $Work = "$TfDrive\tf-qa\montage" }; if (-not $Source) { $Source = "$TfDrive\tf-qa\projects" }; if (-not $Models) { $Models = "$TfDrive\tf-models" }
 $PSX = (Get-Process -Id $PID).Path   # el mismo PowerShell (5.1 o 7) para los guiones internos
 if ($Mode -ne "full" -and $Mode -ne "cancel") { Write-Output "MONTAGE modo desconocido: $Mode"; exit 3 }
 
 
 $srcs = @(Get-ChildItem -Directory $Source -ErrorAction SilentlyContinue | Where-Object { $_.Name -like $Match })
 if ($srcs.Count -eq 0) { Write-Output "MONTAGE SINTEMA: no hay '$Match' en $Source"; exit 3 }
-if (-not (Test-Path "C:\ToneForge\x64\ToneForge.exe")) { Write-Output "MONTAGE SINAPP: falta C:\ToneForge\x64\ToneForge.exe (build.sh --no-run)"; exit 3 }
+if (-not (Test-Path "$TfDrive\ToneForge\x64\ToneForge.exe")) { Write-Output "MONTAGE SINAPP: falta $TfDrive\ToneForge\x64\ToneForge.exe (build.sh --no-run)"; exit 3 }
 if (-not (Test-Path (Join-Path $Models "pose\model.onnx"))) { Write-Output "MONTAGE AVISO: falta $Models\pose\model.onnx (el analisis de encuadre puede no terminar)" }
 
 New-Item -ItemType Directory -Force $Work | Out-Null
@@ -45,7 +47,7 @@ $evalFile = Join-Path $Work "montage-export-$Mode.js"
 # --audio simulated: sin sesion WASAPI. --support-dir nuevo: perfil y Models aislados. TF_MODELS_DIR: pose (encuadre) sin descargar.
 $args1 = "--projects-folder `"$projects`" --support-dir `"$support`" --audio simulated --camera simulated --window 1440x900 --eval-file `"$evalFile`" --eval-delay 6"
 [IO.File]::WriteAllText((Join-Path $Work "montage-$Mode.args"), $args1)
-[IO.File]::WriteAllText((Join-Path $Work "montage-$Mode.env"), "TF_MODELS_DIR=$Models")
+[IO.File]::WriteAllText((Join-Path $Work "montage-$Mode.env"), ("TF_MODELS_DIR=$Models" + $(if ($env:TF_ORT_DLL) { ";TF_ORT_DLL=" + $env:TF_ORT_DLL } else { "" })))
 $done = Join-Path $Work "montage-$Mode.done"
 Remove-Item -Force $done -ErrorAction SilentlyContinue
 

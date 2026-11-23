@@ -33,6 +33,8 @@ typedef struct {
 tfhost* tfhost_create(const tfhost_config* config);
 /// Mapea https://<host>/ a una carpeta (acceso ALLOW); p. ej. media.toneforge. 0 bien, distinto de 0 HRESULT.
 int tfhost_map_folder(tfhost* host, const char* host_utf8, const char* folder_utf8);
+/// Resultado (Clear/Set) de la ultima llamada a tfhost_map_folder, para el log de la app. Cadena valida hasta la siguiente llamada.
+const char* tfhost_last_map_log(void);
 /// PostWebMessageAsString, seguro desde cualquier hilo.
 void tfhost_post(tfhost* host, const char* utf8);
 /// CapturePreview a un PNG; done(ok, ctx) en el hilo de UI. Seguro desde cualquier hilo.

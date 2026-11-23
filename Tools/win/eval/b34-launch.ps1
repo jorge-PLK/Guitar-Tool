@@ -2,12 +2,15 @@
 # Uso: powershell -NoProfile -ExecutionPolicy Bypass -File C:\tf-qa\b34\b34-launch.ps1 -Mode firstrun|photos [-LimitMin 10] [-NoPickHook]
 # firstrun: por defecto el 1.er lanzamiento lleva TF_TEST_PICK_FOLDER=<fr-projects> (gancho de AppCore: host.pickProjectsFolder devuelve la ruta sin abrir el
 #   dialogo; el resto del camino es el real) y no se maneja UI Automation. -NoPickHook: sin variable, el selector nativo se rellena con UIA (b34-task.ps1 -DialogPath).
-param([string]$Mode = "photos", [string]$Work = "C:\tf-qa\b34", [string]$Source = "C:\tf-qa\projects", [int]$LimitMin = 10, [switch]$NoPickHook)
+param([string]$Mode = "photos", [string]$Work = "", [string]$Source = "", [int]$LimitMin = 10, [switch]$NoPickHook)
 $ErrorActionPreference = "Continue"
+$TfDrive = if ($env:TF_DRIVE) { $env:TF_DRIVE.TrimEnd('\') } else { "C:" }   # pass.ps1 la pone a la unidad del clon
+if (-not $Work) { $Work = "$TfDrive\tf-qa\b34" }; if (-not $Source) { $Source = "$TfDrive\tf-qa\projects" }
 $PSX = (Get-Process -Id $PID).Path   # el mismo PowerShell (5.1 o 7) para los guiones internos
 $script:ok = 0; $script:bad = 0; $script:skip = 0
 function Chk($n, $c, $d) { if ($c) { $script:ok++; Write-Output "eval| OK $n $d" } else { $script:bad++; Write-Output "eval| FAIL $n $d" } }
-if (-not (Test-Path "C:\ToneForge\x64\ToneForge.exe")) { Write-Output "B34 SINAPP: falta ToneForge.exe (build.sh --no-run)"; exit 3 }
+$Exe = if ($env:TF_EXE) { $env:TF_EXE } else { "$TfDrive/ToneForge/x64/ToneForge.exe" }   # TF_EXE: instalacion de prueba aparte
+if (-not (Test-Path $Exe)) { Write-Output "B34 SINAPP: falta $Exe (build.sh --no-run)"; exit 3 }
 New-Item -ItemType Directory -Force $Work | Out-Null
 $OFFLINE = "HTTPS_PROXY=http://127.0.0.1:9;https_proxy=http://127.0.0.1:9;SPOTIFY_CLIENT_ID=invalid;SPOTIFY_CLIENT_SECRET=invalid"
 
@@ -17,6 +20,7 @@ function Launch($name, $argsLine, $envLine, $prelude, $dialogPath) {
     $evalFile = Join-Path $Work "$name.js"
     [IO.File]::WriteAllText($evalFile, "$prelude`n$body", (New-Object Text.UTF8Encoding($false)))
     [IO.File]::WriteAllText((Join-Path $Work "$name.args"), "$argsLine --audio simulated --camera simulated --screen library --window 1440x900 --eval-file `"$evalFile`" --eval-delay 6")
+    if ($env:TF_ORT_DLL) { $envLine += ";TF_ORT_DLL=$($env:TF_ORT_DLL)" }   # la tarea no hereda el entorno de pass.ps1
     [IO.File]::WriteAllText((Join-Path $Work "$name.env"), $envLine)
     $done = Join-Path $Work "$name.done"; Remove-Item -Force $done -ErrorAction SilentlyContinue
     $ta = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", (Join-Path $PSScriptRoot "b34-task.ps1"), "-Name", $name, "-Work", $Work, "-LimitMin", "$LimitMin")

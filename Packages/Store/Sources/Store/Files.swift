@@ -2,9 +2,10 @@ import Foundation
 
 // MARK: - Utilidades de fichero
 
-enum FileOps {
+public enum FileOps {
     /// Sustituye `destination` por `temporary` (misma carpeta/volumen) de forma atómica; si no existía, lo mueve.
-    static func atomicReplace(_ destination: URL, with temporary: URL) throws {
+    /// Pública para la conversión HEVC → H.264 de las tomas en Windows (AppCore, `VideoConversionEngine`).
+    public static func atomicReplace(_ destination: URL, with temporary: URL) throws {
         let fm = FileManager.default
         #if os(Windows)
         // `replaceItemAt` no está implementado en Foundation para Windows: MoveFileEx con reemplazo es atómico en NTFS.

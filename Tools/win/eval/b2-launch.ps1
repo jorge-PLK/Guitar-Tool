@@ -6,16 +6,19 @@
 #   host.chooseFolder real de la app. Una variable de entorno da una sola ruta: "apuntar" (P2) y "trabajo en cola" (P3) siguen con el interceptor del JS.
 #   -NoPickHook: sin la variable; todo el selector va por el interceptor del JS (camino anterior).
 param(
-    [string]$Work = "C:\tf-qa\b2",
-    [string]$Source = "C:\tf-qa\projects",
+    [string]$Work = "",
+    [string]$Source = "",
     [string]$First = "El roce*",
     [int]$LimitMin = 45,
     [switch]$NoPickHook
 )
 $ErrorActionPreference = "Continue"
 $PSX = (Get-Process -Id $PID).Path   # el mismo PowerShell (5.1 o 7) para los guiones internos
+$TfDrive = if ($env:TF_DRIVE) { $env:TF_DRIVE.TrimEnd('\') } else { "C:" }   # pass.ps1 la pone a la unidad del clon
+if (-not $Work) { $Work = "$TfDrive\tf-qa\b2" }; if (-not $Source) { $Source = "$TfDrive\tf-qa\projects" }
 
-if (-not (Test-Path "C:\ToneForge\x64\ToneForge.exe")) { Write-Output "B2 SINAPP: falta C:\ToneForge\x64\ToneForge.exe (build.sh --no-run)"; exit 3 }
+$Exe = if ($env:TF_EXE) { $env:TF_EXE } else { "$TfDrive/ToneForge/x64/ToneForge.exe" }   # TF_EXE: instalacion de prueba aparte
+if (-not (Test-Path $Exe)) { Write-Output "B2 SINAPP: falta $Exe (build.sh --no-run)"; exit 3 }
 
 $all = @(Get-ChildItem -Directory $Source -ErrorAction SilentlyContinue | Where-Object { Test-Path (Join-Path $_.FullName "project.json") })
 $one = $all | Where-Object { $_.Name -like $First } | Select-Object -First 1
@@ -57,6 +60,7 @@ foreach ($ph in $phases) {
     [IO.File]::WriteAllText($evalFile, (Prefix $id) + $body, $utf8)
     [IO.File]::WriteAllText((Join-Path $Work "b2-$id.args"), ($ph.args + " --eval-file `"$evalFile`""))
     $envLine = "TF_X=1"
+    if ($env:TF_ORT_DLL) { $envLine += ";TF_ORT_DLL=$($env:TF_ORT_DLL)" }   # la tarea no hereda el entorno de pass.ps1
     if ($id -eq "a" -and $hook) { $envLine += ";TF_TEST_PICK_FOLDER=$hook" }
     [IO.File]::WriteAllText((Join-Path $Work "b2-$id.env"), $envLine)
     $done = Join-Path $Work "b2-$id.done"

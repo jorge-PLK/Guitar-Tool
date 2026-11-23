@@ -301,7 +301,11 @@ extension Bridge {
 
     /// Carpeta que se propone en el primer arranque (`AppModel.proposedFolder` del Mac: `~/Music/ToneForge`).
     static var defaultProposedFolder: URL {
-        FileManager.default.homeDirectoryForCurrentUser
+        #if os(Windows)
+        // Carpeta Música real del usuario (KnownFolder); si Windows no la da, cae a `~/Music`.
+        if let music = windowsMusicFolder() { return music.appendingPathComponent("ToneForge", isDirectory: true) }
+        #endif
+        return FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Music", isDirectory: true).appendingPathComponent("ToneForge", isDirectory: true)
     }
 

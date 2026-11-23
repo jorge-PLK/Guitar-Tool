@@ -4,10 +4,12 @@
 #  - "eval| DONE b2" -> mata la app y escribe el codigo en <Work>\b2-<Phase>.done (0 = salio DONE, 124 = tope, 2 = la app murio antes)
 param(
     [string]$Phase = "a",
-    [string]$Work = "C:\tf-qa\b2",
+    [string]$Work = "",
     [int]$LimitMin = 45
 )
-$exe = "C:\ToneForge\x64\ToneForge.exe"
+$TfDrive = if ($env:TF_DRIVE) { $env:TF_DRIVE.TrimEnd('\') } else { "C:" }   # pass.ps1 la pone a la unidad del clon
+if (-not $Work) { $Work = "$TfDrive\tf-qa\b2" }
+$exe = if ($env:TF_EXE) { $env:TF_EXE } else { "$TfDrive/ToneForge/x64/ToneForge.exe" }
 $argsFile = Join-Path $Work "b2-$Phase.args"
 $envFile = Join-Path $Work "b2-$Phase.env"
 $log = Join-Path $Work "app-$Phase.log"

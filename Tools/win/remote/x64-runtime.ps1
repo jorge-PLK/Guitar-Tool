@@ -6,7 +6,8 @@
 # renombran los ficheros con la tabla File. Idempotente. ASCII puro, PowerShell 5.1.
 # Salida: "TF:RTL x64 <ruta>" (o "TF:RTL x64 FALLO <motivo>" y codigo 1).
 $ErrorActionPreference = "Stop"
-$Dest = "C:\tf-rtl-x64"
+$TfDrive = if ($env:TF_DRIVE) { $env:TF_DRIVE.TrimEnd('\') } else { "C:" }   # ver common.ps1
+$Dest = "$TfDrive\tf-rtl-x64"
 if (Test-Path (Join-Path $Dest "swiftCore.dll")) {
     Write-Output "TF:RTL x64 $Dest"
     exit 0
@@ -14,7 +15,7 @@ if (Test-Path (Join-Path $Dest "swiftCore.dll")) {
 try {
     $redist = Get-ChildItem "$env:LOCALAPPDATA\Programs\Swift\Redistributables" -Directory | Sort-Object Name | Select-Object -Last 1
     $msm = Join-Path $redist.FullName "rtl.shared.amd64.msm"
-    $work = "C:\tf-rtl-work"
+    $work = "$TfDrive\tf-rtl-work"
     if (Test-Path $work) { Remove-Item -Recurse -Force $work }
     New-Item -ItemType Directory -Force $work | Out-Null
     New-Item -ItemType Directory -Force $Dest | Out-Null

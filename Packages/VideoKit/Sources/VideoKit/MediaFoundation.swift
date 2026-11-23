@@ -125,11 +125,33 @@ enum MediaFoundationReader {
         var duration: Double
     }
 
+    /// El fichero tiene pista de vídeo y Media Foundation no la abre (sin decodificador: una toma HEVC del Mac en un
+    /// Windows sin «Extensiones de vídeo HEVC»). Antes el reintento solo de audio tapaba este error con
+    /// `MF_E_INVALIDSTREAMNUMBER` (0xC00D36B3).
+    struct UndecodableVideo: Error, Equatable, CustomStringConvertible {
+        var file: String
+        /// FOURCC del subtipo que da Media Foundation ('HEVC'…) o, si no lo da, el de `stsd` (`hvc1`…).
+        var codec: String
+        var hr: Int32
+        var description: String {
+            "\(file): este equipo no puede decodificar el vídeo \(codec) (HRESULT 0x" + String(UInt32(bitPattern: hr), radix: 16, uppercase: true) + ")"
+        }
+    }
+
     static func info(_ url: URL) throws -> Info {
         var info = TFMFReaderInfo()
         var r: UnsafeMutableRawPointer?
         var hr = MF.withWidePath(url) { tfmf_reader_open($0, 1, 0, &r, &info) }
-        if hr < 0 { hr = MF.withWidePath(url) { tfmf_reader_open($0, 0, 1, &r, &info) } }
+        if hr < 0 {
+            // El shim rellena `hasVideo` y `videoFourCC` antes de fallar en `SetCurrentMediaType`: con pista de vídeo el
+            // error es ese, no el del reintento de audio. Sin el subtipo, el códec lo dice `stsd`. (Si el shim no llegó
+            // a ver las pistas, el fallo es de abrir el fichero y lo cuenta el reintento.)
+            if info.hasVideo != 0 {
+                let stsd = (try? MP4EditList.tracks(in: url).first { $0.handler == "vide" })?.sampleEntry
+                throw UndecodableVideo(file: url.lastPathComponent, codec: info.videoFourCC != 0 ? MF.fourCC(info.videoFourCC) : (stsd ?? "?"), hr: hr)
+            }
+            hr = MF.withWidePath(url) { tfmf_reader_open($0, 0, 1, &r, &info) }
+        }
         try MF.check(hr, "abrir \(url.lastPathComponent)")
         tfmf_reader_release(r)
         return Info(hasVideo: info.hasVideo != 0, width: Int(info.width), height: Int(info.height),

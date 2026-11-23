@@ -56,6 +56,17 @@ on('jobs.progress', j => {
   jobs.value = next;
 });
 
+/// Fase 7c: texto de un vídeo de toma que aún no se puede ver (`video` del visor, `preview.videos` del montaje: HEVC que se
+/// convierte a H.264, o ya convertido que espera a que se cierre el visor). El progreso vivo sale de `jobs.progress` (clave
+/// `jobId`, etapa `video`); el fallo, de `failures` o del propio aviso.
+export function videoNoteText(note, live = jobs.value, failed = failures.value) {
+  if (!note) return null;
+  if (note.code === 'video-failed') return note.message;
+  if (live[note.jobId]?.text) return live[note.jobId].text;
+  if (failed[note.jobId]) return `No se pudo convertir el vídeo de esta toma a H.264: ${failed[note.jobId]}.`;
+  return note.message;
+}
+
 /// Fin de una importación por enlace: error (título + detalle), duplicado o avisos de la descarga.
 on('link.finished', e => {
   if (e.error) {

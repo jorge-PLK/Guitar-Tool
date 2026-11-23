@@ -45,6 +45,8 @@ public final class Bridge: @unchecked Sendable {
     let montageService: MontageService
     /// Visor de tomas con el audio en el núcleo (W2-V, `TakeViewMethods.swift`).
     let takeViewService: TakeViewService
+    /// Conversión HEVC → H.264 de las tomas, bajo demanda (Fase 7c, `VideoConversion.swift`).
+    let videoConversion: VideoConversionEngine
     /// Cancelaciones que `shutdownAsync` hace antes de cerrar nada (descargas por enlace, lista); como el
     /// `linkImport?.cancel()` y `playlistImport?.cancel()` de `AppModel.flushForTermination` del Mac.
     private var _shutdownHooks: [@Sendable () async -> Void] = []
@@ -84,7 +86,8 @@ public final class Bridge: @unchecked Sendable {
 
     init(options: LaunchOptions, mediaBase: String, reveal: (@Sendable (URL) throws -> Void)?,
          services: JobServices? = nil, link: ExternalSources? = nil, tab: TabServices? = nil,
-         spotify: (any SpotifySearching)? = nil, artistPhotos: (any ArtistPhotoProviding)? = nil) throws {
+         spotify: (any SpotifySearching)? = nil, artistPhotos: (any ArtistPhotoProviding)? = nil,
+         videoHooks: VideoConversionEngine.Hooks? = nil) throws {
         self.artistPhotos = artistPhotos
         self.link = link
         self.spotify = spotify
@@ -107,6 +110,8 @@ public final class Bridge: @unchecked Sendable {
                                              pauseOthers: { [study = self.studyService] in study.current?.controller.stop() })
         self.takeViewService = TakeViewService(options: options, root: folder,
                                                pauseOthers: { [study = self.studyService] in study.current?.controller.stop() })
+        self.videoConversion = VideoConversionEngine(jobs: queue, hooks: videoHooks ?? .production(
+            sources: link ?? ExternalSources.production(supportDir: options.supportDir, environment: ProcessInfo.processInfo.environment)))
         registerMethods()
     }
 
@@ -160,6 +165,7 @@ public final class Bridge: @unchecked Sendable {
         tabService.register(on: router)
         registerMontageMethods()   // W2-M1, `MontageMethods.swift`
         registerTakeViewMethods()   // W2-V, `TakeViewMethods.swift`
+        registerVideoConversion()   // Fase 7c, HEVC → H.264 (`VideoConversion.swift`), tras `record.*`
         FrameRelay.register(on: router)   // W2-E1, `FrameRelay.swift`
         let opener = revealOverride
         router.register("library.reveal") { (p: ProjectIDParams) -> RevealResult in

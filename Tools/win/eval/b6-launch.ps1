@@ -2,8 +2,10 @@
 # Uso: powershell -NoProfile -ExecutionPolicy Bypass -File Tools\win\eval\b6-launch.ps1 [-Work C:\tf-qa\b6] [-Exe C:\ToneForge\x64\ToneForge.exe]
 # Mide cuanto tardan en desaparecer ToneForge.exe, yt-dlp.exe y ffmpeg.exe tras WM_CLOSE (tope 3.5 s) y que tras reabrir no haya trabajo en marcha.
 # --audio simulated y --camera simulated: no toca audio ni camara reales. Ultima linea: DONE b6 n/m (skip k).
-param([string]$Work = "C:\tf-qa\b6", [string]$Exe = "C:\ToneForge\x64\ToneForge.exe", [double]$MaxCloseSec = 3.5)
+param([string]$Work = "", [string]$Exe = "", [double]$MaxCloseSec = 3.5)
 $ErrorActionPreference = "Continue"
+$TfDrive = if ($env:TF_DRIVE) { $env:TF_DRIVE.TrimEnd('\') } else { "C:" }   # pass.ps1 la pone a la unidad del clon
+if (-not $Work) { $Work = "$TfDrive\tf-qa\b6" }; if (-not $Exe) { $Exe = "$TfDrive\ToneForge\x64\ToneForge.exe" }
 $script:ok = 0; $script:bad = 0; $script:skip = 0
 function Chk($n, $c, $d) { if ($c) { $script:ok++; Write-Output "eval| OK $n $d" } else { $script:bad++; Write-Output "eval| FAIL $n $d" } }
 function Finish { Write-Output "DONE b6 $($script:ok)/$($script:ok + $script:bad) (skip $($script:skip))"; exit 0 }

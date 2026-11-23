@@ -154,15 +154,43 @@ import XCTest
 final class VideoFileTests: XCTestCase {
     static let format = VideoFormat(cameraID: "sim-camera", cameraName: "Cámara simulada", width: 320, height: 180, fps: 30)
 
-    /// PTS en tiempo de la película: el lector de Media Foundation da el tiempo de los medios (desde 0, no lee la lista
-    /// de ediciones), al que se suma el tramo vacío de la lista.
+    /// PTS en tiempo de la película: la marca cruda de Media Foundation, que ya aplica el tramo vacío de la lista de
+    /// ediciones (medido en Windows 11 x64: `ZZDiagTests` y `testTakeVideoFileMeasuresReaderShift`). No se le suma nada.
     static func ptsOf(_ url: URL) throws -> [Double] {
-        let video = try XCTUnwrap(MP4EditList.tracks(in: url).first { $0.handler == "vide" })
-        let empty = video.edits.filter { $0.mediaTime < 0 }.reduce(0) { $0 + Double($1.segmentDuration) } / Double(video.movieTimescale)
-        let start = Double(video.edits.first { $0.mediaTime >= 0 }?.mediaTime ?? 0) / Double(video.mediaTimescale)
         var pts: [Double] = []
-        try MediaFoundationReader.forEachFrame(url) { t, _, _ in pts.append(t - start + empty); return true }
+        try MediaFoundationReader.forEachFrame(url) { t, _, _ in pts.append(t); return true }
         return pts.sorted()
+    }
+
+    /// El desfase de `TakeVideoFile` sale de comparar las cajas con el lector, lo aplique o no la lista de ediciones.
+    func testReaderShiftCoversBothReaderBehaviours() {
+        // Lector que aplica la lista (este PC): primer fotograma a 20,0 en las cajas y en el lector.
+        XCTAssertEqual(TakeVideoFile.readerShift(expectedFirst: 20, readerFirst: 20, fallback: 20), 0, accuracy: 1e-12)
+        // Lector que da el tiempo de los medios: tramo vacío 20 s, inicio de los medios 0,1 s, primera composición 0,1 s.
+        XCTAssertEqual(TakeVideoFile.readerShift(expectedFirst: 20, readerFirst: 0.1, fallback: 19.9), 19.9, accuracy: 1e-12)
+        // Sin primer fotograma (fichero vacío o fallo al decodificarlo): la cuenta de las cajas.
+        XCTAssertEqual(TakeVideoFile.readerShift(expectedFirst: 20, readerFirst: nil, fallback: 19.9), 19.9)
+        XCTAssertEqual(TakeVideoFile.readerShift(expectedFirst: nil, readerFirst: 3, fallback: 0), 0)
+    }
+
+    /// Toma del escritor de Windows que empieza a 12,345 s del tema: `TakeVideoFile` la coloca sin contar dos veces el
+    /// tramo vacío. El primer fotograma se ve a 12,345 s (±1/90 000) y no antes, y el tramo con imagen empieza ahí.
+    func testTakeVideoFileMeasuresReaderShift() async throws {
+        let dir = try TestWav.tempDir("VideoFileTests")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let url = dir.appendingPathComponent("video.mov")
+        let (_, sent) = try await Self.writeVideo(url, start: 12.345, seconds: 1, color: (0, 0, 255))
+        let file = try XCTUnwrap(TakeVideoFile.open(url))
+        let raw = try XCTUnwrap(Self.ptsOf(url).first)
+        let reader = TakeFrameReader(file: file, rotation: VideoRotation(degrees: 0))
+        let before = try reader.frame(at: sent[0] - 1.0 / 60)
+        let at = try reader.frame(at: sent[0])
+        print(String(format: "desfase medido: marca cruda del primer fotograma %.6f s, shift %.2e s, PTS del tema %.6f s (enviado %.6f s)",
+                     raw, file.shift, raw + file.shift, sent[0]))
+        XCTAssertEqual(raw + file.shift, sent[0], accuracy: 1.0 / 90_000)
+        XCTAssertEqual(file.available.lowerBound, sent[0], accuracy: 1.0 / 90_000)
+        XCTAssertNil(before)
+        XCTAssertNotNil(at)
     }
 
     /// Lo mismo que en el Mac: solo vídeo, formato real, PTS = tiempo del tema (empezando a mitad: 12,345 s) con error de

@@ -8,6 +8,7 @@ import {
   setKeepVideoAspect, setCutGaps, togglePlay, seek, setScrubbing, onPosition, pos,
 } from './store.js';
 import { LAYOUTS, TRANSITIONS, fmtDur, sectionName, resLabel, fpsLabel, FPS_CHOICES } from './model.js';
+import { videoNoteText } from '../state.js';
 
 const pauseIcon = html`<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="3" width="5" height="18" rx="1"/><rect x="14" y="3" width="5" height="18" rx="1"/></svg>`;
 const playIcon = icon('play', 16);
@@ -96,7 +97,7 @@ export function PreviewColumn() {
     <div class="mt-prev-head muted"><span class="t">${label}</span><span class="tm" ref=${head}>${fmtDur(pos.seconds)}</span></div>
     <div class="mt-player-wrap"><div class=${'mt-player' + (s.isPortrait ? ' portrait' : '')}>
       <canvas ref=${canvas} aria-label="Vista previa del montaje"></canvas>
-      ${phase === 'preparing' || phase === 'none' ? html`<span class="mt-prep" role="status"><span class="spinner" aria-hidden="true"></span></span>` : null}
+      ${phase === 'preparing' || phase === 'none' || phase === 'converting' ? html`<span class="mt-prep" role="status"><span class="spinner" aria-hidden="true"></span></span>` : null}
     </div></div>
     <div class="mt-controls">
       <button class="mt-play" disabled=${!ready} aria-label=${playing ? 'Pausar la vista previa' : 'Reproducir la vista previa'}
@@ -110,6 +111,8 @@ export function PreviewColumn() {
           onChange=${e => seek(+e.currentTarget.value)} />` : html`<span class="grow"></span>`}
       <span class="mt-clock"><span ref=${now}>${fmtDur(pos.seconds)}</span><span class="muted"> / ${fmtDur(span.end)}</span></span>
     </div>
+    ${phase === 'converting' ? (s.preview?.videos ?? []).map(v => html`<div key=${v.takeId} class="small muted" role="status">
+      ${lanes.value.find(l => l.takeId === v.takeId)?.partName ?? 'Toma'}: ${videoNoteText(v)}</div>`) : null}
     ${s.preview?.audio?.phase === 'preparing' ? html`<div class="small muted" role="status">Mezclando el audio de la vista previa…</div>` : null}
     ${s.preview?.audio?.phase === 'error' && s.preview.audio.error ? html`<div class="small danger-text">${s.preview.audio.error}</div>` : null}
   </section>`;

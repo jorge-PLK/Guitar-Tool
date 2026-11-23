@@ -5,8 +5,8 @@ import NativeONNX
 // Predictores de Windows sobre ONNX Runtime (plan, «Corte del paso 7», parte 7.8), con los contratos de los de
 // Core ML. Modelos de la parte 7.3: `basic_pitch.onnx` (`serving_default_input_2:0` (b, 43 844, 1) →
 // `StatefulPartitionedCall:1` nota y `:2` onset (b, 172, 88), `:0` contorno) y `adtof.onnx` (`spec` (1, T, 84, 1)
-// → `act` (1, T, 5)). Proveedor elegido por `OnnxModelLoader`; si la GPU no cuadra con CPU (p. ej. la GRU de ADTOF,
-// que Core ML calcula mal en GPU), el modelo se queda en CPU.
+// → `act` (1, T, 5)). Basic Pitch: proveedor elegido por `OnnxModelLoader`; si la GPU no cuadra con CPU, se queda en
+// CPU. ADTOF: siempre en CPU (ver `OnnxDrumPredictor.loaderEnvironment`).
 
 /// Basic Pitch: ventana de 43 844 muestras → nota y onset [172][88].
 final class OnnxBasicPitchPredictor: BasicPitchWindowPredictor, @unchecked Sendable {
@@ -63,9 +63,18 @@ final class OnnxDrumPredictor: DrumActivationPredictor, @unchecked Sendable {
     /// Tramas de la entrada fija con que se compara GPU frente a CPU (1 s a 100 fps).
     static let probeFrames = 100
 
+    /// Entorno del cargador para ADTOF: proveedor CPU forzado, diga lo que diga `TF_ONNX_PROVIDER`. En CPU, T = 18 000
+    /// tramas (3 min) tarda 0,9 s (Temp/win/estado/modelos-analisis.md, hallazgo 2).
+    // Siempre CPU (Jorge, 23/11/2026): en DirectML, con T ≥ ~8000 tramas, ADTOF desborda la pila de DirectML.dll (c00000fd).
+    static func loaderEnvironment(_ base: [String: String] = ProcessInfo.processInfo.environment) -> [String: String] {
+        var env = base
+        env[OnnxProviderPlan.environmentKey] = OnnxProvider.cpu.rawValue
+        return env
+    }
+
     init(modelURL: URL) throws {
         do {
-            session = try OnnxModelLoader.session(modelURL: modelURL, model: "adtof") {
+            session = try OnnxModelLoader.session(modelURL: modelURL, model: "adtof", environment: Self.loaderEnvironment()) {
                 OnnxProbe.inputs(for: $0, dynamic: [Self.probeFrames])
             }
         } catch {

@@ -4,10 +4,12 @@
 # (0 = salio la linea DONE, 124 = tope, 2 = la app murio antes).
 param(
     [string]$Mode = "full",
-    [string]$Work = "C:\tf-qa\montage",
+    [string]$Work = "",
     [int]$LimitMin = 45
 )
-$exe = "C:\ToneForge\x64\ToneForge.exe"
+$TfDrive = if ($env:TF_DRIVE) { $env:TF_DRIVE.TrimEnd('\') } else { "C:" }   # pass.ps1 la pone a la unidad del clon
+if (-not $Work) { $Work = "$TfDrive\tf-qa\montage" }
+$exe = "$TfDrive\ToneForge\x64\ToneForge.exe"
 $argsFile = Join-Path $Work "montage-$Mode.args"
 $envFile = Join-Path $Work "montage-$Mode.env"
 $log = Join-Path $Work "app-$Mode.log"

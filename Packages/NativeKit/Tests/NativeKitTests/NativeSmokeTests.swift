@@ -76,9 +76,35 @@ final class NativeSmokeTests: XCTestCase {
         XCTAssertEqual(d2d_shim_version(), 1)
     }
 
+    /// API C mínima que admite el puente (COnnxRuntime.c, `api_init`: desde la 17, ORT 1.17).
+    static let minimumOnnxMinor = 17
+    /// La que se compila y se copia junto a los tests (cabeceras de NativeKit).
+    static let bundledOnnxMinor = 32
+
+    /// Con la DLL por defecto, 1.32; con `TF_ORT_DLL` (otro sabor, p. ej. DirectML 1.24), la que traiga, ≥ 1.17. La API
+    /// negociada es la de esa versión (en ORT 1.x, la API N es la versión 1.N).
     func testOnnxRuntimeVersionAndProviders() throws {
-        XCTAssertTrue(try OnnxRuntime.version.hasPrefix("1.32."))
-        XCTAssertTrue(try OnnxRuntime.availableProviders.contains("CPUExecutionProvider"))
+        let version = try OnnxRuntime.version
+        let parts = version.split(separator: ".").compactMap { Int($0) }
+        XCTAssertGreaterThanOrEqual(parts.count, 2, version)
+        let major = parts.first ?? 0, minor = parts.count > 1 ? parts[1] : 0
+        let override = ProcessInfo.processInfo.environment["TF_ORT_DLL"].flatMap { $0.isEmpty ? nil : $0 }
+        XCTAssertEqual(major, 1, version)
+        if let override {
+            XCTAssertGreaterThanOrEqual(minor, Self.minimumOnnxMinor, "\(version) (TF_ORT_DLL=\(override))")
+        } else {
+            XCTAssertEqual(minor, Self.bundledOnnxMinor, version)
+        }
+        XCTAssertEqual(OnnxRuntime.apiVersion, min(minor, Self.bundledOnnxMinor), "API negociada con \(version)")
+        let providers = try OnnxRuntime.availableProviders
+        XCTAssertTrue(providers.contains("CPUExecutionProvider"), "\(providers)")
+        // La compilación de DirectML lleva DirectML.dll a su lado y debe anunciar el proveedor.
+        if let override {
+            let dml = URL(fileURLWithPath: override).deletingLastPathComponent().appendingPathComponent("DirectML.dll")
+            if FileManager.default.fileExists(atPath: dml.path) {
+                XCTAssertTrue(providers.contains(OnnxProvider.directML.executionProviderName), "\(providers)")
+            }
+        }
     }
     #else
     func testOnnxIsWindowsOnlyOnMac() {

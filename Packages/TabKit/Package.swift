@@ -28,6 +28,8 @@ let package = Package(
             .product(name: "NativeDSP", package: "NativeKit"),
             .product(name: "NativeAudioFile", package: "NativeKit"),
             .product(name: "NativePlatform", package: "NativeKit"),
+            // Proveedor con que se abre ADTOF en Windows (OnnxDrumProviderTests).
+            .product(name: "NativeONNX", package: "NativeKit", condition: .when(platforms: [.windows])),
         ], resources: [.copy("Fixtures")])
     ]
 )

@@ -22,19 +22,41 @@ function useOffsetPlayer({ videoPath, punches, offsetMs }) {
   const [st, setSt] = useState({ t: 0, d: 0, playing: false, ready: false });
   const [error, setError] = useState(null);
   const [videoError, setVideoError] = useState(null);
+  const [videoNote, setVideoNote] = useState(null);
   const fail = e => setError(e?.message || String(e));
   const apply = s => setSt(p => ({ ...p, d: s.duration, playing: s.playing }));
   useEffect(() => {
     let alive = true;
     let early = null;   // posición que llega antes de la respuesta de `openOffset`
+    let lateVideo = null;   // `takeview.video` que llega antes de la respuesta de `openOffset`
+    let shown = null;   // aviso de vídeo que se enseña ahora (null = `<video>`)
+    let mine = null;   // `takeId` de la instantánea
     const off = on('takeview.position', ev => {
       const now = performance.now() / 1000;
       if (sync.current) sync.current.push(ev, now); else early = [ev, now];
       setSt(p => (p.playing === ev.playing ? p : { ...p, playing: ev.playing }));
     });
+    // Fase 7c (opción b'): el vídeo se convirtió con la hoja abierta. Solo se recarga el `<video>`, con el desfase actual
+    // (lo guarda CoreTakeSync); el audio del núcleo sigue sin cortes.
+    const showVideo = note => {
+      if (shown && !note) { setVideoError(null); sync.current?.setVideo(videoPath, punches ?? []); }
+      shown = note;
+      setVideoNote(note);
+    };
+    const offVideo = on('takeview.video', ev => {
+      if (!sync.current) { lateVideo = ev; return; }
+      if (ev.takeId === mine) showVideo(ev.video ?? null);
+    });
     call('takeview.openOffset').then(s => {
       if (!alive) return;
-      const ts = new CoreTakeSync(video.current, { songStart: s.songStart, offsetMs: offsetMs ?? 0, basePath: videoPath, punches: punches ?? [],
+      mine = s.takeId;
+      // Fase 7c: toma del Mac en HEVC que se está convirtiendo: suena el audio y se avisa, sin `<video>`. Un
+      // `takeview.video` anterior a esta respuesta solo cuenta si dice que ya se puede ver.
+      const note = lateVideo && lateVideo.takeId === mine && !lateVideo.video ? null : (s.video ?? null);
+      shown = note;
+      setVideoNote(note);
+      const ts = new CoreTakeSync(video.current, { songStart: s.songStart, offsetMs: offsetMs ?? 0, basePath: note ? null : videoPath,
+        punches: note ? [] : (punches ?? []),
         duration: s.duration, onVideoError: setVideoError, onTick: t => setSt(p => (Math.abs(p.t - t) < 0.01 ? p : { ...p, t })) });
       sync.current = ts;
       if (early) ts.push(...early);
@@ -45,6 +67,7 @@ function useOffsetPlayer({ videoPath, punches, offsetMs }) {
     return () => {
       alive = false;
       off();
+      offVideo();
       sync.current?.destroy();
       sync.current = null;
       call('takeview.close').catch(() => {});
@@ -55,7 +78,8 @@ function useOffsetPlayer({ videoPath, punches, offsetMs }) {
     video, error, videoError, ...st,
     toggle: () => call(st.playing ? 'takeview.pause' : 'takeview.play').then(s => { setError(null); apply(s); }, fail),
     restart: () => call('takeview.seek', { seconds: 0 }).then(apply, fail),
-    hasVideo: !!(videoPath || (punches ?? []).some(p => p.videoPath)),
+    hasVideo: !videoNote && !!(videoPath || (punches ?? []).some(p => p.videoPath)),
+    videoNote,
   };
 }
 

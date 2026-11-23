@@ -23,6 +23,9 @@ for m in bs_roformer pose lead_rhythm; do
   scp -q -r -o BatchMode=yes "$H:C:/tf-models/$m" "$st/Vendor/models-win/" || fail "C:\\tf-models\\$m en $H"
 done
 for f in bs_roformer/model.onnx bs_roformer/T1_mix_60-85s.wav pose/model.onnx; do [ -f "$st/Vendor/models-win/$f" ] || fail "Vendor/models-win/$f"; done
+# DirectML calcula mal el GLU con Split (22/11/2026): los RoFormer tienen que llevarlo en dos Slice
+Tools/py/.venv/bin/python Probes/P8-windows/ort-models/glu_slice.py check "$st/Vendor/models-win/bs_roformer/model.onnx" \
+  "$st/Vendor/models-win/lead_rhythm/model.onnx" || fail "GLU con Split en C:\\tf-models: pasar Probes/P8-windows/ort-models/glu_slice.py rewrite"
 { echo "PC-BUNDLE $(date '+%Y-%m-%d %H:%M')"; echo "Extraer en la raiz del clon."; (cd "$st" && find . -maxdepth 4 -mindepth 3 -type d | sort | while read -r d; do printf '%s  %s\n' "$(du -sh "$d" | cut -f1)" "$d"; done); } > "$st/PC-BUNDLE.txt"
 rm -f "$zip"; (cd "$st" && zip -q -r "../pc-bundle.zip" .) || fail "zip"
 du -h "$zip"; cat "$st/PC-BUNDLE.txt"; rm -rf "$st"

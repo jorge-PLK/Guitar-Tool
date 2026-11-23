@@ -388,7 +388,7 @@ Ola 2, trabajo ya identificado (además de las partes 8.9+ de la tabla):
 
 - [x] Grabar y Montaje: «Ver toma» (visor de tomas) y los retoques del Mac a 1100×680 (Montaje: columnas 252/276, tiempo en una línea; Grabar: píldora de la toma en una línea y cámara y «Rotar» en segunda fila). *Hecho en la ola 2 (`takeview.*`, `TakeViewTests` 8/8, `OffsetSheetTests` 4/4); verificado en la VM con `takeview.open` sobre una toma existente; falta Grabar real con la HeadRush (abajo).*
 - [x] Importación de Songsterr (hoja, `tab/songsterr-grid.json`) y listas, álbumes y episodios en el enlace. *Hecho en la ola 2; en la VM Songsterr en WebView2 oculto (19 resultados, 6 pistas) y `link.classify` 4/4.*
-- [ ] F3: arena de ONNX Runtime en la separación (desglose con `TF_SEPARATE_TIMING=1`, `StemKit/SeparationTiming.swift`); decidir el arreglo con los números. Propuesto para la fase de arreglos, sin respuesta de Jorge.
+- [ ] F3: arena de ONNX Runtime en la separación (desglose con `TF_SEPARATE_TIMING=1`, `StemKit/SeparationTiming.swift`); *Cerrado (Jorge, 22/11/2026): opción C.* La arena ya está apagada (`StemKit/OnnxMaskModel.swift:25`); el 95 % es `session.Run` (12,5 s/trozo en régimen) y fuera del modelo <0,3 s/trozo; DML es la vía por defecto (~21-29 s/min) y CPU queda de respaldo. Detalle en `Temp/win/estado/f3-deletetake.md`.
 - [ ] Sin probar desde la página: limpieza real de la Biblioteca («Limpiar…»), borrado real de toma y recarga de Backing al borrar con el tema abierto, soltar ficheros, selector múltiple, «Sin artista» al final, ajuste del bucle por arrastre en WebView2, metrónomo con rejilla de Songsterr (oído de Jorge), «Oír transcripción» y vuelta a Backing (oído de Jorge, arreglo de `TabController.close()` en el Mac).
 - [ ] Dudas visuales para Jorge (pierden prioridad por la migración a Flutter, 22/11/2026): color de la casilla marcada, interruptor encendido, triángulos de menú muy pequeños y botones de la barra de edición (12 px frente a 13 pt); error de yt-dlp con la línea cruda en inglés (comparar con el Mac).
 
@@ -435,7 +435,7 @@ Núcleo pendiente (ids de `Temp/win/appcore-gap-audit.md`; entre paréntesis, ag
 - [ ] A1 · Cámaras en Ajustes del Mac por AppCore: hoy `resolvedCameras` da `nil` con cámara real (`tf-implementer`).
 - [ ] M1 · Hoja «Encuadre» en el Mac: `takeFrame` devuelve `nil` fuera de Windows (`tf-engineer`).
 - [ ] R3 y M2 · Medir en el Mac el rendimiento de la cámara y de la vista previa de Montaje por JPEG y `FrameRelay` (`tf-engineer`).
-- [ ] F3 · Arena de ONNX Runtime en la separación (desglose con `TF_SEPARATE_TIMING=1`): pendiente de decisión de Jorge con los números.
+- [ ] F3 · Arena de ONNX Runtime en la separación (desglose con `TF_SEPARATE_TIMING=1`): *Cerrado (Jorge, 22/11/2026): opción C.* Arena apagada, 95 % en `session.Run` (12,5 s/trozo), fuera del modelo <0,3 s/trozo; DML por defecto (~21-29 s/min), CPU de respaldo.
 - T3 (guardar fichero y abrir URL) y S4 (modelos embebidos en `Bundle.main`) son del anfitrión Flutter, no de la 7c.
 - [ ] Sin probar desde la página y dudas visuales: siguen abiertas en «Ola 2, trabajo ya identificado».
 

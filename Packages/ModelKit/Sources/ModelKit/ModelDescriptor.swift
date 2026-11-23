@@ -105,8 +105,8 @@ public enum ModelCatalog {
     public static let separationLargeChunkMemory: UInt64 = 15 << 30
 
     static let onnxSeparation = [
-        OnnxModelFile(fileName: "bs_roformer.onnx", sha256: "224f5f54a7ff9ff0e487aabca0a365d94513d51a6cdb7778152f2371716f2b68",
-                      bytes: 701_010_313, frames: 345),
+        OnnxModelFile(fileName: "bs_roformer.onnx", sha256: "3d209b6ca99b1299bb609add13c9ea8859d289743408d4d9681fe6c62c11007d",
+                      bytes: 701_163_604, frames: 345),
         OnnxModelFile(fileName: "bs_roformer_T575.onnx", sha256: "f2969881ea94334ba7b5c0fb7ed9386e4cc2a20a7db6838e8fd87c013e201dcf",
                       bytes: 710_602_834, frames: 575, minimumPhysicalMemory: separationLargeChunkMemory),
     ]
@@ -203,7 +203,7 @@ public enum ModelCatalog {
         archiveKind: .bundledZippedMLPackage,
         packageName: "LeadRhythmMelRoformer_fp16.mlpackage",
         license: "openrail; pesos anónimos de HF, uso personal",
-        onnxFiles: [OnnxModelFile(fileName: "lead_rhythm.onnx", sha256: "8a42c4ecf266a8a1cf20641a2cd1756a8b863665877c420bf453dbf425ead51d", bytes: 338_871_118)])
+        onnxFiles: [OnnxModelFile(fileName: "lead_rhythm.onnx", sha256: "e0c42b06b617efd1649892d912d721e049eee25ac2dc4ed736762b4a657e34b4", bytes: 338_894_766)])
 
     /// SHA-256 y tamaño de `App/Resources/Models/ADTOF_FrameRNN_fp32.mlpackage.zip` (lo genera, idéntico en cada
     /// ejecución, `Probes/P4-modelos/adtof/package.py --install`; una nueva conversión cambia el hash).

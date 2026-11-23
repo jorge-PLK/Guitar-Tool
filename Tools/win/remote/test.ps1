@@ -47,12 +47,12 @@ foreach ($a in (Get-Archs $Arch)) {
             $worst = 2
             continue
         }
-        $env:Path = "C:\tf-rtl-x64;" + $env:Path
+        $env:Path = "$TfDrive\tf-rtl-x64;" + $env:Path
         $swiftArgs += @("--arch", "x86_64")
     }
     if ($Filter -ne "") { $swiftArgs += @("--filter", $Filter) }
     $sw = [Diagnostics.Stopwatch]::StartNew()
-    $outFile = "C:\tf-run-$a.txt"
+    $outFile = "$TfDrive\tf-run-$a.txt"
     $timedOut = $null
     $lines = @()
     $rc = 0

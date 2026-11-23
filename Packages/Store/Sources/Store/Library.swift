@@ -163,6 +163,9 @@ public actor Library {
     /// Prefijos de las carpetas temporales que `removeOrphanTemporaries` borra al arrancar.
     static let importingPrefix = ".importing-"
     static let migratingPrefix = ".migrating-"
+    /// Prefijo del fichero temporal de la conversión HEVC → H.264 de una toma en Windows (AppCore,
+    /// `VideoConversionEngine`): vive junto al vídeo, en `takes/<id>/` o `takes/<id>/punch-N/`.
+    public static let videoConversionPrefix = ".converting-"
 
     public nonisolated let events: AsyncStream<LibraryEvent>
     private nonisolated let continuation: AsyncStream<LibraryEvent>.Continuation
@@ -600,6 +603,28 @@ public actor Library {
             for u in inner where u.lastPathComponent.hasPrefix(migratingPrefix) {
                 FileOps.removeIfExists(u); removed += 1
             }
+            removed += removeConversionTemporaries(inTakes: ProjectLayout(folder: url).takesDir)
+        }
+        return removed
+    }
+
+    /// `.converting-*` que dejó una conversión de vídeo interrumpida: en `takes/<id>/` y en `takes/<id>/<sub>/` (punches).
+    /// El original no se toca hasta la sustitución atómica, así que el temporal siempre sobra.
+    nonisolated static func removeConversionTemporaries(inTakes takes: URL) -> Int {
+        let fm = FileManager.default
+        var removed = 0
+        func sweep(_ dir: URL, depth: Int) {
+            for u in (try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? [] {
+                let name = u.lastPathComponent
+                if name.hasPrefix(videoConversionPrefix) {
+                    FileOps.removeIfExists(u); removed += 1
+                } else if depth > 0, !name.hasPrefix("."), (try? u.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true {
+                    sweep(u, depth: depth - 1)
+                }
+            }
+        }
+        for take in (try? fm.contentsOfDirectory(at: takes, includingPropertiesForKeys: nil)) ?? [] where !take.lastPathComponent.hasPrefix(".") {
+            sweep(take, depth: 1)
         }
         return removed
     }

@@ -80,6 +80,18 @@ def link_model(src: Path):
     return src.stat().st_size
 
 
+def glu_fixed(src: Path) -> Path:
+    """Copia de un ONNX ya exportado con el GLU en dos Slice (glu_slice.py; DirectML calcula mal el Split)."""
+    dst = src.with_name(src.stem + "_glu_slice.onnx")
+    if not dst.exists():
+        import onnx
+        from glu_slice import rewrite
+        mp = onnx.load(str(src))
+        log.info("GLU Split -> Slice: %d en %s", rewrite(mp), dst.name)
+        onnx.save(mp, str(dst))
+    return dst
+
+
 def ort_cpu(path: Path):
     import onnxruntime as ort
     so = ort.SessionOptions()
@@ -99,7 +111,8 @@ def bs_roformer():
     if st == "ort":
         mix, sr = M.load_wav(TESTAUDIO / "T1" / "mix.wav")
         spec = C.stft_np(mix[:, start:start + C.PUB_CHUNK])     # (2, 1025, 345, 2)
-        sess = ort_cpu(C.ensure_onnx_pub(log))
+        pub = glu_fixed(C.ensure_onnx_pub(log))
+        sess = ort_cpu(pub)
         feed = {"spec_real": spec[None, ..., 0], "spec_imag": spec[None, ..., 1]}
         (re, im), first, med = timed(lambda: sess.run(["out_spec_real", "out_spec_imag"], feed))
         m = state["manifest"]
@@ -111,7 +124,7 @@ def bs_roformer():
         m["out"] = ["out out_spec_real ref_real.bin", "out out_spec_imag ref_imag.bin"]
         m["runs_per_minute"] = 60 * C.SR / (C.PUB_CHUNK // C.NUM_OVERLAP)
         state["mac"]["ort_cpu"] = {"first_s": first, "median_s": med, "per_min_s": med * m["runs_per_minute"],
-                                   "size_mb": link_model(C.PUB) / 1e6, "out_shape": list(re.shape)}
+                                   "size_mb": link_model(pub) / 1e6, "out_shape": list(re.shape)}
         np.save(D / "spec.npy", spec)
     elif st == "torch":
         import torch
@@ -255,6 +268,8 @@ def lead_rhythm():
                 urllib.request.urlretrieve(base + name, L.W / name)
         model, _ = L.load_model(log)
         core = L.make_core(model)[0]
+        from slice_glu import use_slice_glu                              # GLU sin Split: DirectML lo calcula mal
+        log.info("GLU por cortes: %d", use_slice_glu(core))
         mix, _ = load_mix()
         spec = L.stft_spec(mix[:, start:start + L.CHUNK])                  # (1, 2050, 301, 2)
         with torch.no_grad():

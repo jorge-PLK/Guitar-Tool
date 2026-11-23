@@ -106,7 +106,12 @@ struct ModelResolver: Sendable {
             if let url = Self.developmentModel(folder: f, environment: environment) { return url }
         }
         #endif
-        return try await store.ensureInstalled(id, progress: progress)
+        do {
+            return try await store.ensureInstalled(id, progress: progress)
+        } catch {
+            // Mejora 1: el error nombra el modelo (en el Mac la descarga es HuggingFace/zip; mismo envoltorio).
+            throw ModelUnavailableError.wrapping(error, modelID: id)
+        }
     }
 
     func isInstalled(_ id: String) async -> Bool {

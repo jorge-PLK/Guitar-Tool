@@ -585,7 +585,8 @@ final class MontageGateTests: XCTestCase {
                 worstFade = max(worstFade, abs(got - want))
                 XCTAssertEqual(got, want, accuracy: Self.fadeTolerance, "fundido en \(t)")
             }
-            let src = try Self.frames(fx.parts[0].video!.url!, at: [1.5], fps: Self.fps)
+            // La toma lleva lista de ediciones y Media Foundation la aplica: su marca es el tiempo del tema.
+            let src = try Self.frames(fx.parts[0].video!.url!, at: [fx.parts[0].video!.take.start + 1.5], fps: Self.fps)
             let srcPx = try XCTUnwrap(src.values.first, "fotograma de la toma A")
             let srcRGB = srcPx.rgb(Double(srcPx.width) / 2, Double(srcPx.height) / 2)
             let outB = try XCTUnwrap(timeline.state(at: 3.5).boxes.first { $0.partID == "A" })

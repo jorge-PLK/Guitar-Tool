@@ -31,6 +31,17 @@ enum MP4EditList {
         var sampleDuration: UInt64
         /// Ediciones que ya tenía (vacío si ninguna).
         var edits: [Edit]
+        /// Tipo de la primera entrada de `stsd` (`hvc1`, `hev1`, `avc1`…); nil sin `stsd` (conversión HEVC → H.264 de
+        /// Windows, `TakeVideoProbe`).
+        var sampleEntry: String? = nil
+        /// Tamaño de la entrada visual de `stsd` (0 si la pista no es de vídeo).
+        var width: Int = 0
+        var height: Int = 0
+        /// Muestras según `stts`.
+        var sampleCount: Int = 0
+        /// Menor instante de composición (DTS de `stts` + desfase de `ctts`), en la escala de la pista: el primer
+        /// fotograma que se muestra.
+        var firstCompositionTime: Int64 = 0
     }
 
     enum Failure: Error, Equatable {
@@ -40,9 +51,10 @@ enum MP4EditList {
 
     // MARK: Fichero
 
-    /// Pistas del fichero con sus ediciones (para comprobarlo).
+    /// Pistas del fichero con sus ediciones. Solo lee: admite la caja `moov` delante o detrás de `mdat` (un MP4 con
+    /// `+faststart` también), a diferencia de `rewrite`.
     static func tracks(in url: URL) throws -> [Track] {
-        let (moov, _) = try readMoov(url)
+        let (moov, _) = try readMoov(url, requireLast: false)
         return try tracks(moov: moov)
     }
 
@@ -58,8 +70,9 @@ enum MP4EditList {
         try fh.truncate(atOffset: offset + UInt64(patched.count))
     }
 
-    /// Lee la caja `moov`, que debe ser la última de primer nivel (salvo `free`/`skip` detrás).
-    static func readMoov(_ url: URL) throws -> (Data, UInt64) {
+    /// Lee la caja `moov`. Con `requireLast` (lo que necesita `rewrite`) debe ser la última de primer nivel (salvo
+    /// `free`/`skip` detrás); sin él vale en cualquier sitio.
+    static func readMoov(_ url: URL, requireLast: Bool = true) throws -> (Data, UInt64) {
         let fh = try FileHandle(forReadingFrom: url)
         defer { try? fh.close() }
         let end = try fh.seekToEnd()
@@ -75,6 +88,7 @@ enum MP4EditList {
             guard size >= 8 else { throw Failure.malformed("caja \(type) de \(size) bytes en \(off)") }
             if type == "moov" {
                 moov = (off, size)
+                if !requireLast { break }
             } else if moov != nil, type != "free", type != "skip" {
                 throw Failure.moovNotLast
             }
@@ -190,12 +204,34 @@ enum MP4EditList {
         let h = hdlr.body.lowerBound + 8
         let handler = String(decoding: d[h..<(h + 4)], as: UTF8.self)
         var samples: UInt64 = 0
-        if let minf = mk.first(where: { $0.type == "minf" }), let stbl = try children(d, minf.body).first(where: { $0.type == "stbl" }),
-           let stts = try children(d, stbl.body).first(where: { $0.type == "stts" }) {
+        var entry: (type: String, width: Int, height: Int)?
+        var sampleCount = 0
+        var firstCT: Int64 = 0
+        let stblKids: [Box]
+        if let minf = mk.first(where: { $0.type == "minf" }), let stbl = try children(d, minf.body).first(where: { $0.type == "stbl" }) {
+            stblKids = try children(d, stbl.body)
+        } else {
+            stblKids = []
+        }
+        if let stsd = stblKids.first(where: { $0.type == "stsd" }), stsd.body.count >= 8,
+           let first = try children(d, (stsd.body.lowerBound + 8)..<stsd.body.upperBound).first {
+            // Entrada visual: cabecera (8) + 6 reservados + índice (2) + 16 de relleno, luego ancho y alto (16 bits).
+            let o = first.start - d.startIndex
+            let visual = handler == "vide" && first.size >= 36
+            entry = (first.type, visual ? Int(be16(d, o + 32)) : 0, visual ? Int(be16(d, o + 34)) : 0)
+        }
+        if let stts = stblKids.first(where: { $0.type == "stts" }) {
             let s = stts.body.lowerBound - d.startIndex
             let n = Int(be32(d, s + 4))
             guard stts.body.count >= 8 + 8 * n else { throw Failure.malformed("stts truncado") }
-            for i in 0..<n { samples += UInt64(be32(d, s + 8 + 8 * i)) * UInt64(be32(d, s + 12 + 8 * i)) }
+            var runs: [(count: Int, delta: UInt64)] = []
+            for i in 0..<n {
+                let count = Int(be32(d, s + 8 + 8 * i)), delta = UInt64(be32(d, s + 12 + 8 * i))
+                samples += UInt64(count) * delta
+                sampleCount += count
+                runs.append((count, delta))
+            }
+            firstCT = try firstCompositionTime(d, runs: runs, ctts: stblKids.first { $0.type == "ctts" })
         } else {
             samples = dur
         }
@@ -216,7 +252,37 @@ enum MP4EditList {
             }
         }
         return Track(handler: handler, movieTimescale: movieTimescale, mediaTimescale: ts, mediaDuration: dur, sampleDuration: samples,
-                     edits: edits)
+                     edits: edits, sampleEntry: entry?.type, width: entry?.width ?? 0, height: entry?.height ?? 0,
+                     sampleCount: sampleCount, firstCompositionTime: firstCT)
+    }
+
+    /// Menor DTS + desfase de composición (`ctts` de versión 0 sin signo o 1 con signo; sin `ctts`, el primer DTS = 0).
+    static func firstCompositionTime(_ d: Data, runs: [(count: Int, delta: UInt64)], ctts: Box?) throws -> Int64 {
+        guard let ctts else { return 0 }
+        let c = ctts.body.lowerBound - d.startIndex
+        let signed = d[ctts.body.lowerBound] == 1
+        let n = Int(be32(d, c + 4))
+        guard ctts.body.count >= 8 + 8 * n else { throw Failure.malformed("ctts truncado") }
+        var offsets: [(count: Int, offset: Int64)] = []
+        for i in 0..<n {
+            let raw = be32(d, c + 12 + 8 * i)
+            // Versión 0: sin signo en la norma, pero hay muxers que escriben negativos; un valor > 2^31 solo puede ser eso.
+            let offset = signed || raw > UInt32(Int32.max) ? Int64(Int32(bitPattern: raw)) : Int64(raw)
+            offsets.append((Int(be32(d, c + 8 + 8 * i)), offset))
+        }
+        var best = Int64.max
+        var dts: Int64 = 0
+        var k = 0, left = offsets.first?.count ?? 0
+        for r in runs {
+            for _ in 0..<r.count {
+                while left == 0, k + 1 < offsets.count { k += 1; left = offsets[k].count }
+                let off = k < offsets.count && left > 0 ? offsets[k].offset : 0
+                best = min(best, dts + off)
+                if left > 0 { left -= 1 }
+                dts += Int64(r.delta)
+            }
+        }
+        return best == .max ? 0 : best
     }
 
     /// `edts` con un `elst` de versión 1 (64 bits) y velocidad 1.
@@ -282,6 +348,7 @@ enum MP4EditList {
     }
 
     static func be64(_ d: Data, _ o: Int) -> UInt64 { UInt64(be32(d, o)) << 32 | UInt64(be32(d, o + 4)) }
+    static func be16(_ d: Data, _ o: Int) -> UInt16 { UInt16(d[d.startIndex + o]) << 8 | UInt16(d[d.startIndex + o + 1]) }
     static func u32(_ v: UInt32) -> Data { Data([UInt8(v >> 24), UInt8((v >> 16) & 0xff), UInt8((v >> 8) & 0xff), UInt8(v & 0xff)]) }
     static func u64(_ v: UInt64) -> Data { u32(UInt32(v >> 32)) + u32(UInt32(v & 0xffff_ffff)) }
 

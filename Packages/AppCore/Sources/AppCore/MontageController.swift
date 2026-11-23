@@ -50,6 +50,8 @@ final class MontageController {
         /// Sin plan (no hay tomas con vídeo) o aún sin pedir.
         case none
         case preparing
+        /// Fase 7c: alguna toma con vídeo se está convirtiendo a H.264 (o espera a que el visor la suelte).
+        case converting
         case ready
         case error
     }
@@ -163,6 +165,11 @@ final class MontageController {
     var onExport: (() -> Void)?
     /// Cambió el análisis de encuadre de una toma.
     var onFraming: ((UUID) -> Void)?
+    /// Fase 7c: antes de leer el vídeo de una toma (vista previa, encuadre, export) se pregunta aquí; si hay que convertirlo,
+    /// el motor lo encola y la toma espera. nil = siempre listo (Mac, tests sin conversión).
+    var videoGate: ((_ takeID: UUID, _ files: [URL?]) -> TakeVideoState)?
+    /// Tomas cuyo vídeo aún no se puede leer (solo las que no están `ready`).
+    private(set) var videoStates: [UUID: TakeVideoState] = [:]
 
     // Exportación.
     private(set) var exportPhase: ExportPhase = .idle
@@ -205,7 +212,7 @@ final class MontageController {
         framingStatus.values.contains { if case .analyzing = $0 { return true }; return $0 == .pending }
     }
     var isExporting: Bool { if case .running = exportPhase { return true }; return false }
-    var canExport: Bool { draft != nil && !isExporting && !isAnalyzing }
+    var canExport: Bool { draft != nil && !isExporting && !isAnalyzing && videoStates.isEmpty }
     var singleRhythmCandidates: [MontageLane] { lanes.filter { $0.hasVideo && !$0.isSolo && !$0.presence.isEmpty } }
     var previewReady: Bool { composer != nil }
     /// Duración del vídeo de la vista previa (s), si hay compositor.
@@ -473,6 +480,16 @@ final class MontageController {
             finishAnalysis(id, a)
             return
         }
+        // Fase 7c: sin vídeo legible no se analiza; al acabar la conversión `videoConversionFinished` lo relanza.
+        switch videoState(lane) {
+        case .ready: break
+        case .failed(let m):
+            setFraming(id, .failed(VideoConversionEngine.failedMessage(m)))
+            return
+        default:
+            setFraming(id, .pending)
+            return
+        }
         setFraming(id, .analyzing(0))
         do {
             let a = try await services.analyze(video) { [weak self] p in
@@ -499,6 +516,50 @@ final class MontageController {
         onFraming?(id)
         rebuildDraft()
         schedulePreview()
+        notify()
+    }
+
+    // MARK: Conversión del vídeo (Fase 7c)
+
+    /// Estado del vídeo de la toma (base y punches) según el motor de conversión; lo apunta en `videoStates`.
+    private func videoState(_ lane: MontageLane) -> TakeVideoState {
+        guard let gate = videoGate, let v = lane.video else { return .ready }
+        let s = gate(lane.takeID, [v.url] + v.punches.map(\.videoURL))
+        videoStates[lane.takeID] = s == .ready ? nil : s
+        return s
+    }
+
+    static let videoWaitMessage = "Hay vídeos de tomas convirtiéndose a H.264 (o con la conversión fallida): espera a que acaben."
+
+    /// Vuelve a preguntar por los vídeos del plan (export).
+    func refreshVideoStates() { _ = videosBlocking() }
+
+    /// Pregunta por todas las tomas con vídeo del plan; `nil` si todas están listas, si no el motivo de la espera.
+    private func videosBlocking() -> TakeVideoState? {
+        let ids = Set(videoLanes.map(\.takeID))
+        videoStates = videoStates.filter { ids.contains($0.key) }
+        let states = videoLanes.map { videoState($0) }
+        if let failed = states.first(where: { if case .failed = $0 { return true }; return false }) { return failed }
+        return states.first { $0 != .ready }
+    }
+
+    /// Fin de una conversión (lo avisa el motor): con el vídeo ya sustituido se reanaliza y se rehace la vista previa.
+    func videoConversionFinished(takeId: UUID, state: TakeVideoState) {
+        guard !closed, lane(takeID: takeId)?.video != nil else { return }
+        switch state {
+        case .ready:
+            videoStates[takeId] = nil
+            analyses[takeId] = nil
+            framingStatus[takeId] = nil
+            startAnalysis()
+            schedulePreview(delay: 0)
+        case .failed(let m):
+            videoStates[takeId] = state
+            setFraming(takeId, .failed(VideoConversionEngine.failedMessage(m)))
+            schedulePreview(delay: 0)
+        case .converting, .awaitingRelease:
+            videoStates[takeId] = state
+        }
         notify()
     }
 
@@ -535,6 +596,19 @@ final class MontageController {
         let wasPlaying = isPlaying
         let keep = composer == nil ? (initialSongTime ?? plan.span.start) : songTime
         if wasPlaying { pauseClock() }
+
+        // 0. Fase 7c: ningún vídeo que haya que convertir llega al compositor.
+        if let blocking = videosBlocking() {
+            composer = nil
+            composerPlan = nil
+            if case .failed(let m) = blocking {
+                previewError = "No se pudo preparar la vista previa: \(VideoConversionEngine.failedMessage(m))"
+                setPreview(.error, error: previewError)
+            } else {
+                setPreview(.converting)
+            }
+            return
+        }
 
         // 1. Compositor (solo si cambia algo del vídeo: el audio no cuenta).
         var videoPlan = plan
@@ -831,6 +905,10 @@ final class MontageController {
               let rel = project.takes.first(where: { $0.id == takeID })?.processedFile else {
             throw RPCError(code: "not-found", message: "La toma no tiene vídeo.")
         }
+        if let l = lane(takeID: takeID), let info = TakeVideoStatusInfo(takeId: takeID, state: videoState(l)) {
+            notify()
+            throw info.rpcError
+        }
         let audioURL = session.layout.url(relative: rel)
         let pixels: MontageFramePixels?
         do { pixels = try await services.takeFrame(video, audioURL, t) } catch {
@@ -876,6 +954,7 @@ final class MontageController {
     // MARK: Exportación
 
     func startExport() {
+        refreshVideoStates()   // Fase 7c: export solo con todos los vídeos legibles (y encola los que falten)
         guard canExport, let draft, exportTask == nil else { return }
         if isPlaying { pauseClock() }
         setExport(.running(stage: "Mezclando el audio", progress: 0))
