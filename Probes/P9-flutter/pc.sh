@@ -387,7 +387,7 @@ step_wvrun() {
   return 0
 }
 
-# pc.sh tear [--ring 0|1|2|3|4] [--size 720|1080] [--seconds 60] [--kind gpu|pixel] [--region x,y,w,h] [--tag sufijo]: P9 7l.
+# pc.sh tear [--wait 0|1] [--copy 1] (P9 7n: TF_P9_WAIT / TF_P9_COPY) [--ring 0|1|2|3|4] [--size 720|1080] [--seconds 60] [--kind gpu|pixel] [--region x,y,w,h] [--tag sufijo]: P9 7l.
 # Prueba de fotogramas (via 1, TF_P9_TEAR=1) + detector de desgarro (win\tear.ps1) en la sesion interactiva (run.ps1 -Tear).
 # --ring 0 = textura unica; 1 = anillo por defecto (3); 2..4 = anillo de ese tamano (TF_P9_RING). La app corre seconds+TEAR_PAD s
 # y el detector mide `seconds` s tras TEAR_DELAY s. Trae a Temp/p9-flutter/pc/: tear-ring<R>-<size>[-kind][-tag].json (fotogramas),
@@ -395,17 +395,17 @@ step_wvrun() {
 TEAR_DELAY=6
 TEAR_PAD=14
 step_tear() {
-  local ring=1 size=720 secs=60 kind=gpu region="" suffix=""
+  local ring=1 size=720 secs=60 kind=gpu region="" suffix="" wait="" copy=""
   while [ $# -gt 0 ]; do
     case "$1" in --ring) ring="$2"; shift 2 ;; --size) size="$2"; shift 2 ;; --seconds) secs="$2"; shift 2 ;; --kind) kind="$2"; shift 2 ;;
-      --region) region="$2"; shift 2 ;; --tag) suffix="-$2"; shift 2 ;; *) shift ;; esac
+      --region) region="$2"; shift 2 ;; --wait) wait="$2"; shift 2 ;; --copy) copy="$2"; shift 2 ;; --tag) suffix="-$2"; shift 2 ;; *) shift ;; esac
   done
   local dst="$ROOT/Temp/p9-flutter/pc"; mkdir -p "$dst"
   local alive; alive="$("${SSH[@]}" 'tasklist /FI "IMAGENAME eq tf_probe.exe" /NH' 2>&1 | tr -d '\r' | grep -c tf_probe)"
   [ "$alive" = "0" ] || { echo "hay tf_probe.exe vivo: no lanzo nada"; return 1; }
   remote "mkdir -p $PC_ROOT/run $PC_ROOT/out/run" || return 1
-  local tag="tear-ring$ring-$size"; [ "$kind" = "gpu" ] || tag="$tag-$kind"; tag="$tag$suffix"
-  local envv="TF_P9_TEAR=1"; case "$ring" in 0|2|3|4) envv="$envv;TF_P9_RING=$ring" ;; esac
+  local tag="tear-ring$ring-$size"; [ "$kind" = "gpu" ] || tag="$tag-$kind"; [ -z "$wait" ] || tag="$tag-wait$wait"; [ "$copy" != "1" ] || tag="$tag-copy"; tag="$tag$suffix"
+  local envv="TF_P9_TEAR=1"; [ -z "$wait" ] || envv="$envv;TF_P9_WAIT=$wait"; [ "$copy" != "1" ] || envv="$envv;TF_P9_COPY=1"; case "$ring" in 0|2|3|4) envv="$envv;TF_P9_RING=$ring" ;; esac
   local load; load="$("${SSH[@]}" 'wmic cpu get loadpercentage' 2>/dev/null | tr -d '\r' | grep -E '^[0-9]+' | head -1 | tr -d ' ')"
   echo "$tag $load" >>"$dst/tear-load.txt"
   echo "=== $tag (carga previa ${load}%) ===" | tee -a "$LOG"

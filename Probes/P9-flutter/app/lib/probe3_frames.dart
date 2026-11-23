@@ -273,6 +273,13 @@ Future<void> _measure(List<String> args, Probe3Surface surf, Watchdog wd,
     'flushes': x1.length >= 22 ? x1[21] : null,
     'tearPattern': Platform.environment['TF_P9_TEAR'] == '1',
   };
+  // P9 7n: espera a la GPU antes de publicar (TF_P9_WAIT) y variante CopyResource (TF_P9_COPY).
+  report['gpuWait'] = x1.length >= 27
+      ? {
+          'wait': x1[22] & 1, 'copy': (x1[22] >> 1) & 1, 'waits': x1[23],
+          'meanUs': x1[23] > 0 ? x1[24] ~/ x1[23] : 0, 'maxUs': x1[25], 'waitTimeouts': x1[26],
+        }
+      : null;
   report['statsRaw'] = {'atWindowStart': s0, 'atEnd': s1};
   report['frameTiming'] = ft.toJson();
   if (bgra) {

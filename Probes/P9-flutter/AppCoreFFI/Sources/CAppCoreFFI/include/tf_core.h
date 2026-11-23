@@ -133,6 +133,8 @@ TF_API void *tf_d3d_handle(int32_t channel);
 /// P9.7k: *ring = 1 si el anillo de 3 texturas está activo (TF_P9_RING != 0), 0 textura única; *flushes = Flush
 /// emitidos por el productor de ese canal. 0 bien.
 TF_API int32_t tf_d3d_ring_stats(int32_t channel, int64_t *ring, int64_t *flushes);
+/// P9 7n: out[0..5) = [modo (bit0 TF_P9_WAIT, bit1 TF_P9_COPY), esperas, suma µs, max µs, timeouts (50 ms)]. 0 bien.
+TF_API int32_t tf_d3d_wait_stats(int32_t channel, int64_t *out);
 /// Libera la textura del canal.
 TF_API void tf_d3d_release(int32_t channel);
 /// Espera de alta resolución (CREATE_WAITABLE_TIMER_HIGH_RESOLUTION) en el hilo que llama. 0 bien.

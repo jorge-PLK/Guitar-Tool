@@ -38,6 +38,10 @@ typedef struct {
   volatile LONG delivered;   // -1 = ninguna
   volatile LONG64 flushes;
   int32_t w, h;
+  // P9 7n: espera a la GPU (TF_P9_WAIT=1) y variante de copia (TF_P9_COPY=1).
+  ID3D11Query *query;
+  ID3D11Texture2D *priv;     // textura privada (no compartida) desde la que se copia con CopyResource
+  volatile LONG64 wait_n, wait_sum_us, wait_max_us, wait_timeouts;
 } tf_d3d_slot;
 
 static INIT_ONCE tf_d3d_once = INIT_ONCE_STATIC_INIT;
@@ -46,6 +50,10 @@ static ID3D11Device *tf_d3d_dev;
 static ID3D11DeviceContext *tf_d3d_ctx;
 static tf_d3d_slot tf_d3d_slots[TF_D3D_CHANNELS];
 static int tf_d3d_ring_n = 3;
+static int tf_d3d_wait = 0;  // TF_P9_WAIT=1: publicar solo cuando un D3D11_QUERY_EVENT confirma que la GPU terminó la subida
+static int tf_d3d_copy = 0;  // TF_P9_COPY=1: subir a una textura privada y CopyResource a la compartida
+#define TF_D3D_WAIT_LIMIT_US 50000
+static LARGE_INTEGER tf_d3d_qpf;
 
 static BOOL CALLBACK tf_d3d_init_lock(PINIT_ONCE once, PVOID param, PVOID *ctx) {
   (void)once; (void)param; (void)ctx;
@@ -53,6 +61,11 @@ static BOOL CALLBACK tf_d3d_init_lock(PINIT_ONCE once, PVOID param, PVOID *ctx) 
   const char *e = getenv("TF_P9_RING");
   if (e != NULL && e[0] == '0') tf_d3d_ring_n = 1;
   else if (e != NULL && e[0] >= '2' && e[0] <= '4') tf_d3d_ring_n = e[0] - '0';
+  const char *w = getenv("TF_P9_WAIT");
+  if (w != NULL && w[0] == '1') tf_d3d_wait = 1;
+  const char *c = getenv("TF_P9_COPY");
+  if (c != NULL && c[0] == '1') tf_d3d_copy = 1;
+  QueryPerformanceFrequency(&tf_d3d_qpf);
   for (int i = 0; i < TF_D3D_CHANNELS; ++i) { tf_d3d_slots[i].published = -1; tf_d3d_slots[i].delivered = -1; }
   return TRUE;
 }
@@ -72,6 +85,7 @@ static void tf_d3d_slot_free(tf_d3d_slot *s) {
     s->tex[i] = NULL; s->shared[i] = NULL;
   }
   s->retire_left = TF_D3D_RETIRE_UPLOADS;
+  if (s->priv) { ID3D11Texture2D_Release(s->priv); s->priv = NULL; }
   s->n = 0; s->w = s->h = 0;
   InterlockedExchange(&s->published, -1);
   InterlockedExchange(&s->delivered, -1);
@@ -108,6 +122,11 @@ static int tf_d3d_ensure_texture(tf_d3d_slot *s, int32_t w, int32_t h) {
     if (FAILED(hr) || hnd == NULL) { s->n = count; tf_d3d_slot_free(s); return 4; }
     s->shared[i] = hnd;
   }
+  if (tf_d3d_copy) {
+    D3D11_TEXTURE2D_DESC pd = d;
+    pd.MiscFlags = 0; pd.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+    if (FAILED(ID3D11Device_CreateTexture2D(tf_d3d_dev, &pd, NULL, &s->priv))) { s->priv = NULL; s->n = count; tf_d3d_slot_free(s); return 5; }
+  }
   s->n = count; s->w = w; s->h = h;
   return 0;
 }
@@ -126,10 +145,43 @@ int32_t tf_d3d_upload(int32_t channel, const uint8_t *bgra, int32_t width, int32
     LONG del = InterlockedCompareExchange(&s->delivered, 0, 0);
     int idx = 0;
     if (s->n > 1) { while (idx == pub || idx == del) ++idx; }
-    ID3D11DeviceContext_UpdateSubresource(tf_d3d_ctx, (ID3D11Resource *)s->tex[idx], 0, NULL, bgra,
-                                          (UINT)width * 4, 0);
-    // El contenido debe estar enviado a la GPU antes de publicar el handle y de avisar al motor.
-    ID3D11DeviceContext_Flush(tf_d3d_ctx);
+    if (tf_d3d_copy && s->priv) {
+      ID3D11DeviceContext_UpdateSubresource(tf_d3d_ctx, (ID3D11Resource *)s->priv, 0, NULL, bgra, (UINT)width * 4, 0);
+      ID3D11DeviceContext_CopyResource(tf_d3d_ctx, (ID3D11Resource *)s->tex[idx], (ID3D11Resource *)s->priv);
+    } else {
+      ID3D11DeviceContext_UpdateSubresource(tf_d3d_ctx, (ID3D11Resource *)s->tex[idx], 0, NULL, bgra,
+                                            (UINT)width * 4, 0);
+    }
+    if (tf_d3d_wait) {
+      if (s->query == NULL) {
+        D3D11_QUERY_DESC qd; qd.Query = D3D11_QUERY_EVENT; qd.MiscFlags = 0;
+        if (FAILED(ID3D11Device_CreateQuery(tf_d3d_dev, &qd, &s->query))) s->query = NULL;
+      }
+      if (s->query) {
+        LARGE_INTEGER t0, t1;
+        QueryPerformanceCounter(&t0);
+        ID3D11DeviceContext_End(tf_d3d_ctx, (ID3D11Asynchronous *)s->query);
+        ID3D11DeviceContext_Flush(tf_d3d_ctx);
+        BOOL done = FALSE;
+        int timeout = 0;
+        for (;;) {
+          HRESULT hr = ID3D11DeviceContext_GetData(tf_d3d_ctx, (ID3D11Asynchronous *)s->query, &done, sizeof(BOOL), 0);
+          if (hr == S_OK && done) break;
+          QueryPerformanceCounter(&t1);
+          if ((t1.QuadPart - t0.QuadPart) * 1000000 / tf_d3d_qpf.QuadPart > TF_D3D_WAIT_LIMIT_US) { timeout = 1; break; }
+          SwitchToThread();
+        }
+        QueryPerformanceCounter(&t1);
+        LONG64 us = (t1.QuadPart - t0.QuadPart) * 1000000 / tf_d3d_qpf.QuadPart;
+        InterlockedIncrement64(&s->wait_n);
+        InterlockedAdd64(&s->wait_sum_us, us);
+        if (us > s->wait_max_us) InterlockedExchange64(&s->wait_max_us, us);
+        if (timeout) InterlockedIncrement64(&s->wait_timeouts);
+      }
+    } else {
+      // El contenido debe estar enviado a la GPU antes de publicar el handle y de avisar al motor.
+      ID3D11DeviceContext_Flush(tf_d3d_ctx);
+    }
     InterlockedIncrement64(&s->flushes);
     InterlockedExchange(&s->published, idx);  // publicar DESPUÉS del Flush
   }
@@ -160,6 +212,18 @@ int32_t tf_d3d_ring_stats(int32_t channel, int64_t *ring, int64_t *flushes) {
   InitOnceExecuteOnce(&tf_d3d_once, tf_d3d_init_lock, NULL, NULL);
   if (ring) *ring = tf_d3d_ring_n > 1 ? tf_d3d_ring_n : 0;  // tamaño del anillo; 0 = textura única
   if (flushes) *flushes = (int64_t)InterlockedCompareExchange64(&tf_d3d_slots[channel].flushes, 0, 0);
+  return 0;
+}
+
+int32_t tf_d3d_wait_stats(int32_t channel, int64_t *out) {
+  if (channel < 0 || channel >= TF_D3D_CHANNELS || out == NULL) return 1;
+  InitOnceExecuteOnce(&tf_d3d_once, tf_d3d_init_lock, NULL, NULL);
+  tf_d3d_slot *s = &tf_d3d_slots[channel];
+  out[0] = tf_d3d_wait | (tf_d3d_copy << 1);
+  out[1] = InterlockedCompareExchange64(&s->wait_n, 0, 0);
+  out[2] = InterlockedCompareExchange64(&s->wait_sum_us, 0, 0);
+  out[3] = InterlockedCompareExchange64(&s->wait_max_us, 0, 0);
+  out[4] = InterlockedCompareExchange64(&s->wait_timeouts, 0, 0);
   return 0;
 }
 

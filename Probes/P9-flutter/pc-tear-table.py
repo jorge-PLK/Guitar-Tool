@@ -27,8 +27,9 @@ for f in sorted(os.listdir(d)):
         "%d (%.3f%%)" % (det["tornCaptures"], det["tornPercent"]),
         "%s/%s" % (c.get("produced"), c.get("distinctDelivered")), c.get("discarded"),
         fr.get("ring", {}).get("flushes"), fr.get("watchdogMaxMs"),
+        "%s/%s/%s" % ((fr.get("gpuWait") or {}).get("meanUs"), (fr.get("gpuWait") or {}).get("maxUs"), (fr.get("gpuWait") or {}).get("waitTimeouts")),
     ))
-hdr = ("modo", "carga", "capturas", "cap/s", "sinbarra", "partidas", "prod/dist", "descartes", "flushes", "vigilante_ms")
+hdr = ("modo", "carga", "capturas", "cap/s", "sinbarra", "partidas", "prod/dist", "descartes", "flushes", "vigilante_ms", "espera_us(media/max/timeouts)")
 print(" | ".join(hdr))
 for r in rows:
     print(" | ".join(str(x) for x in r))

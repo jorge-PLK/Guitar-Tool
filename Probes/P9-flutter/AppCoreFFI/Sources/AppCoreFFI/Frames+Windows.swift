@@ -244,8 +244,11 @@ final class FrameSource: @unchecked Sendable {
         // P9.7k: [20] = 1 si anillo de 3 texturas (TF_P9_RING != 0), [21] = Flush emitidos por el productor.
         var ring: Int64 = 0, flushes: Int64 = 0
         _ = tf_d3d_ring_stats(channel, &ring, &flushes)
+        // P9 7n: [22] modo (bit0 WAIT, bit1 COPY), [23] esperas, [24] suma µs, [25] max µs, [26] timeouts.
+        var w = [Int64](repeating: 0, count: 5)
+        _ = tf_d3d_wait_stats(channel, &w)
         return [bgraDistinct, fetches, repeatFetches, gapFetches, skippedSeqs, lateGapFetches]
-            + prodIv.summary() + fetchIv.summary() + [ring, flushes]
+            + prodIv.summary() + fetchIv.summary() + [ring, flushes] + w
     }
 
     func stats() -> (Int64, Int64, Int64, Int64, Int64) {
