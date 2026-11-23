@@ -439,7 +439,7 @@ step_tear() {
 # Casos: steady-hevc seek-hevc loop-hevc steady-h264 seek-h264 loop-h264 rot-hevc rot-h264. `all` falla rapido: si steady de un video incumple
 # el umbral (pc-video-table.py verdict) se salta su seek/loop; tras el steady-hevc fallido hace UNA repeticion con --decoders FFmpeg (tag ffmpeg).
 # Antes de cada lanzamiento espera a que no haya otra prueba con ventana (wv_all, wv_flutter, tf_probe) en el PC.
-VID_NAMES="code-hevc.mov code-h264.mp4 take-hevc-rot90.mov take-h264-rot90.mp4"
+VID_NAMES="code-hevc.mov code-h264.mp4 code-h264-g30.mp4 take-hevc-rot90.mov take-h264-rot90.mp4"
 vid_busy() { "${SSH[@]}" "tasklist" 2>/dev/null | grep -ciE 'wv_all|wv_flutter|tf_probe|vp_fvp'; }
 vid_case() { # caso -> VC_CASE VC_FILE VC_SHOT
   case "$1" in
@@ -449,8 +449,11 @@ vid_case() { # caso -> VC_CASE VC_FILE VC_SHOT
     steady-h264) VC_CASE=steady; VC_FILE=code-h264.mp4; VC_SHOT=12 ;;
     seek-h264) VC_CASE=seek; VC_FILE=code-h264.mp4; VC_SHOT=0 ;;
     loop-h264) VC_CASE=loop; VC_FILE=code-h264.mp4; VC_SHOT=0 ;;
-    rot-hevc) VC_CASE=rotation; VC_FILE=take-hevc-rot90.mov; VC_SHOT=3 ;;
-    rot-h264) VC_CASE=rotation; VC_FILE=take-h264-rot90.mp4; VC_SHOT=3 ;;
+    steady-h264g30) VC_CASE=steady; VC_FILE=code-h264-g30.mp4; VC_SHOT=12 ;;  # GOP de 1 s (code-h264.mp4 lo tiene de 250 fotogramas)
+    seek-h264g30) VC_CASE=seek; VC_FILE=code-h264-g30.mp4; VC_SHOT=0 ;;
+    loop-h264g30) VC_CASE=loop; VC_FILE=code-h264-g30.mp4; VC_SHOT=0 ;;
+    rot-hevc) VC_CASE=rotation; VC_FILE=take-hevc-rot90.mov; VC_SHOT=6 ;;  # a 3 s la captura salía blanca (antes del primer fotograma)
+    rot-h264) VC_CASE=rotation; VC_FILE=take-h264-rot90.mp4; VC_SHOT=6 ;;
     *) return 1 ;;
   esac
 }

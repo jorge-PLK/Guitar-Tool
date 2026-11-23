@@ -75,6 +75,12 @@ static const double kCopyGuard = 0.003;
 static const double kPhaseAlpha = 0.05, kPhaseMinR = 0.6;
 static const int64_t kPhaseMinCopies = 30;
 static const double kTwoPi = 6.283185307179586;
+/// Salto (agente 6): SetCurrentPosition apunta a pos(ahora + kSeekAim) (TF_P9_SEEKAIM_MS): con GOP de 250 (8,34 s en
+/// code-h264.mp4) un fotograma clave justo por delante evita decodificar desde el anterior.
+static const double kSeekAim = 0.25;
+/// Modo 3: frontera = fase media a menos de max(kFrontIn, 2,5·sd) del vblank; se sale con kFrontHyst más.
+static const double kFrontIn = 0.0025, kFrontHyst = 0.0015;
+#define MFV_SEEKLOG 16
 
 typedef struct {
   uint8_t *px;
@@ -144,6 +150,12 @@ typedef struct mfv {
   int64_t cp_n;
   int64_t vb_misses, ahead_n;  // subidas terminadas después del fin de su ventana
   double ahead_sum, ahead_min;  // fin de ventana - fin de subida (s)
+  int front;                     // modo 3: fase en la frontera (histéresis)
+  // Fases del salto en curso (absolutas, 0 = no ocurrió) y registro de saltos cerrados (se vacía con reset).
+  struct { int gen, n_before; double req, set0, set1, first, queued, pub, okpub, aim; } sk, sklog[MFV_SEEKLOG];
+  int n_sklog;
+  int rot_mode;  // lectura del índice: 0 sin giro, 1 girado 90 horario, 2 antihorario, -1 sin decidir
+  int rot_found; // 1 si el índice se leyó en la orientación rot_mode
 } mfv;
 
 static mfv *g_mfv[MFV_CHANNELS];
@@ -198,17 +210,32 @@ static double mfv_copy_phase(const mfv *p) {
 
 /// Instante en que se verá lo que se suba ahora; *win_end = fin de la ventana de subida (vblank o copia objetivo).
 /// cs tomado, vs_mode != 0 y vb_period > 0.
-static double mfv_show_time(const mfv *p, double now, double *win_end) {
-  if (p->vs_mode == 2 && mfv_phase_ready(p)) {
+static double mfv_show_time(mfv *p, double now, double *win_end) {
+  if (p->vs_mode >= 2 && mfv_phase_ready(p)) {
     double phi = mfv_copy_phase(p);
     double c = p->vb_base + phi + (floor((now - kCopyGuard - p->vb_base - phi) / p->vb_period) + 1.0) * p->vb_period;
     *win_end = c;
+    if (p->vs_mode == 3) {
+      // Centro: el fotograma que contiene pos(vblank de la copia + P/2) → e_vb ∈ [−P/2, P/2)·rate. En la frontera la
+      // copia puede caer a uno u otro lado del vblank (e_vb salta un periodo): se apunta al vblank posterior al más
+      // cercano con adelanto 0, que deja e_vb ∈ [0, P) o [−P, 0) según el lado, dentro de ±P en ambos casos.
+      double cr = hypot(p->cp_x, p->cp_y);
+      double sd = p->vb_period / kTwoPi * sqrt(-2.0 * log(cr < 1.0 ? cr : 1.0));
+      double dist = phi < p->vb_period - phi ? phi : p->vb_period - phi;
+      double in = 2.5 * sd > kFrontIn ? 2.5 * sd : kFrontIn;
+      if (dist < in) p->front = 1;
+      else if (dist > in + kFrontHyst) p->front = 0;
+      if (p->front) {
+        double vn = p->vb_base + floor((c - p->vb_base) / p->vb_period + 0.5) * p->vb_period;
+        return vn + p->vb_period;
+      }
+    }
     return mfv_next_vb(p, c) + p->lead;
   }
   double v = mfv_next_vb(p, now - kVbGuard);
   *win_end = v;
   // Modo 2 sin fase fiable: supone la copia justo tras el vblank v, así que se verá un periodo después.
-  return v + p->lead + (p->vs_mode == 2 ? p->vb_period : 0);
+  return v + p->lead + (p->vs_mode >= 2 ? p->vb_period : 0);
 }
 
 static void mfv_event_add(mfv *p, double now, const char *kind) {  // cs tomado
@@ -228,9 +255,23 @@ static void mfv_free_buf(mfv *p, int b) {  // cs tomado
 }
 
 /// Salto: vacía la cola y pide al decodificador SetCurrentPosition a la posición actual del reloj. cs tomado.
+static void mfv_sk_close(mfv *p) {  // cs tomado: archiva el salto en curso (cerrado o sustituido)
+  if (p->sk.req > 0 && p->n_sklog < MFV_SEEKLOG) p->sklog[p->n_sklog++] = p->sk;
+  p->sk.req = 0;
+}
+
 static void mfv_request_seek(mfv *p, double now, const char *kind, int drift) {
   p->seek_gen++;
-  p->seek_target = mfv_pos(p, now);
+  // El fotograma clave lo elige MF (≤ objetivo): se apunta a la posición prevista al publicar, no a la de ahora.
+  static double aim = -1;
+  if (aim < 0) { const char *a = getenv("TF_P9_SEEKAIM_MS"); aim = (a && a[0]) ? atof(a) / 1000.0 : kSeekAim; }
+  double tgt = mfv_pos(p, now) + (p->c_play ? aim * p->c_rate : 0);
+  double lim = (p->l_on ? p->l_end : p->duration) - kFrameDur;
+  if (tgt > lim) tgt = lim > mfv_pos(p, now) ? lim : mfv_pos(p, now);
+  p->seek_target = tgt;
+  mfv_sk_close(p);
+  memset(&p->sk, 0, sizeof p->sk);
+  p->sk.gen = p->seek_gen; p->sk.req = now; p->sk.aim = tgt - mfv_pos(p, now);
   p->applied_epoch = p->c_epoch;
   while (p->q_n > 0) {
     mfv_free_buf(p, p->q[p->q_head]);
@@ -246,16 +287,20 @@ static void mfv_request_seek(mfv *p, double now, const char *kind, int drift) {
 
 /// Índice de fotograma de los vídeos de prueba (igual que VideoProbe.frameIndex): 12 bloques de 64x64 arriba a la
 /// izquierda; referencias en los bloques 12 (blanco) y 13 (negro). Canal G de la fila 32, centro de cada bloque.
-static int mfv_index(const uint8_t *px, int w, int h) {
-  if (w < 896 || h < 64) return -1;
-  const size_t row = (size_t)32 * (size_t)w * 4;
-#define MFV_G(k) ((int)px[row + (size_t)(64 * (k) + 32) * 4 + 1])
+/// rot: 0 sin giro; 1 la textura viene girada 90° horario (el bloque k queda en x = w-33, y = 64k+32); 2 antihorario
+/// (x = 32, y = h-1-(64k+32)). Sirve para leer el índice cuando MF ya entrega el fotograma girado.
+static int mfv_index(const uint8_t *px, int w, int h, int rot) {
+  if (rot == 0 ? (w < 896 || h < 64) : (h < 896 || w < 64)) return -1;
+#define MFV_XY(x, y) (((size_t)(y) * (size_t)w + (size_t)(x)) * 4 + 1)
+#define MFV_G(k) ((int)px[rot == 0 ? MFV_XY(64 * (k) + 32, 32) : rot == 1 ? MFV_XY(w - 33, 64 * (k) + 32) \
+                                                                       : MFV_XY(32, h - 1 - (64 * (k) + 32))])
   int wv = MFV_G(12), bv = MFV_G(13);
   if (wv - bv <= 100) return -1;
   int thr = (wv + bv) / 2, n = 0;
   for (int k = 0; k < 12; k++)
     if (MFV_G(k) > thr) n |= 1 << k;
 #undef MFV_G
+#undef MFV_XY
   return n;
 }
 
@@ -312,7 +357,13 @@ static void mfv_take_sample(mfv *p, IMFSample *s, LONGLONG ts, int gen) {
   EnterCriticalSection(&p->cs);
   int stale = p->seek_gen != gen;
   double pos = mfv_pos(p, now);
-  int late = !stale && pts + kFrameDur <= pos;
+  // Tarde = ya habrá pasado al publicarlo (lectura + subida + un tick): no se lee a CPU ni se sube.
+  double est = (p->rb_n ? p->rb_sum / (double)p->rb_n : 10.0) + (p->uploads ? p->up_sum / (double)p->uploads : 2.0) + 1.0;
+  int late = !stale && pts + kFrameDur <= mfv_pos(p, now + est / 1000.0);
+  if (!stale && p->sk.req > 0 && p->sk.gen == gen && !p->sk.queued) {
+    if (!p->sk.first) p->sk.first = now;
+    p->sk.n_before++;
+  }
   // Tras un salto, MF entrega desde el fotograma clave anterior: lo previo al objetivo se descarta sin pedir otro
   // salto (si no, con GOP > kFarSeconds se saltaría en bucle). Solo hay deriva si esta generación ya alcanzó el reloj.
   if (late && p->seek_noted && pts + kFarSeconds < pos) {
@@ -327,8 +378,16 @@ static void mfv_take_sample(mfv *p, IMFSample *s, LONGLONG ts, int gen) {
   double r0 = mfv_now();
   int rc = mfv_readback(p, s, p->buf[b].px);
   double rb = (mfv_now() - r0) * 1000;
-  int n = rc == 0 ? mfv_index(p->buf[b].px, p->w, p->h) : -1;
+  int n = -1;
+  if (rc == 0 && p->rot_mode >= 0) {
+    n = mfv_index(p->buf[b].px, p->w, p->h, p->rot_mode);
+  } else if (rc == 0) {  // MF entregó girado: se averigua el sentido buscando el índice (horario primero)
+    for (int m = 1; m <= 2 && n < 0; m++)
+      if ((n = mfv_index(p->buf[b].px, p->w, p->h, m)) >= 0) { p->rot_mode = m; p->rot_found = 1; }
+  }
+  if (rc == 0 && p->rot_mode == 0 && n >= 0) p->rot_found = 1;
   EnterCriticalSection(&p->cs);
+  if (p->sk.req > 0 && p->sk.gen == gen && !p->sk.queued && rc == 0 && p->seek_gen == gen) p->sk.queued = mfv_now();
   p->rb_n++; p->rb_sum += rb;
   if (rb > p->rb_max) p->rb_max = rb;
   if (rc != 0 || p->seek_gen != gen) {
@@ -594,6 +653,7 @@ static DWORD WINAPI mfv_decode(void *arg) {
   }
   p->w = cw; p->h = chh;
   p->out_h = o.out_h; p->stride = o.stride;
+  p->rot_mode = mf_rotated ? -1 : 0;
   p->force_alpha = 1;  // RGB32 trae X indefinido; ARGB32 del procesador de vídeo también se fuerza (coste medido en rb)
   p->start_pts = (double)ts / 1e7;
   p->duration = dur - p->start_pts;
@@ -602,11 +662,11 @@ static DWORD WINAPI mfv_decode(void *arg) {
   snprintf(p->info, sizeof p->info,
            "{\"width\":%d,\"height\":%d,\"displayWidth\":%d,\"displayHeight\":%d,\"rotationDegrees\":%d,\"fps\":%.4f,"
            "\"duration\":%.4f,\"startPts\":%.4f,\"hardwareDecode\":%s,\"engine\":\"mf-sourcereader\",\"codec\":\"%s\","
-           "\"mfRotation\":%u,\"mfRotatedOutput\":%s,\"nativeSize\":[%d,%d],\"readerOutput\":[%d,%d],\"outFormat\":\"%s\","
+           "\"mfRotation\":%u,\"mfRotatedOutput\":%s,\"alreadyRotatedByMF\":%s,\"nativeSize\":[%d,%d],\"readerOutput\":[%d,%d],\"outFormat\":\"%s\","
            "\"d3dManager\":%s,\"d3dFail\":\"%s\",\"d3dOutputSamples\":%s,\"decoder\":\"%s\",\"decoderHardwareUrl\":%s,"
            "\"openMsNative\":%.1f}",
            cw, chh, swap ? chh : cw, swap ? cw : chh, flutter_rot, fps, p->duration, p->start_pts,
-           (o.used_d3d && d3d_out) ? "true" : "false", codec, (unsigned)rot, mf_rotated ? "true" : "false", nw, nh,
+           (o.used_d3d && d3d_out) ? "true" : "false", codec, (unsigned)rot, mf_rotated ? "true" : "false", mf_rotated ? "true" : "false", nw, nh,
            o.out_w, o.out_h, o.argb ? "ARGB32" : "RGB32", o.used_d3d ? "true" : "false", d3d_fail,
            d3d_out ? "true" : "false", dec, hw_mft ? "true" : "false", (mfv_now() - t_open) * 1000);
   LeaveCriticalSection(&p->cs);
@@ -634,8 +694,10 @@ static DWORD WINAPI mfv_decode(void *arg) {
       PropVariantInit(&v);
       v.vt = VT_I8;
       v.hVal.QuadPart = (LONGLONG)((tgt + p->start_pts) * 1e7);
+      double s0t = mfv_now();
       hr = IMFSourceReader_SetCurrentPosition(r, &TF_GUID_NULL, &v);
       EnterCriticalSection(&p->cs);
+      if (p->sk.req > 0 && p->sk.gen == gen) { p->sk.set0 = s0t; p->sk.set1 = mfv_now(); }
       p->seeks++;
       if (FAILED(hr)) { p->seek_fails++; p->last_hr = hr; }
       LeaveCriticalSection(&p->cs);
@@ -681,7 +743,8 @@ static DWORD WINAPI mfv_present(void *arg) {
   SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
   const char *vs = getenv("TF_P9_VSYNC");
   const char *vl = getenv("TF_P9_VLEAD_MS");
-  const int mode = (vs && vs[0] == '0') ? 0 : (vs && vs[0] == '2') ? 2 : 1;
+  const int mode = (vs && vs[0] == '0') ? 0 : (vs && vs[0] == '2') ? 2 : (vs && vs[0] == '3') ? 3 : 1;
+  double pick_tgt = 0;
   const double lead_env = (vl && vl[0]) ? atof(vl) / 1000.0 : -1.0;  // < 0: por defecto del modo
   double vb_at = -1e9;
   while (!p->stop) {
@@ -695,7 +758,7 @@ static DWORD WINAPI mfv_present(void *arg) {
     EnterCriticalSection(&p->cs);
     if (vb_dwm >= 0) {
       p->vs_mode = mode; p->vb_dwm = vb_dwm; p->vb_base = vb_base; p->vb_period = vb_per;
-      p->lead = lead_env >= 0 ? lead_env : (mode == 1 ? vb_per : 0);
+      p->lead = lead_env >= 0 ? lead_env : (mode == 1 ? vb_per : mode == 3 ? vb_per / 2 : 0);
     }
     // Bucle: el reloj vuelve a start al llegar a end (salto con epoch), como VideoProbe.tick.
     if (p->l_on && p->c_play && mfv_pos(p, now) >= p->l_end) {
@@ -730,6 +793,7 @@ static DWORD WINAPI mfv_present(void *arg) {
       pick = b;
     }
     if (pick >= 0) WakeAllConditionVariable(&p->cv);
+    pick_tgt = tgt;
     LeaveCriticalSection(&p->cs);
     if (pick >= 0) {
       mfv_frame *f = &p->buf[pick];
@@ -746,6 +810,10 @@ static DWORD WINAPI mfv_present(void *arg) {
         if (ahead < 0) p->vb_misses++;
         if (p->ahead_n == 0 || ahead < p->ahead_min) p->ahead_min = ahead;
         p->ahead_sum += ahead; p->ahead_n++;
+      }
+      if (rc == 0 && p->sk.req > 0 && f->gen == p->sk.gen) {  // primera publicación y primera correcta del salto
+        if (!p->sk.pub) p->sk.pub = u1;
+        if (f->pts + kFrameDur > pick_tgt) { p->sk.okpub = u1; mfv_sk_close(p); }
       }
       if (rc == 0) p->uploads++; else p->upload_fails++;
       p->up_sum += um;
@@ -946,7 +1014,10 @@ char *tf_mfv_stats(int32_t channel, int32_t reset) {
             (long long)p->unreadable);
   for (int i = 0; i < p->n_samples; i++) {
     mfv_sample *x = &p->samples[i];
-    if (x->has_e)
+    if (x->has_e && x->has_evb)  // 6.º elemento: e_vb (ms), criterio de Windows en probe5_measure.dart
+      sb_printf(&b, "%s[%.2f,%.2f,%d,%.4f,%d,%.2f]", i ? "," : "", x->t * 1000, x->e * 1000, x->n, x->item, x->epoch,
+                x->evb * 1000);
+    else if (x->has_e)
       sb_printf(&b, "%s[%.2f,%.2f,%d,%.4f,%d]", i ? "," : "", x->t * 1000, x->e * 1000, x->n, x->item, x->epoch);
     else
       sb_printf(&b, "%s[%.2f,null,%d,%.4f,%d]", i ? "," : "", x->t * 1000, x->n, x->item, x->epoch);
@@ -959,15 +1030,34 @@ char *tf_mfv_stats(int32_t channel, int32_t reset) {
                 "\"readbackMsAvg\":%.3f,\"readbackMsMax\":%.3f,\"uploadMsAvg\":%.3f,\"uploadMsMax\":%.3f,"
                 "\"vsyncMode\":%d,\"vsyncSource\":\"%s\",\"refreshMs\":%.3f,\"leadMs\":%.3f,\"phaseReady\":%s,"
                 "\"copyPhaseMs\":%s,\"copyPhaseSdMs\":%s,\"vsyncMisses\":%lld,\"aheadMsMin\":%s,\"aheadMsAvg\":%.2f,"
-                "\"evbN\":%d,\"evbMsP05\":%s,\"evbMsMed\":%s,\"evbMsP95\":%s}}",
+                "\"evbN\":%d,\"evbMsP05\":%s,\"evbMsMed\":%s,\"evbMsP95\":%s,\"vsyncFront\":%d,\"rotIndexMode\":%d,"
+                "\"rotIndexFound\":%s,\"seekLog\":[",
             (long long)p->late_drops, (long long)p->queued, (long long)p->uploads, (long long)p->upload_fails,
             (long long)p->seeks, (long long)p->seek_fails, (long long)p->read_fails, (unsigned long)p->last_hr,
             p->read_n ? p->read_sum / (double)p->read_n : 0, p->read_max, p->rb_n ? p->rb_sum / (double)p->rb_n : 0,
             p->rb_max, p->uploads ? p->up_sum / (double)p->uploads : 0, p->up_max,
             p->vs_mode, p->vb_dwm ? "dwm" : "fallback", p->vb_period * 1000, p->lead * 1000,
             (p->vb_period > 0 && mfv_phase_ready(p)) ? "true" : "false", phase, phase_sd, (long long)p->vb_misses,
-            ahead_min, p->ahead_n ? p->ahead_sum / (double)p->ahead_n * 1000 : 0, ne, evb05, evb50, evb95);
+            ahead_min, p->ahead_n ? p->ahead_sum / (double)p->ahead_n * 1000 : 0, ne, evb05, evb50, evb95, p->front,
+            p->rot_mode, p->rot_found ? "true" : "false");
+  // Fases de cada salto, ms desde la petición (-1 = no ocurrió): SetCurrentPosition (inicio, fin), primera muestra
+  // de la generación, muestras decodificadas hasta la primera encolada, encolada, primera publicación y primera
+  // correcta; abierto = aún sin publicación correcta.
+  for (int i = 0; i <= p->n_sklog; i++) {
+    int cur = i == p->n_sklog;
+    if (cur && p->sk.req <= 0) break;
+    double r = cur ? p->sk.req : p->sklog[i].req;
+#define MFV_SKT(f) ((cur ? p->sk.f : p->sklog[i].f) > 0 ? ((cur ? p->sk.f : p->sklog[i].f) - r) * 1000 : -1.0)
+    sb_printf(&b, "%s{\"setPos0\":%.1f,\"setPos1\":%.1f,\"firstSample\":%.1f,\"decodedBefore\":%d,\"queued\":%.1f,"
+                  "\"firstPub\":%.1f,\"firstOkPub\":%.1f,\"aimMs\":%.1f,\"open\":%s}",
+              i ? "," : "", MFV_SKT(set0), MFV_SKT(set1), MFV_SKT(first),
+              cur ? p->sk.n_before : p->sklog[i].n_before, MFV_SKT(queued), MFV_SKT(pub), MFV_SKT(okpub),
+              (cur ? p->sk.aim : p->sklog[i].aim) * 1000, cur ? "true" : "false");
+#undef MFV_SKT
+  }
+  sb_printf(&b, "]}}");
   if (reset) {
+    p->n_sklog = 0;
     p->vb_misses = p->ahead_n = 0;
     p->ahead_sum = p->ahead_min = 0;
     p->n_samples = 0; p->n_events = 0;
