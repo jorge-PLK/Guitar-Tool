@@ -120,6 +120,7 @@ Future<void> runSongsterr(Ctx c) async {
   c.report['title'] = await c.web.eval('document.title');
   c.report['uaPlugin'] = await c.web.userAgentFromPlugin();
   c.report['uaSetTo'] = safariUa;
+  c.report['uaApplied'] = c.web.uaApplied;
   c.report['uaMatches'] = '${c.report['navigatorUserAgent']}'.contains('Version/17.5');
   c.report['totalSeconds'] = sw.elapsedMilliseconds / 1000.0;
 }

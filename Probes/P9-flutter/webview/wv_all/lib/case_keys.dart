@@ -80,8 +80,10 @@ Future<void> runKeys(Ctx c) async {
     if (reclaim == 'makeFirstResponder') {
       reclaimCalls++;
       channel.invokeMethod<bool>('reclaim').then((r) {
+        c.report.putIfAbsent('reclaimSupported', () => true);
         if (reclaimResults.length < 20) reclaimResults.add('$r');
       }, onError: (Object e) {
+        if (e is MissingPluginException) c.report['reclaimSupported'] = false;
         if (reclaimResults.length < 20) reclaimResults.add('error: $e');
       });
     }

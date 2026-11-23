@@ -43,6 +43,19 @@ class Ctx {
   Future<void>? _finishing;
   int badMessages = 0;
 
+  /// Marcas de arranque (ms desde main): main, firstFrame, controllerCreated, pageFinished; shimVia.
+  final Json startup = {};
+  bool _webReady = false;
+
+  void mark(String name) => startup.putIfAbsent(name, () => ms);
+
+  Future<void> _captureShim() async {
+    try {
+      final v = await evalJson('JSON.stringify(window.__shimVia===undefined?null:window.__shimVia)');
+      if (v != null) startup['shimVia'] = v;
+    } catch (_) {}
+  }
+
   Future<void> newWeb({String? userAgent}) async {
     late final ProbeWebView w;
     w = ProbeWebView(
@@ -53,6 +66,8 @@ class Ctx {
         if (consoleLog.length < 200) consoleLog.add('$level: $msg');
       },
       onPageFinished: (url) {
+        mark('pageFinished');
+        if (_webReady && !startup.containsKey('shimVia')) unawaited(_captureShim());
         final p = _pageFinished;
         _pageFinished = null;
         if (p != null && !p.isCompleted) p.complete(url);
@@ -61,6 +76,8 @@ class Ctx {
     );
     await w.init(userAgent: userAgent);
     web = w;
+    _webReady = true;
+    mark('controllerCreated');
   }
 
   /// Ejecuta [load] y espera onPageFinished.
@@ -136,14 +153,29 @@ class Ctx {
     report['badMessages'] = badMessages;
     report['eventCounts'] = counts;
     report['elapsedMs'] = ms;
+    startup.putIfAbsent('shimVia', () => null);
+    report['startup'] = startup;
     report.putIfAbsent('ok', () => true);
     final path = args.get('--report');
     if (path != null) {
-      await File(path).parent.create(recursive: true);
-      await File(path).writeAsString(const JsonEncoder.withIndent('  ').convert(report));
+      try {
+        await File(path).parent.create(recursive: true);
+        await File(path).writeAsString(const JsonEncoder.withIndent('  ').convert(_clean(report)));
+      } catch (e) {
+        stderr.writeln('no se pudo escribir el informe: $e');
+      }
     }
     st.status = 'hecho';
     st.changed();
+  }
+
+  /// NaN/infinito -> null y tipos no JSON -> texto, para que jsonEncode no falle.
+  static dynamic _clean(dynamic v) {
+    if (v is double) return v.isFinite ? v : null;
+    if (v == null || v is num || v is bool || v is String) return v;
+    if (v is Map) return {for (final e in v.entries) '${e.key}': _clean(e.value)};
+    if (v is Iterable) return [for (final e in v) _clean(e)];
+    return '$v';
   }
 
   /// RepaintBoundary.toImage: en macOS no incluye la vista de plataforma; se mide cuantos pixeles no son del fondo de Flutter.

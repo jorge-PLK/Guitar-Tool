@@ -20,8 +20,14 @@ class ProbeWebView {
   final void Function(String url) onPageFinished;
   final void Function(String description) onError;
 
+  /// Carpeta de datos de usuario pedida con --user-data-dir. webview_all 1.5.2 no la expone en su API
+  /// publica (solo webview_all_windows.ensureEnvironment, dependencia transitiva), asi que no se aplica.
+  static String? requestedUserDataDir;
+  static const userDataDirApplied = false;
+
   late final WebViewController _c;
   String serving = '';
+  bool uaApplied = false;
 
   Future<void> init({String? userAgent}) async {
     _c = WebViewController();
@@ -32,7 +38,14 @@ class ProbeWebView {
     ));
     await _c.setOnConsoleMessage((m) => onConsole(m.level.name, m.message));
     await _c.addJavaScriptChannel(channelName, onMessageReceived: (m) => onMessage(m.message));
-    if (userAgent != null) await _c.setUserAgent(userAgent);
+    if (userAgent != null) {
+      try {
+        await _c.setUserAgent(userAgent);
+        uaApplied = true;
+      } catch (e) {
+        onError('setUserAgent fallo: $e');
+      }
+    }
   }
 
   /// Carga un asset de Flutter; si el paquete no lo resuelve, cae a loadFile sobre flutter_assets del .app.
@@ -41,8 +54,11 @@ class ProbeWebView {
       await _c.loadFlutterAsset(key);
       serving = 'loadFlutterAsset (file://, lectura concedida a la carpeta del asset)';
     } catch (e) {
-      final root = File(Platform.resolvedExecutable).parent.parent.path;
-      await _c.loadFile('$root/Frameworks/App.framework/Resources/flutter_assets/$key');
+      final exeDir = File(Platform.resolvedExecutable).parent;
+      final path = Platform.isWindows
+          ? '${exeDir.path}\\data\\flutter_assets\\${key.replaceAll('/', '\\')}'
+          : '${exeDir.parent.path}/Frameworks/App.framework/Resources/flutter_assets/$key';
+      await _c.loadFile(path);
       serving = 'loadFile en flutter_assets (loadFlutterAsset fallo: $e)';
     }
   }

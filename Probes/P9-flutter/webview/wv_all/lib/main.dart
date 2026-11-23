@@ -15,11 +15,17 @@ import 'screen.dart';
 
 Future<void> main(List<String> argv) async {
   WidgetsFlutterBinding.ensureInitialized();
-  final c = Ctx(Args(argv));  runApp(ProbeApp(c));
+  final c = Ctx(Args(argv));
+  c.mark('main');
+  ProbeWebView.requestedUserDataDir = c.args.get('--user-data-dir');
+  runApp(ProbeApp(c));
+  WidgetsBinding.instance.addPostFrameCallback((_) => c.mark('firstFrame'));
   final exitAfter = c.args.intOr('--exit-after', 60);
   Timer(Duration(seconds: exitAfter), () async {
     c.report.putIfAbsent('timedOut', () => true);
-    await c.finish();
+    try {
+      await c.finish().timeout(const Duration(seconds: 10));
+    } catch (_) {}
     exit(0);
   });
   unawaited(_run(c));
@@ -29,8 +35,16 @@ Future<void> _run(Ctx c) async {
   final name = c.args.get('--case') ?? 'tab';
   c.report['candidate'] = ProbeWebView.candidate;
   c.report['case'] = name;
-  c.report['platform'] = Platform.operatingSystemVersion;
+  c.report['platform'] = Platform.operatingSystem;
+  c.report['osVersion'] = Platform.operatingSystemVersion;
   c.report['argv'] = c.args.list;
+  final view = WidgetsBinding.instance.platformDispatcher.views.first;
+  final dpr = view.devicePixelRatio;
+  c.report['devicePixelRatio'] = dpr;
+  c.report['viewPhysicalSize'] = [view.physicalSize.width, view.physicalSize.height];
+  c.report['viewLogicalSize'] = [view.physicalSize.width / dpr, view.physicalSize.height / dpr];
+  c.report['userDataDir'] = ProbeWebView.requestedUserDataDir;
+  c.report['userDataDirApplied'] = ProbeWebView.userDataDirApplied;
   try {
     await Future<void>.delayed(const Duration(milliseconds: 300));
     switch (name) {
