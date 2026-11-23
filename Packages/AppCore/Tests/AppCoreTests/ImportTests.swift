@@ -701,7 +701,7 @@ final class ImportTests: XCTestCase {
         let found = ModelResolver.developmentModel(folder: "beat_this", environment: ["TF_MODELS_DIR": dir.path])
         XCTAssertNotNil(found, "TF_MODELS_DIR=\(dir.path) model=\(folder.appendingPathComponent("model.onnx").path) existe=\(FileManager.default.fileExists(atPath: folder.appendingPathComponent("model.onnx").path))")
         XCTAssertEqual(ModelResolver.separatorFolders(physicalMemory: 8 << 30), ["bs_roformer"])
-        XCTAssertEqual(ModelResolver.separatorFolders(physicalMemory: 16 << 30).first, "bs_roformer_T575")
+        XCTAssertEqual(ModelResolver.separatorFolders(physicalMemory: 32 << 30), ["bs_roformer"], "T575 desactivado")
 
         let exe = dir.appendingPathComponent(HelperLocator.helperFileName)
         XCTAssertNil(HelperLocator.separateHelper(environment: [:], executableDirectory: dir))

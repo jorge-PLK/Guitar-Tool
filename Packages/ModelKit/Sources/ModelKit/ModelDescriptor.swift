@@ -107,8 +107,10 @@ public enum ModelCatalog {
     static let onnxSeparation = [
         OnnxModelFile(fileName: "bs_roformer.onnx", sha256: "3d209b6ca99b1299bb609add13c9ea8859d289743408d4d9681fe6c62c11007d",
                       bytes: 701_163_604, frames: 345),
+        // T575 sigue con GLU en Split, roto en DirectML; vuelve cuando se reescriba y se publique en models-win-v1
+        // (decisión de Jorge, 23/11/2026): con `.max` de RAM nunca se elige. Entonces: `separationLargeChunkMemory`.
         OnnxModelFile(fileName: "bs_roformer_T575.onnx", sha256: "f2969881ea94334ba7b5c0fb7ed9386e4cc2a20a7db6838e8fd87c013e201dcf",
-                      bytes: 710_602_834, frames: 575, minimumPhysicalMemory: separationLargeChunkMemory),
+                      bytes: 710_602_834, frames: 575, minimumPhysicalMemory: .max),
     ]
 
     /// Separador de stems de la Fase 1. Datos del manifest de Probes/P4-modelos/bs_roformer_sw.

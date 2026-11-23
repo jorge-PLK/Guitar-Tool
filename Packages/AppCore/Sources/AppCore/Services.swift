@@ -84,9 +84,10 @@ struct ModelResolver: Sendable {
         return FileManager.default.fileExists(atPath: url.path) ? url : nil
     }
 
-    /// Carpeta de desarrollo del separador: T=575 con RAM de sobra (`separationLargeChunkMemory`), si no T=345.
+    /// Carpeta de desarrollo del separador: siempre T=345. T575 sigue con GLU en Split, roto en DirectML; vuelve cuando
+    /// se reescriba y se publique en models-win-v1 (con `separationLargeChunkMemory`).
     static func separatorFolders(physicalMemory: UInt64) -> [String] {
-        physicalMemory >= ModelCatalog.separationLargeChunkMemory ? ["bs_roformer_T575", "bs_roformer"] : ["bs_roformer"]
+        ["bs_roformer"]
     }
 
     /// `lead_rhythm`: misma carpeta que `LeadSeparatorHeavyTests` y que la salida de tf-ml (parte 7.3).
