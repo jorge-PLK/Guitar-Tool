@@ -312,7 +312,7 @@ step_webview() {
 # pc.sh wvrun <wv_all|wv_flutter> <caso|all> [--tag sufijo] [--rebuild] [--keep-data]: P9 7j. Compila si falta el .exe (o --rebuild),
 # lanza cada caso con ventana por la tarea interactiva (run.ps1 -ExePath), trae informe + captura + log a
 # Temp/p9-flutter/pc/wv-<app>-<caso>[-sufijo].{json,png,out,err,keys.txt} y anota la carga previa en wv-load.txt.
-# Casos: tab messages overlay resize-on resize-off capture songsterr songsterr-offstage songsterr-zero keys-raw keys-flutter.
+# Casos: tab messages overlay resize-on resize-off capture fpsbar songsterr songsterr-offstage songsterr-zero keys-raw keys-flutter.
 # Sin --keep-data borra el perfil de WebView (Temp\p9\run\wvdata\<app>) antes de cada caso (arranque en frio).
 wv_args() { # caso -> argumentos de la app (sin --report/--user-data-dir) y segundo de captura en $WV_SHOT
   WV_SHOT=3; WV_ARGS=""
@@ -321,7 +321,8 @@ wv_args() { # caso -> argumentos de la app (sin --report/--user-data-dir) y segu
     resize-on) WV_ARGS="--case resize --raf-loop on --exit-after 40" ;;
     resize-off) WV_ARGS="--case resize --raf-loop off --exit-after 40" ;;
     capture) WV_ARGS="--case capture --exit-after 40"; WV_SHOT=10 ;;
-    songsterr) WV_ARGS="--case songsterr --exit-after 40" ;;
+    fpsbar) WV_ARGS="--case fpsbar --capture-secs 10 --exit-after 40"; WV_SHOT=6 ;;
+    songsterr) WV_ARGS="--case songsterr --exit-after 40"; WV_SHOT=14 ;;
     songsterr-offstage) WV_ARGS="--case songsterr --mode offstage --exit-after 40" ;;
     songsterr-zero) WV_ARGS="--case songsterr --mode zero --exit-after 40" ;;
     keys-raw) WV_ARGS="--case keys --keys-mode raw --keys-script --keys-wait 8 --exit-after 40"; WV_SHOT=0 ;;
@@ -395,10 +396,11 @@ step_wvrun() {
 TEAR_DELAY=6
 TEAR_PAD=14
 step_tear() {
-  local ring=1 size=720 secs=60 kind=gpu region="" suffix="" wait="" copy=""
+  local ring=1 size=720 secs=60 kind=gpu region="" suffix="" wait="" copy="" extra=""
   while [ $# -gt 0 ]; do
     case "$1" in --ring) ring="$2"; shift 2 ;; --size) size="$2"; shift 2 ;; --seconds) secs="$2"; shift 2 ;; --kind) kind="$2"; shift 2 ;;
-      --region) region="$2"; shift 2 ;; --wait) wait="$2"; shift 2 ;; --copy) copy="$2"; shift 2 ;; --tag) suffix="-$2"; shift 2 ;; *) shift ;; esac
+      --region) region="$2"; shift 2 ;; --wait) wait="$2"; shift 2 ;; --copy) copy="$2"; shift 2 ;; --tag) suffix="-$2"; shift 2 ;;
+      --series) extra="-Series"; shift ;; *) shift ;; esac  # --series (P9 7g): el detector anade la serie de x y sus metricas al -det.json
   done
   local dst="$ROOT/Temp/p9-flutter/pc"; mkdir -p "$dst"
   local alive; alive="$("${SSH[@]}" 'tasklist /FI "IMAGENAME eq tf_probe.exe" /NH' 2>&1 | tr -d '\r' | grep -c tf_probe)"
@@ -413,7 +415,7 @@ step_tear() {
   local b64; b64="$(printf %s "--probe frames --mode texture --size $size --seconds $((secs + TEAR_PAD)) --threads via1 --texture-kind $kind \
 --core-lib $REL_WIN\\AppCoreFFI.dll --projects-folder $PC_ROOT_WIN\\run\\projects --support-dir $PC_ROOT_WIN\\run\\support \
 --report $PC_ROOT_WIN\\out\\run\\$tag.json" | base64 | tr -d '\n')"
-  local tr="$secs;tf_probe;$PC_ROOT_WIN\\out\\run\\$tag-det.json;$region;$TEAR_DELAY"
+  local tr="$secs;tf_probe;$PC_ROOT_WIN\\out\\run\\$tag-det.json;$region;$TEAR_DELAY;$extra"
   "${SSH[@]}" "powershell -NoProfile -ExecutionPolicy Bypass -File '$WINDIR_REMOTE\\run.ps1' -Tag '$tag' -ArgsB64 '$b64' -Timeout $((secs + TEAR_PAD + 60)) -EnvVars '$envv' -Tear '$tr'" 2>&1 | tr -d '\r' >>"$LOG"
   local rc=${PIPESTATUS[0]}
   grep 'TF:code' "$LOG" | tail -1
@@ -428,7 +430,142 @@ step_tear() {
   return $rc
 }
 
+# pc.sh video [caso|all] [--rebuild] [--decoders "lista"] [--tag s]: P9 7h. Compila video\vp_fvp (fvp/mdk) en el PC si falta el .exe (o --rebuild),
+# copia los videos a Temp\p9\run\video si faltan, lanza cada caso con ventana (run.ps1 -ExePath) y trae informe/captura/log a
+# Temp/p9-flutter/pc/vid-fvp-<caso>[-tag].{json,png,out,err}; carga previa en vid-load.txt.
+# --env "A=1;B=2" pasa variables al proceso (VP_DBG=1, VP_ATTACH=play, VP_MININT=n de la app).
+# Casos: steady-hevc seek-hevc loop-hevc steady-h264 seek-h264 loop-h264 rot-hevc rot-h264. `all` falla rapido: si steady de un video incumple
+# el umbral (pc-video-table.py verdict) se salta su seek/loop; tras el steady-hevc fallido hace UNA repeticion con --decoders FFmpeg (tag ffmpeg).
+# Antes de cada lanzamiento espera a que no haya otra prueba con ventana (wv_all, wv_flutter, tf_probe) en el PC.
+VID_NAMES="code-hevc.mov code-h264.mp4 take-hevc-rot90.mov take-h264-rot90.mp4"
+vid_busy() { "${SSH[@]}" "tasklist" 2>/dev/null | grep -ciE 'wv_all|wv_flutter|tf_probe|vp_fvp'; }
+vid_case() { # caso -> VC_CASE VC_FILE VC_SHOT
+  case "$1" in
+    steady-hevc) VC_CASE=steady; VC_FILE=code-hevc.mov; VC_SHOT=12 ;;
+    seek-hevc) VC_CASE=seek; VC_FILE=code-hevc.mov; VC_SHOT=0 ;;
+    loop-hevc) VC_CASE=loop; VC_FILE=code-hevc.mov; VC_SHOT=0 ;;
+    steady-h264) VC_CASE=steady; VC_FILE=code-h264.mp4; VC_SHOT=12 ;;
+    seek-h264) VC_CASE=seek; VC_FILE=code-h264.mp4; VC_SHOT=0 ;;
+    loop-h264) VC_CASE=loop; VC_FILE=code-h264.mp4; VC_SHOT=0 ;;
+    rot-hevc) VC_CASE=rotation; VC_FILE=take-hevc-rot90.mov; VC_SHOT=3 ;;
+    rot-h264) VC_CASE=rotation; VC_FILE=take-h264-rot90.mp4; VC_SHOT=3 ;;
+    *) return 1 ;;
+  esac
+}
+vid_run() { # caso decoders suffix -> informe en $dst; devuelve 0 si el informe cumple los umbrales
+  local c="$1" decs="$2" suffix="$3" dst="$ROOT/Temp/p9-flutter/pc"
+  vid_case "$c" || { echo "caso desconocido: $c"; return 1; }
+  local name="vid-fvp-$c$suffix" tag="fvp-$c$suffix" w=0
+  while [ "$(vid_busy)" != "0" ] && [ $w -lt 1800 ]; do echo "  PC ocupado, espero ($w s)"; sleep 30; w=$((w + 30)); done
+  [ "$(vid_busy)" = "0" ] || { echo "PC sigue ocupado: no lanzo $name"; return 1; }
+  local outwin="$PC_ROOT_WIN\\out\\vid" outu="$PC_ROOT/out/vid" exe="$PC_ROOT_WIN\\src\\Probes\\P9-flutter\\video\\vp_fvp\\build\\windows\\x64\\runner\\Release\\vp_fvp.exe"
+  remote "mkdir -p $outu; rm -f $outu/$tag.json $outu/$tag.png $outu/$tag.log $outu/$tag.err $outu/$tag.code $outu/$tag.shot.txt"
+  local load; load="$("${SSH[@]}" 'wmic cpu get loadpercentage' 2>/dev/null | tr -d '\r' | grep -E '^[0-9]+' | head -1 | tr -d ' ')"
+  echo "$name $load" >>"$dst/vid-load.txt"
+  local line="--case $VC_CASE --file $PC_ROOT_WIN\\run\\video\\$VC_FILE --report $outwin\\$tag.json --exit-after 80 --regime-s 10"
+  [ -z "$decs" ] || line="$line --decoders $decs"
+  local b64; b64="$(printf %s "$line" | base64 | tr -d '\n')"
+  echo "=== $name (carga previa ${load}%) ===" | tee -a "$LOG"
+  "${SSH[@]}" "powershell -NoProfile -ExecutionPolicy Bypass -File '$WINDIR_REMOTE\\run.ps1' -Tag '$tag' -ArgsB64 '$b64' -Timeout 100 -ExePath '$exe' -RunOut '$outwin' -ShotAt $VC_SHOT -EnvVars '$VID_ENV'" 2>&1 | tr -d '\r' >>"$LOG"
+  grep 'TF:code' "$LOG" | tail -1
+  rm -f "$dst/$name".{json,png,out,err}
+  scp -q -o BatchMode=yes "$PC_HOST:$PC_ROOT_SCP/out/vid/$tag.json" "$dst/$name.json" >>"$LOG" 2>&1
+  scp -q -o BatchMode=yes "$PC_HOST:$PC_ROOT_SCP/out/vid/$tag.png" "$dst/$name.png" >>"$LOG" 2>&1
+  scp -q -o BatchMode=yes "$PC_HOST:$PC_ROOT_SCP/out/vid/$tag.log" "$dst/$name.out" >>"$LOG" 2>&1
+  scp -q -o BatchMode=yes "$PC_HOST:$PC_ROOT_SCP/out/vid/$tag.err" "$dst/$name.err" >>"$LOG" 2>&1
+  [ -f "$dst/$name.json" ] || { echo "SIN INFORME: $name"; return 1; }
+  local v; v="$(python3 -I "$ROOT/Probes/P9-flutter/pc-video-table.py" verdict "$dst/$name.json")"; local rc=$?
+  echo "  $name: $v" | tee -a "$LOG"
+  return $rc
+}
+
+step_video() {
+  local want="${1:-all}"; shift 2>/dev/null
+  local suffix="" rebuild=0 decs=""; VID_ENV=""
+  while [ $# -gt 0 ]; do
+    case "$1" in --tag) suffix="-$2"; shift 2 ;; --rebuild) rebuild=1; shift ;; --decoders) decs="$2"; shift 2 ;; --env) VID_ENV="$2"; shift 2 ;; *) shift ;; esac
+  done
+  local dst="$ROOT/Temp/p9-flutter/pc" vsrc="$ROOT/Temp/p9-flutter/video"; mkdir -p "$dst"
+  local reldir="$PC_ROOT/src/Probes/P9-flutter/video/vp_fvp/build/windows/x64/runner/Release"
+  if [ "$rebuild" = 1 ] || ! "${SSH[@]}" "test -f $reldir/vp_fvp.exe" 2>/dev/null; then
+    echo "compilando vp_fvp ..."
+    run_bg video.ps1 video 3000 || true
+    grep -E '^TF:(vp_fvp|ERR|flutter)|^error:' "$LOG" | cut -c1-230 | tail -10
+    "${SSH[@]}" "test -f $reldir/vp_fvp.exe" 2>/dev/null || { echo "no hay vp_fvp.exe tras compilar"; return 1; }
+  fi
+  [ "$want" = "build" ] && { echo "vp_fvp.exe listo"; return 0; }
+  local t0; t0="$("${SSH[@]}" "powershell -NoProfile -Command \"(Get-Date).AddMinutes(-1).ToString('yyyy-MM-dd HH:mm:ss')\"" | tr -d '\r')"
+  remote "mkdir -p $PC_ROOT/run/video $PC_ROOT/out/vid" || return 1
+  local f
+  for f in $VID_NAMES; do
+    "${SSH[@]}" "test -f $PC_ROOT/run/video/$f" 2>/dev/null || scp -q -o BatchMode=yes "$vsrc/$f" "$PC_HOST:$PC_ROOT_SCP/run/video/$f" >>"$LOG" 2>&1 || echo "fallo scp $f"
+  done
+  if [ "$want" = "all" ]; then
+    local v
+    for v in hevc h264; do
+      if vid_run "steady-$v" "$decs" "$suffix"; then
+        vid_run "seek-$v" "$decs" "$suffix"; vid_run "loop-$v" "$decs" "$suffix"
+      else
+        echo "steady-$v incumple: no sigo con seek/loop de $v"
+        [ "$v" = hevc ] && [ -z "$decs" ] && vid_run steady-hevc FFmpeg "-ffmpeg"
+      fi
+    done
+    vid_run rot-hevc "$decs" "$suffix"; vid_run rot-h264 "$decs" "$suffix"
+  else
+    vid_run "$want" "$decs" "$suffix"
+  fi
+  echo "ficheros escapados:"; { echo "=== stray (desde $t0) ==="; stray -Since "'$t0'"; } >>"$LOG"
+  awk '/=== stray \(desde/{f=1} f && /^STRAY/ && !/\\.claude\\/' "$LOG" | head -6
+  echo "n escapados: $(awk '/=== stray \(desde/{f=1} f && /^STRAY/ && !/\\.claude\\/' "$LOG" | wc -l | tr -d ' ')"
+  python3 -I "$ROOT/Probes/P9-flutter/pc-video-table.py" table "$dst" "vid-fvp-" 2>&1 | tee -a "$LOG" | head -40
+  return 0
+}
+
+# pc.sh wvfps <wv_all|wv_flutter> [--seconds 30] [--tag s]: P9 7g. fps REAL con que se pinta el WebView dentro de Flutter en Windows.
+# Lanza el caso fpsbar con ventana (barra blanca que avanza por rAF) y, a la vez, win\tear.ps1 -Series sobre la zona del WebView
+# (todo el area cliente menos la franja superior de Flutter, WV_TOP_LOGICAL px logicos: se escala con el DPI de la ventana, asi sirve a
+# cualquier escala sin cambios). El detector muestrea a ~50-60 capturas/s: no puede ver mas posiciones distintas que eso.
+# Trae a Temp/p9-flutter/pc/wvfps-<app>[-tag].{json (app), det.json (detector), png}; carga previa y escala en wvfps-load.txt.
+WV_TOP_LOGICAL=44   # topBarHeight de screen.dart
+WVFPS_DELAY=8       # s entre la aparicion de la ventana y el inicio del detector (la pagina tarda en estar lista)
+step_wvfps() {
+  local app="${1:-}"; shift 2>/dev/null
+  local secs=30 suffix=""
+  while [ $# -gt 0 ]; do
+    case "$1" in --seconds) secs="$2"; shift 2 ;; --tag) suffix="-$2"; shift 2 ;; *) shift ;; esac
+  done
+  case "$app" in wv_all|wv_flutter) ;; *) echo "uso: pc.sh wvfps <wv_all|wv_flutter> [--seconds 30] [--tag s]"; return 1 ;; esac
+  local dst="$ROOT/Temp/p9-flutter/pc"; mkdir -p "$dst"
+  [ "$(vid_busy)" = "0" ] || { echo "hay otra prueba con ventana viva en el PC: no lanzo nada"; return 1; }
+  local reldir="$PC_ROOT/src/Probes/P9-flutter/webview/$app/build/windows/x64/runner/Release"
+  local relwin="$PC_ROOT_WIN\\src\\Probes\\P9-flutter\\webview\\$app\\build\\windows\\x64\\runner\\Release"
+  "${SSH[@]}" "test -f $reldir/$app.exe" 2>/dev/null || { echo "falta $app.exe: pc.sh sync y pc.sh wvrun $app fpsbar --rebuild"; return 1; }
+  local tag="$app-fps$suffix" name="wvfps-$app$suffix" outwin="$PC_ROOT_WIN\\out\\wv" repu="$PC_ROOT/out/wv"
+  local capsecs=$((secs + WVFPS_DELAY + 20))
+  remote "mkdir -p $repu $PC_ROOT/run/wvdata; rm -rf $PC_ROOT/run/wvdata/$app; rm -f $repu/$tag.* $repu/$tag-det*"
+  local load; load="$("${SSH[@]}" 'wmic cpu get loadpercentage' 2>/dev/null | tr -d '\r' | grep -E '^[0-9]+' | head -1 | tr -d ' ')"
+  local line="--case fpsbar --capture-secs $capsecs --exit-after $((capsecs + 25)) --report $outwin\\$tag.json --user-data-dir $PC_ROOT_WIN\\run\\wvdata\\$app"
+  local b64; b64="$(printf %s "$line" | base64 | tr -d '\n')"
+  local tr="$secs;$app;$outwin\\$tag.det.json;;$WVFPS_DELAY;-Series -TopLogical $WV_TOP_LOGICAL"
+  echo "=== $name (carga previa ${load}%) ===" | tee -a "$LOG"
+  "${SSH[@]}" "powershell -NoProfile -ExecutionPolicy Bypass -File '$WINDIR_REMOTE\\run.ps1' -Tag '$tag' -ArgsB64 '$b64' -Timeout $((capsecs + 60)) -ExePath '$relwin\\$app.exe' -RunOut '$outwin' -Tear '$tr'" 2>&1 | tr -d '\r' >>"$LOG"
+  grep 'TF:code' "$LOG" | tail -1
+  rm -f "$dst/$name".{json,det.json,png,tear.txt} "$dst/$name"_cap*.png
+  local f
+  scp -q -o BatchMode=yes "$PC_HOST:$PC_ROOT_SCP/out/wv/$tag.json" "$dst/$name.json" >>"$LOG" 2>&1
+  scp -q -o BatchMode=yes "$PC_HOST:$PC_ROOT_SCP/out/wv/$tag.det.json" "$dst/$name.det.json" >>"$LOG" 2>&1
+  scp -q -o BatchMode=yes "$PC_HOST:$PC_ROOT_SCP/out/wv/$tag.tear.txt" "$dst/$name.tear.txt" >>"$LOG" 2>&1
+  scp -q -o BatchMode=yes "$PC_HOST:$PC_ROOT_SCP/out/wv/$tag.det_cap200.png" "$dst/$name.png" >>"$LOG" 2>&1
+  local dpr; dpr="$(grep -m1 -oE '"devicePixelRatio": *[0-9.]+' "$dst/$name.json" 2>/dev/null | grep -oE '[0-9.]+$')"
+  echo "$name load=${load}% dpr=${dpr:-?}" >>"$dst/wvfps-load.txt"
+  tr -d '\000\377\376' <"$dst/$name.tear.txt" 2>/dev/null | tail -2 | cut -c1-200
+  python3 -I "$ROOT/Probes/P9-flutter/pc-wvfps-table.py" "$dst" 2>&1 | tee -a "$LOG"
+  return 0
+}
+
 case "$STEP" in
+  wvfps) shift; step_wvfps "$@"; rc=$? ;;
+  video) shift; step_video "$@"; rc=$? ;;
   tear) shift; step_tear "$@"; rc=$? ;;
   wvrun) shift; step_wvrun "$@"; rc=$? ;;
   soak) shift; step_soak "$@"; rc=$? ;;

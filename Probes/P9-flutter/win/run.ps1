@@ -44,6 +44,7 @@ if ($Tear) {
   $t = $Tear -split ';'
   $reg = ""
   if ($t.Count -gt 3 -and $t[3]) { $reg = " -Region '$($t[3])'" }
+  if ($t.Count -gt 5 -and $t[5]) { $reg += " $($t[5])" }  # P9 7g: opciones extra de tear.ps1 (-Series -TopLogical N)
   $shotLines = "& '$PSScriptRoot\tear.ps1' -Seconds $($t[0]) -Title '$($t[1])' -Out '$($t[2])' -Delay $($t[4])$reg *> '$(Join-Path $RunOut "$Tag.tear.txt")'`r`n"
 }
 @"

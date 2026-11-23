@@ -1,0 +1,98 @@
+#!/usr/bin/env python3
+# P9 7h: tabla / veredicto de los informes de vp_fvp traidos por `pc.sh video` (Temp/p9-flutter/pc/vid-fvp-*.json).
+# Uso: pc-video-table.py table <dir> <prefijo> [sufijo]   |   pc-video-table.py verdict <json>   (exit 0 pasa, 1 incumple)
+# Umbrales (spec P9, prueba 7h): error A/V mediana y p95 <= 16,7 ms (medio fotograma a 30 fps); recuperacion tras salto < 300 ms.
+import glob, json, os, sys
+
+E_MAX_MS = 16.7
+RECOVER_MAX_MS = 300
+
+
+def load(p):
+    try:
+        return json.load(open(p))
+    except Exception:
+        return None
+
+
+def checks(r):
+    """Lista de incumplimientos."""
+    bad = []
+    if r is None:
+        return ["sin informe"]
+    if r.get("error"):
+        bad.append("error: %s" % str(r["error"])[:80])
+    res = r.get("result") or {}
+    c = r.get("case")
+    if c == "steady":
+        for k, v in res.items():
+            if k.startswith("rate_"):
+                e = v["e_ms"]
+                if e["median"] is None or abs(e["median"]) > E_MAX_MS or abs(e["p95"]) > E_MAX_MS:
+                    bad.append("%s e med/p95 %s/%s" % (k, e["median"], e["p95"]))
+    elif c == "seek":
+        for j in res.get("jumps", []):
+            if j.get("stayOkMs") is None or j["stayOkMs"] > RECOVER_MAX_MS:
+                bad.append("salto %s stay %s ms" % (j["target"], j.get("stayOkMs")))
+    elif c == "loop":
+        for j in res.get("recovery", []):
+            if j.get("stayOkMs") is None or j["stayOkMs"] > RECOVER_MAX_MS:
+                bad.append("vuelta stay %s ms" % j.get("stayOkMs"))
+        e = (res.get("inLoop") or {}).get("e_ms") or {}
+        if e.get("median") is None or abs(e["median"]) > E_MAX_MS or abs(e["p95"]) > E_MAX_MS:
+            bad.append("en bucle e med/p95 %s/%s" % (e.get("median"), e.get("p95")))
+    return bad
+
+
+def row(name, r, load_pct):
+    if r is None:
+        return ["%-34s SIN INFORME" % name]
+    res = r.get("result") or {}
+    c = r.get("case")
+    o = r.get("open") or {}
+    cpu = None
+    if r.get("wallS"):
+        cpu = round(100 * (r.get("cpuProcessS") or 0) / r["wallS"], 1)
+    tail = "dec=%s CPU %s%% vig %s ms carga %s%%" % (r.get("activeDecoder"), cpu, r.get("watchdogMaxMs"), load_pct)
+    out = []
+    if c == "steady":
+        for k, v in res.items():
+            if k.startswith("rate_"):
+                e = v["e_ms"]
+                out.append("%-34s %s e %s/%s/%s rep %s salt %s | %s" % (name, k[5:], e["median"], e["p95"], e["max"], v["repeated"], v["skipped"], tail))
+    elif c == "seek":
+        out.append("%-34s saltos stay/first ms: %s | %s" % (name, " ".join("%s/%s" % (j.get("stayOkMs"), j.get("firstOkMs")) for j in res.get("jumps", [])), tail))
+    elif c == "loop":
+        e = (res.get("inLoop") or {}).get("e_ms") or {}
+        out.append("%-34s vueltas %s bucle e %s/%s/%s | %s" % (name, " ".join("%s/%s" % (j.get("stayOkMs"), j.get("firstOkMs")) for j in res.get("recovery", [])), e.get("median"), e.get("p95"), e.get("max"), tail))
+    else:
+        out.append("%-34s tex %s rot %s codec %s | %s" % (name, o.get("textureSize"), o.get("rotation"), o.get("codec"), tail))
+    return out or ["%-34s (sin datos)" % name]
+
+
+def main():
+    if sys.argv[1] == "verdict":
+        bad = checks(load(sys.argv[2]))
+        print("; ".join(bad) if bad else "PASA")
+        sys.exit(1 if bad else 0)
+    d, pre = sys.argv[2], sys.argv[3]
+    loads = {}
+    try:
+        for l in open(os.path.join(d, "vid-load.txt")):
+            p = l.split()
+            if len(p) == 2:
+                loads[p[0]] = p[1]
+    except OSError:
+        pass
+    n = 0
+    for p in sorted(glob.glob(os.path.join(d, pre + "*.json"))):
+        name = os.path.basename(p)[:-5]
+        for ln in row(name[len(pre):], load(p), loads.get(name)):
+            print(ln[:230])
+            n += 1
+        bad = checks(load(p))
+        if bad:
+            print("   INCUMPLE: " + "; ".join(bad)[:200])
+
+
+main()

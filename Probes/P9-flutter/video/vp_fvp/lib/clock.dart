@@ -67,6 +67,11 @@ class ExtClock {
     cb.ref.cb = syncCallback();
     // macOS: la dirección viaja en `opaque`. Windows: el estado es global en el shim (opaque no se usa).
     cb.ref.opaque = Platform.isWindows ? nullptr : Pointer<Void>.fromAddress(_p.address);
+    // Traza (VP_SELFTEST=1): invoca el callback desde Dart; si calls pasa a 1 el shim funciona y el fallo está en mdk.
+    if (Platform.environment['VP_SELFTEST'] == '1') {
+      cb.ref.cb.asFunction<double Function(Pointer<Void>)>()(nullptr);
+      stderr.writeln('[selftest] onSync=${api.ref.onSync.address} object=${api.ref.object.address} cb=${cb.ref.cb.address} calls=${syncStats()['calls']}');
+    }
     api.ref.onSync.asFunction<void Function(Pointer<mdkPlayer>, mdkSyncCallback, int)>()(api.ref.object, cb.ref, minInterval);
   }
 

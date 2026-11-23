@@ -1,0 +1,42 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  /* P9 7g: fondo negro, barra blanca vertical de 24 px de ancho y alto total; x avanza STEP px por rAF. */
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  #bar { position: absolute; left: 0; top: 0; height: 100%; width: 24px; background: #fff; }
+</style>
+<script src="shim.js"></script>
+</head>
+<body>
+<div id="bar"></div>
+<script>
+(function (root) {
+  function post(o) { try { root.webkit.messageHandlers.tf.postMessage(JSON.stringify(o)); } catch (e) {} }
+  var BAR = 24, STEP = 11;  // 11 px: > tolerancia del detector (4 px); ciclo = (ancho-24)/11 fotogramas (>= 100 con 1280 px: > 1 s a 60 fps)
+  var bar = document.getElementById('bar');
+  var n = 0, running = false, first = 0, last = 0, maxGap = 0, t0 = 0;
+  function loop(now) {
+    if (!running) return;
+    if (n === 0) { first = now; } else { var g = now - last; if (g > maxGap) maxGap = g; }
+    last = now;
+    n++;
+    bar.style.transform = 'translateX(' + ((n * STEP) % Math.max(STEP, root.innerWidth - BAR)) + 'px)';
+    root.requestAnimationFrame(loop);
+  }
+  root.fb = {
+    start: function () { if (!running) { running = true; root.requestAnimationFrame(loop); } },
+    stop: function () { running = false; },
+    info: function () {
+      var dt = (last - first) / 1000;
+      return JSON.stringify({ n: n, iw: root.innerWidth, ih: root.innerHeight, dpr: root.devicePixelRatio,
+        rafFps: dt > 0 ? (n - 1) / dt : 0, rafMaxGapMs: maxGap, step: STEP, barPx: BAR });
+    }
+  };
+  post({ event: 'ready', page: 'fpsbar' });
+})(window);
+</script>
+</body>
+</html>

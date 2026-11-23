@@ -1,4 +1,4 @@
-// P9.4: prueba 4 (WebView en el Mac). Uso: --case tab|messages|keys|overlay|resize|capture|songsterr|occluded
+// P9.4: prueba 4 (WebView en el Mac). Uso: --case tab|messages|keys|overlay|resize|capture|fpsbar|songsterr|occluded
 //   [--raf-loop on|off] (resize) [--capture-secs <s>] (capture) [--keys-script --keys-wait <s>] (keys)
 //   --report <json> [--snapshot <png>] --exit-after <s> [--occluded-delay <s>]
 import 'dart:async';
@@ -7,6 +7,7 @@ import 'dart:io';
 import 'package:flutter/widgets.dart';
 
 import 'case_capture.dart';
+import 'case_fpsbar.dart';
 import 'case_keys.dart';
 import 'case_msgs.dart';
 import 'case_songsterr.dart';
@@ -61,6 +62,8 @@ Future<void> _run(Ctx c) async {
         await runResize(c);
       case 'capture':
         await runCapture(c);
+      case 'fpsbar':
+        await runFpsBar(c);
       case 'songsterr':
         await runSongsterr(c);
       case 'occluded':
