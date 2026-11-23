@@ -129,6 +129,9 @@ final class FrameSource: @unchecked Sendable {
         return need
     }
 
+    func extra() -> [Int64]? { nil }  // P9.7f-B: solo Windows
+    func resetWindow() {}
+
     func stats() -> (Int64, Int64, Int64, Int64, Int64) {
         lock.lock(); defer { lock.unlock() }
         return (produced, textureCopies, distinctCopies, bgraCopies, produced > 0 ? costNs / produced / 1000 : 0)

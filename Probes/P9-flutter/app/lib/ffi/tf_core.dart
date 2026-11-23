@@ -170,7 +170,12 @@ class TfCore {
             void Function(int, Pointer<Int64>, Pointer<Int64>, Pointer<Int64>,
                 Pointer<Int64>)>('tf_debug_frames_stats'),
         framesCostUs = lib.lookupFunction<Int64 Function(Int32),
-            int Function(int)>('tf_debug_frames_cost_us');
+            int Function(int)>('tf_debug_frames_cost_us'),
+        _framesExtra = lib.lookupFunction<
+            Void Function(Int32, Pointer<Int64>, Int32),
+            void Function(int, Pointer<Int64>, int)>('tf_debug_frames_extra'),
+        framesReset = lib.lookupFunction<Void Function(Int32),
+            void Function(int)>('tf_debug_frames_reset');
 
   /// `sink` = `listener` | `port`.
   factory TfCore.open(String libPath, String sink) =>
@@ -203,6 +208,20 @@ class TfCore {
   final void Function(int, Pointer<Int64>, Pointer<Int64>, Pointer<Int64>,
       Pointer<Int64>) _framesStats;
   final int Function(int) framesCostUs;
+  final void Function(int, Pointer<Int64>, int) _framesExtra;
+  /// Vacía la ventana de intervalos y los contadores de peticiones (P9.7f-B).
+  final void Function(int) framesReset;
+
+  /// P9.7f-B, ver tf_core.h (tf_debug_frames_extra): 20 valores.
+  List<int> framesExtra(int channel) {
+    final p = nativeCalloc(8 * 20).cast<Int64>();
+    try {
+      _framesExtra(channel, p, 20);
+      return [for (var i = 0; i < 20; i++) p[i]];
+    } finally {
+      nativeFree(p);
+    }
+  }
 
   /// [producidos, copiasTextura, copiasTexturaDistintas, copiasBgra].
   List<int> framesStats(int channel) {

@@ -12,6 +12,33 @@ import Foundation
 
 private let solidSquare = 200
 
+// P9.7f-B: umbrales de la atribución de descartes (intervalos en µs).
+private let shortIntervalUs: Int64 = 8_000    // dos fotogramas casi seguidos (cadencia del generador)
+private let longIntervalUs: Int64 = 50_000    // hueco largo
+private let lateFetchUs: Int64 = 40_000       // petición tardía del motor (>1,2 periodos a 30 fps)
+
+/// Intervalos entre eventos sucesivos, en µs.
+private struct Intervals {
+    var v: [Int64] = []
+    var lastNs: Int64 = 0
+    mutating func tick(_ nowNs: Int64) -> Int64 {
+        defer { lastNs = nowNs }
+        guard lastNs != 0 else { return 0 }
+        let d = (nowNs - lastNs) / 1000
+        v.append(d)
+        return d
+    }
+    mutating func reset() { v.removeAll(keepingCapacity: true) }
+    /// [cuenta, min, p50, p99, max, <8 ms, >50 ms]
+    func summary() -> [Int64] {
+        guard !v.isEmpty else { return [0, 0, 0, 0, 0, 0, 0] }
+        let s = v.sorted()
+        func q(_ p: Double) -> Int64 { s[min(s.count - 1, Int((Double(s.count - 1) * p).rounded()))] }
+        return [Int64(s.count), s[0], q(0.5), q(0.99), s[s.count - 1],
+                Int64(s.filter { $0 < shortIntervalUs }.count), Int64(s.filter { $0 > longIntervalUs }.count)]
+    }
+}
+
 final class FrameSource: @unchecked Sendable {
     let channel: Int32
     let width: Int
@@ -33,11 +60,22 @@ final class FrameSource: @unchecked Sendable {
     private var costNs: Int64 = 0
     private var wantGPU = false
     private var uploadedSeq: Int64 = 0
+    // P9.7f-B
+    private let precise: Bool  // TF_P9_PRECISE=1: hilo propio con temporizador de espera de alta resolución
+    private var running = false
+    private let exited = DispatchSemaphore(value: 0)
+    private var prodIv = Intervals()
+    private var fetchIv = Intervals()
+    private var bgraDistinct: Int64 = 0
+    private var bgraLastDelivered: Int64 = 0
+    private var fetches: Int64 = 0, repeatFetches: Int64 = 0, gapFetches: Int64 = 0
+    private var skippedSeqs: Int64 = 0, lateGapFetches: Int64 = 0
 
     init?(channel: Int32, width: Int, height: Int, fps: Int) {
         guard width >= 16, height >= 2, fps > 0 else { return nil }
         self.channel = channel; self.width = width; self.height = height; self.fps = fps
         solid = getenv("TF_P9_SOLID").map { String(cString: $0) == "1" } ?? false
+        precise = getenv("TF_P9_PRECISE").map { String(cString: $0) == "1" } ?? false
         queue = DispatchQueue(label: "tf-frames-\(channel)", qos: .userInteractive)
         work = .allocate(capacity: width * height)
         last = .allocate(capacity: width * height)
@@ -51,6 +89,26 @@ final class FrameSource: @unchecked Sendable {
     }
 
     func start() {
+        if precise {
+            running = true
+            let period = Int64(1_000_000_000 / fps)
+            let th = Thread { [self] in
+                var next = Int64(DispatchTime.now().uptimeNanoseconds)
+                while true {
+                    lock.lock(); let go = running; lock.unlock()
+                    if !go { break }
+                    produceOne()
+                    next += period
+                    let now = Int64(DispatchTime.now().uptimeNanoseconds)
+                    if next <= now { next = now }  // atrasado: sin ráfaga de recuperación
+                    _ = tf_hr_sleep_ns(next - now)
+                }
+                exited.signal()
+            }
+            th.qualityOfService = .userInteractive
+            th.start()
+            return
+        }
         let t = DispatchSource.makeTimerSource(flags: .strict, queue: queue)
         t.schedule(deadline: .now(), repeating: .nanoseconds(1_000_000_000 / fps), leeway: .nanoseconds(0))
         t.setEventHandler { [self] in produceOne() }
@@ -59,6 +117,12 @@ final class FrameSource: @unchecked Sendable {
     }
 
     func stop() {
+        if precise {
+            lock.lock(); let was = running; running = false; lock.unlock()
+            if was { exited.wait() }
+            lock.lock(); haveLast = false; lock.unlock()
+            return
+        }
         timer?.cancel()
         timer = nil
         queue.sync {}  // espera a que termine el fotograma en curso
@@ -110,6 +174,7 @@ final class FrameSource: @unchecked Sendable {
         lock.lock()
         swap(&work, &last)  // doble búfer: `last` pasa a ser el recién generado
         haveLast = true; lastSeq = seq; produced += 1; costNs += cost
+        _ = prodIv.tick(Int64(t0))
         if uploaded { uploadedSeq = seq }
         lock.unlock()
         if let id = frameTextures.id(for: channel) { frameTextures.host?.frame_available?(id) }
@@ -120,6 +185,7 @@ final class FrameSource: @unchecked Sendable {
     func copyForTexture() -> UnsafeMutableRawPointer? {
         lock.lock(); defer { lock.unlock() }
         wantGPU = true
+        noteFetch(delivered: uploadedSeq, previous: lastDelivered)
         guard uploadedSeq > 0, let h = tf_d3d_handle(channel) else { return nil }
         textureCopies += 1
         if uploadedSeq != lastDelivered { distinctCopies += 1; lastDelivered = uploadedSeq }
@@ -130,13 +196,39 @@ final class FrameSource: @unchecked Sendable {
     func copyBGRA(dst: UnsafeMutablePointer<UInt8>, capacity: Int, seqInOut: UnsafeMutablePointer<Int64>?) -> Int {
         lock.lock(); defer { lock.unlock() }
         guard haveLast else { return 0 }
+        noteFetch(delivered: lastSeq, previous: bgraLastDelivered)
         if let seqInOut, lastSeq <= seqInOut.pointee { return 0 }
         let need = width * height * 4
         if capacity < need { return -1 }
         memcpy(dst, last, need)
         bgraCopies += 1
+        if lastSeq > bgraLastDelivered { bgraDistinct += 1; bgraLastDelivered = lastSeq }
         seqInOut?.pointee = lastSeq
         return need
+    }
+
+    /// Bajo lock. Una petición del motor (o de Dart en bgra): ¿sirvió una secuencia nueva, repetida o con huecos?
+    private func noteFetch(delivered: Int64, previous: Int64) {
+        let iv = fetchIv.tick(Int64(DispatchTime.now().uptimeNanoseconds))
+        fetches += 1
+        if delivered == previous { repeatFetches += 1; return }
+        let gap = previous > 0 ? delivered - previous - 1 : 0
+        if gap > 0 {
+            gapFetches += 1; skippedSeqs += gap
+            if iv > lateFetchUs { lateGapFetches += 1 }
+        }
+    }
+
+    func resetWindow() {
+        lock.lock(); defer { lock.unlock() }
+        prodIv.reset(); fetchIv.reset()
+        fetches = 0; repeatFetches = 0; gapFetches = 0; skippedSeqs = 0; lateGapFetches = 0
+    }
+
+    func extra() -> [Int64]? {
+        lock.lock(); defer { lock.unlock() }
+        return [bgraDistinct, fetches, repeatFetches, gapFetches, skippedSeqs, lateGapFetches]
+            + prodIv.summary() + fetchIv.summary()
     }
 
     func stats() -> (Int64, Int64, Int64, Int64, Int64) {

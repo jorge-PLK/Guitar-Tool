@@ -117,11 +117,13 @@ Future<void> _measure(List<String> args, Probe3Surface surf, Watchdog wd,
   // Estado de medida.
   final sw = Stopwatch()..start();
   var inWindow = false;
+  var decodedInWindow = 0;
   var decoded = 0, painted = 0, paintedInWindow = 0, skipped = 0, maxGap = 0;
   var lastSeq = 0;
   final copyMs = <double>[], decodeMs = <double>[];
   final rss = <String, double>{};
   List<int> s0 = const [0, 0, 0, 0];
+  List<int> x0 = List.filled(20, 0);
   double cpuW0 = 0;
   var wallW0 = 0.0;
 
@@ -140,6 +142,8 @@ Future<void> _measure(List<String> args, Probe3Surface surf, Watchdog wd,
       'bgraSkippedFirstSecond': skipped,
     };
     s0 = core.framesStats(0);
+    x0 = core.framesExtra(0);
+    core.framesReset(0);
     cpuW0 = cpuSeconds();
     wallW0 = sw.elapsedMicroseconds / 1e6;
     wd.reset();
@@ -177,6 +181,7 @@ Future<void> _measure(List<String> args, Probe3Surface surf, Watchdog wd,
     if (inWindow) {
       copyMs.add((b - a) / 1000);
       decodeMs.add((c - b) / 1000);
+      decodedInWindow++;
       skipped += gap;
       if (gap + 1 > maxGap) maxGap = gap + 1;
     }
@@ -211,6 +216,7 @@ Future<void> _measure(List<String> args, Probe3Surface surf, Watchdog wd,
   if (bgra) await pollOnce(); // recoge el último fotograma producido
   await Future<void>.delayed(const Duration(milliseconds: 400));
   final s1 = core.framesStats(0);
+  final x1 = core.framesExtra(0);
   // FrameTiming llega por lotes con retraso: espera a que se vacíe el último.
   await Future<void>.delayed(const Duration(milliseconds: 1500));
   ft.active = false;
@@ -218,14 +224,21 @@ Future<void> _measure(List<String> args, Probe3Surface surf, Watchdog wd,
 
   final produced = s1[0] - s0[0];
   // Contador de textura: indice 2 (copias distintas) para gpu/macOS; indice 3 (copias BGRA) para pixel.
-  final ti = _opt(args, '--texture-kind') == 'pixel' ? 3 : 2;
-  final presented = bgra ? paintedInWindow : s1[ti] - s0[ti];
+  // presented = fotogramas DISTINTOS entregados (por secuencia): gpu = indice 2; pixel = extra[0] (bgra distintos).
+  final pixel = _opt(args, '--texture-kind') == 'pixel';
+  final ti = pixel ? 3 : 2;
+  final distinct = bgra ? decodedInWindow : (pixel ? x1[0] - x0[0] : s1[2] - s0[2]);
+  final totalCopies = bgra ? decodedInWindow : (pixel ? s1[3] - s0[3] : s1[1] - s0[1]);
+  final presented = bgra ? paintedInWindow : distinct;
   final discarded = bgra ? skipped : produced - presented;
   final growth = (rss['60s'] ?? 0) - (rss['30s'] ?? 0);
   report['counts'] = {
     'produced': produced,
     'presented': presented,
     'discarded': discarded,
+    'distinctDelivered': distinct,
+    'totalCopies': totalCopies,
+    'duplicateCopies': totalCopies - distinct,
     'discardedByStatsDelta':
         produced - (bgra ? s1[3] - s0[3] : s1[ti] - s0[ti]),
     'maxSeqGap': bgra ? maxGap : null,
@@ -236,6 +249,23 @@ Future<void> _measure(List<String> args, Probe3Surface surf, Watchdog wd,
     'discardedTotalRun': s1[0] - (bgra ? s1[3] : s1[ti]),
     'note': 'ventana = tras el primer segundo; margen +-1 en los bordes',
   };
+  List<int> blk(int o) => x1.sublist(o, o + 7);
+  Map<String, Object?> iv(int o) {
+    final b = blk(o);
+    double ms(int us) => round3(us / 1000);
+    return {
+      'count': b[0], 'min': ms(b[1]), 'p50': ms(b[2]), 'p99': ms(b[3]), 'max': ms(b[4]),
+      'under8ms': b[5], 'over50ms': b[6],
+    };
+  }
+  report['producerIntervalMs'] = iv(6);
+  report['fetchIntervalMs'] = iv(13);
+  report['fetches'] = {
+    'requests': x1[1], 'repeatRequests': x1[2], 'gapRequests': x1[3],
+    'skippedSeqs': x1[4], 'gapRequestsLate40ms': x1[5],
+    'note': 'ventana; peticion = llamada al callback de textura (gpu/pixel) o sondeo de Dart (bgra)',
+  };
+  report['preciseTimer'] = Platform.environment['TF_P9_PRECISE'] == '1';
   report['statsRaw'] = {'atWindowStart': s0, 'atEnd': s1};
   report['frameTiming'] = ft.toJson();
   if (bgra) {

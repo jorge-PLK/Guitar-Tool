@@ -108,6 +108,11 @@ TF_API void tf_debug_frames_stop(int32_t channel);
 /// Devuelve bytes escritos; 0 sin fotograma nuevo; -1 no cabe.
 TF_API int32_t tf_debug_frame_bgra(int32_t channel, uint8_t *dst, int32_t capacity, int32_t *outWidth, int32_t *outHeight, int64_t *outSeq);
 TF_API void tf_debug_frames_stats(int32_t channel, int64_t *produced, int64_t *textureCopies, int64_t *distinctTextureCopies, int64_t *bgraCopies);
+/// Prueba 7 (P9.7f-B): out[0..n) = [0 copiasBgraDistintas, 1 peticiones, 2 peticionesRepetidas, 3 peticionesConHueco,
+/// 4 secuenciasSaltadas, 5 peticionesConHuecoTardias(>40 ms), 6..12 productor, 13..19 peticiones]. Cada bloque de intervalos:
+/// [cuenta, min, p50, p99, max (µs), <8 ms, >50 ms]. Contadores 1..19 desde el último tf_debug_frames_reset (ventana).
+TF_API void tf_debug_frames_extra(int32_t channel, int64_t *out, int32_t n);
+TF_API void tf_debug_frames_reset(int32_t channel);
 /// Coste medio del generador, µs por fotograma.
 TF_API int64_t tf_debug_frames_cost_us(int32_t channel);
 
@@ -122,6 +127,8 @@ TF_API int32_t tf_d3d_size(int32_t channel, int32_t *width, int32_t *height);
 TF_API void *tf_d3d_handle(int32_t channel);
 /// Libera la textura del canal.
 TF_API void tf_d3d_release(int32_t channel);
+/// Espera de alta resolución (CREATE_WAITABLE_TIMER_HIGH_RESOLUTION) en el hilo que llama. 0 bien.
+TF_API int32_t tf_hr_sleep_ns(int64_t ns);
 #endif
 
 #ifdef __cplusplus

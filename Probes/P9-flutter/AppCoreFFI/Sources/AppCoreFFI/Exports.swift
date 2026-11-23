@@ -142,6 +142,24 @@ public func ffiDebugFramesStats(_ channel: Int32, _ produced: UnsafeMutablePoint
     #endif
 }
 
+/// Prueba 7 (P9.7f-B): contadores justos e intervalos. Ver tf_core.h. Solo Windows rellena; en Apple, ceros.
+@_cdecl("tf_debug_frames_extra")
+public func ffiDebugFramesExtra(_ channel: Int32, _ out: UnsafeMutablePointer<Int64>?, _ n: Int32) {
+    guard let out else { return }
+    var v = [Int64](repeating: 0, count: Int(max(n, 0)))
+    #if canImport(CoreVideo) || os(Windows)
+    if let x = frameSources.get(channel)?.extra() { for i in 0..<min(v.count, x.count) { v[i] = x[i] } }
+    #endif
+    for i in 0..<v.count { out[i] = v[i] }
+}
+
+@_cdecl("tf_debug_frames_reset")
+public func ffiDebugFramesReset(_ channel: Int32) {
+    #if canImport(CoreVideo) || os(Windows)
+    frameSources.get(channel)?.resetWindow()
+    #endif
+}
+
 /// Extra de prueba: coste medio del generador en µs por fotograma (solo relleno del búfer, sin la copia).
 @_cdecl("tf_debug_frames_cost_us")
 public func ffiDebugFramesCostUs(_ channel: Int32) -> Int64 {

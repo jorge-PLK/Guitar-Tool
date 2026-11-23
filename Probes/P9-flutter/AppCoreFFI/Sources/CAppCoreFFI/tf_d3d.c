@@ -109,6 +109,26 @@ void tf_d3d_release(int32_t channel) {
   tf_d3d_slot_free(&tf_d3d_slots[channel]);
   LeaveCriticalSection(&tf_d3d_lock);
 }
+
+// P9.7f-B (TF_P9_PRECISE=1): espera de alta resolución (temporizador de espera de alta resolución, un tick de
+// ~0,5 ms en vez de los ~15,6 ms del reloj por defecto). Un temporizador por hilo que llama.
+#ifndef CREATE_WAITABLE_TIMER_HIGH_RESOLUTION
+#define CREATE_WAITABLE_TIMER_HIGH_RESOLUTION 0x00000002
+#endif
+static __declspec(thread) HANDLE tf_hr_timer;
+
+int32_t tf_hr_sleep_ns(int64_t ns) {
+  if (ns <= 0) return 0;
+  if (tf_hr_timer == NULL) {
+    tf_hr_timer = CreateWaitableTimerExW(NULL, NULL, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS);
+    if (tf_hr_timer == NULL) return 1;
+  }
+  LARGE_INTEGER due;
+  due.QuadPart = -(ns / 100);  // relativo, en unidades de 100 ns
+  if (!SetWaitableTimer(tf_hr_timer, &due, 0, NULL, NULL, FALSE)) return 2;
+  WaitForSingleObject(tf_hr_timer, INFINITE);
+  return 0;
+}
 #else
 typedef int tf_d3d_unused_t;
 #endif

@@ -207,17 +207,18 @@ step_frames() {
   [ "$alive" = "0" ] || { echo "hay tf_probe.exe vivo: no lanzo nada"; return 1; }
   remote "mkdir -p $PC_ROOT/run $PC_ROOT/out/run" || return 1
   # frames_one tag mode size kind segundos [env] [captura_a_los_s]
-  if ! frames_one gpu-720 texture 720 gpu 60 "" 30; then
+  if [ "${1:-}" != "--no-fail-fast" ] && ! frames_one gpu-720 texture 720 gpu 60 "" 30; then
     echo "gpu-720 falla: corro pixel-720 de respaldo y paro"
     frames_one pixel-720 texture 720 pixel 60 "" 30
   else
+    [ "${1:-}" = "--no-fail-fast" ] && frames_one gpu-720 texture 720 gpu 60 "" 30
     frames_one gpu-1080 texture 1080 gpu 60
     frames_one pixel-720 texture 720 pixel 60 "" 30
     frames_one pixel-1080 texture 1080 pixel 60
     frames_one bgra-720 bgra 720 gpu 60
     frames_one bgra-1080 bgra 1080 gpu 60
-    frames_one solid-gpu texture 720 gpu 10 TF_P9_SOLID=1 6
-    frames_one solid-pixel texture 720 pixel 10 TF_P9_SOLID=1 6
+    frames_one gpu-720-precise texture 720 gpu 60 TF_P9_PRECISE=1
+    frames_one pixel-720-precise texture 720 pixel 60 TF_P9_PRECISE=1
   fi
   python3 -I "$ROOT/Probes/P9-flutter/pc-frames-table.py" "$dst" 2>&1 | tee -a "$LOG"
   return 0
@@ -237,7 +238,7 @@ step_webview() {
 }
 
 case "$STEP" in
-  frames) step_frames; rc=$? ;;
+  frames) shift; step_frames "$@"; rc=$? ;;
   webview) shift; step_webview "$@"; rc=$? ;;
   app) step_app; rc=$? ;;
   run) shift; step_run "$@"; rc=$? ;;
