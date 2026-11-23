@@ -9,12 +9,22 @@
 // motor llama a tf_mfv_copy, que devuelve el handle y mide el error A/V como VideoProbe.swift (mismas claves).
 // La textura sale sin rotar; info.rotationDegrees lleva el giro que aplica Flutter (misma semántica que el Mac).
 // Variables: TF_P9_VSW=1 fuerza decodificación por software (sin gestor D3D) para comparar.
+// Presentación adelantada (P9 7h, monitor de 60 Hz): el presentador elige el fotograma cuyo [PTS, PTS+T) contiene la
+// posición del reloj en el instante en que se verá, no en el de ahora, y lo sube al empezar la ventana de ese vblank.
+//   TF_P9_VSYNC=0  control: el último fotograma cuyo PTS ya cubre pos(ahora) (comportamiento anterior).
+//   TF_P9_VSYNC=1  (por defecto) visible = próximo vblank (DWM) + TF_P9_VLEAD_MS (por defecto un periodo).
+//   TF_P9_VSYNC=2  visible = vblank siguiente a la próxima copia del motor (fase medida de tf_mfv_copy respecto a la
+//                  rejilla de vblank) + TF_P9_VLEAD_MS (por defecto 0); sin fase fiable usa la fórmula del modo 1.
+// El reloj de vblank sale de DwmGetCompositionTimingInfo (qpcVBlank, qpcRefreshPeriod); si falla, 60 Hz con fase 0
+// de QPC. La métrica e (en tf_mfv_copy) no cambia; se añade e_vb = pos(próximo vblank tras la copia) - n·T.
 #ifdef _WIN32
 #include "tf_core.h"
 
 #define COBJMACROS
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <dwmapi.h>
+#include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,6 +46,7 @@ static const GUID TF_GUID_NULL = {0};
 #pragma comment(lib, "ole32.lib")
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxguid.lib")
+#pragma comment(lib, "dwmapi.lib")
 
 #ifndef CREATE_WAITABLE_TIMER_HIGH_RESOLUTION
 #define CREATE_WAITABLE_TIMER_HIGH_RESOLUTION 0x00000002
@@ -50,6 +61,20 @@ static const double kFrameDur = 1001.0 / 30000.0;
 static const double kFarSeconds = 1.0;
 /// Redondeo de PTS a 100 ns: un fotograma cuenta como «ya toca» con este margen.
 static const double kPtsEps = 0.0002;
+/// Respaldo sin DWM (encargo 7h): periodo de 60 Hz con fase 0 de QPC.
+static const double kVbFallbackPeriod = 1.0 / 60.0;
+/// Periodos de refresco aceptados de DWM (500 Hz .. 10 Hz); fuera de eso se usa el respaldo.
+static const double kVbPeriodMin = 0.002, kVbPeriodMax = 0.1;
+/// Cada cuánto se relee DwmGetCompositionTimingInfo; entre lecturas se extrapola con el periodo.
+static const double kVbRefresh = 0.1;
+/// Modo 1: la ventana de subida para el vblank k empieza kVbGuard después del vblank k-1 (jitter de qpcVBlank).
+static const double kVbGuard = 0.001;
+/// Modo 2: la ventana para la copia i empieza kCopyGuard después de la copia i-1 (jitter del raster del motor).
+static const double kCopyGuard = 0.003;
+/// Modo 2: media circular de la fase de copia (EMA) y condiciones para fiarse de ella.
+static const double kPhaseAlpha = 0.05, kPhaseMinR = 0.6;
+static const int64_t kPhaseMinCopies = 30;
+static const double kTwoPi = 6.283185307179586;
 
 typedef struct {
   uint8_t *px;
@@ -59,8 +84,8 @@ typedef struct {
 } mfv_frame;
 
 typedef struct {
-  double t, e, item;
-  int has_e, n, epoch;
+  double t, e, item, evb;
+  int has_e, n, epoch, has_evb;
 } mfv_sample;
 
 typedef struct {
@@ -111,6 +136,14 @@ typedef struct mfv {
   double read_sum, read_max, rb_sum, rb_max, up_sum, up_max;
   int64_t read_n, rb_n;
   HRESULT last_hr;
+  // Vblank (bajo cs; el presentador refresca la temporización cada kVbRefresh). Tiempos en la escala de mfv_now.
+  int vs_mode;  // 0 control, 1 vblank + adelanto, 2 fase de copia
+  int vb_dwm;   // 1 DWM, 0 respaldo
+  double vb_base, vb_period, lead;
+  double cp_x, cp_y;  // media circular de la fase de tf_mfv_copy en la rejilla de vblank (no se reinicia)
+  int64_t cp_n;
+  int64_t vb_misses, ahead_n;  // subidas terminadas después del fin de su ventana
+  double ahead_sum, ahead_min;  // fin de ventana - fin de subida (s)
 } mfv;
 
 static mfv *g_mfv[MFV_CHANNELS];
@@ -126,6 +159,56 @@ static double mfv_now(void) {
 
 static double mfv_pos(mfv *p, double t) {  // cs tomado
   return p->c_play ? p->c_sec + (t - p->c_at) * p->c_rate : p->c_sec;
+}
+
+/// Temporización de vblank en segundos de QPC: DWM (1) o respaldo de 60 Hz con fase 0 (0). Llamar fuera de cs.
+static int mfv_vsync_read(double *base, double *period) {
+  DWM_TIMING_INFO ti;
+  memset(&ti, 0, sizeof ti);
+  ti.cbSize = sizeof ti;
+  if (g_qpf.QuadPart == 0) QueryPerformanceFrequency(&g_qpf);
+  if (SUCCEEDED(DwmGetCompositionTimingInfo(NULL, &ti)) && ti.qpcRefreshPeriod > 0 && ti.qpcVBlank > 0) {
+    double per = (double)ti.qpcRefreshPeriod / (double)g_qpf.QuadPart;
+    if (per >= kVbPeriodMin && per <= kVbPeriodMax) {
+      *base = (double)ti.qpcVBlank / (double)g_qpf.QuadPart;
+      *period = per;
+      return 1;
+    }
+  }
+  *base = 0;
+  *period = kVbFallbackPeriod;
+  return 0;
+}
+
+/// Primer vblank estrictamente posterior a t. cs tomado y vb_period > 0.
+static double mfv_next_vb(const mfv *p, double t) {
+  return p->vb_base + (floor((t - p->vb_base) / p->vb_period) + 1.0) * p->vb_period;
+}
+
+static int mfv_phase_ready(const mfv *p) {  // cs tomado
+  return p->cp_n >= kPhaseMinCopies && hypot(p->cp_x, p->cp_y) >= kPhaseMinR;
+}
+
+/// Fase media de las copias del motor dentro del periodo, en [0, periodo). cs tomado.
+static double mfv_copy_phase(const mfv *p) {
+  double a = atan2(p->cp_y, p->cp_x);
+  if (a < 0) a += kTwoPi;
+  return a / kTwoPi * p->vb_period;
+}
+
+/// Instante en que se verá lo que se suba ahora; *win_end = fin de la ventana de subida (vblank o copia objetivo).
+/// cs tomado, vs_mode != 0 y vb_period > 0.
+static double mfv_show_time(const mfv *p, double now, double *win_end) {
+  if (p->vs_mode == 2 && mfv_phase_ready(p)) {
+    double phi = mfv_copy_phase(p);
+    double c = p->vb_base + phi + (floor((now - kCopyGuard - p->vb_base - phi) / p->vb_period) + 1.0) * p->vb_period;
+    *win_end = c;
+    return mfv_next_vb(p, c) + p->lead;
+  }
+  double v = mfv_next_vb(p, now - kVbGuard);
+  *win_end = v;
+  // Modo 2 sin fase fiable: supone la copia justo tras el vblank v, así que se verá un periodo después.
+  return v + p->lead + (p->vs_mode == 2 ? p->vb_period : 0);
 }
 
 static void mfv_event_add(mfv *p, double now, const char *kind) {  // cs tomado
@@ -596,16 +679,40 @@ static DWORD WINAPI mfv_present(void *arg) {
   HANDLE timer = CreateWaitableTimerExW(NULL, NULL, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS);
   if (!timer) timer = CreateWaitableTimerExW(NULL, NULL, 0, TIMER_ALL_ACCESS);
   SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
+  const char *vs = getenv("TF_P9_VSYNC");
+  const char *vl = getenv("TF_P9_VLEAD_MS");
+  const int mode = (vs && vs[0] == '0') ? 0 : (vs && vs[0] == '2') ? 2 : 1;
+  const double lead_env = (vl && vl[0]) ? atof(vl) / 1000.0 : -1.0;  // < 0: por defecto del modo
+  double vb_at = -1e9;
   while (!p->stop) {
     double now = mfv_now();
+    // DWM fuera de cs y solo cada kVbRefresh (también en el modo 0: e_vb y fase de copia se miden siempre).
+    double vb_base = 0, vb_per = 0;
+    int vb_dwm = -1;
+    if (now - vb_at >= kVbRefresh) { vb_dwm = mfv_vsync_read(&vb_base, &vb_per); vb_at = now; }
     int pick = -1;
+    double win_end = 0;
     EnterCriticalSection(&p->cs);
+    if (vb_dwm >= 0) {
+      p->vs_mode = mode; p->vb_dwm = vb_dwm; p->vb_base = vb_base; p->vb_period = vb_per;
+      p->lead = lead_env >= 0 ? lead_env : (mode == 1 ? vb_per : 0);
+    }
     // Bucle: el reloj vuelve a start al llegar a end (salto con epoch), como VideoProbe.tick.
     if (p->l_on && p->c_play && mfv_pos(p, now) >= p->l_end) {
       p->c_sec = p->l_start; p->c_at = now; p->c_epoch++;
     }
     if (p->c_epoch != p->applied_epoch) mfv_request_seek(p, now, "clock", 0);
     double pos = mfv_pos(p, now);
+    // Posición objetivo: la de ahora (modo 0) o la proyectada al instante en que se verá (velocidad del reloj).
+    double tgt = pos;
+    if (mode != 0) {
+      tgt = mfv_pos(p, mfv_show_time(p, now, &win_end));
+      // Con bucle no se adelanta más allá del final: el último fotograma antes de l_end hasta que el reloj salte.
+      if (p->l_on && p->c_play && tgt > p->l_end - 2 * kPtsEps) {
+        double lim = p->l_end - 2 * kPtsEps;
+        tgt = lim > pos ? lim : pos;
+      }
+    }
     while (p->q_n > 0) {
       int b = p->q[p->q_head];
       mfv_frame *f = &p->buf[b];
@@ -614,7 +721,7 @@ static DWORD WINAPI mfv_present(void *arg) {
         mfv_free_buf(p, b);
         continue;
       }
-      if (f->pts > pos + kPtsEps) {
+      if (f->pts > tgt + kPtsEps) {
         if (f->pts > pos + kFarSeconds) mfv_request_seek(p, now, "drift", 1);  // reloj > 1 s por detrás de la cola
         break;
       }
@@ -631,8 +738,15 @@ static DWORD WINAPI mfv_present(void *arg) {
       int rc = tf_d3d_upload(p->ch, f->px, p->w, p->h);
       if (rc == 0) { p->pub_n = f->n; p->pub_pts = f->pts; p->pub_seq++; }
       LeaveCriticalSection(&p->pub);
-      double um = (mfv_now() - u0) * 1000;
+      double u1 = mfv_now();
+      double um = (u1 - u0) * 1000;
       EnterCriticalSection(&p->cs);
+      if (rc == 0 && mode != 0 && win_end > 0) {  // margen de la subida frente al fin de su ventana
+        double ahead = win_end - u1;
+        if (ahead < 0) p->vb_misses++;
+        if (p->ahead_n == 0 || ahead < p->ahead_min) p->ahead_min = ahead;
+        p->ahead_sum += ahead; p->ahead_n++;
+      }
       if (rc == 0) p->uploads++; else p->upload_fails++;
       p->up_sum += um;
       if (um > p->up_max) p->up_max = um;
@@ -789,12 +903,44 @@ static void sb_printf(mfv_sb *b, const char *fmt, ...) {
   }
 }
 
+static int mfv_cmp_double(const void *a, const void *b) {
+  double x = *(const double *)a, y = *(const double *)b;
+  return (x > y) - (x < y);
+}
+
+/// Percentil de v ordenado (rango más cercano) como texto JSON; "null" sin datos.
+static void mfv_pct_json(char *out, size_t cap, const double *v, int n, double q) {
+  if (n <= 0) { snprintf(out, cap, "null"); return; }
+  snprintf(out, cap, "%.2f", v[(int)floor(q * (double)(n - 1) + 0.5)]);
+}
+
 char *tf_mfv_stats(int32_t channel, int32_t reset) {
   AcquireSRWLockShared(&g_mfv_lock);
   mfv *p = mfv_get_locked(channel);
   if (!p) { ReleaseSRWLockShared(&g_mfv_lock); return NULL; }
   mfv_sb b = {0};
   EnterCriticalSection(&p->cs);
+  // e_vb (ms, con signo) del tramo; fase de copia (media y desviación circulares, ms); margen de subida.
+  int ne = 0;
+  double *ev = p->n_samples > 0 ? (double *)malloc(sizeof(double) * (size_t)p->n_samples) : NULL;
+  for (int i = 0; ev && i < p->n_samples; i++)
+    if (p->samples[i].has_evb) ev[ne++] = p->samples[i].evb * 1000;
+  if (ne > 1) qsort(ev, (size_t)ne, sizeof(double), mfv_cmp_double);
+  char evb05[24], evb50[24], evb95[24], ahead_min[24], phase[24], phase_sd[24];
+  mfv_pct_json(evb05, sizeof evb05, ev, ne, 0.05);
+  mfv_pct_json(evb50, sizeof evb50, ev, ne, 0.50);
+  mfv_pct_json(evb95, sizeof evb95, ev, ne, 0.95);
+  free(ev);
+  if (p->ahead_n > 0) snprintf(ahead_min, sizeof ahead_min, "%.2f", p->ahead_min * 1000);
+  else snprintf(ahead_min, sizeof ahead_min, "null");
+  double cr = hypot(p->cp_x, p->cp_y);
+  if (p->cp_n > 0 && p->vb_period > 0 && cr > 1e-9) {
+    snprintf(phase, sizeof phase, "%.2f", mfv_copy_phase(p) * 1000);
+    snprintf(phase_sd, sizeof phase_sd, "%.2f", p->vb_period / kTwoPi * sqrt(-2.0 * log(cr < 1.0 ? cr : 1.0)) * 1000);
+  } else {
+    snprintf(phase, sizeof phase, "null");
+    snprintf(phase_sd, sizeof phase_sd, "null");
+  }
   sb_printf(&b, "{\"resyncs\":%lld,\"driftResyncs\":%lld,\"calls\":%lld,\"deliveries\":%lld,\"unreadable\":%lld,\"samples\":[",
             (long long)p->resyncs, (long long)p->drift_resyncs, (long long)p->calls, (long long)p->deliveries,
             (long long)p->unreadable);
@@ -810,12 +956,20 @@ char *tf_mfv_stats(int32_t channel, int32_t reset) {
     sb_printf(&b, "%s[%.2f,\"%s\"]", i ? "," : "", p->events[i].t * 1000, p->events[i].kind);
   sb_printf(&b, "],\"win\":{\"lateDrops\":%lld,\"queued\":%lld,\"uploads\":%lld,\"uploadFails\":%lld,\"seeks\":%lld,"
                 "\"seekFails\":%lld,\"readFails\":%lld,\"lastHr\":\"0x%08lX\",\"readMsAvg\":%.3f,\"readMsMax\":%.3f,"
-                "\"readbackMsAvg\":%.3f,\"readbackMsMax\":%.3f,\"uploadMsAvg\":%.3f,\"uploadMsMax\":%.3f}}",
+                "\"readbackMsAvg\":%.3f,\"readbackMsMax\":%.3f,\"uploadMsAvg\":%.3f,\"uploadMsMax\":%.3f,"
+                "\"vsyncMode\":%d,\"vsyncSource\":\"%s\",\"refreshMs\":%.3f,\"leadMs\":%.3f,\"phaseReady\":%s,"
+                "\"copyPhaseMs\":%s,\"copyPhaseSdMs\":%s,\"vsyncMisses\":%lld,\"aheadMsMin\":%s,\"aheadMsAvg\":%.2f,"
+                "\"evbN\":%d,\"evbMsP05\":%s,\"evbMsMed\":%s,\"evbMsP95\":%s}}",
             (long long)p->late_drops, (long long)p->queued, (long long)p->uploads, (long long)p->upload_fails,
             (long long)p->seeks, (long long)p->seek_fails, (long long)p->read_fails, (unsigned long)p->last_hr,
             p->read_n ? p->read_sum / (double)p->read_n : 0, p->read_max, p->rb_n ? p->rb_sum / (double)p->rb_n : 0,
-            p->rb_max, p->uploads ? p->up_sum / (double)p->uploads : 0, p->up_max);
+            p->rb_max, p->uploads ? p->up_sum / (double)p->uploads : 0, p->up_max,
+            p->vs_mode, p->vb_dwm ? "dwm" : "fallback", p->vb_period * 1000, p->lead * 1000,
+            (p->vb_period > 0 && mfv_phase_ready(p)) ? "true" : "false", phase, phase_sd, (long long)p->vb_misses,
+            ahead_min, p->ahead_n ? p->ahead_sum / (double)p->ahead_n * 1000 : 0, ne, evb05, evb50, evb95);
   if (reset) {
+    p->vb_misses = p->ahead_n = 0;
+    p->ahead_sum = p->ahead_min = 0;
     p->n_samples = 0; p->n_events = 0;
     p->resyncs = p->drift_resyncs = p->calls = p->deliveries = p->unreadable = 0;
     p->late_drops = p->queued = p->uploads = p->upload_fails = p->seeks = p->seek_fails = p->read_fails = 0;
@@ -845,6 +999,15 @@ void *tf_mfv_copy(int32_t channel, int32_t *active) {
   double now = mfv_now();
   EnterCriticalSection(&p->cs);
   p->calls++;
+  // Fase de esta copia en la rejilla de vblank (cada llamada es un raster del motor): media circular por EMA.
+  if (p->vb_period > 0) {
+    double ph = fmod(now - p->vb_base, p->vb_period);
+    if (ph < 0) ph += p->vb_period;
+    double th = ph / p->vb_period * kTwoPi;
+    p->cp_x += kPhaseAlpha * (cos(th) - p->cp_x);
+    p->cp_y += kPhaseAlpha * (sin(th) - p->cp_y);
+    p->cp_n++;
+  }
   if (fresh) {
     p->deliveries++;
     if (n < 0) p->unreadable++;
@@ -858,6 +1021,9 @@ void *tf_mfv_copy(int32_t channel, int32_t *active) {
       x->t = now - p->t0;
       x->has_e = n >= 0;
       x->e = n >= 0 ? mfv_pos(p, now) - (double)n * kFrameDur : 0;
+      // Auxiliar: error en el primer vblank tras la copia (la métrica e de arriba no cambia).
+      x->has_evb = n >= 0 && p->vb_period > 0;
+      x->evb = x->has_evb ? mfv_pos(p, mfv_next_vb(p, now)) - (double)n * kFrameDur : 0;
       x->n = n;
       x->item = item;
       x->epoch = p->c_epoch;

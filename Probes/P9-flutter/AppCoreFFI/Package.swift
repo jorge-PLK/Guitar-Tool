@@ -16,7 +16,7 @@ let package = Package(
     targets: [
         // P9 7h: tf_mfvideo.c/tf_d3d.c en Windows (además de sus #pragma comment, por si el enlazador los ignora).
         .target(name: "CAppCoreFFI", cSettings: [.headerSearchPath("dart")],
-                linkerSettings: ["mfplat", "mfreadwrite", "mfuuid", "d3d11", "dxguid", "ole32"].map {
+                linkerSettings: ["mfplat", "mfreadwrite", "mfuuid", "d3d11", "dxguid", "ole32", "dwmapi"].map {
                     .linkedLibrary($0, .when(platforms: [.windows]))
                 }),
         .target(name: "AppCoreFFI", dependencies: ["CAppCoreFFI", .product(name: "AppCore", package: "AppCore")]),
