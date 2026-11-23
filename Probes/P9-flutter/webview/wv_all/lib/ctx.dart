@@ -53,8 +53,10 @@ class Ctx {
 
   Future<void> _captureShim() async {
     try {
-      final v = await evalJson('JSON.stringify(window.__shimVia===undefined?null:window.__shimVia)');
-      if (v != null) startup['shimVia'] = v;
+      // Windows devuelve el resultado ya decodificado una vez (el JSON.stringify llega con comillas) y
+      // evalJson lo decodificaba otra vez: 'chrome.webview' no es JSON y la excepcion se tragaba.
+      final v = looseJson(await web.eval('String(window.__shimVia)').timeout(const Duration(seconds: 8)));
+      if (v is String && v != 'undefined' && v != 'null') startup['shimVia'] = v;
     } catch (_) {}
   }
 
@@ -155,7 +157,10 @@ class Ctx {
     report['badMessages'] = badMessages;
     report['eventCounts'] = counts;
     report['elapsedMs'] = ms;
+    if (!startup.containsKey('shimVia') && _webReady) await _captureShim();
     startup.putIfAbsent('shimVia', () => null);
+    report['userDataDirApplied'] = ProbeWebView.userDataDirApplied;
+    if (ProbeWebView.userDataDirError != null) report['userDataDirError'] = ProbeWebView.userDataDirError;
     report['startup'] = startup;
     report.putIfAbsent('ok', () => true);
     final path = args.get('--report');
@@ -210,6 +215,19 @@ class Ctx {
       'webContentCaptured': nonBg > total * 0.05,
     };
   }
+}
+
+/// Decodifica JSON hasta 3 veces mientras el resultado siga siendo texto JSON valido; si no, lo deja tal cual.
+dynamic looseJson(String s) {
+  dynamic v = s;
+  for (var i = 0; i < 3 && v is String; i++) {
+    try {
+      v = jsonDecode(v);
+    } catch (_) {
+      break;
+    }
+  }
+  return v;
 }
 
 Json stats(List<double> v) {

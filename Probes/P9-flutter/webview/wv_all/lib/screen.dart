@@ -87,7 +87,7 @@ class Screen extends StatelessWidget {
   Widget? _web(Size avail) {
     final st = c.st;
     final hidden = st.hidden;
-    if (hidden == 'none') return null;
+    // 'none' = visible: cae en la rama por defecto (tamano completo segun frac).
     if (hidden != null || st.showWeb) {
       final w = c.web.widget();
       return switch (hidden) {

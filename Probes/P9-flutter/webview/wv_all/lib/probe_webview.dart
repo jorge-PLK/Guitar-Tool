@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/widgets.dart';
 import 'package:webview_all/webview_all.dart';
+import 'package:webview_all_windows/webview_all_windows.dart' show WindowsWebViewController;
 
 class ProbeWebView {
   ProbeWebView({
@@ -20,16 +21,29 @@ class ProbeWebView {
   final void Function(String url) onPageFinished;
   final void Function(String description) onError;
 
-  /// Carpeta de datos de usuario pedida con --user-data-dir. webview_all 1.5.2 no la expone en su API
-  /// publica (solo webview_all_windows.ensureEnvironment, dependencia transitiva), asi que no se aplica.
+  /// Carpeta de datos de usuario pedida con --user-data-dir. La API publica de webview_all no la expone:
+  /// en Windows se aplica con WindowsWebViewController.ensureEnvironment (webview_all_windows), una vez por proceso.
   static String? requestedUserDataDir;
-  static const userDataDirApplied = false;
+  static bool userDataDirApplied = false;
+  static String? userDataDirError;
+  static bool _envTried = false;
 
   late final WebViewController _c;
   String serving = '';
   bool uaApplied = false;
 
   Future<void> init({String? userAgent}) async {
+    final dir = requestedUserDataDir;
+    if (Platform.isWindows && dir != null && !_envTried) {
+      _envTried = true;
+      try {
+        await WindowsWebViewController.ensureEnvironment(userDataPath: dir);
+        userDataDirApplied = true;
+      } catch (e) {
+        userDataDirApplied = false;
+        userDataDirError = '$e';
+      }
+    }
     _c = WebViewController();
     await _c.setJavaScriptMode(JavaScriptMode.unrestricted);
     await _c.setNavigationDelegate(NavigationDelegate(

@@ -46,7 +46,6 @@ Future<void> _run(Ctx c) async {
   c.report['viewPhysicalSize'] = [view.physicalSize.width, view.physicalSize.height];
   c.report['viewLogicalSize'] = [view.physicalSize.width / dpr, view.physicalSize.height / dpr];
   c.report['userDataDir'] = ProbeWebView.requestedUserDataDir;
-  c.report['userDataDirApplied'] = ProbeWebView.userDataDirApplied;
   try {
     await Future<void>.delayed(const Duration(milliseconds: 300));
     switch (name) {

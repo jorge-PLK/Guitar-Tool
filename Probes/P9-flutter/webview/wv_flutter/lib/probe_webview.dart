@@ -28,6 +28,8 @@ class ProbeWebView {
   /// Lo fija main.dart con --user-data-dir antes de init(). Solo se aplica en Windows.
   static String? requestedUserDataDir;
   static bool userDataDirApplied = false;
+  static String? userDataDirError;
+  static bool _envTried = false; // initializeEnvironment vale una sola vez, antes del primer controlador
 
   late final WebViewController _c;
   win.WebviewController? _w;
@@ -56,13 +58,14 @@ class ProbeWebView {
   // Canal JS: shim.js encamina webkit.messageHandlers.tf.postMessage a chrome.webview.postMessage.
   Future<void> _initWin(String? userAgent) async {
     final dir = requestedUserDataDir;
-    if (dir != null) {
+    if (dir != null && !_envTried) {
+      _envTried = true;
       try {
         await win.WebviewController.initializeEnvironment(userDataPath: dir);
         userDataDirApplied = true;
       } catch (e) {
         userDataDirApplied = false;
-        onError('initializeEnvironment: $e');
+        userDataDirError = '$e';
       }
     }
     final w = win.WebviewController();

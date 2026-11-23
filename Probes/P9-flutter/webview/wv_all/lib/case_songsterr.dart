@@ -24,6 +24,30 @@ Future<Json> _testHidden(Ctx c, String mode) async {
   }
 }
 
+/// Prueba de pintado independiente de la captura externa: estado de visibilidad, tamano de la ventana
+/// y de body, y ticks de requestAnimationFrame durante 2 s (0 ticks = el navegador no esta pintando).
+Future<void> _paintProbe(Ctx c) async {
+  try {
+    final r = looseJson(await c.web.eval(
+        'JSON.stringify({vs:document.visibilityState,w:innerWidth,h:innerHeight,bh:document.body.getBoundingClientRect().height})'));
+    if (r is Map) {
+      c.report['visibilityState'] = r['vs'];
+      c.report['innerWidth'] = r['w'];
+      c.report['innerHeight'] = r['h'];
+      c.report['bodyHeight'] = r['bh'];
+    } else {
+      c.report['paintProbeRaw'] = '$r';
+    }
+    await c.web.run('window.__raf=0;(function f(){window.__raf++;requestAnimationFrame(f)})();');
+    await Future<void>.delayed(const Duration(seconds: 2));
+    final n = looseJson(await c.web.eval('String(window.__raf)'));
+    c.report['rafTicksIn2s'] = n is num ? n.toInt() : null;
+  } catch (e) {
+    c.report['paintProbeError'] = '$e';
+  }
+  c.report['visibleUntilExit'] = c.st.hidden == 'none';
+}
+
 /// Songsterr real con un modo oculto fijo (--mode): ms hasta pagina lista, bytes, titulo y JS vivo.
 Future<void> _runHiddenReal(Ctx c, String mode) async {
   c.report['hiddenModeUsed'] = mode;
@@ -58,6 +82,7 @@ Future<void> _runHiddenReal(Ctx c, String mode) async {
     c.report['jsTicksIn2s'] = n;
     c.report['jsAlive'] = n >= 5;
     c.report['navigatorUserAgent'] = await c.web.eval('navigator.userAgent');
+    await _paintProbe(c);
     c.report['ok'] = (c.report['htmlBytes'] as int) > 0;
   } catch (e) {
     c.fail('eval fallo ($mode): $e');
@@ -122,5 +147,6 @@ Future<void> runSongsterr(Ctx c) async {
   c.report['uaSetTo'] = safariUa;
   c.report['uaApplied'] = c.web.uaApplied;
   c.report['uaMatches'] = '${c.report['navigatorUserAgent']}'.contains('Version/17.5');
+  await _paintProbe(c);
   c.report['totalSeconds'] = sw.elapsedMilliseconds / 1000.0;
 }
