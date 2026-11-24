@@ -1,12 +1,47 @@
 import Foundation
 
-/// Error de un método; viaja como `{"error":{"code","message"}}`.
+/// Valor JSON para los `args` de un error (los números viajan como número, no como texto).
+public enum JSONValue: Sendable, Equatable, Encodable {
+    case null
+    case bool(Bool)
+    case int(Int64)
+    case double(Double)
+    case string(String)
+    case array([JSONValue])
+    case object([String: JSONValue])
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.singleValueContainer()
+        switch self {
+        case .null: try c.encodeNil()
+        case .bool(let v): try c.encode(v)
+        case .int(let v): try c.encode(v)
+        case .double(let v): try c.encode(v)
+        case .string(let v): try c.encode(v)
+        case .array(let v): try c.encode(v)
+        case .object(let v): try c.encode(v)
+        }
+    }
+}
+
+extension JSONValue: ExpressibleByStringLiteral, ExpressibleByIntegerLiteral, ExpressibleByFloatLiteral,
+                     ExpressibleByBooleanLiteral {
+    public init(stringLiteral value: String) { self = .string(value) }
+    public init(integerLiteral value: Int64) { self = .int(value) }
+    public init(floatLiteral value: Double) { self = .double(value) }
+    public init(booleanLiteral value: Bool) { self = .bool(value) }
+}
+
+/// Error de un método; viaja como `{"error":{"code","message"[,"args"]}}`. `args` solo sale si no está vacío
+/// (contrato, «Reglas de Dart» regla 6: el mensaje lo compone la interfaz a partir de `code` y `args`).
 public struct RPCError: Error, Sendable, Equatable {
     public let code: String
     public let message: String
-    public init(code: String, message: String) {
+    public let args: [String: JSONValue]
+    public init(code: String, message: String, args: [String: JSONValue] = [:]) {
         self.code = code
         self.message = message
+        self.args = args
     }
 }
 
@@ -93,14 +128,25 @@ public final class Router: @unchecked Sendable {
         return "{\"event\":\(String(decoding: nameData, as: UTF8.self)),\"payload\":\(String(decoding: data, as: UTF8.self))}"
     }
 
-    private struct ErrorBody: Encodable { let code: String; let message: String }
+    private struct ErrorBody: Encodable {
+        let code: String
+        let message: String
+        let args: [String: JSONValue]
+        enum CodingKeys: String, CodingKey { case code, message, args }
+        func encode(to encoder: Encoder) throws {
+            var c = encoder.container(keyedBy: CodingKeys.self)
+            try c.encode(code, forKey: .code)
+            try c.encode(message, forKey: .message)
+            if !args.isEmpty { try c.encode(args, forKey: .args) }
+        }
+    }
     private struct ErrorEnvelope: Encodable {
         let id: Int?
         let error: ErrorBody
     }
 
     static func errorResponse(id: Int?, _ e: RPCError) -> String {
-        let env = ErrorEnvelope(id: id, error: ErrorBody(code: e.code, message: e.message))
+        let env = ErrorEnvelope(id: id, error: ErrorBody(code: e.code, message: e.message, args: e.args))
         let data = (try? JSONEncoder().encode(env)) ?? Data()
         return String(decoding: data, as: UTF8.self)
     }

@@ -1,0 +1,9 @@
+{
+  "launch" : {
+    "snapshot" : false
+  },
+  "mediaBase" : "https://tf.media/",
+  "platform" : "macos",
+  "projectsFolder" : "/<dir>/Projects",
+  "version" : "0.1.0"
+}

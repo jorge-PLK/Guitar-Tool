@@ -1,0 +1,6 @@
+{
+  "paths" : [
+    "/<dir>/Song.mp3",
+    "/<dir>/Other.wav"
+  ]
+}
