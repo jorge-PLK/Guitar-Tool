@@ -489,6 +489,7 @@ vid_run() { # caso decoders suffix -> informe en $dst; devuelve 0 si el informe 
   rm -f "$dst/$name".{json,png,out,err}
   scp -q -o BatchMode=yes "$PC_HOST:$PC_ROOT_SCP/out/vid/$tag.json" "$dst/$name.json" >>"$LOG" 2>&1
   scp -q -o BatchMode=yes "$PC_HOST:$PC_ROOT_SCP/out/vid/$tag.png" "$dst/$name.png" >>"$LOG" 2>&1
+  for x in pw.png screen.png info.txt shot.txt; do scp -q -o BatchMode=yes "$PC_HOST:$PC_ROOT_SCP/out/vid/$tag.$x" "$dst/$name.$x" >>"$LOG" 2>&1; done  # diagnostico de shot.ps1
   scp -q -o BatchMode=yes "$PC_HOST:$PC_ROOT_SCP/out/vid/$tag.log" "$dst/$name.out" >>"$LOG" 2>&1
   scp -q -o BatchMode=yes "$PC_HOST:$PC_ROOT_SCP/out/vid/$tag.err" "$dst/$name.err" >>"$LOG" 2>&1
   [ -f "$dst/$name.json" ] || { echo "SIN INFORME: $name"; return 1; }

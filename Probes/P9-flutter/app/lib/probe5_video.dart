@@ -47,7 +47,11 @@ class _View extends StatelessWidget {
                         quarterTurns: s.quarter,
                         child: AspectRatio(
                           aspectRatio: s.w / s.h,
-                          child: Texture(textureId: s.id),
+                          // Magenta detrás (diagnóstico 7h): si la captura lo muestra, el widget existe pero la textura no pinta.
+                          child: ColoredBox(
+                            color: const Color(0xFFFF00FF),
+                            child: Texture(textureId: s.id),
+                          ),
                         ),
                       ),
                     ),
