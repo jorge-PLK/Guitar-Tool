@@ -26,7 +26,7 @@ Estado a comprobar al empezar la ola 0 contra `docs/plan/fase-7c.md` («Condici�
 | A1 | Cámaras en Ajustes del Mac por `AppCore` (`resolvedCameras`) | 3 | núcleo | abierto |
 | M1 | Hoja «Encuadre» en el Mac (`takeFrame` tenía `nil`; `MontageServices.swift:73-78` ya tiene rama Mac) | 4 | núcleo, vídeo | resuelto en código (`a5f9eb6`); pendiente de que Jorge compruebe `framingFrame` con vídeo real en el Mac |
 | R3, M2 | Rendimiento de cámara y vista previa en el Mac | P9 | medida | lo sustituye la prueba 3 de P9 (píxeles crudos) |
-| T3 | Guardar fichero y abrir URL desde el anfitrión | 0 | anfitrión Flutter | abierto |
+| T3 | Guardar fichero y abrir URL desde el anfitrión | 0 | anfitrión Flutter | resuelto en código (b5f880d): `saveFile` y `openURL` por `hostRequest`; falta el lado Dart (F1) |
 | S4 | Modelos embebidos en `Bundle.main` | 5 | empaquetado | abierto |
 | — | Audio y cámara reales del Mac por el puente de `AppCore` | 3 | hardware (Jorge) | abierto |
 

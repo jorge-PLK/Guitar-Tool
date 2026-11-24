@@ -10,9 +10,11 @@ Documentación de la fase, por piezas: `docs/flutter/README.md` (índice). El or
 - [ ] **Ola 2 · Estudio:** Backing (mezclador, rejilla de acordes, secciones, bucle, metrónomo) y Tablatura (WebView de alphaTab, edición, Songsterr, exportar `.gp`) (`pantallas/backing.md`, `pantallas/tablatura.md`).
 - [ ] **Ola 3 · Grabación:** Grabar, Ver toma, Ajustar desfase, Ajustes · Audio (calibración) y Ajustes · Cámara y vídeo (`pantallas/grabar.md`, `pantallas/ajustes.md`).
 - [ ] **Ola 4 · Montaje:** Montaje y hoja «Encuadre» (`pantallas/montaje.md`).
-- [ ] **Ola 5 · Cierre:** empaquetado de Mac y de Windows (recursos, DLL), mensajes del núcleo por código en todas las áreas que falten, pasada completa en el PC x64, borrado de `App/`, `WinApp/Web`, `Tools/webdev` y `FrameRelay` en JPEG, CODEMAP y `CLAUDE.md`.
+- [ ] **Ola 5 · Cierre:** empaquetado de Mac y de Windows (recursos, DLL), mensajes del núcleo por código en todas las áreas que falten, pasada única en el PC x64 al final (tras validar todas las olas en el Mac), borrado de `App/`, `WinApp/Web`, `Tools/webdev` y `FrameRelay` en JPEG, CODEMAP y `CLAUDE.md`.
 
-Cada ola: contrato del área (fixtures → DTO) antes que la pantalla; partes en paralelo si no se pisan; validación con la lista de `orquestador.md`; `tf-qa` una vez; compilación y prueba en el PC x64; visto bueno de Jorge sobre las parejas referencia/Flutter. Commits pequeños y frecuentes con push a `fase-7f`, sin preguntar, uno por parte integrada.
+Cada ola: contrato del área (fixtures → DTO) antes que la pantalla; partes en paralelo si no se pisan; validación con la lista de `orquestador.md`; `tf-qa` una vez; todo se valida primero en el Mac (el PC x64 solo cuando todo esté validado: pasada única al final, con lo pendiente de Windows acumulado en una lista); visto bueno de Jorge sobre las parejas referencia/Flutter.
+
+Orden acordado (24/11/2026): Ola 0 sola → olas 1, 2 y 3 en paralelo (una sesión y un worktree por ola) → ola 4 → ola 5 → pasada del PC. Commits pequeños y frecuentes con push a `fase-7f`, sin preguntar, uno por parte integrada.
 
 Condición de paso (Jorge, 22/11/2026): en el Mac y en el PC x64, con la app Flutter: importar un tema por enlace, separarlo, Backing en bucle al 70 %, tablatura con edición y exportación a `.gp`, grabar una toma con cámara y verla, montar y exportar un vídeo, y Ajustes completos; todas las pantallas y hojas comparadas con su captura de referencia y aceptadas por Jorge; puerta de tests verde; sin SwiftUI ni WebView2 en el repo.
 

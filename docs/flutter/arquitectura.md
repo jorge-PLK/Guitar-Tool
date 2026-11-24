@@ -85,7 +85,7 @@ Resolución y fps por canal los decide el núcleo: `camera` y `montage` a 720p30
 
 ## Estructura de `FlutterApp/`
 
-Versiones fijadas en P9: Flutter **3.50.1** por FVM (`.fvmrc` en la raíz; el Dart que trae fija `sdk:` en `pubspec.yaml`); `webview_all` **1.5.2** y `webview_all_windows` **1.5.2** (dependencia directa: `ensureEnvironment` para la carpeta de datos). Sin plugin de vídeo. El resto de plugins permitidos (regla 9) se fija con versión exacta, sin `^`, al crear `pubspec.yaml` en la ola 0, con la última estable que resuelva con Flutter 3.50.1, y `pubspec.lock` se versiona. Subir Flutter o un plugin es una pregunta a Jorge.
+Versiones fijadas en P9: Flutter **3.50.1** por FVM (`.fvmrc` en la raíz; el Dart que trae fija `sdk:` en `pubspec.yaml`); `webview_all` **1.5.2** y `webview_all_windows` **1.5.2** (dependencia directa: `ensureEnvironment` para la carpeta de datos). Sin plugin de vídeo. `material_ui` **1.11.1** (aceptado por Jorge el 24/11/2026). El resto de plugins permitidos (regla 9) se fija con versión exacta, sin `^`, al crear `pubspec.yaml` en la ola 0, con la última estable que resuelva con Flutter 3.50.1, y `pubspec.lock` se versiona. Subir Flutter o un plugin es una pregunta a Jorge.
 
 ```
 FlutterApp/
@@ -122,7 +122,7 @@ Contract/fixtures/<área>/ JSON dorado: <método>.params.json, <método>.result.
 6. **Errores del núcleo**: `{code, message, args}`. Dart traduce por `code` (`error_<code>` en ARB) y cae a `message` si no conoce el código.
 7. **Dibujo propio** con `CustomPainter` (rejilla de acordes, diagramas, medidores, líneas de tiempo); nada de paquetes de gráficos.
 8. **Un fichero ≤ ~300 líneas.** Una pantalla grande se parte en `widgets/`.
-9. **Plugins permitidos** (versión exacta en `pubspec.yaml`; añadir otro es una pregunta a Jorge): `flutter_riverpod`, `file_selector`, `url_launcher`, `path_provider`, `desktop_drop`, `window_manager`, `shared_preferences` (solo el idioma, con la API `SharedPreferencesAsync`). WebView: `webview_all` + `webview_all_windows` (P9); vídeo: ninguno (motor nativo en el núcleo). Los goldens usan `matchesGoldenFile` con fuentes reales y se generan solo en el Mac.
+9. **Plugins permitidos** (versión exacta en `pubspec.yaml`; añadir otro es una pregunta a Jorge): `flutter_riverpod`, `file_selector`, `url_launcher`, `path_provider`, `desktop_drop`, `window_manager`, `shared_preferences` (solo el idioma, con la API `SharedPreferencesAsync`), `material_ui` 1.11.1 (sustituto oficial de `package:flutter/material.dart`, deprecado en Flutter 3.50; aceptado por Jorge el 24/11/2026). WebView: `webview_all` + `webview_all_windows` (P9); vídeo: ninguno (motor nativo en el núcleo). Los goldens usan `matchesGoldenFile` con fuentes reales y se generan solo en el Mac.
 
 ## WebView (Tablatura y Songsterr)
 

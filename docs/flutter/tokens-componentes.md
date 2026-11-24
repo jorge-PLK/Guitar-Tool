@@ -79,7 +79,7 @@ Nota: `.bold` en `body` (p. ej. `TF.body(11, .bold)`, `MixerToggle` `BackingMixe
 | `.white` | ≥8 | `RecordView.swift:478`, `BackingRecord.swift:22`, `ArtistGrid.swift:42` (0.9) | `TfColors.white` | |
 | `.black` | ≥9 | `TakeViewer.swift:320`, `VideoSettingsView.swift:288`, `OffsetSheet.swift:34` | `TfColors.black` | fondos de vídeo |
 | `Color(hue: h%360/360, sat 0.45, br 0.5)` | 1 | `ArtistGrid.swift:74` | `TfColors.artistAvatar(String name)` | color de avatar derivado de FNV-1a 64 bits del nombre (`ArtistGrid.swift:72-73`) |
-| `VideoSettingsView.swift:388`: `.white .yellow .cyan .green .pink .red .blue .black` | 8 | | `TfColors.colorBars` | barras de colores de prueba (sistema, no paleta): fijar sRGB equivalentes, **decisión de Jorge** |
+| `VideoSettingsView.swift:388`: `.white .yellow .cyan .green .pink .red .blue .black` | 8 | | `TfColors.colorBars` | barras de colores de prueba (sistema, no paleta): sRGB de los colores de SwiftUI en modo oscuro, a confirmar con la captura de referencia (orquestador, 24/11/2026, por el criterio de Jorge) |
 
 Fuera del barrido de vistas: `LinkImportDemo.swift:75` y `SpotifyDemo.swift:54-55` son demos (`NSColor` con RGB 0.95/0.64/0.23 y HSB), no se portan.
 
@@ -99,7 +99,7 @@ Fuera del barrido de vistas: `LinkImportDemo.swift:75` y `SpotifyDemo.swift:54-5
 | 9 | 2 | `SectionBoxes.swift:64,67` | `TfRadius.r9` (cercano a 8/10) |
 | 7 | 2 | `TabScreen.swift:250` | `TfRadius.r7` (cercano a 6/8) |
 
-Más `Capsule()` (22 usos, `Theme.swift:94,134`) → `TfRadius.pill` (radio = alto/2). `LibraryView.swift:438` usa `Self.radius = 8`. Casi iguales: 7 y 9 podrían ser 8; 3 podría ser 2 o 4. Los tokens mantienen el valor literal; fundirlos es **decisión de Jorge** (cambia píxeles).
+Más `Capsule()` (22 usos, `Theme.swift:94,134`) → `TfRadius.pill` (radio = alto/2). `LibraryView.swift:438` usa `Self.radius = 8`. Casi iguales: 7 y 9 podrían ser 8; 3 podría ser 2 o 4. Los tokens mantienen el valor literal; no se funden (orquestador, 24/11/2026, por el criterio de Jorge de no fundir valores).
 
 ### 2.3 Grosores y bordes
 
@@ -122,7 +122,7 @@ Más `Capsule()` (22 usos, `Theme.swift:94,134`) → `TfRadius.pill` (radio = al
 | 0.35 / 0.28 / 0.30 / 0.22 / 0.20 / 0.18 / 0.16 / 0.12 / 0.07 | 3/2/1/1/1/1/1/1/1 | `MontageView.swift:792,828`; fila seleccionada ok 0.12 `LibraryView.swift:235`; hover 0.07 `LibraryView.swift:236`; sección 0.16/0.07 (`SectionBoxes`) | `TfOpacity.tintStrong/…` |
 | 0.45, 0.75, 0.9 | 1 c/u | deshabilitado de otro control, scrim 0.75 `RecordView.swift:456`, blanco 0.9 `ArtistGrid.swift:42` | |
 
-Casi iguales: 0.4/0.45/0.5/0.55 (atenuado), 0.18/0.20/0.22 (tintes). Escala mínima propuesta: 0.07, 0.12, 0.2, 0.35, 0.4, 0.5, 0.6, 0.7, 0.8, 0.85; los singletons se asignan al más cercano **tras decisión de Jorge** (cambian píxeles).
+Casi iguales: 0.4/0.45/0.5/0.55 (atenuado), 0.18/0.20/0.22 (tintes). Escala mínima propuesta: 0.07, 0.12, 0.2, 0.35, 0.4, 0.5, 0.6, 0.7, 0.8, 0.85; no se usa: las opacidades mantienen el valor literal de SwiftUI, sin fundir (orquestador, 24/11/2026, por el criterio de Jorge).
 
 ### 2.5 Sombras (4, todas negras)
 

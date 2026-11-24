@@ -78,6 +78,17 @@ La app SwiftUI no importa `HostServices` (ningún acierto en `App/`); no usa `Br
 | Eventos propios del anfitrión | recomendado | `host.filesDropped` | |
 | Mostrar en Explorador, privacidad de cámara, cámara | no | AppCore lo hace solo | |
 
+### 1.5 `hostRequest` de `AppCoreFFI`
+
+Los `hostRequest` de `AppCoreFFI` usan como `method` el nombre del método de `HostServices`: `pickFile`, `pickFiles`, `pickFolder`, `projectsFolderChanged`, `saveFile`, `openURL`, `showPreview`, `hidePreview` y `load`. Los params y resultados son los de cada método (fuente: la cabecera de comentarios de `Packages/AppCore/Sources/AppCoreFFI/HostBroker.swift`):
+
+- `pickFile {types}` -> `{path}`; `pickFiles {types}` -> `{paths}`; `pickFolder {initial}` -> `{path}`.
+- `projectsFolderChanged {path}` -> `{ok}`; `saveFile {suggestedName,types}` -> `{path}`; `openURL {url}` -> `{opened}`.
+- `showPreview {url,rect}` -> `{shown}`; `hidePreview {}`; `load {url,userAgent,readyScript,timeout}` -> `{status,html}`.
+- Error: `{code,message,status?}`; en `load`, `code` es uno de `offline`, `readyTimeout`, `httpStatus`, `cancelled`, `unsupported`.
+
+Una petición sin respuesta queda pendiente hasta el cierre del núcleo, que la resuelve con `cancelled`. «Mostrar en Finder» no es servicio de anfitrión: lo hace el núcleo (`Bridge.openFolder`).
+
 ## 2. Hilos
 
 ### 2.1 Qué es `@MainActor` en AppCore
