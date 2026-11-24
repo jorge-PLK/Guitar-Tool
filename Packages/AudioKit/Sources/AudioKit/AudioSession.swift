@@ -216,10 +216,16 @@ public final class AudioSession: @unchecked Sendable {
         let fixedAnchor: PlaybackAnchor?
         var anchor: PlaybackAnchor?
         var cut = false
-        init(recorder: TakeRecorder, url: URL, anchor: PlaybackAnchor?) {
+        /// Contadores de E/S al empezar (la línea `audio.take|` da la diferencia).
+        /// La E/S se guarda para leer los contadores al final aunque la sesión se haya cortado (`io = nil`).
+        let io: any AudioIO
+        let ioAtStart: AudioIODiagnostics?
+        init(recorder: TakeRecorder, url: URL, anchor: PlaybackAnchor?, io: any AudioIO) {
             self.recorder = recorder
             self.url = url
             fixedAnchor = anchor
+            self.io = io
+            ioAtStart = io.diagnostics
         }
     }
 
@@ -473,7 +479,7 @@ public final class AudioSession: @unchecked Sendable {
         drainCapture()
         try consumerLock.withLock {
             guard calibrator == nil, recording == nil else { throw AudioSessionError.busy }
-            recording = Recording(recorder: rec, url: url, anchor: anchor)
+            recording = Recording(recorder: rec, url: url, anchor: anchor, io: io)
             finishedTake = nil
         }
     }
@@ -501,6 +507,9 @@ public final class AudioSession: @unchecked Sendable {
     }
 
     private func finish(_ rec: Recording) -> Result<RecordedTake, AudioSessionError> {
+        let filled = rec.recorder.filledGaps
+        AudioKitLog.write(AudioKitLog.takeLine(start: rec.ioAtStart, end: rec.io.diagnostics, filledGaps: filled.count,
+                                               filledFrames: filled.frames, sampleRate: rec.recorder.sampleRate))
         do {
             let take = try rec.recorder.finish(writingTo: rec.url)
             if take.rigDelayReliable == true { lastReliableRigDelay = take.rigDelaySamples }

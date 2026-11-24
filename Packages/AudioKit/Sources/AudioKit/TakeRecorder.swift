@@ -126,6 +126,10 @@ public final class TakeRecorder: @unchecked Sendable {
 
     public func setAnchor(_ anchor: PlaybackAnchor) { lock.withLock { self.anchor = anchor } }
 
+    private var filled = (gaps: 0, frames: 0)
+    /// Huecos de la entrada rellenados con silencio hasta ahora y sus muestras (log por toma, Parte C de la ronda 7c).
+    public var filledGaps: (count: Int, frames: Int) { lock.withLock { (filled.gaps, filled.frames) } }
+
     /// Manejador de entrada. Los huecos entre bloques se rellenan con silencio para no perder la alineación.
     public func capture(_ buffer: AudioIOBuffer) {
         lock.withLock {
@@ -134,6 +138,7 @@ public final class TakeRecorder: @unchecked Sendable {
             let have = data.first?.count ?? 0
             guard at + buffer.frameCount > have else { return }
             let skip = max(0, have - at)
+            if at > have { filled = (filled.gaps + 1, filled.frames + at - have) }
             for (s, ch) in stored.enumerated() {
                 if at > have { data[s].append(contentsOf: repeatElement(0, count: at - have)) }
                 if ch < buffer.channelCount {

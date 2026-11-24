@@ -68,8 +68,16 @@ final class IOCounters: Sendable {
     /// `Int.max` / `Int.min` = sin medir.
     let skewMin = Atomic<Int>(.max)
     let skewMax = Atomic<Int>(.min)
+    /// Solo WASAPI (`WASAPIStreamCore`): discontinuidades de captura, fotogramas tirados sin offset y correcciones del
+    /// offset tras una discontinuidad (`DuplexClockSync.realigns`).
+    let captureResets = Atomic<Int>(0)
+    let droppedCaptureFrames = Atomic<Int>(0)
+    let captureRealigns = Atomic<Int>(0)
 
     func reset() {
+        captureResets.store(0, ordering: .relaxed)
+        droppedCaptureFrames.store(0, ordering: .relaxed)
+        captureRealigns.store(0, ordering: .relaxed)
         overloads.store(0, ordering: .relaxed)
         gaps.store(0, ordering: .relaxed)
         callbacks.store(0, ordering: .relaxed)
@@ -89,6 +97,9 @@ final class IOCounters: Sendable {
         return AudioIODiagnostics(overloads: overloads.load(ordering: .relaxed), inputJumps: inGaps.load(ordering: .relaxed),
                                   inputJumpMaxFrames: inGapMax.load(ordering: .relaxed), outputJumps: gaps.load(ordering: .relaxed),
                                   outputJumpMaxFrames: gapMax.load(ordering: .relaxed), outMinusInMin: lo == .max ? nil : lo,
-                                  outMinusInMax: hi == .min ? nil : hi, callbacks: callbacks.load(ordering: .relaxed))
+                                  outMinusInMax: hi == .min ? nil : hi, callbacks: callbacks.load(ordering: .relaxed),
+                                  captureResets: captureResets.load(ordering: .relaxed),
+                                  droppedCaptureFrames: droppedCaptureFrames.load(ordering: .relaxed),
+                                  captureRealigns: captureRealigns.load(ordering: .relaxed))
     }
 }

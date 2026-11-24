@@ -382,7 +382,19 @@ final class AudioController {
     }
 
     /// Calibración válida guardada para la configuración actual (la clave no cambió).
-    var calibrationValid: Bool { settings?.validLatency(sampleRate: workingRate, wasapi: wasapiKeyContext) != nil }
+    var calibrationValid: Bool { validCalibration != nil }
+
+    /// La calibración guardada si su clave es la de ahora (mini-spec Fase 3, «Caducidad»). Con la sesión abierta se compara
+    /// con la clave REAL de la sesión, la misma que se guardó al calibrar y la que usa la grabación: con WASAPI el búfer de
+    /// la clave es el periodo concedido (480 en compartido a 48 kHz), no los 512 pedidos del perfil, y comparar con el
+    /// perfil daba «Sin calibrar» justo después de calibrar. Sin sesión, la clave del perfil (en el Mac son la misma).
+    var validCalibration: LatencyCalibration? {
+        guard let a = settings, let saved = a.latency else { return nil }
+        if let s = session, let key = s.calibrationKey {
+            return PortableAudioBridge.storeKey(key.inProfileTerms(outputDeviceUID: a.outputDeviceUID)) == saved.key ? saved : nil
+        }
+        return a.validLatency(sampleRate: workingRate, wasapi: wasapiKeyContext)
+    }
 
     /// Lo que la clave de Windows añade al perfil (F2): el modo y el contenedor de los dispositivos elegidos (la salida por
     /// defecto va vacía en la clave, sin contenedor). nil en el Mac.

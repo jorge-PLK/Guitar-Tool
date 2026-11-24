@@ -41,6 +41,11 @@ public struct AudioIODiagnostics: Sendable, Equatable {
     public var outMinusInMin: Int?
     public var outMinusInMax: Int?
     public var callbacks: Int
+    /// Solo WASAPI (0 en el HAL): discontinuidades de captura tras el primer paquete, fotogramas de captura tirados
+    /// mientras no había offset y correcciones del offset tras una discontinuidad (`DuplexClockSync`).
+    public var captureResets = 0
+    public var droppedCaptureFrames = 0
+    public var captureRealigns = 0
 }
 
 // MARK: Marcas de host (diagnóstico de los saltos de 12 muestras de la Flex Prime, 15/11/2026)

@@ -384,6 +384,8 @@ func runUI() {
         exit(2)
     }
     startup.mark("Bridge creado")
+    // Líneas de diagnóstico del núcleo (audio.take|, una por toma) al mismo log.
+    CoreLog.setSink { tfLog($0) }
     let app = App(options: options, bridge: bridge, supportDir: supportDir)
     let appContext = Unmanaged.passUnretained(app).toOpaque()
     let size = options.window ?? (width: 1440, height: 900)

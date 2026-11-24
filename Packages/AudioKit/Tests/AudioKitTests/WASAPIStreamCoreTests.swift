@@ -48,6 +48,15 @@ final class WASAPIStreamCoreTests: XCTestCase {
         var chunkFrames = WASAPIStreamCore.defaultChunkFrames
         /// Discontinuidad en el paquete `packet`: se pierden `lostFrames` fotogramas de captura.
         var discontinuity: (packet: Int, lostFrames: Int)?
+        /// Paquetes seguidos con discontinuidad desde `discontinuity.packet` (cada uno pierde `lostFrames`).
+        var discontinuityRun = 1
+        /// Paquetes seguidos desde `discontinuity.packet` con `AUDCLNT_BUFFERFLAGS_TIMESTAMP_ERROR` y la marca desviada.
+        var timestampErrorRun = 0
+        /// Desde el paquete de la discontinuidad, la posición que da el dispositivo se desvía estos fotogramas (miente);
+        /// el audio y la marca QPC siguen siendo los verdaderos.
+        var positionError: Int64 = 0
+        /// Recibe también los bloques capturados (como en una toma real), para contar el silencio que rellena.
+        var recorder: TakeRecorder?
         /// Cada cuántos paquetes llega uno con `AUDCLNT_BUFFERFLAGS_TIMESTAMP_ERROR` y la marca 50 ms desviada (0 = nunca).
         var timestampErrorEvery = 37
         /// Clics en la salida (muestras de la línea común).
@@ -65,6 +74,8 @@ final class WASAPIStreamCoreTests: XCTestCase {
         var channelSwaps = 0
         var unwrittenReads = 0
         var maxBlock = 0
+        /// `sampleTime` verdadero de cada paquete de captura (fotograma de captura menos adelanto), entregado o no.
+        var packetTruth: [Int64] = []
     }
 
     /// Lo que tocan los manejadores (los llama el test, en su hilo).
@@ -79,6 +90,7 @@ final class WASAPIStreamCoreTests: XCTestCase {
         let box = Box()
         let clicks = cfg.clicks
         let lead = cfg.captureLeadFrames
+        let recorder = cfg.recorder
         let tR0 = 86_400.0 + Double(cfg.seed)          // QPC tras un día encendido
         let tC0 = tR0 - Double(cfg.captureLeadFrames) / fs
         let warm = 1.2                                   // s de render antes de mirar las marcas de host
@@ -93,6 +105,7 @@ final class WASAPIStreamCoreTests: XCTestCase {
                 box.r.renderHostErrorMax = max(box.r.renderHostErrorMax, abs(b.hostSeconds - (tR0 + Double(b.sampleTime) / fs)))
             }
         }, capture: { b in
+            recorder?.capture(b)
             for i in 0..<b.frameCount {
                 if b[0][i] > 0.5 { box.r.clicksFound.append(b.sampleTime + Int64(i)) }
                 if b[0][i] == 0.25 || b[1][i] > 0.5 { box.r.channelSwaps += 1 }
@@ -123,10 +136,12 @@ final class WASAPIStreamCoreTests: XCTestCase {
 
         var m = 1, j = 0, lost = 0
         let end = tR0 + cfg.seconds
+        /// Paquete `j` dentro de los `run` primeros desde la discontinuidad.
+        func inRun(_ j: Int, _ run: Int) -> Bool { cfg.discontinuity.map { j >= $0.packet && j < $0.packet + run } ?? false }
         while true {
             let tr = tR0 + Double(m * cfg.renderPeriod) / fs
             // Los fotogramas perdidos también pasan en el tiempo: el paquete llega cuando termina su último fotograma.
-            let pending = cfg.discontinuity.map { $0.packet == j ? $0.lostFrames : 0 } ?? 0
+            let pending = inRun(j, cfg.discontinuityRun) ? cfg.discontinuity!.lostFrames : 0
             let tc = tC0 + Double((j + 1) * cfg.capturePeriod + lost + pending) / fs
             if min(tr, tc) > end { break }
             if tr <= tc {
@@ -149,8 +164,8 @@ final class WASAPIStreamCoreTests: XCTestCase {
             } else {
                 // Paquete de captura: fotogramas de dispositivo [c, c + periodo).
                 var flags: UInt32 = j == 0 ? WASAPICaptureMarks.discontinuity : 0   // P8: el primero la trae
-                if let d = cfg.discontinuity, d.packet == j {
-                    lost += d.lostFrames
+                if inRun(j, cfg.discontinuityRun) {
+                    lost += pending
                     flags |= WASAPICaptureMarks.discontinuity
                 }
                 let c = j * cfg.capturePeriod + lost
@@ -161,11 +176,14 @@ final class WASAPIStreamCoreTests: XCTestCase {
                     inp[i * 2 + 1] = k >= 0 && k < tape1.count ? tape1[k] : 0
                 }
                 var qpcTime = tC0 + Double(c) / fs + jitter(true)
-                if cfg.timestampErrorEvery > 0, j > 0, j % cfg.timestampErrorEvery == 0 {
+                box.r.packetTruth.append(Int64(c - cfg.captureLeadFrames))
+                let periodic = cfg.timestampErrorEvery > 0 && j > 0 && j % cfg.timestampErrorEvery == 0
+                if periodic || inRun(j, cfg.timestampErrorRun) {
                     flags |= WASAPICaptureMarks.timestampError
                     qpcTime += 0.05
                 }
-                let marks = WASAPICaptureMarks(streamPosition: UInt64(c), qpc100ns: UInt64((qpcTime * 1e7).rounded()),
+                let lie = cfg.discontinuity.map { j >= $0.packet ? cfg.positionError : 0 } ?? 0
+                let marks = WASAPICaptureMarks(streamPosition: UInt64(Int64(c) + lie), qpc100ns: UInt64((qpcTime * 1e7).rounded()),
                                                flags: flags)
                 core.capture(interleaved: inp, frames: cfg.capturePeriod, channels: 2, marks: marks)
                 j += 1
@@ -247,8 +265,8 @@ final class WASAPIStreamCoreTests: XCTestCase {
     }
 
     func testCaptureDiscontinuityRefitsOffsetAndKeepsLatency() throws {
-        // A 1,5 s se pierden 1000 fotogramas de captura: el offset se vuelve a estimar (otro segundo de paquetes
-        // descartados) y los clics posteriores siguen en la latencia física.
+        // A 1,5 s se pierden 1000 fotogramas de captura: el offset se conserva, la recta nueva se ajusta en segundo plano
+        // (`DuplexClockSync.captureDiscontinuity`) y los clics posteriores siguen en la latencia física.
         var cfg = Config()
         cfg.seed = 7
         cfg.seconds = 5.0
@@ -262,6 +280,132 @@ final class WASAPIStreamCoreTests: XCTestCase {
         let worst = Double(r.errors.map { abs($0) }.max() ?? .max)
         print("WASAPIStreamCore tras discontinuidad: peor \(worst) muestras (\(Self.ms(worst)) ms)")
         XCTAssertLessThan(Self.ms(worst), AlignmentCheck.passThresholdSeconds * 1000 / 5)
+    }
+
+    /// Toma que recibe los bloques capturados (clave como en `TakeAlignmentTests`): cuenta el silencio que rellena.
+    static func recorder() -> TakeRecorder {
+        let key = LatencyCalibrationKey(inputUID: "sim-in", outputUID: "sim-out", sampleRate: fs, bufferFrames: 480,
+                                        inputChannel: 1, outputChannel: 1)
+        return TakeRecorder(sampleRate: fs, guitarIn: [1], key: key, clock: .single, declaredLatencySamples: 0,
+                            calibration: nil)
+    }
+
+    /// Hueco que deja una discontinuidad de 10 ms (Parte C de la ronda 7c). Antes la toma se rellenaba con 1 s de ceros
+    /// (punch real: 1007 ms, 48 343 muestras) mientras se volvía a fijar el offset; ahora solo el hueco real.
+    static let lostFrames = 480
+
+    func testCaptureDiscontinuityFillsOnlyTheRealGap() throws {
+        // Caso A: la posición del dispositivo avanza por los fotogramas perdidos (la del motor). Relleno = hueco, ±1.
+        var worstAll = 0.0
+        for seed in UInt64(1)...10 {
+            var cfg = Config()
+            cfg.seed = seed
+            cfg.captureLeadFrames = 37 * Int(seed) % 960
+            cfg.seconds = 3.0
+            cfg.discontinuity = (packet: 150, lostFrames: Self.lostFrames)
+            cfg.clicks = (0..<6).map { 76_800 + Int64($0) * 8_640 }   // 1,6-2,5 s, justo tras la discontinuidad
+            let rec = Self.recorder()
+            cfg.recorder = rec
+            let (r, core) = Self.run(cfg)
+            let filled = rec.filledGaps
+            XCTAssertEqual(r.clicksFound.count, cfg.clicks.count, "semilla \(seed)")
+            XCTAssertEqual(filled.count, 1, "semilla \(seed)")
+            XCTAssertEqual(Double(filled.frames), Double(Self.lostFrames), accuracy: 1, "semilla \(seed)")
+            XCTAssertEqual(core.captureResets, 1)
+            XCTAssertEqual(core.sync.realigns, 0, "la posición casa con la marca QPC: el offset no se toca")
+            XCTAssertEqual(core.counters.diagnostics.inputJumps, 1, "una discontinuidad, un salto")
+            let worst = Double(r.errors.map { abs($0) }.max() ?? .max)
+            worstAll = max(worstAll, worst)
+            print("WASAPIStreamCore hueco real, semilla \(seed): relleno \(filled.frames) fotogramas "
+                  + "(\(Self.ms(Double(filled.frames))) ms), clics peor \(worst) muestras (\(Self.ms(worst)) ms)")
+        }
+        XCTAssertLessThan(Self.ms(worstAll), 0.2)
+    }
+
+    func testCaptureDiscontinuityWithLyingPositionUsesTheQPCMark() throws {
+        // Caso B: tras la discontinuidad la posición se desvía (hacia atrás y hacia delante); la marca QPC del primer
+        // paquete, sobre la recta anterior, da el hueco. Una marca suelta tiembla ±0,5 ms: relleno = hueco ± 48.
+        var worstAll = 0.0
+        for (seed, lie) in [(UInt64(3), Int64(-50_000)), (4, 100_000), (5, -20_000), (6, 2_000)] {
+            var cfg = Config()
+            cfg.seed = seed
+            cfg.seconds = 4.0
+            cfg.discontinuity = (packet: 150, lostFrames: Self.lostFrames)
+            cfg.positionError = lie
+            cfg.clicks = (0..<6).map { 129_600 + Int64($0) * 8_640 }  // 2,7-3,6 s, tras la recta nueva (100 paquetes)
+            let rec = Self.recorder()
+            cfg.recorder = rec
+            let (r, core) = Self.run(cfg)
+            let filled = rec.filledGaps
+            XCTAssertEqual(r.clicksFound.count, cfg.clicks.count, "desvío \(lie)")
+            XCTAssertEqual(Double(filled.frames), Double(Self.lostFrames), accuracy: 48, "desvío \(lie)")
+            XCTAssertGreaterThanOrEqual(core.sync.realigns, 1, "desvío \(lie)")
+            let worst = Double(r.errors.map { abs($0) }.max() ?? .max)
+            worstAll = max(worstAll, worst)
+            print("WASAPIStreamCore posición desviada \(lie): relleno \(filled.frames) fotogramas en \(filled.count) "
+                  + "huecos, realineados \(core.sync.realigns), clics peor \(worst) muestras (\(Self.ms(worst)) ms)")
+        }
+        XCTAssertLessThan(Self.ms(worstAll), 0.2)
+    }
+
+    func testCaptureDiscontinuityWithoutQPCMarkChecksOnTheNextValidMark() throws {
+        // Caso C: el primer paquete tras la discontinuidad (o los `run` primeros, con discontinuidades seguidas) trae
+        // AUDCLNT_BUFFERFLAGS_TIMESTAMP_ERROR y la posición se desvía. La comprobación espera a la primera marca válida:
+        // desde ese paquete cada bloque cae en su sitio (± 48, una marca suelta como en el caso B), no 1 s después con la
+        // recta nueva. Los paquetes sin marca de en medio siguen con el offset conservado (con desvío 0, sin coste).
+        let period = Config().capturePeriod
+        var worstAll = 0.0
+        for (seed, lie, run) in [(UInt64(3), Int64(-50_000), 1), (4, 100_000, 1), (5, -20_000, 2), (6, 2_000, 2),
+                                 (8, 0, 1), (9, 0, 2)] {
+            var cfg = Config()
+            cfg.seed = seed
+            cfg.seconds = 4.0
+            cfg.discontinuity = (packet: 150, lostFrames: Self.lostFrames)
+            cfg.discontinuityRun = run
+            cfg.timestampErrorRun = run
+            cfg.positionError = lie
+            cfg.clicks = (0..<6).map { 76_800 + Int64($0) * 8_640 }   // 1,6-2,5 s, antes de la recta nueva
+            let rec = Self.recorder()
+            cfg.recorder = rec
+            let (r, core) = Self.run(cfg)
+            let filled = rec.filledGaps
+            let what = "desvío \(lie), \(run) seguidas"
+            let dropped = core.droppedCaptureFrames / period
+            XCTAssertEqual(r.captureBlocks.count, r.packetTruth.count - dropped, what)
+            // Desfase de cada bloque desde el primer paquete con marca válida (150 + run): ± 48 con la marca suelta;
+            // ya con la recta nueva (100 puntos, más los paquetes sin marca de cada 37), lo que la recta deja sin corregir
+            // (`realignToleranceSeconds`, 0,25 ms) más el temblor de una estimación (≤ 0,10 ms, `DuplexClockSyncTests`).
+            let refitted = 150 + run + core.minimumPoints + 10
+            var misplaced: Int64 = 0, misplacedRefit: Int64 = 0
+            for (i, b) in r.captureBlocks.enumerated() where i + dropped >= 150 + run {
+                let e = abs(b.start - r.packetTruth[i + dropped])
+                misplaced = max(misplaced, e)
+                if i + dropped >= refitted { misplacedRefit = max(misplacedRefit, e) }
+            }
+            XCTAssertLessThanOrEqual(misplaced, 48, what)
+            XCTAssertLessThan(Double(misplacedRefit) / Self.fs, DuplexClockSync.realignToleranceSeconds + 0.0001, what)
+            XCTAssertGreaterThan(r.packetTruth.count, refitted + 50, what)
+            XCTAssertEqual(r.clicksFound.count, cfg.clicks.count, what)
+            XCTAssertEqual(core.captureResets, run, what)
+            if lie == 0 {
+                XCTAssertEqual(Double(filled.frames), Double(run * Self.lostFrames), accuracy: 1, what)
+                XCTAssertEqual(core.sync.realigns, 0, what)
+            } else {
+                XCTAssertGreaterThanOrEqual(core.sync.realigns, 1, what)
+                if lie < 0 {
+                    // La toma descarta los paquetes sin marca (caen atrás) y rellena hueco + esos paquetes.
+                    XCTAssertEqual(Double(filled.frames), Double(run * (Self.lostFrames + period)), accuracy: 48, what)
+                }
+            }
+            let worst = Double(r.errors.map { abs($0) }.max() ?? .max)
+            worstAll = max(worstAll, worst)
+            print("WASAPIStreamCore sin marca tras discontinuidad, \(what): bloques desde la marca válida desfase máx "
+                  + "\(misplaced) fotogramas (tras la recta nueva \(misplacedRefit)), relleno \(filled.frames) fotogramas "
+                  + "en \(filled.count) huecos, realineados \(core.sync.realigns), clics peor \(worst) muestras "
+                  + "(\(Self.ms(worst)) ms)")
+        }
+        // Los clics caen entre la marca válida y la recta nueva: error de una marca suelta, dentro del alineado (1 ms).
+        XCTAssertLessThan(Self.ms(worstAll), AlignmentCheck.passThresholdSeconds * 1000)
     }
 
     func testChunkingDoesNotMoveAnySample() throws {
