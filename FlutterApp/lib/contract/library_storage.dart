@@ -1,5 +1,5 @@
 import '../core/core_client.dart' show Json;
-import 'library.dart';
+import 'json_read.dart';
 
 /// Modo de `library.relocate`. Valor no previsto → [unknown].
 enum RelocateMode {
