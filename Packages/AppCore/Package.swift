@@ -7,7 +7,9 @@ let package = Package(
     name: "AppCore",
     platforms: [.macOS(.v15)],
     products: [
-        .library(name: "AppCore", targets: ["AppCore"])
+        .library(name: "AppCore", targets: ["AppCore"]),
+        // Fase 7f: ABI C para Flutter (docs/flutter/arquitectura.md, «AppCoreFFI»): .dylib en Mac, .dll en Windows.
+        .library(name: "AppCoreFFI", type: .dynamic, targets: ["AppCoreFFI"])
     ],
     dependencies: [
         .package(path: "../Store"),
@@ -28,6 +30,10 @@ let package = Package(
     targets: [
         .target(name: "AppCore", dependencies: ["Store", "AudioKit", "ModelKit", "StemKit", "StudyKit", "SourceKit", "TabKit", "VideoKit",
                                           .product(name: "NativeAudioFile", package: "NativeKit")]),
+        .target(name: "CAppCoreFFI", cSettings: [.headerSearchPath("dart")],
+                linkerSettings: ["d3d11", "dxguid"].map { .linkedLibrary($0, .when(platforms: [.windows])) }),
+        .target(name: "AppCoreFFI", dependencies: ["AppCore", "CAppCoreFFI"]),
+        .testTarget(name: "AppCoreFFITests", dependencies: ["AppCoreFFI", "AppCore", "CAppCoreFFI"]),
         // W2-E2: los tests usan VideoKit y AudioKit directamente (FrameRelayTests, RecordTests): declarados, no transitivos.
         // B1: ModelKit y StemKit para GuitarSplitterTests (catálogo de prueba y separador simulado).
         .testTarget(name: "AppCoreTests", dependencies: ["AppCore", "Store", "SourceKit", "StudyKit", "TabKit", "VideoKit", "AudioKit",
