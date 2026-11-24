@@ -96,8 +96,8 @@ void main() {
   });
 
   test('hostRequest se responde con hostResponse', () async {
-    t.inbox.add({'hostRequest': {'id': 5, 'method': 'ok', 'params': {}}});
-    t.inbox.add({'hostRequest': {'id': 6, 'method': 'boom', 'params': {}}});
+    t.inbox.add({'hostRequest': {'id': 5, 'method': 'ok', 'params': <String, Object?>{}}});
+    t.inbox.add({'hostRequest': {'id': 6, 'method': 'boom', 'params': <String, Object?>{}}});
     await Future<void>.delayed(Duration.zero);
     expect(t.sent[0], {'hostResponse': {'id': 5, 'result': {'ok': true}}});
     expect(t.sent[1], {

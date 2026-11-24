@@ -24,6 +24,15 @@ abstract final class TfColors {
   static const Color danger = Color(0xFFF07178);
   static const Color dangerBg = Color(0xFF331A1C);
 
+  // Controles nativos de macOS medidos con cuentagotas sobre la captura de referencia (ventana inactiva).
+  static const Color nativeControl = Color(0xFF45474A);
+  static const Color nativeSegmentBg = Color(0xFF2D2E30);
+  static const Color nativeSegmentText = Color(0xFFC5C5C5);
+  static const Color nativeFieldBg = Color(0xFF171717);
+  static const Color nativeFieldLine = Color(0xFF26282A);
+  static const Color nativeStepperBg = Color(0xFF2D2E30);
+  static const Color nativeStepperLine = Color(0xFF494A4C);
+
   // §1.1 TF.sectionPalette, en el orden de SectionEditor.paletteCount.
   static const Color sectionBlue = Color(0xFF6C9BD2);
   static const Color sectionGreen = Color(0xFF6FB58A);
@@ -93,6 +102,9 @@ abstract final class TfRadius {
   static const double r9 = 9;
   static const double r7 = 7;
 
+  /// Controles nativos de macOS (desplegable, segmentado, stepper) medidos en la captura.
+  static const double native = 5;
+
   /// Capsule() de SwiftUI: radio = alto/2. Valor grande que se clampa a alto/2 en Flutter.
   static const double pill = 999;
 }
@@ -124,6 +136,9 @@ abstract final class TfSpace {
 abstract final class TfStroke {
   static const double hairline = 1;
   static const double thick = 2;
+
+  /// Trazo discontinuo `dash: [3]` (TabScreen.swift:238): 3 pt de trazo y 3 de hueco.
+  static const double dash = 3;
 }
 
 /// Opacidades literales de SwiftUI (§2.4). Sin fundir valores casi iguales.
@@ -187,4 +202,81 @@ abstract final class TfSize {
   static const double controlMd = 36;
   static const double controlSm = 28;
   static const double sidebarWidth = 240;
+
+  // K5: barra lateral, filas y avisos.
+  static const double navIcon = 18; // RootView.swift:108, VideoSettingsView.swift:312
+  static const double noticeIcon = 16; // sin medida en SwiftUI: confirmar con captura de referencia
+  static const double noticeClose = 12; // sin medida en SwiftUI: confirmar con captura de referencia
+  static const double statusDot = 8; // RootView.swift:95
+  static const double marqueeSpeed = 30; // px/s, MarqueeText.swift:10
+  static const double trackingTableHeader = 0.7; // LibraryView.swift:156-159
+
+  // K1 (botones, chip, barras, spinner, carátula).
+  static const double font12 = 12;
+  static const double font13 = 13;
+  static const double font14 = 14;
+  static const double iconButtonIcon = 14;
+  static const double nudgeWidth = 30;
+  static const double nudgeHeight = 24;
+  static const double nudgeIcon = 11;
+  static const double accentBarHeight = 6;
+  static const double progressHeight = 4;
+  static const double spinnerSmall = 16;
+  static const double spinnerMini = 10;
+  static const double coverSide = 44;
+  static const double coverIcon = 18;
+  static const double coverThumbPixels = 88;
+  static const double dividerVerticalHeight = 28;
+
+  // K4 (capas): medidas propias del kit, sin origen literal en SwiftUI (menú/alerta/barra dibujados en Flutter).
+  static const double menuMinWidth = 180;
+  static const double alertWidth = 320;
+  static const double tooltipMaxWidth = 280;
+
+  // K2: controles nativos redibujados (§3.2). Los marcados "confirmar" no están medidos.
+  static const double linkFieldHeight = 32;
+  static const double searchFieldWidth = 240;
+  static const double numberFieldHeight = 24;
+  static const double numberFieldWidth = 70;
+  static const double dropdownHeight = 22;
+  static const double dropdownPadH = 11;
+  static const double dropdownGap = 8;
+  static const double segmentedHeight = 24;
+  static const double segmentedPadH = 12;
+  static const double segmentedInset = 1;
+  static const double switchWidth = 38;
+  static const double switchHeight = 22;
+  static const double switchSmallWidth = 32;
+  static const double switchSmallHeight = 18;
+  static const double checkboxBox = 16;
+  static const double checkboxMark = 12;
+  static const double sliderTrack = 4; // confirmar con captura de referencia
+  static const double sliderKnob = 16;
+  static const double sliderHit = 20;
+  static const double sliderWidth = 120;
+  static const double stepperWidth = 18;
+  static const double stepperHeight = 24;
+  static const double stepperIcon = 8;
+  static const double fieldIcon = 14;
+  static const double dropdownChevron = 9;
+  static const double dropdownMenuItem = 28;
+  static const double dropdownMenuMaxHeight = 280;
+  static const double focusHalo = 3;
+
+  // K3: pastilla de pista, fader, medidores y canal de mezclador (BackingMixer.swift, TabScreen.swift).
+  static const double font11 = 11;
+  static const double pillHeight = 34;
+  static const double faderWidth = 28;
+  static const double faderTrackWidth = 6;
+  static const double faderKnobHeight = 18;
+  static const double faderBaseHeight = 150;
+  static const double faderMinHeight = 40;
+  static const double levelBarWidth = 8;
+  static const double inputMeterWidth = 8;
+  static const double inputMeterHeight = 28;
+  static const double mixerChannelWidth = 96;
+  static const double mixerChannelHeight = 276;
+  static const double mixerChannelMinHeight = 166;
+  static const double mixerTitleHeight = 22;
+  static const double mixerTogglesHeight = 40;
 }
