@@ -110,6 +110,11 @@ void main() {
     }
   });
 
+  test('calibrateBlockMessage de audio.state expone el código del bloqueo', () async {
+    final state = AudioState.fromJson(await _load('audio/audio.state.noinput.result.json'));
+    expect(state.calibrateBlockMessage?.code, 'audio-block-no-input-device');
+  });
+
   group('AudioSetMetersParams', () {
     for (final n in [
       'audio.setMeters.params',

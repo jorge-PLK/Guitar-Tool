@@ -78,6 +78,8 @@ struct AudioSettingsResult: Codable, Sendable, Equatable {
     var calibration: AudioCalibrationInfo
     /// Motivo por el que «Calibrar latencia» está desactivado; nil si se puede.
     var calibrateBlock: String?
+    /// `calibrateBlock` por código `audio-block-<motivo>`.
+    var calibrateBlockMessage: CoreMessage?
     /// Textos de la hoja de calibración (`CalibrationSheet`), en orden.
     var calibrateInstructions: [String]
 }
@@ -94,6 +96,8 @@ struct AudioStateResult: Codable, Sendable, Equatable {
     var calibrationRunning: Bool
     var calibrationValid: Bool
     var calibrateBlock: String?
+    /// `calibrateBlock` por código `audio-block-<motivo>`.
+    var calibrateBlockMessage: CoreMessage?
     var recordingNotices: [String]
     var mismatchedRate: Double?
     var workingSampleRate: Double
@@ -390,7 +394,7 @@ final class AudioService {
                 AudioGuitarChoice(label: $0.label, channels: $0.value)
             },
             rateMismatch: mismatch, calibration: calibration, calibrateBlock: c.deviceBlock?.message,
-            calibrateInstructions: calibrateInstructions)
+            calibrateBlockMessage: c.deviceBlock?.coreMessage(prefix: "audio"), calibrateInstructions: calibrateInstructions)
     }
 
     static func stateResult(_ c: AudioController) -> AudioStateResult {
@@ -398,7 +402,8 @@ final class AudioService {
             sessionOpen: c.session?.isOpen == true, sessionError: c.sessionError, interruptionNote: c.interruptionNote,
             hostError: c.hostError, hosting: c.session?.isOpen == true && c.isHostingPlayer, metersVisible: c.metersVisible,
             recording: c.isRecording, calibrationRunning: c.calibrationIsRunning, calibrationValid: c.calibrationValid,
-            calibrateBlock: c.deviceBlock?.message, recordingNotices: c.takeNotices, mismatchedRate: c.mismatchedRate,
+            calibrateBlock: c.deviceBlock?.message,
+            calibrateBlockMessage: c.deviceBlock?.coreMessage(prefix: "audio"), recordingNotices: c.takeNotices, mismatchedRate: c.mismatchedRate,
             workingSampleRate: c.workingRate)
     }
 

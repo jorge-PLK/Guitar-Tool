@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:toneforge/contract/audio.dart';
+import 'package:toneforge/contract/core_message.dart';
 import 'package:toneforge/core/core_client.dart';
 import 'package:toneforge/core/core_providers.dart';
 import 'package:toneforge/shell/shell_providers.dart';
@@ -43,6 +44,10 @@ class AudioStoreState {
 
   /// Motivo por el que «Empezar» está deshabilitado (el estado vivo manda sobre el de `audio.settings`).
   String? get calibrateBlock => audioState?.calibrateBlock ?? settings?.calibrateBlock;
+
+  /// Mismo motivo con código (`CoreMessage`), con la misma precedencia que `calibrateBlock`.
+  CoreMessage? get calibrateBlockMessage =>
+      audioState?.calibrateBlockMessage ?? settings?.calibrateBlockMessage;
 
   AudioStoreState copyWith({
     AudioSettings? settings,

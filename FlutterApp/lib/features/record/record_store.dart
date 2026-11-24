@@ -3,6 +3,7 @@ import 'dart:ui' show Size;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:toneforge/contract/audio.dart';
+import 'package:toneforge/contract/core_message.dart';
 import 'package:toneforge/contract/record.dart';
 import 'package:toneforge/core/core_client.dart';
 import 'package:toneforge/core/core_providers.dart';
@@ -38,6 +39,9 @@ class RecordState {
 
   /// Motivo de bloqueo tal como lo emite el núcleo (hoy texto en español, no código: ver informe).
   String? get blockReason => snapshot?.blockReason;
+
+  /// Mismo motivo con código (`CoreMessage`), lectura directa del snapshot.
+  CoreMessage? get block => snapshot?.block;
 
   /// El botón envía `record.start`: reposo y sin bloqueo.
   bool get canStartTake => snapshot != null && phase == RecordPhase.idle && blockReason == null;

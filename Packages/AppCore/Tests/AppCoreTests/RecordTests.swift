@@ -190,6 +190,8 @@ final class RecordTests: XCTestCase {
         let r = try await makeRig(guitar: false)
         let s = try await openRecord(r, camera: nil)
         XCTAssertNotNil(s.blockReason, "sin guitarra asignada no se puede grabar")
+        XCTAssertEqual(s.block?.code, "record-block-no-input-device")
+        XCTAssertEqual(s.block?.message, s.blockReason)
         let code = await errorCode(r, "record.start")
         XCTAssertEqual(code, "record-blocked")
         _ = await call(r.router, "record.close")
@@ -470,6 +472,7 @@ final class RecordTests: XCTestCase {
         // Sin marcas no se puede; con ellas sí.
         s = try await snap(r, "record.setPunch", "{\"enabled\":true}")
         XCTAssertEqual(s.blockReason, "Marca la entrada y la salida del punch-in en la línea de tiempo.")
+        XCTAssertEqual(s.block?.code, "record-block-punch-no-marks")
         s = try await snap(r, "record.setPunch", "{\"in\":1.3,\"free\":true}")
         XCTAssertEqual(s.punch.in, 1.3)
         s = try await snap(r, "record.setPunch", "{\"in\":1.3}")   // con imán: compás de 2 s
@@ -479,6 +482,7 @@ final class RecordTests: XCTestCase {
         XCTAssertEqual(s.punch.out, 1.2)
         XCTAssertTrue(s.punch.ready)
         XCTAssertNil(s.blockReason)
+        XCTAssertNil(s.block)
         XCTAssertNil(s.plannedStop, "el punch tiene su propia parada: salida + 0,5 s")
         s = try await snap(r, "record.setPunch", "{\"out\":0.2,\"free\":true}")   // salida antes de la entrada: se cruzan
         XCTAssertEqual(s.punch.in, 0.2)

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart' show immutable;
 
 import '../core/core_client.dart' show Json;
 import 'audio_settings.dart';
+import 'core_message.dart';
 import 'patch.dart';
 
 export 'audio_calibration.dart';
@@ -95,6 +96,7 @@ class AudioState {
     this.interruptionNote,
     this.hostError,
     this.calibrateBlock,
+    this.calibrateBlockMessage,
     this.mismatchedRate,
   });
 
@@ -109,6 +111,9 @@ class AudioState {
         calibrationRunning: j['calibrationRunning'] as bool,
         calibrationValid: j['calibrationValid'] as bool,
         calibrateBlock: j['calibrateBlock'] as String?,
+        calibrateBlockMessage: j['calibrateBlockMessage'] == null
+            ? null
+            : CoreMessage.fromJson(j['calibrateBlockMessage'] as Json),
         recordingNotices: (j['recordingNotices'] as List).cast<String>(),
         mismatchedRate: (j['mismatchedRate'] as num?)?.toDouble(),
         workingSampleRate: (j['workingSampleRate'] as num).toDouble(),
@@ -124,6 +129,7 @@ class AudioState {
   final bool calibrationRunning;
   final bool calibrationValid;
   final String? calibrateBlock;
+  final CoreMessage? calibrateBlockMessage;
   final List<String> recordingNotices;
   final double? mismatchedRate;
   final double workingSampleRate;
@@ -139,6 +145,7 @@ class AudioState {
         'calibrationRunning': calibrationRunning,
         'calibrationValid': calibrationValid,
         'calibrateBlock': calibrateBlock,
+        'calibrateBlockMessage': calibrateBlockMessage?.toJson(),
         'recordingNotices': recordingNotices,
         'mismatchedRate': mismatchedRate,
         'workingSampleRate': workingSampleRate,

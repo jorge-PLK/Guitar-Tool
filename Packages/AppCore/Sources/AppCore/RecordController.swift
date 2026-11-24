@@ -715,13 +715,21 @@ final class RecordController {
     // MARK: Grabar
 
     /// Motivo por el que no se puede grabar ahora (reglas de la Fase 3), o nil.
-    var blockReason: String? {
+    var blockReason: String? { blockMessage?.message }
+
+    /// Lo mismo que `blockReason` con código estable `record-block-<motivo>` y args (regla 6 de la arquitectura Flutter).
+    var blockMessage: CoreMessage? {
         guard phase == .idle else { return nil }
-        if let b = audio.recordBlock(playbackRate: 1, loopActive: false) { return b.message }
-        if activePart == nil { return "Elige una parte." }
+        if let b = audio.recordBlock(playbackRate: 1, loopActive: false) { return b.coreMessage(prefix: "record") }
+        if activePart == nil { return CoreMessage(code: "record-block-no-part", message: "Elige una parte.") }
         if punchEnabled {
-            if selectedTake == nil { return "Elige la toma sobre la que hacer el punch-in." }
-            if punchPlan() == nil { return "Marca la entrada y la salida del punch-in en la línea de tiempo." }
+            if selectedTake == nil {
+                return CoreMessage(code: "record-block-punch-no-take", message: "Elige la toma sobre la que hacer el punch-in.")
+            }
+            if punchPlan() == nil {
+                return CoreMessage(code: "record-block-punch-no-marks",
+                                   message: "Marca la entrada y la salida del punch-in en la línea de tiempo.")
+            }
         }
         return nil
     }

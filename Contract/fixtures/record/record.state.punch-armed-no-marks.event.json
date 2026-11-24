@@ -8,6 +8,10 @@
   },
   "barSeconds" : 2,
   "beatsPerBar" : 4,
+  "block" : {
+    "code" : "record-block-punch-no-marks",
+    "message" : "Marca la entrada y la salida del punch-in en la línea de tiempo."
+  },
   "blockReason" : "Marca la entrada y la salida del punch-in en la línea de tiempo.",
   "bpm" : 120,
   "busy" : false,

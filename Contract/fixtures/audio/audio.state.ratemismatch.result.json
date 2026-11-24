@@ -1,5 +1,13 @@
 {
   "calibrateBlock" : "El dispositivo está a 44,1 kHz y la frecuencia de trabajo es 48 kHz",
+  "calibrateBlockMessage" : {
+    "args" : {
+      "deviceHz" : 44100,
+      "workingHz" : 48000
+    },
+    "code" : "audio-block-rate-mismatch",
+    "message" : "El dispositivo está a 44,1 kHz y la frecuencia de trabajo es 48 kHz"
+  },
   "calibrationRunning" : false,
   "calibrationValid" : false,
   "hosting" : false,

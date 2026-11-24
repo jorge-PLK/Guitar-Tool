@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../core/core_client.dart' show Json;
+import 'core_message.dart';
 
 /// Valor crudo no previsto → [unknown]; nunca lanza.
 T enumOf<T extends Enum>(Iterable<T> values, T unknown, Object? raw) =>
@@ -477,6 +478,7 @@ class RecordSnapshot {
     required this.sections,
     required this.startTime,
     required this.title,
+    this.block,
     this.blockReason,
     this.countBeat,
     this.loadError,
@@ -511,6 +513,7 @@ class RecordSnapshot {
         sections: [for (final s in j['sections'] as List) RecordSection.fromJson(s as Json)],
         startTime: j['startTime'] as num,
         title: j['title'] as String,
+        block: j['block'] == null ? null : CoreMessage.fromJson(j['block'] as Json),
         blockReason: j['blockReason'] as String?,
         countBeat: j['countBeat'] as int?,
         loadError: j['loadError'] as String?,
@@ -544,6 +547,7 @@ class RecordSnapshot {
   final List<RecordSection> sections;
   final num startTime;
   final String title;
+  final CoreMessage? block;
   final String? blockReason;
   final int? countBeat;
   final String? loadError;
@@ -577,6 +581,7 @@ class RecordSnapshot {
         'sections': [for (final s in sections) s.toJson()],
         'startTime': startTime,
         'title': title,
+        if (block != null) 'block': block!.toJson(),
         if (blockReason != null) 'blockReason': blockReason,
         if (countBeat != null) 'countBeat': countBeat,
         if (loadError != null) 'loadError': loadError,

@@ -21,6 +21,14 @@
     "right" : 2
   },
   "calibrateBlock" : "El dispositivo está a 44,1 kHz y la frecuencia de trabajo es 48 kHz",
+  "calibrateBlockMessage" : {
+    "args" : {
+      "deviceHz" : 44100,
+      "workingHz" : 48000
+    },
+    "code" : "audio-block-rate-mismatch",
+    "message" : "El dispositivo está a 44,1 kHz y la frecuencia de trabajo es 48 kHz"
+  },
   "calibrateInstructions" : [
     "Conecta con un cable una salida del dispositivo a su entrada de guitarra.",
     "Con una pedalera, carga un rig vacío y baja el volumen de salida: el bucle realimenta (entrada, rig, salida, cable, entrada).",

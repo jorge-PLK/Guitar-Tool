@@ -1,5 +1,9 @@
 {
   "calibrateBlock" : "Elige un dispositivo de entrada en Ajustes · Audio.",
+  "calibrateBlockMessage" : {
+    "code" : "audio-block-no-input-device",
+    "message" : "Elige un dispositivo de entrada en Ajustes · Audio."
+  },
   "calibrationRunning" : false,
   "calibrationValid" : false,
   "hosting" : false,

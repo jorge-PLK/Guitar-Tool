@@ -1,5 +1,9 @@
 {
   "calibrateBlock" : "El dispositivo de entrada no está conectado.",
+  "calibrateBlockMessage" : {
+    "code" : "audio-block-input-disconnected",
+    "message" : "El dispositivo de entrada no está conectado."
+  },
   "calibrationRunning" : false,
   "calibrationValid" : false,
   "hosting" : false,

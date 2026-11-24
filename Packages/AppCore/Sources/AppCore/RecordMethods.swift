@@ -160,6 +160,8 @@ struct RecordSnapshot: Codable, Sendable {
     var position: Double
     var busy: Bool
     var blockReason: String?
+    /// `blockReason` por código: `{code:"record-block-…", message, args?}`; nil si se puede grabar.
+    var block: CoreMessage?
     var loadError: String?
     var messages: [String]
     /// Avisos de la última toma del dispositivo (`AudioController.takeNotices`).
@@ -648,7 +650,7 @@ final class RecordService {
             projectId: s.projectID.uuidString, title: s.project.song.title, phase: c.phase.name, countBeat: countBeat,
             beatsPerBar: t.beatsPerBar, barSeconds: t.barSeconds, bpm: 60 / t.beatSeconds, downbeats: t.downbeats,
             duration: c.duration, position: c.player.currentTime, busy: c.isBusy, blockReason: c.blockReason,
-            loadError: c.loadError, messages: c.messages, notices: host.takeNotices, takeSaveError: s.takeSaveError,
+            block: c.blockMessage, loadError: c.loadError, messages: c.messages, notices: host.takeNotices, takeSaveError: s.takeSaveError,
             countIn: c.state.countIn, preRollBars: c.state.preRollBars, startSectionId: c.startSectionID?.uuidString,
             startTime: c.startTime, plannedStop: c.plannedStop, sections: sections,
             guitarRoles: c.guitarRoles.map { RecordGuitarRole(role: $0.rawValue, name: c.guitarName($0)) },

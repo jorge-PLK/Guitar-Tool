@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' show immutable;
 
 import '../core/core_client.dart' show Json;
+import 'core_message.dart';
 
 List<T> _list<T>(Object? raw, T Function(Json) fromJson) =>
     [for (final e in raw as List) fromJson(e as Json)];
@@ -138,6 +139,7 @@ class AudioSettings {
     this.guitarIn,
     this.rateMismatch,
     this.calibrateBlock,
+    this.calibrateBlockMessage,
   });
 
   factory AudioSettings.fromJson(Json j) => AudioSettings(
@@ -154,6 +156,9 @@ class AudioSettings {
             : AudioRateMismatch.fromJson(j['rateMismatch'] as Json),
         calibration: AudioCalibrationSummary.fromJson(j['calibration'] as Json),
         calibrateBlock: j['calibrateBlock'] as String?,
+        calibrateBlockMessage: j['calibrateBlockMessage'] == null
+            ? null
+            : CoreMessage.fromJson(j['calibrateBlockMessage'] as Json),
         calibrateInstructions: (j['calibrateInstructions'] as List).cast<String>(),
       );
 
@@ -168,6 +173,7 @@ class AudioSettings {
   final AudioRateMismatch? rateMismatch;
   final AudioCalibrationSummary calibration;
   final String? calibrateBlock;
+  final CoreMessage? calibrateBlockMessage;
   final List<String> calibrateInstructions;
 
   Json toJson() => {
@@ -182,6 +188,7 @@ class AudioSettings {
         'rateMismatch': rateMismatch?.toJson(),
         'calibration': calibration.toJson(),
         'calibrateBlock': calibrateBlock,
+        'calibrateBlockMessage': calibrateBlockMessage?.toJson(),
         'calibrateInstructions': calibrateInstructions,
       }..removeWhere((_, v) => v == null);
 }

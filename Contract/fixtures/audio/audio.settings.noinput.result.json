@@ -21,6 +21,10 @@
     "right" : 2
   },
   "calibrateBlock" : "Elige un dispositivo de entrada en Ajustes · Audio.",
+  "calibrateBlockMessage" : {
+    "code" : "audio-block-no-input-device",
+    "message" : "Elige un dispositivo de entrada en Ajustes · Audio."
+  },
   "calibrateInstructions" : [
     "Conecta con un cable una salida del dispositivo a su entrada de guitarra.",
     "Con una pedalera, carga un rig vacío y baja el volumen de salida: el bucle realimenta (entrada, rig, salida, cable, entrada).",

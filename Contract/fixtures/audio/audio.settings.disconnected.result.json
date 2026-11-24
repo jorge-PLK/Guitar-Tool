@@ -21,6 +21,10 @@
     "right" : 2
   },
   "calibrateBlock" : "El dispositivo de entrada no está conectado.",
+  "calibrateBlockMessage" : {
+    "code" : "audio-block-input-disconnected",
+    "message" : "El dispositivo de entrada no está conectado."
+  },
   "calibrateInstructions" : [
     "Conecta con un cable una salida del dispositivo a su entrada de guitarra.",
     "Con una pedalera, carga un rig vacío y baja el volumen de salida: el bucle realimenta (entrada, rig, salida, cable, entrada).",
