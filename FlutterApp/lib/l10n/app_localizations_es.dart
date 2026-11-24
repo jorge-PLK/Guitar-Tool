@@ -993,6 +993,509 @@ class AppLocalizationsEs extends AppLocalizations {
   String get recordAnchor => '';
 
   @override
+  String get record_addPart => 'Añadir parte';
+
+  @override
+  String get record_addPartAdd => 'Añadir';
+
+  @override
+  String get record_addPartName => 'Nombre de la parte';
+
+  @override
+  String get record_addPartNone => 'Ninguna (parte añadida)';
+
+  @override
+  String get record_addPartReplaces => 'Guitarra que sustituye';
+
+  @override
+  String get record_addPartTitle => 'Añadir parte';
+
+  @override
+  String get record_blockMarkPunch =>
+      'Marca la entrada y la salida del punch-in en la línea de tiempo.';
+
+  @override
+  String get record_blockPickPart => 'Elige una parte.';
+
+  @override
+  String get record_blockPickTake =>
+      'Elige la toma sobre la que hacer el punch-in.';
+
+  @override
+  String record_cameraAudioOnly(String message) {
+    return '$message Se grabará solo el audio.';
+  }
+
+  @override
+  String get record_cameraDenied =>
+      'Sin permiso de cámara: se grabará solo el audio. Concédelo en Ajustes del Sistema > Privacidad > Cámara.';
+
+  @override
+  String get record_cameraMissing =>
+      'La cámara elegida en Ajustes no está conectada.';
+
+  @override
+  String get record_cameraNone => 'No hay ninguna cámara conectada.';
+
+  @override
+  String record_cameraOpenFailed(String error) {
+    return 'No se pudo abrir la cámara ($error).';
+  }
+
+  @override
+  String get record_cameraUnplugged =>
+      'Se desconectó la cámara: se grabará solo el audio.';
+
+  @override
+  String get record_cancel => 'Cancelar';
+
+  @override
+  String get record_chooserEmpty =>
+      'Aún no hay temas separados. Importa uno y sepáralo en la biblioteca.';
+
+  @override
+  String get record_chooserPick => 'Elige un tema';
+
+  @override
+  String get record_countIn => 'Cuenta de 1 compás';
+
+  @override
+  String get record_deleteBody =>
+      'Se borra su carpeta (audio y vídeo). No se puede deshacer.';
+
+  @override
+  String get record_deleteConfirm => 'Borrar toma';
+
+  @override
+  String get record_deleteTitle => '¿Borrar la toma?';
+
+  @override
+  String get record_durationHelpAuto =>
+      'Para sola al acabar la sección más el margen';
+
+  @override
+  String get record_durationHelpTheme => 'Duración del tema';
+
+  @override
+  String record_errDelete(String error) {
+    return 'No se pudo borrar la toma ($error).';
+  }
+
+  @override
+  String get record_errDeviceClosed => 'El dispositivo no está abierto.';
+
+  @override
+  String record_errPriorTakes(String error) {
+    return 'No se pudieron cargar tus tomas anteriores ($error).';
+  }
+
+  @override
+  String get record_errPunchTake => 'No se encontró la toma del punch.';
+
+  @override
+  String get record_errSave => 'No se pudo guardar la toma.';
+
+  @override
+  String get record_errStart => 'No se pudo empezar a grabar.';
+
+  @override
+  String record_errStems(String error) {
+    return 'No se pudieron cargar los stems ($error).';
+  }
+
+  @override
+  String record_errTake(String error) {
+    return 'No se pudo grabar la toma ($error).';
+  }
+
+  @override
+  String get record_faderA11y => 'Volumen';
+
+  @override
+  String get record_goLibrary => 'Ir a la biblioteca';
+
+  @override
+  String get record_goMontage => 'Ir al montaje';
+
+  @override
+  String get record_goMontageHelp => 'Monta las mejores tomas en un vídeo';
+
+  @override
+  String get record_headerMulti => 'Multitoma';
+
+  @override
+  String get record_inputLevelA11y => 'Nivel de la entrada de guitarra';
+
+  @override
+  String get record_inputWord => 'Entrada';
+
+  @override
+  String get record_master => 'Master';
+
+  @override
+  String get record_menuBest => 'Marcar como mejor';
+
+  @override
+  String get record_menuDelete => 'Borrar…';
+
+  @override
+  String get record_menuOffset => 'Ajustar desfase…';
+
+  @override
+  String get record_menuPunch => 'Punch-in';
+
+  @override
+  String get record_mixerExpand => 'Expandir';
+
+  @override
+  String get record_mixerExpandA11y => 'Expandir el mezclador';
+
+  @override
+  String get record_mixerFold => 'Plegar';
+
+  @override
+  String get record_mixerFoldA11y => 'Plegar el mezclador';
+
+  @override
+  String record_mixerOutput(String device) {
+    return 'Salida: $device';
+  }
+
+  @override
+  String get record_mixerTitle => 'Mezclador';
+
+  @override
+  String record_muteA11y(String name) {
+    return 'Silenciar $name';
+  }
+
+  @override
+  String get record_muted => 'Silenciado';
+
+  @override
+  String get record_notSeparatedBody =>
+      'Grabar necesita los stems. Sepáralo desde la biblioteca y vuelve.';
+
+  @override
+  String get record_notSeparatedTitle => 'Este tema aún no está separado';
+
+  @override
+  String get record_noticeNoFrames =>
+      'No llegaron fotogramas de la cámara: la toma es solo de audio.';
+
+  @override
+  String get record_noticeStopped =>
+      'La toma se detuvo y se guardó lo grabado.';
+
+  @override
+  String get record_offsetDiscard => 'Descartar toma';
+
+  @override
+  String record_offsetFrameNote(int ms) {
+    return 'Fotograma = $ms ms';
+  }
+
+  @override
+  String get record_offsetHelp =>
+      'Dale al play y mueve el desfase hasta que imagen y sonido coincidan (un golpe seco en las cuerdas ayuda). Positivo = la imagen llega tarde.';
+
+  @override
+  String record_offsetLoadError(String error) {
+    return 'No se pudo abrir la toma ($error).';
+  }
+
+  @override
+  String record_offsetMakeDefault(String camera) {
+    return 'Guardar como desfase por defecto de esta cámara ($camera)';
+  }
+
+  @override
+  String get record_offsetMinusFrame => '−1 fotograma';
+
+  @override
+  String get record_offsetMinusMs => '−1 ms';
+
+  @override
+  String get record_offsetMsA11y => 'Desfase en milisegundos';
+
+  @override
+  String get record_offsetPlayPause => 'Reproducir / pausa';
+
+  @override
+  String get record_offsetPlusFrame => '+1 fotograma';
+
+  @override
+  String get record_offsetPlusMs => '+1 ms';
+
+  @override
+  String get record_offsetRestart => 'Al principio';
+
+  @override
+  String get record_offsetSave => 'Guardar';
+
+  @override
+  String get record_offsetSaveTake => 'Guardar toma';
+
+  @override
+  String get record_offsetTitle => 'Ajustar desfase';
+
+  @override
+  String get record_offsetUnit => 'ms';
+
+  @override
+  String get record_offsetUnset => 'Desfase de la cámara: sin ajustar';
+
+  @override
+  String record_offsetValue(String ms) {
+    return 'Desfase de la cámara: $ms ms';
+  }
+
+  @override
+  String get record_partAdded => 'Parte añadida';
+
+  @override
+  String record_partReplaces(String guitar) {
+    return 'Sustituye: $guitar';
+  }
+
+  @override
+  String get record_parts => 'Partes';
+
+  @override
+  String get record_partsHelp =>
+      'En cada toma suena el backing sin esa parte y con tus tomas anteriores.';
+
+  @override
+  String get record_preRoll => 'Margen';
+
+  @override
+  String get record_preRoll0 => 'Sin margen';
+
+  @override
+  String get record_preRoll1 => '1 compás';
+
+  @override
+  String get record_preRoll2 => '2 compases';
+
+  @override
+  String get record_previewNoVideo => 'Sin vídeo: se grabará solo el audio';
+
+  @override
+  String record_previewSimulated(String camera) {
+    return 'Vista previa de la cámara · $camera (simulada)';
+  }
+
+  @override
+  String get record_punchEntryA11y => 'Entrada del punch-in';
+
+  @override
+  String get record_punchExitA11y => 'Salida del punch-in';
+
+  @override
+  String get record_punchHelp_mac =>
+      'Haz clic para marcar la entrada y después la salida; arrastra las marcas para moverlas (⌥ = libre, sin imán al compás).';
+
+  @override
+  String get record_punchHelp_win =>
+      'Haz clic para marcar la entrada y después la salida; arrastra las marcas para moverlas (Alt = libre, sin imán al compás).';
+
+  @override
+  String record_punchSummary(String entry, String exit) {
+    return 'Entrada $entry · Salida $exit';
+  }
+
+  @override
+  String get record_punchTitle => 'Punch-in';
+
+  @override
+  String get record_punchToggle => 'Punch-in';
+
+  @override
+  String get record_punchToggleHelp => 'Vuelve a grabar un tramo de una toma';
+
+  @override
+  String get record_recPrefix => 'REC · ';
+
+  @override
+  String get record_rotate => 'Rotar';
+
+  @override
+  String record_rotateA11y(int degrees) {
+    return 'Rotar cámara, ahora $degrees grados';
+  }
+
+  @override
+  String record_rotateDegrees(int degrees) {
+    return 'Rotar · $degrees°';
+  }
+
+  @override
+  String get record_rotateHelp =>
+      'Gira la imagen de esta cámara 90° en sentido horario (no se recodifica; se aplica al ver y montar)';
+
+  @override
+  String record_soloA11y(String name) {
+    return 'Solo $name';
+  }
+
+  @override
+  String get record_start => 'Grabar';
+
+  @override
+  String get record_startAt => 'Empezar en';
+
+  @override
+  String get record_startBeginning => 'Principio';
+
+  @override
+  String get record_statusDone => 'Hecha';
+
+  @override
+  String get record_statusPending => 'Pendiente';
+
+  @override
+  String get record_statusRecording => 'Grabando';
+
+  @override
+  String get record_stemBass => 'Bajo';
+
+  @override
+  String get record_stemDrums => 'Batería';
+
+  @override
+  String get record_stemGuitar => 'Guitarra';
+
+  @override
+  String get record_stemOther => 'Resto';
+
+  @override
+  String get record_stemPiano => 'Piano';
+
+  @override
+  String get record_stemVocals => 'Voz';
+
+  @override
+  String get record_stop => 'Parar';
+
+  @override
+  String get record_stopA11y => 'Parar la grabación';
+
+  @override
+  String record_take(int n) {
+    return 'Toma $n';
+  }
+
+  @override
+  String record_takeA11y(int n) {
+    return 'Toma $n';
+  }
+
+  @override
+  String record_takeA11yBest(int n) {
+    return 'Toma $n, mejor';
+  }
+
+  @override
+  String record_takeBest(int n) {
+    return 'Toma $n · mejor';
+  }
+
+  @override
+  String record_takePill(int n, String part) {
+    return 'Toma $n · $part';
+  }
+
+  @override
+  String get record_title => 'Grabar';
+
+  @override
+  String get record_uncalibrated =>
+      'Sin calibrar: la toma puede ir desfasada decenas de ms; se corregirá al calibrar.';
+
+  @override
+  String record_unmuteA11y(String name) {
+    return 'Activar $name';
+  }
+
+  @override
+  String get record_viewTake => 'Ver toma';
+
+  @override
+  String record_viewTakeA11y(int n) {
+    return 'Ver toma $n';
+  }
+
+  @override
+  String record_viewerTitle(int n, String part) {
+    return 'Toma $n · $part';
+  }
+
+  @override
+  String get record_yourGuitar => 'Tu guitarra';
+
+  @override
+  String get takeview_backing => 'Backing';
+
+  @override
+  String get takeview_backingMuteHelp => 'Silenciar el backing';
+
+  @override
+  String get takeview_backingMuted => 'Backing mudo';
+
+  @override
+  String get takeview_backingUnmuteHelp => 'Oír el backing';
+
+  @override
+  String get takeview_bestChip => '★ mejor';
+
+  @override
+  String get takeview_close => 'Cerrar';
+
+  @override
+  String get takeview_delete => 'Eliminar…';
+
+  @override
+  String get takeview_deleteBody =>
+      'Se borra su carpeta (audio y vídeo). No se puede deshacer.';
+
+  @override
+  String get takeview_deleteConfirm => 'Eliminar toma';
+
+  @override
+  String get takeview_deleteTitle => '¿Eliminar la toma?';
+
+  @override
+  String takeview_errInnerAudio(String file) {
+    return 'no se pudo leer el audio $file';
+  }
+
+  @override
+  String get takeview_errInnerNoAudio => 'la toma no tiene audio procesado';
+
+  @override
+  String get takeview_errNoAudio => 'Esta toma no tiene audio que reproducir.';
+
+  @override
+  String takeview_errPrepare(String error) {
+    return 'No se pudo preparar la toma ($error).';
+  }
+
+  @override
+  String get takeview_markBest => 'Marcar como mejor';
+
+  @override
+  String get takeview_noVideo => 'Sin vídeo: solo audio';
+
+  @override
+  String get takeview_pause => 'Pausa';
+
+  @override
+  String get takeview_play => 'Reproducir';
+
+  @override
+  String get takeview_position => 'Posición';
+
+  @override
   String get montageAnchor => '';
 
   @override

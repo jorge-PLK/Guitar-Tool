@@ -1718,6 +1718,864 @@ abstract class AppLocalizations {
   /// **''**
   String get recordAnchor;
 
+  /// Grabar, partes: botón añadir parte (RV:200).
+  ///
+  /// In es, this message translates to:
+  /// **'Añadir parte'**
+  String get record_addPart;
+
+  /// Grabar, añadir parte: botón confirmar (RV:349).
+  ///
+  /// In es, this message translates to:
+  /// **'Añadir'**
+  String get record_addPartAdd;
+
+  /// Grabar, añadir parte: campo del nombre (RV:341).
+  ///
+  /// In es, this message translates to:
+  /// **'Nombre de la parte'**
+  String get record_addPartName;
+
+  /// Grabar, añadir parte: opción sin guitarra sustituida (RV:343).
+  ///
+  /// In es, this message translates to:
+  /// **'Ninguna (parte añadida)'**
+  String get record_addPartNone;
+
+  /// Grabar, añadir parte: selector de guitarra sustituida (RV:342).
+  ///
+  /// In es, this message translates to:
+  /// **'Guitarra que sustituye'**
+  String get record_addPartReplaces;
+
+  /// Grabar, añadir parte: título del diálogo (RV:340).
+  ///
+  /// In es, this message translates to:
+  /// **'Añadir parte'**
+  String get record_addPartTitle;
+
+  /// Grabar, bloqueo: punch sin marcas (RC:505).
+  ///
+  /// In es, this message translates to:
+  /// **'Marca la entrada y la salida del punch-in en la línea de tiempo.'**
+  String get record_blockMarkPunch;
+
+  /// Grabar, bloqueo: falta la parte (RC:502).
+  ///
+  /// In es, this message translates to:
+  /// **'Elige una parte.'**
+  String get record_blockPickPart;
+
+  /// Grabar, bloqueo: falta la toma (RC:504).
+  ///
+  /// In es, this message translates to:
+  /// **'Elige la toma sobre la que hacer el punch-in.'**
+  String get record_blockPickTake;
+
+  /// Grabar, aviso: cámara sin vídeo (RV:174, 176).
+  ///
+  /// In es, this message translates to:
+  /// **'{message} Se grabará solo el audio.'**
+  String record_cameraAudioOnly(String message);
+
+  /// Grabar, aviso: permiso de cámara denegado (RV:175; decisión 16).
+  ///
+  /// In es, this message translates to:
+  /// **'Sin permiso de cámara: se grabará solo el audio. Concédelo en Ajustes del Sistema > Privacidad > Cámara.'**
+  String get record_cameraDenied;
+
+  /// Grabar, aviso: la cámara elegida no está conectada (RC:430).
+  ///
+  /// In es, this message translates to:
+  /// **'La cámara elegida en Ajustes no está conectada.'**
+  String get record_cameraMissing;
+
+  /// Grabar, aviso: no hay cámara (RC:430).
+  ///
+  /// In es, this message translates to:
+  /// **'No hay ninguna cámara conectada.'**
+  String get record_cameraNone;
+
+  /// Grabar, error: no se pudo abrir la cámara (RC:443, 468).
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo abrir la cámara ({error}).'**
+  String record_cameraOpenFailed(String error);
+
+  /// Grabar, aviso: cámara desconectada durante la grabación (RC:492).
+  ///
+  /// In es, this message translates to:
+  /// **'Se desconectó la cámara: se grabará solo el audio.'**
+  String get record_cameraUnplugged;
+
+  /// Grabar, botón cancelar (RV:137, 348; OS:74).
+  ///
+  /// In es, this message translates to:
+  /// **'Cancelar'**
+  String get record_cancel;
+
+  /// Grabar, selector vacío (RV:31).
+  ///
+  /// In es, this message translates to:
+  /// **'Aún no hay temas separados. Importa uno y sepáralo en la biblioteca.'**
+  String get record_chooserEmpty;
+
+  /// Grabar, selector: instrucción (RV:33).
+  ///
+  /// In es, this message translates to:
+  /// **'Elige un tema'**
+  String get record_chooserPick;
+
+  /// Grabar, arranque: opción cuenta de 1 compás (RV:506).
+  ///
+  /// In es, this message translates to:
+  /// **'Cuenta de 1 compás'**
+  String get record_countIn;
+
+  /// Grabar, borrar toma: cuerpo del diálogo (RV:139).
+  ///
+  /// In es, this message translates to:
+  /// **'Se borra su carpeta (audio y vídeo). No se puede deshacer.'**
+  String get record_deleteBody;
+
+  /// Grabar, borrar toma: botón confirmar (RV:136).
+  ///
+  /// In es, this message translates to:
+  /// **'Borrar toma'**
+  String get record_deleteConfirm;
+
+  /// Grabar, borrar toma: título del diálogo (RV:134).
+  ///
+  /// In es, this message translates to:
+  /// **'¿Borrar la toma?'**
+  String get record_deleteTitle;
+
+  /// Grabar, duración: ayuda del modo automático (RV:493).
+  ///
+  /// In es, this message translates to:
+  /// **'Para sola al acabar la sección más el margen'**
+  String get record_durationHelpAuto;
+
+  /// Grabar, duración: ayuda del tema (RV:493).
+  ///
+  /// In es, this message translates to:
+  /// **'Duración del tema'**
+  String get record_durationHelpTheme;
+
+  /// Grabar, error: borrar toma (RC:801).
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo borrar la toma ({error}).'**
+  String record_errDelete(String error);
+
+  /// Grabar, error: dispositivo cerrado (RC:557).
+  ///
+  /// In es, this message translates to:
+  /// **'El dispositivo no está abierto.'**
+  String get record_errDeviceClosed;
+
+  /// Grabar, error: cargar tomas anteriores (RC:388).
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudieron cargar tus tomas anteriores ({error}).'**
+  String record_errPriorTakes(String error);
+
+  /// Grabar, error: toma del punch no encontrada (RC:814).
+  ///
+  /// In es, this message translates to:
+  /// **'No se encontró la toma del punch.'**
+  String get record_errPunchTake;
+
+  /// Grabar, error: guardar toma (RC:596).
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo guardar la toma.'**
+  String get record_errSave;
+
+  /// Grabar, error: empezar a grabar (RC:583).
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo empezar a grabar.'**
+  String get record_errStart;
+
+  /// Grabar, error: cargar stems (RC:335).
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudieron cargar los stems ({error}).'**
+  String record_errStems(String error);
+
+  /// Grabar, error: grabar toma (RC:632).
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo grabar la toma ({error}).'**
+  String record_errTake(String error);
+
+  /// Grabar, mezclador: etiqueta de accesibilidad del fader (BM:307).
+  ///
+  /// In es, this message translates to:
+  /// **'Volumen'**
+  String get record_faderA11y;
+
+  /// Grabar, sin separar: botón ir a la biblioteca (RV:62).
+  ///
+  /// In es, this message translates to:
+  /// **'Ir a la biblioteca'**
+  String get record_goLibrary;
+
+  /// Grabar, cabecera: botón ir al montaje (RV:155).
+  ///
+  /// In es, this message translates to:
+  /// **'Ir al montaje'**
+  String get record_goMontage;
+
+  /// Grabar, cabecera: ayuda del botón montaje (RV:162).
+  ///
+  /// In es, this message translates to:
+  /// **'Monta las mejores tomas en un vídeo'**
+  String get record_goMontageHelp;
+
+  /// Grabar, cabecera: indicador de multitoma (RV:149).
+  ///
+  /// In es, this message translates to:
+  /// **'Multitoma'**
+  String get record_headerMulti;
+
+  /// Grabar, mezclador: nivel de entrada, accesibilidad (RM:86, 214).
+  ///
+  /// In es, this message translates to:
+  /// **'Nivel de la entrada de guitarra'**
+  String get record_inputLevelA11y;
+
+  /// Grabar, mezclador: etiqueta de la entrada (RM:208).
+  ///
+  /// In es, this message translates to:
+  /// **'Entrada'**
+  String get record_inputWord;
+
+  /// Grabar, mezclador: canal master (RM:70, 178).
+  ///
+  /// In es, this message translates to:
+  /// **'Master'**
+  String get record_master;
+
+  /// Grabar, menú de toma: marcar como mejor (RV:274).
+  ///
+  /// In es, this message translates to:
+  /// **'Marcar como mejor'**
+  String get record_menuBest;
+
+  /// Grabar, menú de toma: borrar (RV:278).
+  ///
+  /// In es, this message translates to:
+  /// **'Borrar…'**
+  String get record_menuDelete;
+
+  /// Grabar, menú de toma: ajustar desfase (RV:275).
+  ///
+  /// In es, this message translates to:
+  /// **'Ajustar desfase…'**
+  String get record_menuOffset;
+
+  /// Grabar, menú de toma: punch-in (RV:276).
+  ///
+  /// In es, this message translates to:
+  /// **'Punch-in'**
+  String get record_menuPunch;
+
+  /// Grabar, mezclador: expandir (RM:29).
+  ///
+  /// In es, this message translates to:
+  /// **'Expandir'**
+  String get record_mixerExpand;
+
+  /// Grabar, mezclador: expandir, accesibilidad (RM:34).
+  ///
+  /// In es, this message translates to:
+  /// **'Expandir el mezclador'**
+  String get record_mixerExpandA11y;
+
+  /// Grabar, mezclador: plegar (RM:29).
+  ///
+  /// In es, this message translates to:
+  /// **'Plegar'**
+  String get record_mixerFold;
+
+  /// Grabar, mezclador: plegar, accesibilidad (RM:34).
+  ///
+  /// In es, this message translates to:
+  /// **'Plegar el mezclador'**
+  String get record_mixerFoldA11y;
+
+  /// Grabar, mezclador: salida; «—» si vacío lo resuelve el código (RM:26).
+  ///
+  /// In es, this message translates to:
+  /// **'Salida: {device}'**
+  String record_mixerOutput(String device);
+
+  /// Grabar, mezclador: título (RM:24).
+  ///
+  /// In es, this message translates to:
+  /// **'Mezclador'**
+  String get record_mixerTitle;
+
+  /// Grabar, mezclador: botón M, accesibilidad (BM:181; RM:129).
+  ///
+  /// In es, this message translates to:
+  /// **'Silenciar {name}'**
+  String record_muteA11y(String name);
+
+  /// Grabar, mezclador: estado silenciado (BM:178).
+  ///
+  /// In es, this message translates to:
+  /// **'Silenciado'**
+  String get record_muted;
+
+  /// Grabar, sin separar: cuerpo (RV:61).
+  ///
+  /// In es, this message translates to:
+  /// **'Grabar necesita los stems. Sepáralo desde la biblioteca y vuelve.'**
+  String get record_notSeparatedBody;
+
+  /// Grabar, sin separar: título (RV:60).
+  ///
+  /// In es, this message translates to:
+  /// **'Este tema aún no está separado'**
+  String get record_notSeparatedTitle;
+
+  /// Grabar, aviso: sin fotogramas (RC:614).
+  ///
+  /// In es, this message translates to:
+  /// **'No llegaron fotogramas de la cámara: la toma es solo de audio.'**
+  String get record_noticeNoFrames;
+
+  /// Grabar, aviso: toma detenida (RC:598).
+  ///
+  /// In es, this message translates to:
+  /// **'La toma se detuvo y se guardó lo grabado.'**
+  String get record_noticeStopped;
+
+  /// Ajustar desfase: botón descartar (OS:74).
+  ///
+  /// In es, this message translates to:
+  /// **'Descartar toma'**
+  String get record_offsetDiscard;
+
+  /// Ajustar desfase: nota del fotograma (OS:67).
+  ///
+  /// In es, this message translates to:
+  /// **'Fotograma = {ms} ms'**
+  String record_offsetFrameNote(int ms);
+
+  /// Ajustar desfase: ayuda (OS:31).
+  ///
+  /// In es, this message translates to:
+  /// **'Dale al play y mueve el desfase hasta que imagen y sonido coincidan (un golpe seco en las cuerdas ayuda). Positivo = la imagen llega tarde.'**
+  String get record_offsetHelp;
+
+  /// Ajustar desfase: error al abrir la toma (OS:119).
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo abrir la toma ({error}).'**
+  String record_offsetLoadError(String error);
+
+  /// Ajustar desfase: casilla de desfase por defecto (OS:70).
+  ///
+  /// In es, this message translates to:
+  /// **'Guardar como desfase por defecto de esta cámara ({camera})'**
+  String record_offsetMakeDefault(String camera);
+
+  /// Ajustar desfase: botón −1 fotograma (OS:55).
+  ///
+  /// In es, this message translates to:
+  /// **'−1 fotograma'**
+  String get record_offsetMinusFrame;
+
+  /// Ajustar desfase: botón −1 ms (OS:56).
+  ///
+  /// In es, this message translates to:
+  /// **'−1 ms'**
+  String get record_offsetMinusMs;
+
+  /// Ajustar desfase: campo, accesibilidad (OS:61).
+  ///
+  /// In es, this message translates to:
+  /// **'Desfase en milisegundos'**
+  String get record_offsetMsA11y;
+
+  /// Ajustar desfase: botón reproducir o pausa (OS:48).
+  ///
+  /// In es, this message translates to:
+  /// **'Reproducir / pausa'**
+  String get record_offsetPlayPause;
+
+  /// Ajustar desfase: botón +1 fotograma (OS:65).
+  ///
+  /// In es, this message translates to:
+  /// **'+1 fotograma'**
+  String get record_offsetPlusFrame;
+
+  /// Ajustar desfase: botón +1 ms (OS:64).
+  ///
+  /// In es, this message translates to:
+  /// **'+1 ms'**
+  String get record_offsetPlusMs;
+
+  /// Ajustar desfase: volver al principio (OS:50).
+  ///
+  /// In es, this message translates to:
+  /// **'Al principio'**
+  String get record_offsetRestart;
+
+  /// Ajustar desfase: botón guardar (OS:79).
+  ///
+  /// In es, this message translates to:
+  /// **'Guardar'**
+  String get record_offsetSave;
+
+  /// Ajustar desfase: botón guardar toma (OS:79).
+  ///
+  /// In es, this message translates to:
+  /// **'Guardar toma'**
+  String get record_offsetSaveTake;
+
+  /// Ajustar desfase: título (OS:30).
+  ///
+  /// In es, this message translates to:
+  /// **'Ajustar desfase'**
+  String get record_offsetTitle;
+
+  /// Ajustar desfase: unidad (OS:62).
+  ///
+  /// In es, this message translates to:
+  /// **'ms'**
+  String get record_offsetUnit;
+
+  /// Cabecera de grabación: desfase sin ajustar (RV:533).
+  ///
+  /// In es, this message translates to:
+  /// **'Desfase de la cámara: sin ajustar'**
+  String get record_offsetUnset;
+
+  /// Cabecera de grabación: desfase con valor; el signo «+» lo pone el código (RV:533).
+  ///
+  /// In es, this message translates to:
+  /// **'Desfase de la cámara: {ms} ms'**
+  String record_offsetValue(String ms);
+
+  /// Grabar, partes: estado de parte añadida (RV:218).
+  ///
+  /// In es, this message translates to:
+  /// **'Parte añadida'**
+  String get record_partAdded;
+
+  /// Grabar, partes: guitarra sustituida (RV:218).
+  ///
+  /// In es, this message translates to:
+  /// **'Sustituye: {guitar}'**
+  String record_partReplaces(String guitar);
+
+  /// Grabar, partes: título (RV:195).
+  ///
+  /// In es, this message translates to:
+  /// **'Partes'**
+  String get record_parts;
+
+  /// Grabar, partes: ayuda (RV:196).
+  ///
+  /// In es, this message translates to:
+  /// **'En cada toma suena el backing sin esa parte y con tus tomas anteriores.'**
+  String get record_partsHelp;
+
+  /// Grabar, arranque: etiqueta del margen (RV:509).
+  ///
+  /// In es, this message translates to:
+  /// **'Margen'**
+  String get record_preRoll;
+
+  /// Grabar, arranque: margen de 0 compases (RV:512).
+  ///
+  /// In es, this message translates to:
+  /// **'Sin margen'**
+  String get record_preRoll0;
+
+  /// Grabar, arranque: margen de 1 compás (RV:511).
+  ///
+  /// In es, this message translates to:
+  /// **'1 compás'**
+  String get record_preRoll1;
+
+  /// Grabar, arranque: margen de 2 compases (RV:510).
+  ///
+  /// In es, this message translates to:
+  /// **'2 compases'**
+  String get record_preRoll2;
+
+  /// Grabar, vista previa: sin vídeo (RV:400).
+  ///
+  /// In es, this message translates to:
+  /// **'Sin vídeo: se grabará solo el audio'**
+  String get record_previewNoVideo;
+
+  /// Grabar, vista previa de la cámara (RV:398); camera por defecto «simulada».
+  ///
+  /// In es, this message translates to:
+  /// **'Vista previa de la cámara · {camera} (simulada)'**
+  String record_previewSimulated(String camera);
+
+  /// Grabar, punch-in: marca de entrada, accesibilidad (PT:64).
+  ///
+  /// In es, this message translates to:
+  /// **'Entrada del punch-in'**
+  String get record_punchEntryA11y;
+
+  /// Grabar, punch-in: marca de salida, accesibilidad (PT:64).
+  ///
+  /// In es, this message translates to:
+  /// **'Salida del punch-in'**
+  String get record_punchExitA11y;
+
+  /// Grabar, punch-in: ayuda, versión macOS (PT:54).
+  ///
+  /// In es, this message translates to:
+  /// **'Haz clic para marcar la entrada y después la salida; arrastra las marcas para moverlas (⌥ = libre, sin imán al compás).'**
+  String get record_punchHelp_mac;
+
+  /// Grabar, punch-in: ayuda, versión Windows (PT:54; web punch.js:73).
+  ///
+  /// In es, this message translates to:
+  /// **'Haz clic para marcar la entrada y después la salida; arrastra las marcas para moverlas (Alt = libre, sin imán al compás).'**
+  String get record_punchHelp_win;
+
+  /// Grabar, punch-in: resumen de marcas; «—» sin marca y formato m:ss,d lo resuelve el código (PT:67-69).
+  ///
+  /// In es, this message translates to:
+  /// **'Entrada {entry} · Salida {exit}'**
+  String record_punchSummary(String entry, String exit);
+
+  /// Grabar, punch-in: título (PT:20).
+  ///
+  /// In es, this message translates to:
+  /// **'Punch-in'**
+  String get record_punchTitle;
+
+  /// Grabar, arranque: interruptor de punch-in (RV:516).
+  ///
+  /// In es, this message translates to:
+  /// **'Punch-in'**
+  String get record_punchToggle;
+
+  /// Grabar, arranque: ayuda del punch-in (RV:521).
+  ///
+  /// In es, this message translates to:
+  /// **'Vuelve a grabar un tramo de una toma'**
+  String get record_punchToggleHelp;
+
+  /// Grabar, cabecera de toma: prefijo de la píldora REC (RV:434).
+  ///
+  /// In es, this message translates to:
+  /// **'REC · '**
+  String get record_recPrefix;
+
+  /// Grabar, cámara: botón rotar (RV:444).
+  ///
+  /// In es, this message translates to:
+  /// **'Rotar'**
+  String get record_rotate;
+
+  /// Grabar, cámara: rotar, accesibilidad (RV:450).
+  ///
+  /// In es, this message translates to:
+  /// **'Rotar cámara, ahora {degrees} grados'**
+  String record_rotateA11y(int degrees);
+
+  /// Grabar, cámara: botón rotar con grados (RV:444).
+  ///
+  /// In es, this message translates to:
+  /// **'Rotar · {degrees}°'**
+  String record_rotateDegrees(int degrees);
+
+  /// Grabar, cámara: ayuda de rotar (RV:449).
+  ///
+  /// In es, this message translates to:
+  /// **'Gira la imagen de esta cámara 90° en sentido horario (no se recodifica; se aplica al ver y montar)'**
+  String get record_rotateHelp;
+
+  /// Grabar, mezclador: botón S, accesibilidad (BM:182; RM:130).
+  ///
+  /// In es, this message translates to:
+  /// **'Solo {name}'**
+  String record_soloA11y(String name);
+
+  /// Grabar, controles: botón empezar (RV:480, 489).
+  ///
+  /// In es, this message translates to:
+  /// **'Grabar'**
+  String get record_start;
+
+  /// Grabar, arranque: etiqueta (RV:500).
+  ///
+  /// In es, this message translates to:
+  /// **'Empezar en'**
+  String get record_startAt;
+
+  /// Grabar, arranque: opción principio (RV:501).
+  ///
+  /// In es, this message translates to:
+  /// **'Principio'**
+  String get record_startBeginning;
+
+  /// Grabar, partes: estado hecha (RV:235).
+  ///
+  /// In es, this message translates to:
+  /// **'Hecha'**
+  String get record_statusDone;
+
+  /// Grabar, partes: estado pendiente (RV:237).
+  ///
+  /// In es, this message translates to:
+  /// **'Pendiente'**
+  String get record_statusPending;
+
+  /// Grabar, partes: estado grabando (RV:236).
+  ///
+  /// In es, this message translates to:
+  /// **'Grabando'**
+  String get record_statusRecording;
+
+  /// Grabar, mezclador: stem bajo (RM:16).
+  ///
+  /// In es, this message translates to:
+  /// **'Bajo'**
+  String get record_stemBass;
+
+  /// Grabar, mezclador: stem batería (RM:16).
+  ///
+  /// In es, this message translates to:
+  /// **'Batería'**
+  String get record_stemDrums;
+
+  /// Grabar, mezclador: stem guitarra (RM:16).
+  ///
+  /// In es, this message translates to:
+  /// **'Guitarra'**
+  String get record_stemGuitar;
+
+  /// Grabar, mezclador: stem resto (RM:16).
+  ///
+  /// In es, this message translates to:
+  /// **'Resto'**
+  String get record_stemOther;
+
+  /// Grabar, mezclador: stem piano (RM:16).
+  ///
+  /// In es, this message translates to:
+  /// **'Piano'**
+  String get record_stemPiano;
+
+  /// Grabar, mezclador: stem voz (RM:16).
+  ///
+  /// In es, this message translates to:
+  /// **'Voz'**
+  String get record_stemVocals;
+
+  /// Grabar, controles: botón parar (RV:480).
+  ///
+  /// In es, this message translates to:
+  /// **'Parar'**
+  String get record_stop;
+
+  /// Grabar, controles: parar, accesibilidad (RV:489).
+  ///
+  /// In es, this message translates to:
+  /// **'Parar la grabación'**
+  String get record_stopA11y;
+
+  /// Grabar, tomas: nombre de la toma (RV:280).
+  ///
+  /// In es, this message translates to:
+  /// **'Toma {n}'**
+  String record_take(int n);
+
+  /// Grabar, tomas: toma, accesibilidad (RV:291).
+  ///
+  /// In es, this message translates to:
+  /// **'Toma {n}'**
+  String record_takeA11y(int n);
+
+  /// Grabar, tomas: toma marcada como mejor, accesibilidad (RV:291; variante creada).
+  ///
+  /// In es, this message translates to:
+  /// **'Toma {n}, mejor'**
+  String record_takeA11yBest(int n);
+
+  /// Grabar, tomas: toma marcada como mejor (RV:280).
+  ///
+  /// In es, this message translates to:
+  /// **'Toma {n} · mejor'**
+  String record_takeBest(int n);
+
+  /// Grabar, cabecera de toma: píldora con parte (RV:434).
+  ///
+  /// In es, this message translates to:
+  /// **'Toma {n} · {part}'**
+  String record_takePill(int n, String part);
+
+  /// Grabar: título de la pantalla (RV:29, 151).
+  ///
+  /// In es, this message translates to:
+  /// **'Grabar'**
+  String get record_title;
+
+  /// Grabar, aviso: toma sin calibrar (BackingRecord.swift:46; RV:172).
+  ///
+  /// In es, this message translates to:
+  /// **'Sin calibrar: la toma puede ir desfasada decenas de ms; se corregirá al calibrar.'**
+  String get record_uncalibrated;
+
+  /// Grabar, mezclador: botón M activo, accesibilidad (BM:181; RM:129).
+  ///
+  /// In es, this message translates to:
+  /// **'Activar {name}'**
+  String record_unmuteA11y(String name);
+
+  /// Grabar, tomas: ayuda de ver toma (RV:267).
+  ///
+  /// In es, this message translates to:
+  /// **'Ver toma'**
+  String get record_viewTake;
+
+  /// Grabar, tomas: ver toma, accesibilidad (RV:267).
+  ///
+  /// In es, this message translates to:
+  /// **'Ver toma {n}'**
+  String record_viewTakeA11y(int n);
+
+  /// Visor de toma: título (RV:254).
+  ///
+  /// In es, this message translates to:
+  /// **'Toma {n} · {part}'**
+  String record_viewerTitle(int n, String part);
+
+  /// Grabar, mezclador: canal de tu guitarra (RM:77, 197).
+  ///
+  /// In es, this message translates to:
+  /// **'Tu guitarra'**
+  String get record_yourGuitar;
+
+  /// Visor de toma: botón backing (TV:349).
+  ///
+  /// In es, this message translates to:
+  /// **'Backing'**
+  String get takeview_backing;
+
+  /// Visor de toma: ayuda de silenciar backing (TV:357).
+  ///
+  /// In es, this message translates to:
+  /// **'Silenciar el backing'**
+  String get takeview_backingMuteHelp;
+
+  /// Visor de toma: backing silenciado (TV:349).
+  ///
+  /// In es, this message translates to:
+  /// **'Backing mudo'**
+  String get takeview_backingMuted;
+
+  /// Visor de toma: ayuda de oír backing (TV:357).
+  ///
+  /// In es, this message translates to:
+  /// **'Oír el backing'**
+  String get takeview_backingUnmuteHelp;
+
+  /// Visor de toma: chip de mejor (TV:307).
+  ///
+  /// In es, this message translates to:
+  /// **'★ mejor'**
+  String get takeview_bestChip;
+
+  /// Visor de toma: cerrar, ayuda y etiqueta (TV:312-313).
+  ///
+  /// In es, this message translates to:
+  /// **'Cerrar'**
+  String get takeview_close;
+
+  /// Visor de toma: eliminar (TV:365).
+  ///
+  /// In es, this message translates to:
+  /// **'Eliminar…'**
+  String get takeview_delete;
+
+  /// Visor de toma: cuerpo de eliminar (TV:299).
+  ///
+  /// In es, this message translates to:
+  /// **'Se borra su carpeta (audio y vídeo). No se puede deshacer.'**
+  String get takeview_deleteBody;
+
+  /// Visor de toma: botón confirmar eliminar (TV:296).
+  ///
+  /// In es, this message translates to:
+  /// **'Eliminar toma'**
+  String get takeview_deleteConfirm;
+
+  /// Visor de toma: título de eliminar (TV:295).
+  ///
+  /// In es, this message translates to:
+  /// **'¿Eliminar la toma?'**
+  String get takeview_deleteTitle;
+
+  /// Visor de toma: fragmento de error dentro de {error} (TV:136).
+  ///
+  /// In es, this message translates to:
+  /// **'no se pudo leer el audio {file}'**
+  String takeview_errInnerAudio(String file);
+
+  /// Visor de toma: fragmento de error dentro de {error} (TV:135).
+  ///
+  /// In es, this message translates to:
+  /// **'la toma no tiene audio procesado'**
+  String get takeview_errInnerNoAudio;
+
+  /// Visor de toma: sin audio (TV:205).
+  ///
+  /// In es, this message translates to:
+  /// **'Esta toma no tiene audio que reproducir.'**
+  String get takeview_errNoAudio;
+
+  /// Visor de toma: error al preparar (TV:235).
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo preparar la toma ({error}).'**
+  String takeview_errPrepare(String error);
+
+  /// Visor de toma: marcar como mejor (TV:363).
+  ///
+  /// In es, this message translates to:
+  /// **'Marcar como mejor'**
+  String get takeview_markBest;
+
+  /// Visor de toma: sin vídeo (TV:324).
+  ///
+  /// In es, this message translates to:
+  /// **'Sin vídeo: solo audio'**
+  String get takeview_noVideo;
+
+  /// Visor de toma: etiqueta de accesibilidad de pausa (TV:341).
+  ///
+  /// In es, this message translates to:
+  /// **'Pausa'**
+  String get takeview_pause;
+
+  /// Visor de toma: etiqueta de accesibilidad de reproducir (TV:341).
+  ///
+  /// In es, this message translates to:
+  /// **'Reproducir'**
+  String get takeview_play;
+
+  /// Visor de toma: etiqueta del deslizador de posición (solo web, viewer.js:38; no hay en Swift).
+  ///
+  /// In es, this message translates to:
+  /// **'Posición'**
+  String get takeview_position;
+
   /// Ancla del bloque montage: añade las claves del área debajo, en orden alfabético; no edites otros bloques.
   ///
   /// In es, this message translates to:

@@ -985,6 +985,508 @@ class AppLocalizationsEn extends AppLocalizations {
   String get recordAnchor => '';
 
   @override
+  String get record_addPart => 'Add part';
+
+  @override
+  String get record_addPartAdd => 'Add';
+
+  @override
+  String get record_addPartName => 'Part name';
+
+  @override
+  String get record_addPartNone => 'None (added part)';
+
+  @override
+  String get record_addPartReplaces => 'Guitar it replaces';
+
+  @override
+  String get record_addPartTitle => 'Add part';
+
+  @override
+  String get record_blockMarkPunch =>
+      'Mark the punch-in start and end on the timeline.';
+
+  @override
+  String get record_blockPickPart => 'Choose a part.';
+
+  @override
+  String get record_blockPickTake => 'Choose the take to punch in on.';
+
+  @override
+  String record_cameraAudioOnly(String message) {
+    return '$message Only audio will be recorded.';
+  }
+
+  @override
+  String get record_cameraDenied =>
+      'No camera permission: only audio will be recorded. Grant it in System Settings > Privacy > Camera.';
+
+  @override
+  String get record_cameraMissing =>
+      'The camera chosen in Settings is not connected.';
+
+  @override
+  String get record_cameraNone => 'No camera is connected.';
+
+  @override
+  String record_cameraOpenFailed(String error) {
+    return 'Couldn’t open the camera ($error).';
+  }
+
+  @override
+  String get record_cameraUnplugged =>
+      'The camera was disconnected: only audio will be recorded.';
+
+  @override
+  String get record_cancel => 'Cancel';
+
+  @override
+  String get record_chooserEmpty =>
+      'No separated songs yet. Import one and separate it in the library.';
+
+  @override
+  String get record_chooserPick => 'Choose a song';
+
+  @override
+  String get record_countIn => '1-bar count-in';
+
+  @override
+  String get record_deleteBody =>
+      'Its folder (audio and video) is deleted. This can’t be undone.';
+
+  @override
+  String get record_deleteConfirm => 'Delete take';
+
+  @override
+  String get record_deleteTitle => 'Delete the take?';
+
+  @override
+  String get record_durationHelpAuto =>
+      'Stops by itself when the section ends, plus the margin';
+
+  @override
+  String get record_durationHelpTheme => 'Song length';
+
+  @override
+  String record_errDelete(String error) {
+    return 'Couldn’t delete the take ($error).';
+  }
+
+  @override
+  String get record_errDeviceClosed => 'The device is not open.';
+
+  @override
+  String record_errPriorTakes(String error) {
+    return 'Couldn’t load your earlier takes ($error).';
+  }
+
+  @override
+  String get record_errPunchTake => 'The punch-in take was not found.';
+
+  @override
+  String get record_errSave => 'Couldn’t save the take.';
+
+  @override
+  String get record_errStart => 'Couldn’t start recording.';
+
+  @override
+  String record_errStems(String error) {
+    return 'Couldn’t load the stems ($error).';
+  }
+
+  @override
+  String record_errTake(String error) {
+    return 'Couldn’t record the take ($error).';
+  }
+
+  @override
+  String get record_faderA11y => 'Volume';
+
+  @override
+  String get record_goLibrary => 'Go to library';
+
+  @override
+  String get record_goMontage => 'Go to montage';
+
+  @override
+  String get record_goMontageHelp => 'Edit your best takes into a video';
+
+  @override
+  String get record_headerMulti => 'Multitake';
+
+  @override
+  String get record_inputLevelA11y => 'Guitar input level';
+
+  @override
+  String get record_inputWord => 'Input';
+
+  @override
+  String get record_master => 'Master';
+
+  @override
+  String get record_menuBest => 'Mark as best';
+
+  @override
+  String get record_menuDelete => 'Delete…';
+
+  @override
+  String get record_menuOffset => 'Adjust offset…';
+
+  @override
+  String get record_menuPunch => 'Punch-in';
+
+  @override
+  String get record_mixerExpand => 'Expand';
+
+  @override
+  String get record_mixerExpandA11y => 'Expand the mixer';
+
+  @override
+  String get record_mixerFold => 'Collapse';
+
+  @override
+  String get record_mixerFoldA11y => 'Collapse the mixer';
+
+  @override
+  String record_mixerOutput(String device) {
+    return 'Output: $device';
+  }
+
+  @override
+  String get record_mixerTitle => 'Mixer';
+
+  @override
+  String record_muteA11y(String name) {
+    return 'Mute $name';
+  }
+
+  @override
+  String get record_muted => 'Muted';
+
+  @override
+  String get record_notSeparatedBody =>
+      'Recording needs the stems. Separate it from the library and come back.';
+
+  @override
+  String get record_notSeparatedTitle => 'This song isn’t separated yet';
+
+  @override
+  String get record_noticeNoFrames =>
+      'No frames arrived from the camera: the take is audio only.';
+
+  @override
+  String get record_noticeStopped =>
+      'The take was stopped and what was recorded was saved.';
+
+  @override
+  String get record_offsetDiscard => 'Discard take';
+
+  @override
+  String record_offsetFrameNote(int ms) {
+    return 'Frame = $ms ms';
+  }
+
+  @override
+  String get record_offsetHelp =>
+      'Press play and move the offset until picture and sound line up (a sharp strum on the strings helps). Positive = the picture arrives late.';
+
+  @override
+  String record_offsetLoadError(String error) {
+    return 'Couldn’t open the take ($error).';
+  }
+
+  @override
+  String record_offsetMakeDefault(String camera) {
+    return 'Save as this camera’s default offset ($camera)';
+  }
+
+  @override
+  String get record_offsetMinusFrame => '−1 frame';
+
+  @override
+  String get record_offsetMinusMs => '−1 ms';
+
+  @override
+  String get record_offsetMsA11y => 'Offset in milliseconds';
+
+  @override
+  String get record_offsetPlayPause => 'Play / pause';
+
+  @override
+  String get record_offsetPlusFrame => '+1 frame';
+
+  @override
+  String get record_offsetPlusMs => '+1 ms';
+
+  @override
+  String get record_offsetRestart => 'To the start';
+
+  @override
+  String get record_offsetSave => 'Save';
+
+  @override
+  String get record_offsetSaveTake => 'Save take';
+
+  @override
+  String get record_offsetTitle => 'Adjust offset';
+
+  @override
+  String get record_offsetUnit => 'ms';
+
+  @override
+  String get record_offsetUnset => 'Camera offset: not set';
+
+  @override
+  String record_offsetValue(String ms) {
+    return 'Camera offset: $ms ms';
+  }
+
+  @override
+  String get record_partAdded => 'Part added';
+
+  @override
+  String record_partReplaces(String guitar) {
+    return 'Replaces: $guitar';
+  }
+
+  @override
+  String get record_parts => 'Parts';
+
+  @override
+  String get record_partsHelp =>
+      'Each take plays the backing without that part and with your earlier takes.';
+
+  @override
+  String get record_preRoll => 'Pre-roll';
+
+  @override
+  String get record_preRoll0 => 'No pre-roll';
+
+  @override
+  String get record_preRoll1 => '1 bar';
+
+  @override
+  String get record_preRoll2 => '2 bars';
+
+  @override
+  String get record_previewNoVideo => 'No video: only audio will be recorded';
+
+  @override
+  String record_previewSimulated(String camera) {
+    return 'Camera preview · $camera (simulated)';
+  }
+
+  @override
+  String get record_punchEntryA11y => 'Punch-in entry';
+
+  @override
+  String get record_punchExitA11y => 'Punch-in exit';
+
+  @override
+  String get record_punchHelp_mac =>
+      'Click to mark the entry and then the exit; drag the markers to move them (⌥ = free, no snapping to the bar).';
+
+  @override
+  String get record_punchHelp_win =>
+      'Click to mark the entry and then the exit; drag the markers to move them (Alt = free, no snapping to the bar).';
+
+  @override
+  String record_punchSummary(String entry, String exit) {
+    return 'Entry $entry · Exit $exit';
+  }
+
+  @override
+  String get record_punchTitle => 'Punch-in';
+
+  @override
+  String get record_punchToggle => 'Punch-in';
+
+  @override
+  String get record_punchToggleHelp => 'Re-records a section of a take';
+
+  @override
+  String get record_recPrefix => 'REC · ';
+
+  @override
+  String get record_rotate => 'Rotate';
+
+  @override
+  String record_rotateA11y(int degrees) {
+    return 'Rotate camera, now $degrees degrees';
+  }
+
+  @override
+  String record_rotateDegrees(int degrees) {
+    return 'Rotate · $degrees°';
+  }
+
+  @override
+  String get record_rotateHelp =>
+      'Rotates this camera’s image 90° clockwise (not re-encoded; applied when viewing and making the montage)';
+
+  @override
+  String record_soloA11y(String name) {
+    return 'Solo $name';
+  }
+
+  @override
+  String get record_start => 'Record';
+
+  @override
+  String get record_startAt => 'Start at';
+
+  @override
+  String get record_startBeginning => 'Beginning';
+
+  @override
+  String get record_statusDone => 'Done';
+
+  @override
+  String get record_statusPending => 'Pending';
+
+  @override
+  String get record_statusRecording => 'Recording';
+
+  @override
+  String get record_stemBass => 'Bass';
+
+  @override
+  String get record_stemDrums => 'Drums';
+
+  @override
+  String get record_stemGuitar => 'Guitar';
+
+  @override
+  String get record_stemOther => 'Other';
+
+  @override
+  String get record_stemPiano => 'Piano';
+
+  @override
+  String get record_stemVocals => 'Vocals';
+
+  @override
+  String get record_stop => 'Stop';
+
+  @override
+  String get record_stopA11y => 'Stop recording';
+
+  @override
+  String record_take(int n) {
+    return 'Take $n';
+  }
+
+  @override
+  String record_takeA11y(int n) {
+    return 'Take $n';
+  }
+
+  @override
+  String record_takeA11yBest(int n) {
+    return 'Take $n, best';
+  }
+
+  @override
+  String record_takeBest(int n) {
+    return 'Take $n · best';
+  }
+
+  @override
+  String record_takePill(int n, String part) {
+    return 'Take $n · $part';
+  }
+
+  @override
+  String get record_title => 'Record';
+
+  @override
+  String get record_uncalibrated =>
+      'Not calibrated: the take may be off by tens of ms; it will be corrected when you calibrate.';
+
+  @override
+  String record_unmuteA11y(String name) {
+    return 'Unmute $name';
+  }
+
+  @override
+  String get record_viewTake => 'View take';
+
+  @override
+  String record_viewTakeA11y(int n) {
+    return 'View take $n';
+  }
+
+  @override
+  String record_viewerTitle(int n, String part) {
+    return 'Take $n · $part';
+  }
+
+  @override
+  String get record_yourGuitar => 'Your guitar';
+
+  @override
+  String get takeview_backing => 'Backing';
+
+  @override
+  String get takeview_backingMuteHelp => 'Mute the backing';
+
+  @override
+  String get takeview_backingMuted => 'Backing muted';
+
+  @override
+  String get takeview_backingUnmuteHelp => 'Hear the backing';
+
+  @override
+  String get takeview_bestChip => '★ best';
+
+  @override
+  String get takeview_close => 'Close';
+
+  @override
+  String get takeview_delete => 'Delete…';
+
+  @override
+  String get takeview_deleteBody =>
+      'Its folder (audio and video) is deleted. This can’t be undone.';
+
+  @override
+  String get takeview_deleteConfirm => 'Delete take';
+
+  @override
+  String get takeview_deleteTitle => 'Delete the take?';
+
+  @override
+  String takeview_errInnerAudio(String file) {
+    return 'couldn’t read the audio $file';
+  }
+
+  @override
+  String get takeview_errInnerNoAudio => 'the take has no processed audio';
+
+  @override
+  String get takeview_errNoAudio => 'This take has no audio to play.';
+
+  @override
+  String takeview_errPrepare(String error) {
+    return 'Couldn’t prepare the take ($error).';
+  }
+
+  @override
+  String get takeview_markBest => 'Mark as best';
+
+  @override
+  String get takeview_noVideo => 'No video: audio only';
+
+  @override
+  String get takeview_pause => 'Pause';
+
+  @override
+  String get takeview_play => 'Play';
+
+  @override
+  String get takeview_position => 'Position';
+
+  @override
   String get montageAnchor => '';
 
   @override
