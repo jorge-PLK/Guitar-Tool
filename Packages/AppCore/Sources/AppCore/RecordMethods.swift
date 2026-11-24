@@ -237,6 +237,22 @@ final class RecordService {
     /// Justo antes de borrar los ficheros de una toma (Grabar ya soltó sus pistas): el visor suelta esa toma si la tiene.
     nonisolated(unsafe) var willDeleteTake: (@MainActor @Sendable (UUID) async -> Void)?
     private(set) var cameraRelay: FrameRelay?
+    private let pixelSinkLock = NSLock()
+    private nonisolated(unsafe) var _cameraPixelSink: (@Sendable (FramePixelBuffer, Double) -> Void)?
+
+    /// Receptor de píxeles de la cámara (Grabar y vista previa de Ajustes), p. ej. la textura de AppCoreFFI. Con receptor,
+    /// el relevo entrega los píxeles sin JPEG; nil = `frames.camera` en JPEG. Vale para las aperturas siguientes.
+    nonisolated var cameraPixelSink: (@Sendable (FramePixelBuffer, Double) -> Void)? {
+        get { pixelSinkLock.lock(); defer { pixelSinkLock.unlock() }; return _cameraPixelSink }
+        set { pixelSinkLock.lock(); _cameraPixelSink = newValue; pixelSinkLock.unlock() }
+    }
+
+    /// Relevo de la cámara: de píxeles si hay receptor, si no el JPEG del `Bridge`.
+    nonisolated func cameraRelayFactory(_ bridge: Bridge?) -> FrameRelay? {
+        if let sink = cameraPixelSink { return FrameRelay(channel: Self.cameraChannel, pixelSink: sink) }
+        return bridge?.makeFrameRelay(channel: Self.cameraChannel)
+    }
+
     private(set) var controller: RecordController?
     private var ticker: Task<Void, Never>?
     private var statePending = false
@@ -699,17 +715,23 @@ final class RecordService {
 }
 
 extension Bridge {
+    /// Sustituye el receptor de los fotogramas de la cámara (Grabar y vista previa de Ajustes): píxeles tal cual, sin JPEG.
+    /// Sin llamarlo, el núcleo los manda por `frames.camera`; nil vuelve a eso. Vale para las aperturas siguientes. Cualquier hilo.
+    public func setCameraFrameSink(_ sink: (@Sendable (FramePixelBuffer, Double) -> Void)?) {
+        recordService?.cameraPixelSink = sink
+    }
+
     /// Registra `record.*` y cierra Grabar cuando se cierra el tema de Backing.
     func registerRecordMethods(options: LaunchOptions) {
         let service = RecordService(options: options, studyService: studyService, emit: { [weak self] in self?.send($0) })
         // W2-E2: cámara en vivo hacia la página (15 fps, 640 px), igual en ToneForge.exe y en tf-webdev.
-        service.makeCameraRelay = { [weak self] in self?.makeFrameRelay(channel: RecordService.cameraChannel) }
+        service.makeCameraRelay = { [weak self, weak service] in service?.cameraRelayFactory(self) }
         service.register(on: router)
         recordService = service
         Self.wireOffsetSheet(record: service, takeView: takeViewService)
         // W2-E2: vista previa de Ajustes por el mismo canal; Grabar le quita la cámara al abrir y la comparte mientras está abierta.
         let preview = CameraPreviewService(options: options)
-        preview.makeRelay = { [weak self] in self?.makeFrameRelay(channel: RecordService.cameraChannel) }
+        preview.makeRelay = { [weak self, weak service] in service?.cameraRelayFactory(self) }
         preview.recordController = { [weak service] in service?.controller }
         service.willOpenCamera = { [weak preview] in preview?.stop() }
         preview.register(on: router)   // el router lo retiene

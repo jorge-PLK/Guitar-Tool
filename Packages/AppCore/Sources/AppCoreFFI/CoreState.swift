@@ -38,6 +38,9 @@ final class CoreState: @unchecked Sendable {
         hostBroker.emit = { [self] json in emit(json) }
         created.send = { [self] json in emit(json) }
         created.host = hostBroker
+        #if canImport(CoreVideo) || os(Windows)
+        installFrameSinks(on: created)  // cámara y Montaje por textura, no por `frames.<canal>` en JPEG
+        #endif
         lock.lock(); bridge = created; lock.unlock()
         created.start()
         return 0

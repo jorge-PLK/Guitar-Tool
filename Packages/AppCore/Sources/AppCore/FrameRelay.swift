@@ -60,6 +60,7 @@ public final class FrameRelay: @unchecked Sendable {
     public let maxWidth: Int
     public let latestWins: Bool
 
+    private let pixelSink: (@Sendable (FramePixelBuffer, Double) -> Void)?
     private let encode: @Sendable (FramePixelBuffer) throws -> JPEGFrame
     private let emit: @Sendable (String, FrameEvent) -> Void
     private let now: @Sendable () -> Double
@@ -91,14 +92,23 @@ public final class FrameRelay: @unchecked Sendable {
                   emit: emit)
     }
 
+    /// Entrega directa de píxeles (AppCoreFFI, canal de fotogramas por textura): sin JPEG, sin cadencia ni cola; `push`
+    /// llama a `pixelSink` en el hilo que empuja y `stop()` lo corta. El último gana lo resuelve el receptor.
+    public convenience init(channel: String, pixelSink: @escaping @Sendable (FramePixelBuffer, Double) -> Void) {
+        self.init(channel: channel, maxFPS: Self.defaultMaxFPS, maxWidth: Self.defaultMaxWidth,
+                  encode: { _ in throw CocoaError(.featureUnsupported) }, emit: { _, _ in }, pixelSink: pixelSink)
+    }
+
     /// Tests: codificador, reloj (s, monótono) y temporizador a medida. Con reloj y temporizador simulados, la cadencia,
     /// el descarte y el hueco de `latestWins` no dependen del reloj real ni de la velocidad de la máquina.
     init(channel: String, maxFPS: Double, maxWidth: Int, latestWins: Bool = false,
          encode: @escaping @Sendable (FramePixelBuffer) throws -> JPEGFrame,
          emit: @escaping @Sendable (String, FrameEvent) -> Void,
          now: @escaping @Sendable () -> Double = { Double(DispatchTime.now().uptimeNanoseconds) / 1e9 },
-         after: (@Sendable (Double, @escaping @Sendable () -> Void) -> Void)? = nil) {
+         after: (@Sendable (Double, @escaping @Sendable () -> Void) -> Void)? = nil,
+         pixelSink: (@Sendable (FramePixelBuffer, Double) -> Void)? = nil) {
         precondition(maxFPS > 0, "FrameRelay: maxFPS ≤ 0")
+        self.pixelSink = pixelSink
         self.channel = channel
         self.maxFPS = maxFPS
         self.maxWidth = maxWidth
@@ -122,6 +132,12 @@ public final class FrameRelay: @unchecked Sendable {
     /// Ofrece un fotograma; `true` si se acepta para codificar. Llamable desde el callback de captura.
     @discardableResult
     public func push(_ frame: FramePixelBuffer, ptsMs: Double) -> Bool {
+        if let pixelSink {
+            lock.lock(); let off = stopped; lock.unlock()
+            if off { return false }
+            pixelSink(frame, ptsMs)
+            return true
+        }
         let t = now()
         lock.lock()
         if stopped { lock.unlock(); return false }

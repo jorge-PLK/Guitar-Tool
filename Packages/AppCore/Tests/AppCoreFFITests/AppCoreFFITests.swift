@@ -1,3 +1,5 @@
+import CAppCoreFFI
+import CoreVideo
 import Foundation
 import Testing
 @testable import AppCoreFFI
@@ -78,9 +80,71 @@ private func started() throws -> (CoreState, Inbox) {
         #expect(event.contains(#""clean""#))
         #expect(Date().timeIntervalSince(t0) < 4.5)
     }
+}
 
+// Estado global (tabla de texturas y canales): serializado y con la tabla restaurada al salir.
+private nonisolated(unsafe) var availableCalls: [Int64] = []
+private let availableLock = NSLock()
+
+private func makePixels(_ w: Int, _ h: Int) -> CVPixelBuffer {
+    var pb: CVPixelBuffer?
+    CVPixelBufferCreate(nil, w, h, kCVPixelFormatType_32BGRA, nil, &pb)
+    return pb!
+}
+
+@Suite(.serialized) struct FrameChannelTests {
     @Test func frameCopyOfTakeChannelIsNil() {
+        ffiCoreSetTextureHost(nil)
         #expect(ffiFrameCopy(2) == nil)
         #expect(ffiTextureCreate(0) == -1)  // sin tabla de texturas
+    }
+
+    @Test func montageSinkPublishesToChannelOne() throws {
+        availableLock.withLock { availableCalls = [] }
+        var host = tf_texture_host()
+        host.register_texture = { channel in 100 + Int64(channel) }
+        host.frame_available = { id in availableLock.withLock { availableCalls.append(id) } }
+        host.unregister_texture = { _ in }
+        ffiCoreSetTextureHost(&host)
+        defer { ffiTextureDispose(1); ffiCoreSetTextureHost(nil) }
+        #expect(ffiTextureCreate(1) == 101)
+
+        montageFrameSink(makePixels(640, 360), 0)
+        #expect(availableLock.withLock { availableCalls } == [101])
+        let raw = try #require(ffiFrameCopy(1))
+        let pb = Unmanaged<CVPixelBuffer>.fromOpaque(raw).takeRetainedValue()
+        #expect(CVPixelBufferGetWidth(pb) == 640)
+        #expect(CVPixelBufferGetHeight(pb) == 360)
+        #expect(ffiFrameCopy(0) == nil)  // la cámara no ha publicado
+    }
+
+    @Test func cameraSinkPublishesToChannelZero() throws {
+        var host = tf_texture_host()
+        host.register_texture = { channel in 100 + Int64(channel) }
+        host.frame_available = { _ in }
+        host.unregister_texture = { _ in }
+        ffiCoreSetTextureHost(&host)
+        defer { ffiTextureDispose(0); ffiCoreSetTextureHost(nil) }
+        #expect(ffiTextureCreate(0) == 100)
+        cameraFrameSink(makePixels(320, 180), 0)
+        let raw = try #require(ffiFrameCopy(0))
+        let pb = Unmanaged<CVPixelBuffer>.fromOpaque(raw).takeRetainedValue()
+        #expect(CVPixelBufferGetWidth(pb) == 320)
+    }
+
+    @Test func withoutTextureTableLatestWinsAndNothingAccumulates() throws {
+        ffiCoreSetTextureHost(nil)
+        weak var first: CVPixelBuffer?
+        autoreleasepool {
+            let pb = makePixels(64, 64)
+            first = pb
+            montageFrameSink(pb, 0)
+        }
+        for i in 1...100 { montageFrameSink(makePixels(64, 32 + i % 2), Double(i)) }
+        #expect(first == nil)  // el primero ya no se retiene: solo queda el último
+        let raw = try #require(ffiFrameCopy(1))
+        let pb = Unmanaged<CVPixelBuffer>.fromOpaque(raw).takeRetainedValue()
+        #expect(CVPixelBufferGetHeight(pb) == 32)  // i = 100 -> 32 + 0
+        frameChannels.get(1)?.clear()
     }
 }
