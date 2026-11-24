@@ -42,21 +42,6 @@ void main() {
       });
 
       test(
-        'library.project.result: decodifica y codifica sin perder campos',
-        () async {
-          final json = await _fixture('library.project.result.json');
-          final result = ProjectDetailResult.fromJson(json);
-          expect(result.stems.first.kind, StemKind.bass);
-          expect(result.parts, hasLength(2));
-          expect(result.parts.first.takes[1].isBest, isTrue);
-          expect(result.parts.first.takes[1].punches.single.videoOffsetMs, 50);
-          expect(result.parts.last.isLead, isTrue);
-          expect(result.videoCount, 0);
-          expect(result.toJson(), equals(json));
-        },
-      );
-
-      test(
         'library.reveal.result: decodifica y codifica sin perder campos',
         () async {
           final json = await _fixture('library.reveal.result.json');
@@ -264,22 +249,6 @@ void main() {
       });
 
       test(
-        'library.deleteTake.params: decodifica y codifica sin perder campos',
-        () async {
-          final json = await _fixture('library.deleteTake.params.json');
-          expect(DeleteTakeParams.fromJson(json).toJson(), equals(json));
-        },
-      );
-
-      test(
-        'library.markBest.params: decodifica y codifica sin perder campos',
-        () async {
-          final json = await _fixture('library.markBest.params.json');
-          expect(MarkBestParams.fromJson(json).toJson(), equals(json));
-        },
-      );
-
-      test(
         'library.cleanupInfo.params y library.cleanup.params: decodifican',
         () async {
           final info = await _fixture('library.cleanupInfo.params.json');
@@ -313,26 +282,31 @@ void main() {
       );
     });
 
-    test('valores de enum no previstos caen en unknown', () {
-      final project = ProjectSummary.fromJson(const {
-        'id': 'x',
-        'title': 't',
-        'folderName': 'f',
-        'duration': 1,
-        'sampleRate': 44100,
-        'createdAt': '2026-01-01T00:00:00Z',
-        'updatedAt': '2026-01-01T00:00:00Z',
-        'separationState': 'paused',
-        'separationError': null,
-        'stemCount': 0,
-        'takeCount': 0,
-        'rigCount': 0,
-        'hasAnalysis': false,
-        'guitars': <String>[],
-      });
-      expect(project.separationState, SeparationState.unknown);
-      expect(StemKind.fromRaw('theremin'), StemKind.unknown);
-      expect(RelocateMode.fromRaw('copy'), RelocateMode.unknown);
-    });
+    test(
+      'valores de enum no previstos caen en unknown; fechas ISO parsean',
+      () {
+        final project = ProjectSummary.fromJson(const {
+          'id': 'x',
+          'title': 't',
+          'folderName': 'f',
+          'duration': 1,
+          'sampleRate': 44100,
+          'createdAt': '2026-01-01T00:00:00Z',
+          'updatedAt': '2026-01-01T00:00:00Z',
+          'separationState': 'paused',
+          'separationError': null,
+          'stemCount': 0,
+          'takeCount': 0,
+          'rigCount': 0,
+          'hasAnalysis': false,
+          'guitars': <String>[],
+        });
+        expect(project.separationState, SeparationState.unknown);
+        expect(project.createdAtDate, DateTime.utc(2026));
+        expect(project.updatedAtDate, DateTime.utc(2026));
+        expect(StemKind.fromRaw('theremin'), StemKind.unknown);
+        expect(RelocateMode.fromRaw('copy'), RelocateMode.unknown);
+      },
+    );
   });
 }

@@ -1,5 +1,8 @@
 import '../core/core_client.dart' show Json;
 
+export 'library_detail.dart';
+export 'library_storage.dart';
+
 /// Estado de separación (`ProjectSummary.separationState`). Valor no previsto → [unknown].
 enum SeparationState {
   none('none'),
@@ -20,47 +23,10 @@ enum SeparationState {
   );
 }
 
-/// Tipo de stem (`StemInfo.kind`). Valor no previsto → [unknown].
-enum StemKind {
-  bass('bass'),
-  drums('drums'),
-  other('other'),
-  vocals('vocals'),
-  guitar('guitar'),
-  piano('piano'),
-  unknown('unknown');
-
-  const StemKind(this.raw);
-
-  /// Valor crudo del contrato.
-  final String raw;
-
-  static StemKind fromRaw(String raw) => values.firstWhere(
-    (v) => v != StemKind.unknown && v.raw == raw,
-    orElse: () => StemKind.unknown,
-  );
-}
-
-/// Modo de `library.relocate`. Valor no previsto → [unknown].
-enum RelocateMode {
-  move('move'),
-  point('point'),
-  unknown('unknown');
-
-  const RelocateMode(this.raw);
-
-  /// Valor crudo del contrato.
-  final String raw;
-
-  static RelocateMode fromRaw(String raw) => values.firstWhere(
-    (v) => v != RelocateMode.unknown && v.raw == raw,
-    orElse: () => RelocateMode.unknown,
-  );
-}
-
-double _double(Object? v) => (v as num).toDouble();
-double? _optDouble(Object? v) => (v as num?)?.toDouble();
-List<T> _list<T>(Object? raw, T Function(Json) decode) => List.unmodifiable([
+/// Decodificadores compartidos por los ficheros `library*.dart`.
+double jsonDouble(Object? v) => (v as num).toDouble();
+double? jsonOptDouble(Object? v) => (v as num?)?.toDouble();
+List<T> jsonList<T>(Object? raw, T Function(Json) decode) => List.unmodifiable([
   for (final e in raw as List<Object?>) decode(e as Json),
 ]);
 
@@ -90,8 +56,8 @@ class ProjectSummary {
     id: json['id'] as String,
     title: json['title'] as String,
     folderName: json['folderName'] as String,
-    duration: _double(json['duration']),
-    sampleRate: _double(json['sampleRate']),
+    duration: jsonDouble(json['duration']),
+    sampleRate: jsonDouble(json['sampleRate']),
     createdAt: json['createdAt'] as String,
     updatedAt: json['updatedAt'] as String,
     separationState: SeparationState.fromRaw(json['separationState'] as String),
@@ -136,6 +102,12 @@ class ProjectSummary {
   final String? origin;
   final List<String> guitars;
 
+  /// [createdAt] como `DateTime`; `null` si no parsea.
+  DateTime? get createdAtDate => DateTime.tryParse(createdAt);
+
+  /// [updatedAt] como `DateTime`; `null` si no parsea.
+  DateTime? get updatedAtDate => DateTime.tryParse(updatedAt);
+
   Json toJson() => {
     'id': id,
     'title': title,
@@ -177,8 +149,8 @@ class LibraryListResult {
   const LibraryListResult({required this.projects, required this.skipped});
 
   factory LibraryListResult.fromJson(Json json) => LibraryListResult(
-    projects: _list(json['projects'], ProjectSummary.fromJson),
-    skipped: _list(json['skipped'], SkippedInfo.fromJson),
+    projects: jsonList(json['projects'], ProjectSummary.fromJson),
+    skipped: jsonList(json['skipped'], SkippedInfo.fromJson),
   );
 
   final List<ProjectSummary> projects;
@@ -187,187 +159,6 @@ class LibraryListResult {
   Json toJson() => {
     'projects': [for (final p in projects) p.toJson()],
     'skipped': [for (final s in skipped) s.toJson()],
-  };
-}
-
-/// Stem de un tema (`StemInfo`).
-class StemInfo {
-  const StemInfo({
-    required this.kind,
-    required this.bytes,
-    required this.isEmpty,
-  });
-
-  factory StemInfo.fromJson(Json json) => StemInfo(
-    kind: StemKind.fromRaw(json['kind'] as String),
-    bytes: json['bytes'] as int,
-    isEmpty: json['isEmpty'] as bool,
-  );
-
-  final StemKind kind;
-  final int bytes;
-  final bool isEmpty;
-
-  Json toJson() => {'kind': kind.raw, 'bytes': bytes, 'isEmpty': isEmpty};
-}
-
-/// Punch de una toma (`TakePunchInfo`).
-class TakePunchInfo {
-  const TakePunchInfo({
-    required this.start,
-    required this.end,
-    this.videoPath,
-    this.videoOffsetMs,
-  });
-
-  factory TakePunchInfo.fromJson(Json json) => TakePunchInfo(
-    start: _double(json['start']),
-    end: _double(json['end']),
-    videoPath: json['videoPath'] as String?,
-    videoOffsetMs: _optDouble(json['videoOffsetMs']),
-  );
-
-  final double start;
-  final double end;
-
-  /// Ausente si es nulo.
-  final String? videoPath;
-
-  /// Ausente si es nulo.
-  final double? videoOffsetMs;
-
-  Json toJson() => {
-    'start': start,
-    'end': end,
-    if (videoPath != null) 'videoPath': videoPath,
-    if (videoOffsetMs != null) 'videoOffsetMs': videoOffsetMs,
-  };
-}
-
-/// Toma (`TakeInfo`). Opcionales ausentes si son nulos.
-class TakeInfo {
-  const TakeInfo({
-    required this.id,
-    required this.number,
-    required this.createdAt,
-    required this.discarded,
-    required this.isBest,
-    required this.hasVideo,
-    required this.punchCount,
-    required this.videoRotation,
-    required this.punches,
-    this.duration,
-    this.audio,
-    this.video,
-    this.songStart,
-    this.videoOffsetMs,
-  });
-
-  factory TakeInfo.fromJson(Json json) => TakeInfo(
-    id: json['id'] as String,
-    number: json['number'] as int,
-    createdAt: json['createdAt'] as String,
-    discarded: json['discarded'] as bool,
-    isBest: json['isBest'] as bool,
-    hasVideo: json['hasVideo'] as bool,
-    punchCount: json['punchCount'] as int,
-    videoRotation: json['videoRotation'] as int,
-    punches: _list(json['punches'], TakePunchInfo.fromJson),
-    duration: _optDouble(json['duration']),
-    audio: json['audio'] as String?,
-    video: json['video'] as String?,
-    songStart: _optDouble(json['songStart']),
-    videoOffsetMs: _optDouble(json['videoOffsetMs']),
-  );
-
-  final String id;
-  final int number;
-  final String createdAt;
-  final bool discarded;
-  final bool isBest;
-  final bool hasVideo;
-  final int punchCount;
-  final int videoRotation;
-  final List<TakePunchInfo> punches;
-  final double? duration;
-  final String? audio;
-  final String? video;
-  final double? songStart;
-  final double? videoOffsetMs;
-
-  Json toJson() => {
-    'id': id,
-    'number': number,
-    'createdAt': createdAt,
-    'discarded': discarded,
-    'isBest': isBest,
-    'hasVideo': hasVideo,
-    'punchCount': punchCount,
-    'videoRotation': videoRotation,
-    'punches': [for (final p in punches) p.toJson()],
-    if (duration != null) 'duration': duration,
-    if (audio != null) 'audio': audio,
-    if (video != null) 'video': video,
-    if (songStart != null) 'songStart': songStart,
-    if (videoOffsetMs != null) 'videoOffsetMs': videoOffsetMs,
-  };
-}
-
-/// Parte de un tema (`PartInfo`).
-class PartInfo {
-  const PartInfo({
-    required this.id,
-    required this.name,
-    required this.isLead,
-    required this.takes,
-  });
-
-  factory PartInfo.fromJson(Json json) => PartInfo(
-    id: json['id'] as String,
-    name: json['name'] as String,
-    isLead: json['isLead'] as bool,
-    takes: _list(json['takes'], TakeInfo.fromJson),
-  );
-
-  final String id;
-  final String name;
-  final bool isLead;
-  final List<TakeInfo> takes;
-
-  Json toJson() => {
-    'id': id,
-    'name': name,
-    'isLead': isLead,
-    'takes': [for (final t in takes) t.toJson()],
-  };
-}
-
-/// Resultado de `library.project`: el resumen aplanado más stems, partes y vídeos.
-class ProjectDetailResult {
-  const ProjectDetailResult({
-    required this.summary,
-    required this.stems,
-    required this.parts,
-    required this.videoCount,
-  });
-
-  factory ProjectDetailResult.fromJson(Json json) => ProjectDetailResult(
-    summary: ProjectSummary.fromJson(json),
-    stems: _list(json['stems'], StemInfo.fromJson),
-    parts: _list(json['parts'], PartInfo.fromJson),
-    videoCount: json['videoCount'] as int,
-  );
-
-  final ProjectSummary summary;
-  final List<StemInfo> stems;
-  final List<PartInfo> parts;
-  final int videoCount;
-
-  Json toJson() => {
-    ...summary.toJson(),
-    'stems': [for (final s in stems) s.toJson()],
-    'parts': [for (final p in parts) p.toJson()],
-    'videoCount': videoCount,
   };
 }
 
@@ -469,36 +260,6 @@ class QueuedResult {
   Json toJson() => {'queued': queued};
 }
 
-/// Parámetros de `library.deleteTake`.
-class DeleteTakeParams {
-  const DeleteTakeParams({required this.id, required this.takeId});
-
-  factory DeleteTakeParams.fromJson(Json json) => DeleteTakeParams(
-    id: json['id'] as String,
-    takeId: json['takeId'] as String,
-  );
-
-  final String id;
-  final String takeId;
-
-  Json toJson() => {'id': id, 'takeId': takeId};
-}
-
-/// Parámetros de `library.markBest`.
-class MarkBestParams {
-  const MarkBestParams({required this.id, required this.takeId});
-
-  factory MarkBestParams.fromJson(Json json) => MarkBestParams(
-    id: json['id'] as String,
-    takeId: json['takeId'] as String,
-  );
-
-  final String id;
-  final String takeId;
-
-  Json toJson() => {'id': id, 'takeId': takeId};
-}
-
 /// Resultado de `library.markBest`.
 class MarkedResult {
   const MarkedResult({required this.marked});
@@ -509,33 +270,6 @@ class MarkedResult {
   final bool marked;
 
   Json toJson() => {'marked': marked};
-}
-
-/// Resultado de `library.cleanupInfo`.
-class CleanupInfoResult {
-  const CleanupInfoResult({required this.bytes});
-
-  factory CleanupInfoResult.fromJson(Json json) =>
-      CleanupInfoResult(bytes: json['bytes'] as int);
-
-  final int bytes;
-
-  Json toJson() => {'bytes': bytes};
-}
-
-/// Resultado de `library.cleanup`.
-class CleanupResult {
-  const CleanupResult({required this.cleaned, required this.bytes});
-
-  factory CleanupResult.fromJson(Json json) => CleanupResult(
-    cleaned: json['cleaned'] as bool,
-    bytes: json['bytes'] as int,
-  );
-
-  final bool cleaned;
-  final int bytes;
-
-  Json toJson() => {'cleaned': cleaned, 'bytes': bytes};
 }
 
 /// Parámetros de `library.artistPhoto`.
@@ -561,100 +295,4 @@ class ArtistPhotoResult {
   final String? photo;
 
   Json toJson() => {'photo': photo};
-}
-
-/// Uso de disco de un tema (`library.usage.projects[]`).
-class ProjectUsage {
-  const ProjectUsage({
-    required this.id,
-    required this.folderName,
-    required this.bytes,
-    required this.regenerableBytes,
-  });
-
-  factory ProjectUsage.fromJson(Json json) => ProjectUsage(
-    id: json['id'] as String,
-    folderName: json['folderName'] as String,
-    bytes: json['bytes'] as int,
-    regenerableBytes: json['regenerableBytes'] as int,
-  );
-
-  final String id;
-  final String folderName;
-  final int bytes;
-  final int regenerableBytes;
-
-  Json toJson() => {
-    'id': id,
-    'folderName': folderName,
-    'bytes': bytes,
-    'regenerableBytes': regenerableBytes,
-  };
-}
-
-/// Resultado de `library.usage`.
-class UsageResult {
-  const UsageResult({
-    required this.totalBytes,
-    required this.regenerableBytes,
-    required this.projects,
-  });
-
-  factory UsageResult.fromJson(Json json) => UsageResult(
-    totalBytes: json['totalBytes'] as int,
-    regenerableBytes: json['regenerableBytes'] as int,
-    projects: _list(json['projects'], ProjectUsage.fromJson),
-  );
-
-  final int totalBytes;
-  final int regenerableBytes;
-  final List<ProjectUsage> projects;
-
-  Json toJson() => {
-    'totalBytes': totalBytes,
-    'regenerableBytes': regenerableBytes,
-    'projects': [for (final p in projects) p.toJson()],
-  };
-}
-
-/// Parámetros de `library.relocate`.
-class RelocateParams {
-  const RelocateParams({required this.path, required this.mode});
-
-  factory RelocateParams.fromJson(Json json) => RelocateParams(
-    path: json['path'] as String,
-    mode: RelocateMode.fromRaw(json['mode'] as String),
-  );
-
-  final String path;
-  final RelocateMode mode;
-
-  Json toJson() => {'path': path, 'mode': mode.raw};
-}
-
-/// Resultado de `library.relocate` y evento `library.relocated`.
-class RelocateResult {
-  const RelocateResult({required this.path, required this.mediaRemapped});
-
-  factory RelocateResult.fromJson(Json json) => RelocateResult(
-    path: json['path'] as String,
-    mediaRemapped: json['mediaRemapped'] as bool,
-  );
-
-  final String path;
-  final bool mediaRemapped;
-
-  Json toJson() => {'path': path, 'mediaRemapped': mediaRemapped};
-}
-
-/// Evento `library.relocateProgress`.
-class RelocateProgress {
-  const RelocateProgress({required this.fraction});
-
-  factory RelocateProgress.fromJson(Json json) =>
-      RelocateProgress(fraction: _double(json['fraction']));
-
-  final double fraction;
-
-  Json toJson() => {'fraction': fraction};
 }
