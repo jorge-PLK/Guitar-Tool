@@ -1,0 +1,55 @@
+shell/barra-lateral	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 
+biblioteca/con-temas	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 
+biblioteca/artistas	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --artists-demo
+biblioteca/detalle	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --screen detail-first --project El roce de tu cuerpo - Platero Y Tu
+biblioteca/detalle-sin-tomas	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --screen detail-first --project Megadeth - Tornado Of Souls
+biblioteca/detalle-edicion	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --screen detail-first --detail-edit
+biblioteca/dialogo-eliminar	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --delete-dialog
+biblioteca/importar-vacio	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --link-import-demo vacio
+biblioteca/importar-resolviendo	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --link-import-demo resolviendo
+biblioteca/importar-preparando	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --link-import-demo preparando
+biblioteca/importar-candidatos	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --link-import-demo candidatos
+biblioteca/importar-descargando	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --link-import-demo descargando
+biblioteca/importar-error	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --link-import-demo error
+biblioteca/importar-youtube	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --link-import-demo youtube
+biblioteca/importar-posible-repetido	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --link-import-demo posible-repetido
+biblioteca/importar-repetido	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --link-import-demo repetido
+biblioteca/importar-spotify	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --spotify-demo ok
+biblioteca/importar-spotify-error	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --spotify-demo error
+biblioteca/vacia	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 
+backing/sin-tema	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --screen backing --project __ninguno__
+backing/tira	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --screen backing --project El roce de tu cuerpo - Platero Y Tu
+backing/tira-bucle	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --screen backing --project El roce de tu cuerpo - Platero Y Tu --loop 20,30
+backing/rejilla	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --screen backing --project El roce de tu cuerpo - Platero Y Tu --chords-expanded
+backing/edicion-acordes	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --screen backing --project El roce de tu cuerpo - Platero Y Tu --chords-expanded --chords-edit
+backing/seccion-tira	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --screen backing --project El roce de tu cuerpo - Platero Y Tu --guitars-demo stereo-solo --select-section 1
+backing/seccion-rejilla	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --screen backing --project El roce de tu cuerpo - Platero Y Tu --chords-expanded --guitars-demo stereo-solo --select-section 1
+backing/solo	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --screen backing --project El roce de tu cuerpo - Platero Y Tu --mute guitar
+backing/capo-transposicion	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --screen backing --project El roce de tu cuerpo - Platero Y Tu --capo 2 --transpose 2
+backing/analisis-en-curso	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --screen backing --project El roce de tu cuerpo - Platero Y Tu --analysis-state analyzing
+backing/analisis-ausente	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --screen backing --project El roce de tu cuerpo - Platero Y Tu --analysis-state missing
+backing/analisis-fallido	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --screen backing --project El roce de tu cuerpo - Platero Y Tu --analysis-state failed
+backing/guitarras-separadas	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --screen backing --project El roce de tu cuerpo - Platero Y Tu --guitars-demo stereo-solo
+backing/pantalla-baja	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --screen backing --project El roce de tu cuerpo - Platero Y Tu --window 1440x760
+tablatura/selector	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --screen tab --project __ninguno__
+tablatura/listo	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --screen tab --project El roce de tu cuerpo - Platero Y Tu
+tablatura/listo-pista-batería	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --screen tab --project El roce de tu cuerpo - Platero Y Tu --tab-track 1
+tablatura/edicion	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --screen tab --project El roce de tu cuerpo - Platero Y Tu --tab-edit
+tablatura/oir-mixto	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --screen tab --project El roce de tu cuerpo - Platero Y Tu --tab-listen
+grabar/preparado	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --screen record --project El roce de tu cuerpo - Platero Y Tu
+grabar/preparado-min	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --screen record --project El roce de tu cuerpo - Platero Y Tu --window 1100x680
+grabar/cuenta-atras	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --screen record-counting --project El roce de tu cuerpo - Platero Y Tu
+grabar/mezclador-expandido	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --screen record-mixer-expanded --project El roce de tu cuerpo - Platero Y Tu
+grabar/desfase	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --screen record-offset --project El roce de tu cuerpo - Platero Y Tu
+grabar/selector-temas	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --screen record --project __ninguno__
+montaje/listo	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --screen montage --project El roce de tu cuerpo - Platero Y Tu
+montaje/compact	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --screen montage --project El roce de tu cuerpo - Platero Y Tu --window 880x900
+montaje/vertical	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --screen montage --project El roce de tu cuerpo - Platero Y Tu --montage-layout single
+montaje/encuadre	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --screen montage-framing --project El roce de tu cuerpo - Platero Y Tu
+montaje/sin-tomas	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --screen montage --project Megadeth - Tornado Of Souls
+montaje/sin-tema	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --screen montage --project __ninguno__
+ajustes/audio-sin-calibrar	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --screen settings
+ajustes/audio-dispositivos	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --screen settings-audio
+ajustes/audio-calibracion	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 6 --screen calibration-sheet
+ajustes/video-simulada	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --screen settings-video
+ajustes/biblioteca	--projects-folder <ref-projects> --support-dir <ref-support> --window 1440x900 --snapshot-delay 3 --screen settings-library
