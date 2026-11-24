@@ -504,6 +504,30 @@ final class RecordTests: XCTestCase {
         XCTAssertEqual(try r.project.recording?.parts.first?.takeIDs.count, 1, "el punch no crea toma nueva")
     }
 
+    /// GR1: activar el punch sin toma elegida elige la mejor de la parte; sin mejor no elige nada.
+    func testPunchEnableSelectsBestTakeWhenNoneSelected() async throws {
+        let sec = Section(name: "Estrofa", start: 0, end: 1.0)
+        let r = try await makeRig(sections: [sec], cameras: .simulated(provider: SimulatedCameraProvider(cameras: [])))
+        _ = try await openRecord(r, camera: "none")
+        _ = try await snap(r, "record.setPreRoll", "{\"bars\":0}")
+        _ = try await snap(r, "record.setStartSection", "{\"sectionId\":\"\(sec.id.uuidString)\"}")
+        _ = try await snap(r, "record.start")
+        var s = try await until(r, timeout: 8) { $0.phase == "idle" && ($0.parts.first?.takes.count ?? 0) == 1 }
+        let take = try XCTUnwrap(s.parts.first?.takes.first)
+        XCTAssertEqual(s.parts.first?.bestTakeId, take.id)
+        s = try await snap(r, "record.selectTake", "{}")
+        XCTAssertNil(s.selectedTakeId)
+        s = try await snap(r, "record.setPunch", "{\"enabled\":true}")
+        XCTAssertEqual(s.selectedTakeId, take.id, "elige la mejor toma de la parte activa")
+
+        // Parte nueva: sin tomas ni mejor, no se elige nada.
+        s = try await snap(r, "record.addPart", "{\"name\":\"Solo\"}")
+        XCTAssertNil(s.selectedTakeId)
+        s = try await snap(r, "record.setPunch", "{\"enabled\":true}")
+        XCTAssertNil(s.selectedTakeId)
+        _ = await call(r.router, "record.close")
+    }
+
     // MARK: Partes, mezcla «Tú · parte», borrar, puntuar
 
     func testPartsMixRestoredAndMarkBestAndDelete() async throws {

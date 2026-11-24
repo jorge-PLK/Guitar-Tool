@@ -88,6 +88,9 @@ struct OffsetRequest {
     var initialOffset: Double
     /// Giro de la imagen (grados en sentido horario) con que se ve la toma.
     var rotation: Int = 0
+    /// Tamaño del fotograma de la toma (px; 0 = desconocido). FC1: `takeview.openOffset` lo publica para la textura de Flutter.
+    var videoWidth: Int = 0
+    var videoHeight: Int = 0
     /// Desfase en edición (ms), dentro de `RecordController.offsetRangeMs`.
     var offsetMs: Double = 0
     /// Rutas relativas a la carpeta del tema (para `record.state`; el vídeo se ve por `media.toneforge`).
@@ -924,6 +927,8 @@ final class RecordController {
                                 cameraName: format.cameraName, initialOffset: offset,
                                 rotation: video.defaultRotation(for: format.cameraID))
         req.offsetMs = Self.clampOffsetMs((offset * 1000).rounded())
+        req.videoWidth = format.width
+        req.videoHeight = format.height
         req.videoRelative = ProjectLayout.videoRelativePath(takeId: plan.takeID)
         req.audioRelative = ProjectLayout.processedRelativePath(takeId: plan.takeID)
         offsetRequest = req
@@ -1010,6 +1015,8 @@ final class RecordController {
                                 videoURL: layout.url(relative: rel), punches: punches, fps: f.fps, cameraID: f.cameraUID,
                                 cameraName: f.cameraName, initialOffset: t.videoOffset ?? 0, rotation: t.rotationDegrees)
         req.offsetMs = Self.clampOffsetMs(((t.videoOffset ?? 0) * 1000).rounded())
+        req.videoWidth = f.width
+        req.videoHeight = f.height
         req.videoRelative = rel
         req.audioRelative = audioRel
         offsetRequest = req

@@ -328,6 +328,8 @@ final class RecordService {
         router.register("record.setPunch") { [self] (p: RecordPunchParams) -> RecordSnapshot in
             try await with { c in
                 guard c.phase == .idle else { return }
+                // GR1 (SwiftUI `RecordView.swift:517-518`): al activar el punch sin toma elegida, se elige la mejor de la parte.
+                if p.enabled == true, c.selectedTakeID == nil, let best = c.activePart?.bestTakeID { c.selectTake(best) }
                 if let e = p.enabled { c.punchEnabled = e }
                 guard c.punchEnabled else { return }
                 let free = p.free ?? false
@@ -745,7 +747,8 @@ extension Bridge {
             guard let c = service?.controller, let r = c.offsetRequest else { return nil }
             c.player.pause()
             return TakeViewOffsetSource(projectId: c.session.projectID, takeId: r.takeID, audioURL: r.audioURL, songStart: r.songStart,
-                                        videoURLs: [r.videoURL] + r.punches.map(\.videoURL))
+                                        videoURLs: [r.videoURL] + r.punches.map(\.videoURL),
+                                        videoWidth: r.videoWidth, videoHeight: r.videoHeight, videoRotation: r.rotation)
         }
         service.willFinishOffset = { [weak takeView] in await takeView?.closeOffset() }
         service.willDeleteTake = { [weak takeView] takeID in await takeView?.release(takeId: takeID) }

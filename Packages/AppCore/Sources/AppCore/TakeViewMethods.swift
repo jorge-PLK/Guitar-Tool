@@ -38,6 +38,10 @@ struct TakeViewOffsetSource: Sendable {
     var songStart: Double
     /// Vídeo de la base y de los punches (una toma del Mac puede ser HEVC: se convierte como en el visor).
     var videoURLs: [URL?] = []
+    /// FC1: tamaño del fotograma y giro de la toma (0 = desconocido).
+    var videoWidth: Int = 0
+    var videoHeight: Int = 0
+    var videoRotation: Int = 0
 }
 
 /// Reloj que publica el núcleo: la posición del reproductor alisada contra el reloj de host (lazo de fase de primer orden).
@@ -105,6 +109,10 @@ struct TakeViewSnapshot: Codable, Sendable, Equatable {
     /// programa, o fallido); nil = listo. El progreso vivo está en `jobs.progress` con la clave `video.jobId`; el cambio
     /// con el visor abierto llega por `takeview.video`.
     var video: TakeVideoStatusInfo? = nil
+    /// FC1: tamaño del fotograma de la toma (px) y giro en grados horarios, para `TfVideoSurface`; nil = sin vídeo o desconocido.
+    var videoWidth: Int? = nil
+    var videoHeight: Int? = nil
+    var videoRotation: Int = 0
 }
 
 /// `takeview.video` (Fase 7c, opción b' de Jorge): cambió el vídeo de la toma abierta en el visor o en la hoja de desfase
@@ -150,6 +158,10 @@ final class TakeViewSession {
     private(set) var epoch = 0
     private(set) var audioError: String?
     var clock = TakeViewClock()
+    /// FC1: formato del vídeo de la toma (nil = sin vídeo).
+    var videoWidth: Int?
+    var videoHeight: Int?
+    var videoRotation = 0
     /// Último instante pedido por la página en pausa (el reproductor lo guarda igual; aquí para no depender de él).
     var player: StudyPlayer { audio.player }
 
@@ -315,7 +327,8 @@ final class TakeViewService {
         TakeViewSnapshot(projectId: s.projectId.uuidString, takeId: s.takeId.uuidString, duration: s.duration, songStart: s.songStart,
                          hasBacking: s.hasBacking, backingOn: s.backingOn, playing: s.isPlaying, position: s.position,
                          epoch: s.epoch, outputName: s.audio.outputName, audioError: s.audioError,
-                         video: videoConversion.flatMap { TakeVideoStatusInfo(takeId: s.takeId, state: $0.currentState(takeId: s.takeId)) })
+                         video: videoConversion.flatMap { TakeVideoStatusInfo(takeId: s.takeId, state: $0.currentState(takeId: s.takeId)) },
+                         videoWidth: s.videoWidth, videoHeight: s.videoHeight, videoRotation: s.videoRotation)
     }
 
     /// Pide el vídeo de la toma al motor de conversión (encola si es HEVC). Justo antes de `install`, sin `await` entre
@@ -395,8 +408,14 @@ final class TakeViewService {
         requestVideo(takeId: tid, files: [take.videoFile.map { layout.url(relative: $0) }]
                         + (take.punches ?? []).map { $0.videoFile.map { layout.url(relative: $0) } },
                      title: "\(project.song.title) · vídeo de la toma")
-        return install(TakeViewSession(projectId: pid, takeId: tid, audio: audio, duration: duration, songStart: start, base: base,
-                                       backingIDs: ids, hasBacking: !backing.tracks.isEmpty, audioError: audioError))
+        let session = TakeViewSession(projectId: pid, takeId: tid, audio: audio, duration: duration, songStart: start, base: base,
+                                      backingIDs: ids, hasBacking: !backing.tracks.isEmpty, audioError: audioError)
+        if take.videoFile != nil, let f = take.videoFormat {
+            session.videoWidth = f.width
+            session.videoHeight = f.height
+            session.videoRotation = take.rotationDegrees
+        }
+        return install(session)
     }
 
     /// W2-O «Ajustar desfase»: solo la toma (`processed.wav`, a 0 dB como el `AVPlayer` del Mac), sin backing; tiempo 0 = inicio
@@ -419,9 +438,15 @@ final class TakeViewService {
         let audioError = Self.prepare(audio, first: src.audioURL)
         audio.player.seek(to: 0)
         requestVideo(takeId: src.takeId, files: src.videoURLs, title: "Vídeo de la toma")
-        return install(TakeViewSession(projectId: src.projectId, takeId: src.takeId, audio: audio, duration: duration,
-                                       songStart: src.songStart, base: 0, backingIDs: [], hasBacking: false, audioError: audioError,
-                                       restartMargin: TakeViewConstants.offsetRestartMargin, isOffset: true))
+        let session = TakeViewSession(projectId: src.projectId, takeId: src.takeId, audio: audio, duration: duration,
+                                      songStart: src.songStart, base: 0, backingIDs: [], hasBacking: false, audioError: audioError,
+                                      restartMargin: TakeViewConstants.offsetRestartMargin, isOffset: true)
+        if src.videoWidth > 0, src.videoHeight > 0 {
+            session.videoWidth = src.videoWidth
+            session.videoHeight = src.videoHeight
+            session.videoRotation = src.videoRotation
+        }
+        return install(session)
     }
 
     /// W2-O: cierra el reproductor solo si es el de la hoja de desfase. Grabar lo llama antes de guardar o descartar la toma
