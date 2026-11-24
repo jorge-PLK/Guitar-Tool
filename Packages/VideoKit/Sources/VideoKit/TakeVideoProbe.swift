@@ -43,6 +43,9 @@ public struct TakeVideoProbe: Sendable, Equatable {
     public var duration: Double
     /// PTS del tema del primer fotograma que se ve: tramo vacío delante + (composición del primero − inicio del tramo).
     public var firstFrameTime: Double
+    /// PTS del tema del último fotograma que se ve (misma cuenta que `firstFrameTime` con la mayor composición dentro de
+    /// los tramos de medios). Con el primero acota la rejilla: si ffmpeg recoloca los fotogramas, este se mueve.
+    public var lastFrameTime: Double = 0
     public var fileSize: Int64
 
     public var frameRate: Double { duration > 0 ? Double(frameCount) / duration : 0 }
@@ -53,21 +56,22 @@ public struct TakeVideoProbe: Sendable, Equatable {
     public static func read(_ url: URL) throws -> TakeVideoProbe? {
         guard let t = try MP4EditList.tracks(in: url).first(where: { $0.handler == "vide" }), let entry = t.sampleEntry else { return nil }
         let size = ((try? FileManager.default.attributesOfItem(atPath: url.path))?[.size] as? NSNumber)?.int64Value ?? 0
-        let (first, duration) = timing(t)
+        let (first, last, duration) = timing(t)
         return TakeVideoProbe(codec: TakeVideoCodec(sampleEntry: entry), sampleEntry: entry, width: t.width, height: t.height,
-                              frameCount: t.sampleCount, duration: duration, firstFrameTime: first, fileSize: size)
+                              frameCount: t.sampleCount, duration: duration, firstFrameTime: first, lastFrameTime: last, fileSize: size)
     }
 
-    /// Primer fotograma en tiempo del tema y duración con imagen.
-    static func timing(_ t: MP4EditList.Track) -> (first: Double, duration: Double) {
+    /// Primer y último fotograma en tiempo del tema y duración con imagen.
+    static func timing(_ t: MP4EditList.Track) -> (first: Double, last: Double, duration: Double) {
         let movie = Double(max(1, t.movieTimescale)), media = Double(max(1, t.mediaTimescale))
         guard let firstMedia = t.edits.firstIndex(where: { $0.mediaTime >= 0 }) else {
-            return (Double(t.firstCompositionTime) / media, Double(t.sampleDuration) / media)
+            return (Double(t.firstCompositionTime) / media, Double(t.lastCompositionTime) / media, Double(t.sampleDuration) / media)
         }
         let empty = t.edits[..<firstMedia].reduce(0.0) { $0 + Double($1.segmentDuration) } / movie
         let start = t.edits[firstMedia].mediaTime
         let shown = t.edits.filter { $0.mediaTime >= 0 }.reduce(0.0) { $0 + Double($1.segmentDuration) } / movie
-        return (empty + Double(max(0, t.firstCompositionTime - start)) / media, shown)
+        return (empty + Double(max(0, t.firstCompositionTime - start)) / media,
+                empty + Double(max(0, t.lastCompositionTime - start)) / media, shown)
     }
 }
 
@@ -104,6 +108,9 @@ public enum TakeVideoTranscode {
     /// Tolerancia del PTS del primer fotograma frente al original (s): el punto fino de la sincronía (1 ms, la del resto
     /// de la cadena de vídeo).
     public static let firstFrameTolerance = 0.001
+    /// Tolerancia del PTS del último fotograma frente al original (s): la misma de 1 ms. Si ffmpeg recolocara los
+    /// fotogramas en una rejilla fija (sin `-enc_time_base demux`), el último se iría hasta medio fotograma.
+    public static let lastFrameTolerance = 0.001
     /// Tolerancia de la duración: un fotograma de la fuente (mini-spec, punto 5).
     public static let durationToleranceFrames = 1.0
 
@@ -119,8 +126,9 @@ public enum TakeVideoTranscode {
     public static func gop(for source: TakeVideoProbe) -> Int { max(1, Int((source.frameRate > 0 ? source.frameRate : 30).rounded())) }
 
     /// Argumentos de ffmpeg. Conservan la sincronía: solo la primera pista de vídeo, sin audio (`-an`), cada fotograma con
-    /// su PTS (`-fps_mode passthrough`), escala de 90 000, sin fotogramas B (el fichero queda como los de
-    /// `VideoTakeWriter`: el tramo de medios empieza en 0) y SIN `+faststart` (`TakeVideoFile.open` y `rewrite` quieren
+    /// su PTS (`-fps_mode passthrough` y `-enc_time_base demux`: sin este, el codificador trabaja en 1/fps y redondea
+    /// cada PTS de una toma VFR del iPhone a esa rejilla, hasta medio fotograma), escala de 90 000, sin fotogramas B
+    /// (el fichero queda como los de `VideoTakeWriter`: el tramo de medios empieza en 0) y SIN `+faststart` (`TakeVideoFile.open` y `rewrite` quieren
     /// `moov` al final). MPEG-4 aunque la extensión sea `.mov`, como el escritor de Windows. Progreso por stdout
     /// (`-progress pipe:1 -nostats`: `ProcessRunning.onLine` solo recibe stdout).
     public static func ffmpegArguments(input: URL, output: URL, encoder: String, bitrate: Int, gop: Int) -> [String] {
@@ -128,7 +136,7 @@ public enum TakeVideoTranscode {
          "-i", input.path,
          "-map", "0:v:0", "-an", "-sn", "-dn",
          "-c:v", encoder, "-b:v", String(bitrate), "-bf", "0", "-g", String(gop), "-pix_fmt", "yuv420p",
-         "-fps_mode", "passthrough", "-video_track_timescale", String(timescale), "-movie_timescale", String(timescale),
+         "-fps_mode", "passthrough", "-enc_time_base", "demux", "-video_track_timescale", String(timescale), "-movie_timescale", String(timescale),
          "-f", "mp4", output.path]
     }
 
@@ -169,7 +177,8 @@ public enum TakeVideoTranscode {
     }
 
     /// `nil` si el convertido vale: H.264, misma duración (±1 fotograma de la fuente) y mismo PTS del primer fotograma
-    /// (±`firstFrameTolerance`). Si no, el motivo (texto para el trabajo fallido).
+    /// (±`firstFrameTolerance`) y del último (±`lastFrameTolerance`; no recorre los demás). Si no, el motivo (texto para
+    /// el trabajo fallido).
     public static func verify(original: TakeVideoProbe, converted: TakeVideoProbe) -> String? {
         guard converted.codec == .h264 else { return "el fichero convertido es \(converted.codec), no H.264" }
         let frame = 1 / (original.frameRate > 0 ? original.frameRate : 30)
@@ -181,6 +190,11 @@ public enum TakeVideoTranscode {
         if df > firstFrameTolerance {
             return String(format: "el primer fotograma no coincide (%.4f s frente a %.4f s del original)",
                           converted.firstFrameTime, original.firstFrameTime)
+        }
+        let dl = abs(converted.lastFrameTime - original.lastFrameTime)
+        if dl > lastFrameTolerance {
+            return String(format: "el último fotograma no coincide (%.4f s frente a %.4f s del original)",
+                          converted.lastFrameTime, original.lastFrameTime)
         }
         return nil
     }

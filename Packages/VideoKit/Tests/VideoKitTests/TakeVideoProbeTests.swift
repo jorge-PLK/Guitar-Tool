@@ -102,18 +102,29 @@ final class TakeVideoProbeTests: XCTestCase {
                                       edits: [.empty(20 * 600), .init(segmentDuration: 300, mediaTime: 6000)]), to: a)
         let pa = try XCTUnwrap(TakeVideoProbe.read(a))
         XCTAssertEqual(pa.firstFrameTime, 20.0, accuracy: 1e-12)
+        XCTAssertEqual(pa.lastFrameTime, 20.0 + 12_000.0 / 90_000, accuracy: 1e-12)   // composición mayor 18000
         XCTAssertEqual(pa.duration, 0.5, accuracy: 1e-12)
         let b = dir.appendingPathComponent("b.mov")
         try Self.write(Self.videoMoov(entry: "hvc1", movieTS: 600, mediaTS: 90_000, stts: [(5, 3000)], ctts: ctts,
                                       edits: [.empty(20 * 600), .init(segmentDuration: 300, mediaTime: 0)]), to: b)
-        XCTAssertEqual(try XCTUnwrap(TakeVideoProbe.read(b)).firstFrameTime, 20.0 + 6000.0 / 90_000, accuracy: 1e-12)
+        let pb = try XCTUnwrap(TakeVideoProbe.read(b))
+        XCTAssertEqual(pb.firstFrameTime, 20.0 + 6000.0 / 90_000, accuracy: 1e-12)
+        XCTAssertEqual(pb.lastFrameTime, 20.0 + 18_000.0 / 90_000, accuracy: 1e-12)
         // Sin lista: la composición mínima en la escala de la pista; duración = suma de `stts`.
         let c = dir.appendingPathComponent("c.mov")
         try Self.write(Self.videoMoov(entry: "avc1", movieTS: 1000, mediaTS: 90_000, stts: [(4, 3000)],
                                       ctts: [(1, 3000), (1, 9000), (1, 0), (1, -3000)], cttsVersion: 1), to: c)
         let pc = try XCTUnwrap(TakeVideoProbe.read(c))
         XCTAssertEqual(pc.firstFrameTime, 3000.0 / 90_000, accuracy: 1e-12)   // composiciones 3000, 12000, 6000, 6000
+        XCTAssertEqual(pc.lastFrameTime, 12_000.0 / 90_000, accuracy: 1e-12)
         XCTAssertEqual(pc.duration, 12_000.0 / 90_000, accuracy: 1e-12)
+        // El último que se ve: un tramo de medios que corta el final (0 … 9000) deja fuera los fotogramas de 9000 y 12000.
+        let d = dir.appendingPathComponent("d.mov")
+        try Self.write(Self.videoMoov(entry: "avc1", movieTS: 90_000, mediaTS: 90_000, stts: [(5, 3000)],
+                                      edits: [.empty(90_000), .init(segmentDuration: 9000, mediaTime: 0)]), to: d)
+        let pd = try XCTUnwrap(TakeVideoProbe.read(d))
+        XCTAssertEqual(pd.firstFrameTime, 1.0, accuracy: 1e-12)
+        XCTAssertEqual(pd.lastFrameTime, 1.0 + 6000.0 / 90_000, accuracy: 1e-12)
     }
 
     /// El fichero real del Mac: HEVC (`hvc1`), 1280×720, 61 fotogramas a 30 fps, primer fotograma en 20,0 s del tema (lo
@@ -127,6 +138,7 @@ final class TakeVideoProbeTests: XCTestCase {
         XCTAssertEqual(p.height, 720)
         XCTAssertEqual(p.frameCount, 61)
         XCTAssertEqual(p.firstFrameTime, 20.0, accuracy: 1e-6)
+        XCTAssertEqual(p.lastFrameTime, 20.0 + 60.0 / 30, accuracy: 1e-6)
         XCTAssertEqual(p.duration, 61.0 / 30, accuracy: 1.0 / 30)
         XCTAssertEqual(p.frameRate, 30, accuracy: 0.5)
     }
@@ -139,7 +151,7 @@ final class TakeVideoProbeTests: XCTestCase {
     func testAlignStartPutsFirstFrameOnOriginalPTSAndVerifyChecksIt() throws {
         let dir = try tempDir()
         let original = TakeVideoProbe(codec: .hevc, sampleEntry: "hvc1", width: 1280, height: 720, frameCount: 61,
-                                      duration: 61.0 / 30, firstFrameTime: 20.0, fileSize: 9834)
+                                      duration: 61.0 / 30, firstFrameTime: 20.0, lastFrameTime: 22.0, fileSize: 9834)
         for (target, label) in [(20.0, "rejilla"), (12.345_678, "fuera de la rejilla")] {
             let url = dir.appendingPathComponent("conv-\(label).mov")
             try Self.write(Self.videoMoov(entry: "avc1", movieTS: 90_000, mediaTS: 90_000, stts: [(61, 3000)]), to: url)
@@ -148,12 +160,14 @@ final class TakeVideoProbeTests: XCTestCase {
             let err = abs(p.firstFrameTime - target)
             print("alignStart \(label): primer fotograma \(p.firstFrameTime) s, error \(err * 1e6) µs (tolerancia \(TakeVideoTranscode.firstFrameTolerance * 1e3) ms)")
             XCTAssertLessThanOrEqual(err, 1.0 / 90_000 + 1e-12, label)
+            XCTAssertLessThanOrEqual(abs(p.lastFrameTime - (target + 2.0)), 1.0 / 90_000 + 1e-12, label)   // 60 × 3000 ticks
             XCTAssertEqual(p.duration, 61.0 / 30, accuracy: 1e-9, label)
             let edits = try XCTUnwrap(MP4EditList.tracks(in: url).first).edits
             XCTAssertEqual(edits.count, 2)
             XCTAssertEqual(edits.last?.mediaTime, 0)
             var o = original
             o.firstFrameTime = target
+            o.lastFrameTime = target + 2.0
             XCTAssertNil(TakeVideoTranscode.verify(original: o, converted: p), label)
         }
         // Con tramo de medios propio (fotogramas B de ffmpeg: empieza en 6000) se conserva y el tramo vacío lo compensa.
@@ -167,7 +181,7 @@ final class TakeVideoProbeTests: XCTestCase {
 
         // Rechazos.
         var conv = TakeVideoProbe(codec: .h264, sampleEntry: "avc1", width: 1280, height: 720, frameCount: 61,
-                                  duration: 61.0 / 30, firstFrameTime: 20.0, fileSize: 6841)
+                                  duration: 61.0 / 30, firstFrameTime: 20.0, lastFrameTime: 22.0, fileSize: 6841)
         XCTAssertNil(TakeVideoTranscode.verify(original: original, converted: conv))
         conv.duration = original.duration + 1.0 / 30   // un fotograma: vale
         XCTAssertNil(TakeVideoTranscode.verify(original: original, converted: conv))
@@ -180,6 +194,13 @@ final class TakeVideoProbeTests: XCTestCase {
         XCTAssertEqual(TakeVideoTranscode.verify(original: original, converted: conv),
                        "el primer fotograma no coincide (20.0020 s frente a 20.0000 s del original)")
         conv.firstFrameTime = 20.0
+        // El último fotograma: la rejilla fija de ffmpeg lo movía hasta medio fotograma con el primero en su sitio.
+        conv.lastFrameTime = 22.0009
+        XCTAssertNil(TakeVideoTranscode.verify(original: original, converted: conv))
+        conv.lastFrameTime = 22.0144
+        XCTAssertEqual(TakeVideoTranscode.verify(original: original, converted: conv),
+                       "el último fotograma no coincide (22.0144 s frente a 22.0000 s del original)")
+        conv.lastFrameTime = 22.0
         conv.codec = .hevc
         XCTAssertNotNil(TakeVideoTranscode.verify(original: original, converted: conv))
         // Un primer fotograma que cae después del objetivo no se arregla con un tramo vacío.
@@ -202,7 +223,7 @@ final class TakeVideoProbeTests: XCTestCase {
         let args = TakeVideoTranscode.ffmpegArguments(input: URL(fileURLWithPath: "/t/video.mov"), output: URL(fileURLWithPath: "/t/.converting-video.mov"),
                                                       encoder: "h264_nvenc", bitrate: 2_000_000, gop: 30)
         let line = args.joined(separator: " ")
-        for needle in ["-an", "-fps_mode passthrough", "-video_track_timescale 90000", "-movie_timescale 90000", "-progress pipe:1",
+        for needle in ["-an", "-fps_mode passthrough", "-enc_time_base demux", "-video_track_timescale 90000", "-movie_timescale 90000", "-progress pipe:1",
                        "-nostats", "-c:v h264_nvenc", "-b:v 2000000", "-bf 0", "-map 0:v:0", "-f mp4"] {
             XCTAssertTrue(line.contains(needle), needle)
         }

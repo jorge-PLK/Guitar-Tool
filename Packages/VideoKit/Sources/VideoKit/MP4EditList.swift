@@ -42,6 +42,9 @@ enum MP4EditList {
         /// Menor instante de composición (DTS de `stts` + desfase de `ctts`), en la escala de la pista: el primer
         /// fotograma que se muestra.
         var firstCompositionTime: Int64 = 0
+        /// Mayor instante de composición entre las muestras que caen dentro de los tramos de medios (todas si no hay
+        /// lista), en la escala de la pista: el último fotograma que se muestra (`TakeVideoProbe.lastFrameTime`).
+        var lastCompositionTime: Int64 = 0
     }
 
     enum Failure: Error, Equatable {
@@ -206,7 +209,7 @@ enum MP4EditList {
         var samples: UInt64 = 0
         var entry: (type: String, width: Int, height: Int)?
         var sampleCount = 0
-        var firstCT: Int64 = 0
+        var cts: [Int64] = []
         let stblKids: [Box]
         if let minf = mk.first(where: { $0.type == "minf" }), let stbl = try children(d, minf.body).first(where: { $0.type == "stbl" }) {
             stblKids = try children(d, stbl.body)
@@ -231,7 +234,7 @@ enum MP4EditList {
                 sampleCount += count
                 runs.append((count, delta))
             }
-            firstCT = try firstCompositionTime(d, runs: runs, ctts: stblKids.first { $0.type == "ctts" })
+            cts = try compositionTimes(d, runs: runs, ctts: stblKids.first { $0.type == "ctts" })
         } else {
             samples = dur
         }
@@ -253,12 +256,31 @@ enum MP4EditList {
         }
         return Track(handler: handler, movieTimescale: movieTimescale, mediaTimescale: ts, mediaDuration: dur, sampleDuration: samples,
                      edits: edits, sampleEntry: entry?.type, width: entry?.width ?? 0, height: entry?.height ?? 0,
-                     sampleCount: sampleCount, firstCompositionTime: firstCT)
+                     sampleCount: sampleCount, firstCompositionTime: cts.min() ?? 0,
+                     lastCompositionTime: lastShownCompositionTime(cts, edits: edits, movieTimescale: movieTimescale, mediaTimescale: ts))
     }
 
-    /// Menor DTS + desfase de composición (`ctts` de versión 0 sin signo o 1 con signo; sin `ctts`, el primer DTS = 0).
-    static func firstCompositionTime(_ d: Data, runs: [(count: Int, delta: UInt64)], ctts: Box?) throws -> Int64 {
-        guard let ctts else { return 0 }
+    /// El último instante de composición que se ve: el mayor por debajo del final de los tramos de medios (inicio del
+    /// primero + suma de sus duraciones, pasada a la escala de la pista). Sin lista o si ninguno cae dentro, el mayor.
+    static func lastShownCompositionTime(_ cts: [Int64], edits: [Edit], movieTimescale: UInt32, mediaTimescale: UInt32) -> Int64 {
+        let body = edits.filter { $0.mediaTime >= 0 }
+        guard let start = body.first?.mediaTime else { return cts.max() ?? 0 }
+        let shown = Double(body.reduce(UInt64(0)) { $0 + $1.segmentDuration }) / Double(max(1, movieTimescale))
+        let end = start + Int64((shown * Double(max(1, mediaTimescale))).rounded())
+        return cts.filter { $0 < end }.max() ?? cts.max() ?? 0
+    }
+
+    /// DTS + desfase de composición de cada muestra, en orden de decodificación (`ctts` de versión 0 sin signo o 1 con
+    /// signo; sin `ctts`, el DTS: el primero = 0).
+    static func compositionTimes(_ d: Data, runs: [(count: Int, delta: UInt64)], ctts: Box?) throws -> [Int64] {
+        guard let ctts else {
+            var out: [Int64] = []
+            var dts: Int64 = 0
+            for r in runs {
+                for _ in 0..<r.count { out.append(dts); dts += Int64(r.delta) }
+            }
+            return out
+        }
         let c = ctts.body.lowerBound - d.startIndex
         let signed = d[ctts.body.lowerBound] == 1
         let n = Int(be32(d, c + 4))
@@ -270,19 +292,19 @@ enum MP4EditList {
             let offset = signed || raw > UInt32(Int32.max) ? Int64(Int32(bitPattern: raw)) : Int64(raw)
             offsets.append((Int(be32(d, c + 8 + 8 * i)), offset))
         }
-        var best = Int64.max
+        var out: [Int64] = []
         var dts: Int64 = 0
         var k = 0, left = offsets.first?.count ?? 0
         for r in runs {
             for _ in 0..<r.count {
                 while left == 0, k + 1 < offsets.count { k += 1; left = offsets[k].count }
                 let off = k < offsets.count && left > 0 ? offsets[k].offset : 0
-                best = min(best, dts + off)
+                out.append(dts + off)
                 if left > 0 { left -= 1 }
                 dts += Int64(r.delta)
             }
         }
-        return best == .max ? 0 : best
+        return out
     }
 
     /// `edts` con un `elst` de versión 1 (64 bits) y velocidad 1.
