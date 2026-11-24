@@ -32,6 +32,7 @@ final Map<String, Json Function(Json)> _paramsRoundTrip = {
   'setMaster': (j) => StudyMasterParams.fromJson(j).toJson(),
   'setMetronome': (j) => StudyMetronomeParams.fromJson(j).toJson(),
   'setKey': (j) => StudySetKeyParams.fromJson(j).toJson(),
+  'chordShape': (j) => StudyChordShapeParams.fromJson(j).toJson(),
   'setChord': (j) => StudySetChordParams.fromJson(j).toJson(),
   'removeChordOverrides': (j) => StudyChordRangeParams.fromJson(j).toJson(),
   'splitChord': (j) => StudySplitChordParams.fromJson(j).toJson(),
@@ -84,10 +85,17 @@ final Map<String, Object Function(Json)> _decoders = {
   'levels.event': StudyLevelsEvent.fromJson,
   'analysis.event': StudyAnalysisEvent.fromJson,
   'guitars.event': StudyGuitarsEvent.fromJson,
-  'error.event': StudyErrorEvent.fromJson,
-  'play.error': StudyErrorEvent.fromJson,
-  'setMix.error': StudyErrorEvent.fromJson,
+  'chordShape.result': StudyChordShapeResult.fromJson,
+  'play.error': _expectCallError,
+  'setMix.error': _expectCallError,
 };
+
+/// Error de llamada `{code, message}`: lo traduce el cliente, no hay DTO.
+Json _expectCallError(Json j) {
+  expect(j['code'], isA<String>());
+  expect(j['message'], isA<String>());
+  return j;
+}
 
 /// Clave `método.tipo` de un fichero `study.<método>.<tipo>[.<variante>].json`,
 /// o null si no encaja con ningún tipo conocido.
@@ -207,6 +215,36 @@ Future<void> main() async {
       final lv = StudyLevelsEvent.fromJson(await _load('study.levels.event.json'));
       expect(lv.channels, isNotEmpty);
       expect(lv.channels.values.first.peakDB, isA<double>());
+    });
+
+    test('chordShape.result: forma con cejilla y cuerda muda', () async {
+      final r = StudyChordShapeResult.fromJson(await _load('study.chordShape.result.json'));
+      expect(r.display, 'B');
+      expect(r.shape!.frets, [4, 6, 6, 5, 4, 4]);
+      expect(r.shape!.barre!.fromString, 6);
+      expect(r.shape!.barre!.toString_, 1);
+      final c0 =
+          StudyChordShapeResult.fromJson(await _load('study.chordShape.result.capo0.json'));
+      expect(c0.shape!.frets.first, isNull);
+      expect(c0.capo, 0);
+    });
+
+    test('analysis.event.withChords: análisis completo con display y shape', () async {
+      final e = StudyAnalysisEvent.fromJson(
+        await _load('study.analysis.event.withChords.json'),
+      );
+      final a = e.analysis!;
+      expect(a.key.display!.tonic, 'A#');
+      expect(a.chords.first.display, 'A#m');
+      expect(a.chords.first.shape!.baseFret, 3);
+    });
+
+    test('setKey shown: params ida y vuelta', () async {
+      final j = await _load('study.setKey.params.shown.json');
+      final p = StudySetKeyParams.fromJson(j);
+      expect(p.shown!.tonic, 'G');
+      expect(p.shown!.mode, 'min');
+      expect(p.toJson(), equals(j));
     });
 
     test('markSection.result: added', () async {

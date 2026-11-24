@@ -123,14 +123,19 @@ final class StudyMetronomeParams {
 }
 
 /// `key` nulo quita la corrección: se envía como clave ausente, que el núcleo lee igual.
+/// `shown` = tonalidad como se ve (transpuesta); el núcleo deshace la transposición.
 final class StudySetKeyParams {
-  const StudySetKeyParams({this.key});
+  const StudySetKeyParams({this.key, this.shown});
 
-  factory StudySetKeyParams.fromJson(Json j) => StudySetKeyParams(key: _sn(j['key']));
+  factory StudySetKeyParams.fromJson(Json j) => StudySetKeyParams(
+        key: _sn(j['key']),
+        shown: _opt(j['shown'], StudyShownKey.fromJson),
+      );
 
   final String? key;
+  final StudyShownKey? shown;
 
-  Json toJson() => _compact({'key': key});
+  Json toJson() => _compact({'key': key, 'shown': shown?.toJson()});
 }
 
 final class StudySetChordParams {

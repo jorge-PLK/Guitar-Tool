@@ -6,8 +6,10 @@
 
 import 'package:toneforge/core/core_client.dart' show Json;
 
+part 'tab_enums.dart';
 part 'tab_params.dart';
 part 'tab_songsterr.dart';
+part 'tab_songsterr_pairing.dart';
 part 'tab_types.dart';
 
 /// Enum con su valor crudo del JSON en [wire]. Lo no previsto cae en `unknown`.
@@ -59,8 +61,6 @@ T? _enumN<T extends TabWire>(List<T> values, Object? raw, T unknown) =>
 String _wire(TabWire e) => e.wire == 'unknown'
     ? throw StateError('valor de enum no enviable: $e')
     : e.wire;
-
-String? _wireOpt(TabWire? e) => e == null ? null : _wire(e);
 
 /// Quita las claves nulas (ausente = null en el JSON del núcleo).
 Json _compact(Json m) {

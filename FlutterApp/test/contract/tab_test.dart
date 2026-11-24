@@ -229,7 +229,7 @@ void main() => group('contract · tab', () {
     expect(s.phase, TabPhase.ready);
     expect(s.source, TabSource.automatic);
     expect(s.selectedTrack, 'bass');
-    expect(s.revision, 2);
+    expect(s.revision, 3);
     expect(s.tracks.map((t) => t.id), ['bass', 'drums']);
     expect(s.tracks.first.kind, TabTrackKind.bass);
     expect(s.tracks.first.tuning!.strings, [43, 38, 33, 28]);
@@ -249,7 +249,7 @@ void main() => group('contract · tab', () {
     final r = TabScoreResult.fromJson(_load('tab.score.result'));
     expect(r.trackIDs, ['bass', 'drums']);
     expect(r.trackIndex, 0);
-    expect(r.revision, 2);
+    expect(r.revision, 3);
     final score = jsonDecode(r.json) as Map<String, Object?>;
     expect(score['version'], 1);
   });
