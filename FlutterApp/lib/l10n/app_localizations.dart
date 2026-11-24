@@ -2576,6 +2576,594 @@ abstract class AppLocalizations {
   /// **'Posición'**
   String get takeview_position;
 
+  /// Bloqueo de Grabar: busy (record-block-busy).
+  ///
+  /// In es, this message translates to:
+  /// **'Hay una calibración o una grabación en marcha.'**
+  String get record_block_busy;
+
+  /// Bloqueo de Grabar: canales repetidos.
+  ///
+  /// In es, this message translates to:
+  /// **'Los canales elegidos se repiten: revisa Ajustes · Audio.'**
+  String get record_block_invalidChannels;
+
+  /// Bloqueo de Grabar: entrada desconectada.
+  ///
+  /// In es, this message translates to:
+  /// **'El dispositivo de entrada no está conectado.'**
+  String get record_block_inputDisconnected;
+
+  /// Bloqueo de Grabar: bucle activo.
+  ///
+  /// In es, this message translates to:
+  /// **'Solo se graba sin bucle: quita el bucle.'**
+  String get record_block_loop;
+
+  /// Bloqueo de Grabar: sin entrada de guitarra.
+  ///
+  /// In es, this message translates to:
+  /// **'Asigna la entrada de guitarra en Ajustes · Audio.'**
+  String get record_block_noGuitarInput;
+
+  /// Bloqueo de Grabar: sin dispositivo de entrada.
+  ///
+  /// In es, this message translates to:
+  /// **'Elige un dispositivo de entrada en Ajustes · Audio.'**
+  String get record_block_noInputDevice;
+
+  /// Bloqueo de Grabar: sin parte.
+  ///
+  /// In es, this message translates to:
+  /// **'Elige una parte.'**
+  String get record_block_noPart;
+
+  /// Bloqueo de Grabar: salida desconectada.
+  ///
+  /// In es, this message translates to:
+  /// **'El dispositivo de salida no está conectado.'**
+  String get record_block_outputDisconnected;
+
+  /// Bloqueo de Grabar: punch-in sin marcas.
+  ///
+  /// In es, this message translates to:
+  /// **'Marca la entrada y la salida del punch-in en la línea de tiempo.'**
+  String get record_block_punchNoMarks;
+
+  /// Bloqueo de Grabar: punch-in sin toma.
+  ///
+  /// In es, this message translates to:
+  /// **'Elige la toma sobre la que hacer el punch-in.'**
+  String get record_block_punchNoTake;
+
+  /// Bloqueo de Grabar: frecuencias distintas.
+  ///
+  /// In es, this message translates to:
+  /// **'El dispositivo está a {deviceHz} kHz y la frecuencia de trabajo es {workingHz} kHz'**
+  String record_block_rateMismatch(num deviceHz, num workingHz);
+
+  /// Bloqueo de Grabar: error del sistema; el texto es el propio error.
+  ///
+  /// In es, this message translates to:
+  /// **'{detail}'**
+  String record_block_sessionUnavailable(String detail);
+
+  /// Bloqueo de Grabar: velocidad distinta de 100 %.
+  ///
+  /// In es, this message translates to:
+  /// **'Solo se graba a velocidad 100 %: pon el tempo al 100 %.'**
+  String record_block_speed(num rate);
+
+  /// Ancla del bloque settings_audio: añade las claves del área debajo, en orden alfabético; no edites otros bloques.
+  ///
+  /// In es, this message translates to:
+  /// **''**
+  String get settingsAudioAnchor;
+
+  /// Ajustes Audio: elección de salidas del backing.
+  ///
+  /// In es, this message translates to:
+  /// **'Salidas {l} y {r} · estéreo'**
+  String settings_audio_backingChoice(String l, String r);
+
+  /// Ajustes Audio: canales de salida del backing.
+  ///
+  /// In es, this message translates to:
+  /// **'Salida del backing'**
+  String get settings_audio_backingOut;
+
+  /// Bloqueo de calibrar: busy (audio-block-busy).
+  ///
+  /// In es, this message translates to:
+  /// **'Hay una calibración o una grabación en marcha.'**
+  String get settings_audio_block_busy;
+
+  /// Bloqueo de calibrar: canales repetidos.
+  ///
+  /// In es, this message translates to:
+  /// **'Los canales elegidos se repiten: revisa Ajustes · Audio.'**
+  String get settings_audio_block_invalidChannels;
+
+  /// Bloqueo de calibrar: entrada desconectada.
+  ///
+  /// In es, this message translates to:
+  /// **'El dispositivo de entrada no está conectado.'**
+  String get settings_audio_block_inputDisconnected;
+
+  /// Bloqueo de calibrar: bucle activo.
+  ///
+  /// In es, this message translates to:
+  /// **'Solo se graba sin bucle: quita el bucle.'**
+  String get settings_audio_block_loop;
+
+  /// Bloqueo de calibrar: sin entrada de guitarra.
+  ///
+  /// In es, this message translates to:
+  /// **'Asigna la entrada de guitarra en Ajustes · Audio.'**
+  String get settings_audio_block_noGuitarInput;
+
+  /// Bloqueo de calibrar: sin dispositivo de entrada.
+  ///
+  /// In es, this message translates to:
+  /// **'Elige un dispositivo de entrada en Ajustes · Audio.'**
+  String get settings_audio_block_noInputDevice;
+
+  /// Bloqueo de calibrar: salida desconectada.
+  ///
+  /// In es, this message translates to:
+  /// **'El dispositivo de salida no está conectado.'**
+  String get settings_audio_block_outputDisconnected;
+
+  /// Bloqueo de calibrar: frecuencias distintas.
+  ///
+  /// In es, this message translates to:
+  /// **'El dispositivo está a {deviceHz} kHz y la frecuencia de trabajo es {workingHz} kHz'**
+  String settings_audio_block_rateMismatch(num deviceHz, num workingHz);
+
+  /// Bloqueo de calibrar: error del sistema; el texto es el propio error.
+  ///
+  /// In es, this message translates to:
+  /// **'{detail}'**
+  String settings_audio_block_sessionUnavailable(String detail);
+
+  /// Bloqueo de calibrar: velocidad distinta de 100 %.
+  ///
+  /// In es, this message translates to:
+  /// **'Solo se graba a velocidad 100 %: pon el tempo al 100 %.'**
+  String settings_audio_block_speed(num rate);
+
+  /// Ajustes Audio: botón calibrar.
+  ///
+  /// In es, this message translates to:
+  /// **'Calibrar latencia'**
+  String get settings_audio_calibrate;
+
+  /// Ajustes Audio: latencia calibrada.
+  ///
+  /// In es, this message translates to:
+  /// **'Calibrada · {ms} ms · {date}'**
+  String settings_audio_calibrated(num ms, String date);
+
+  /// Ajustes Audio: nota de calibración (AS:209).
+  ///
+  /// In es, this message translates to:
+  /// **'Un pulso de prueba mide el retardo de ida y vuelta del dispositivo.'**
+  String get settings_audio_calNote;
+
+  /// Ajustes Audio: título de calibración (AS:208).
+  ///
+  /// In es, this message translates to:
+  /// **'Calibración'**
+  String get settings_audio_calTitle;
+
+  /// Ajustes Audio: nota de canales (AS:184).
+  ///
+  /// In es, this message translates to:
+  /// **'Qué entra y qué sale por cada canal del dispositivo.'**
+  String get settings_audio_channelsNote;
+
+  /// Ajustes Audio: título de canales (AS:184).
+  ///
+  /// In es, this message translates to:
+  /// **'Canales'**
+  String get settings_audio_channelsTitle;
+
+  /// Ajustes Audio: dispositivo elegido desconectado (AS:154).
+  ///
+  /// In es, this message translates to:
+  /// **'Dispositivo elegido'**
+  String get settings_audio_chosenFallback;
+
+  /// Ajustes Audio: dispositivo desconectado (AS:154).
+  ///
+  /// In es, this message translates to:
+  /// **'{name} · desconectado'**
+  String settings_audio_deviceDisconnected(String name);
+
+  /// Ajustes Audio: nota de dispositivo (AS:115).
+  ///
+  /// In es, this message translates to:
+  /// **'Por dónde suena el backing y por dónde entra tu guitarra.'**
+  String get settings_audio_deviceNote;
+
+  /// Ajustes Audio: opción de dispositivo (AS:152).
+  ///
+  /// In es, this message translates to:
+  /// **'{name} · {channels} can.'**
+  String settings_audio_deviceOption(String name, int channels);
+
+  /// Ajustes Audio: título de dispositivo (AS:115).
+  ///
+  /// In es, this message translates to:
+  /// **'Dispositivo'**
+  String get settings_audio_deviceTitle;
+
+  /// Ajustes Audio: entrada de guitarra (AS:185-192).
+  ///
+  /// In es, this message translates to:
+  /// **'Entrada de guitarra'**
+  String get settings_audio_guitarIn;
+
+  /// Ajustes Audio: etiqueta de entrada (AS:116-136).
+  ///
+  /// In es, this message translates to:
+  /// **'Dispositivo de entrada'**
+  String get settings_audio_input;
+
+  /// Ajustes Audio: una entrada (AS:59-60).
+  ///
+  /// In es, this message translates to:
+  /// **'Entrada {n}'**
+  String settings_audio_inputN(int n);
+
+  /// Ajustes Audio: dos entradas (AS:59-60).
+  ///
+  /// In es, this message translates to:
+  /// **'Entradas {n} y {m}'**
+  String settings_audio_inputsNM(int n, int m);
+
+  /// Ajustes Audio: etiqueta de latencia (AS:210).
+  ///
+  /// In es, this message translates to:
+  /// **'Latencia'**
+  String get settings_audio_latency;
+
+  /// Ajustes Audio: sin entrada (AS:129).
+  ///
+  /// In es, this message translates to:
+  /// **'Ninguna'**
+  String get settings_audio_noInput;
+
+  /// Ajustes Audio: etiqueta de salida (AS:116-136).
+  ///
+  /// In es, this message translates to:
+  /// **'Dispositivo de salida'**
+  String get settings_audio_output;
+
+  /// Ajustes Audio: etiqueta de frecuencia (AS:116-136).
+  ///
+  /// In es, this message translates to:
+  /// **'Frecuencia de trabajo'**
+  String get settings_audio_rate;
+
+  /// Ajustes Audio: frecuencias distintas (AS:166).
+  ///
+  /// In es, this message translates to:
+  /// **'El dispositivo está a {device} y la frecuencia de trabajo es {working}'**
+  String settings_audio_rateMismatch(String device, String working);
+
+  /// Ajustes Audio: pista de frecuencias distintas (AS:168).
+  ///
+  /// In es, this message translates to:
+  /// **'Grabar y calibrar quedan bloqueados; el backing suena igual.'**
+  String get settings_audio_rateMismatchHint;
+
+  /// Ajustes Audio: salida del sistema (AS:119).
+  ///
+  /// In es, this message translates to:
+  /// **'Salida del sistema'**
+  String get settings_audio_systemOutput;
+
+  /// Ajustes Audio: canal sin asignar (AS:59-60).
+  ///
+  /// In es, this message translates to:
+  /// **'Sin asignar'**
+  String get settings_audio_unassigned;
+
+  /// Ajustes Audio: latencia sin calibrar (AS:227).
+  ///
+  /// In es, this message translates to:
+  /// **'Sin calibrar'**
+  String get settings_audio_uncalibrated;
+
+  /// Ajustes Audio: aplicar la frecuencia del dispositivo (AS:171).
+  ///
+  /// In es, this message translates to:
+  /// **'Usar {rate} como frecuencia de trabajo'**
+  String settings_audio_useRate(String rate);
+
+  /// Calibrar latencia: cancelar (CS:51-85).
+  ///
+  /// In es, this message translates to:
+  /// **'Cancelar'**
+  String get settings_cal_cancel;
+
+  /// Calibrar latencia: cerrar (CS:51-85).
+  ///
+  /// In es, this message translates to:
+  /// **'Cerrar'**
+  String get settings_cal_close;
+
+  /// Calibrar latencia: tomas sin corregir (CS:102).
+  ///
+  /// In es, this message translates to:
+  /// **'{n} de este tema, hechas sin calibrar'**
+  String settings_cal_correctedNote(int n);
+
+  /// Calibrar latencia: resultado (CS:92).
+  ///
+  /// In es, this message translates to:
+  /// **'Calibrada'**
+  String get settings_cal_done;
+
+  /// Calibrar latencia: título de error (CS:77).
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo calibrar'**
+  String get settings_cal_errorTitle;
+
+  /// Calibrar latencia: pista sin señal (CS:121).
+  ///
+  /// In es, this message translates to:
+  /// **'Comprueba el cable de una salida del dispositivo a la entrada de guitarra, y que la entrada elegida sea esa. Después repite.'**
+  String get settings_cal_noSignalHint;
+
+  /// Calibrar latencia: título sin señal (CS:120).
+  ///
+  /// In es, this message translates to:
+  /// **'No llegó la señal de prueba'**
+  String get settings_cal_noSignalTitle;
+
+  /// Calibrar latencia: repetir (CS:51-85).
+  ///
+  /// In es, this message translates to:
+  /// **'Repetir'**
+  String get settings_cal_retry;
+
+  /// Calibrar latencia: sin canal de referencia (CS:99).
+  ///
+  /// In es, this message translates to:
+  /// **'sin canal de referencia: la latencia calibrada vale tal cual'**
+  String get settings_cal_rigNone;
+
+  /// Calibrar latencia: retardo del rig (CS:97).
+  ///
+  /// In es, this message translates to:
+  /// **'{ms} ms · se corregirá en cada toma'**
+  String settings_cal_rigNote(num ms);
+
+  /// Calibrar latencia: fila de tomas corregidas (CS:94-102).
+  ///
+  /// In es, this message translates to:
+  /// **'Tomas corregidas'**
+  String get settings_cal_rowCorrected;
+
+  /// Calibrar latencia: fila de latencia (CS:94-102).
+  ///
+  /// In es, this message translates to:
+  /// **'Latencia'**
+  String get settings_cal_rowLatency;
+
+  /// Calibrar latencia: fila de retardo del rig (CS:94-102).
+  ///
+  /// In es, this message translates to:
+  /// **'Retardo del rig'**
+  String get settings_cal_rowRig;
+
+  /// Calibrar latencia: fila de dispersión (CS:94-102).
+  ///
+  /// In es, this message translates to:
+  /// **'Dispersión'**
+  String get settings_cal_rowSpread;
+
+  /// Calibrar latencia: medición en curso (CS:62).
+  ///
+  /// In es, this message translates to:
+  /// **'Midiendo… no toques la guitarra ni muevas el cable.'**
+  String get settings_cal_running;
+
+  /// Calibrar latencia: pista de señal saturada (CS:124).
+  ///
+  /// In es, this message translates to:
+  /// **'Baja el volumen de salida del dispositivo (con una pedalera, el del rig o el de la salida) y repite.'**
+  String get settings_cal_saturatedHint;
+
+  /// Calibrar latencia: título de señal saturada (CS:123).
+  ///
+  /// In es, this message translates to:
+  /// **'La señal llegó saturada'**
+  String get settings_cal_saturatedTitle;
+
+  /// Calibrar latencia: empezar (CS:51-85).
+  ///
+  /// In es, this message translates to:
+  /// **'Empezar'**
+  String get settings_cal_start;
+
+  /// Calibrar latencia: título de la hoja (CS:21).
+  ///
+  /// In es, this message translates to:
+  /// **'Calibrar latencia'**
+  String get settings_cal_title;
+
+  /// Calibrar latencia: pista de medidas inestables (CS:127).
+  ///
+  /// In es, this message translates to:
+  /// **'Carga un rig vacío o sin delay ni reverb, cierra otras apps de audio y repite.'**
+  String get settings_cal_unstableHint;
+
+  /// Calibrar latencia: título de medidas inestables (CS:126).
+  ///
+  /// In es, this message translates to:
+  /// **'Las medidas no coinciden entre sí (dispersión de {ms} ms)'**
+  String settings_cal_unstableTitle(num ms);
+
+  /// Ancla del bloque settings_video: añade las claves del área debajo, en orden alfabético; no edites otros bloques.
+  ///
+  /// In es, this message translates to:
+  /// **''**
+  String get settingsVideoAnchor;
+
+  /// Ajustes Cámara y vídeo: etiqueta de cámara (VS:255-271).
+  ///
+  /// In es, this message translates to:
+  /// **'Cámara'**
+  String get settings_video_camera;
+
+  /// Ajustes Cámara y vídeo: cámara desconectada (VS:239).
+  ///
+  /// In es, this message translates to:
+  /// **'{name} · desconectada'**
+  String settings_video_cameraDisconnected(String name);
+
+  /// Ajustes Cámara y vídeo: título de cámara (VS:252).
+  ///
+  /// In es, this message translates to:
+  /// **'Cámara'**
+  String get settings_video_cameraTitle;
+
+  /// Ajustes Cámara y vídeo: cámara elegida desconectada (VS:239).
+  ///
+  /// In es, this message translates to:
+  /// **'Cámara elegida'**
+  String get settings_video_chosenFallback;
+
+  /// Ajustes Cámara y vídeo: aviso de cámara elegida desconectada (VS:249-251).
+  ///
+  /// In es, this message translates to:
+  /// **'La cámara elegida está desconectada.'**
+  String get settings_video_chosenOff;
+
+  /// Ajustes Cámara y vídeo: sin permiso de cámara (VS:300-301, CP:59).
+  ///
+  /// In es, this message translates to:
+  /// **'ToneForge no tiene permiso para usar la cámara.'**
+  String get settings_video_denied;
+
+  /// Ajustes Cámara y vídeo: nota de exportación (VS:355).
+  ///
+  /// In es, this message translates to:
+  /// **'Se puede cambiar en cada montaje.'**
+  String get settings_video_exportNote;
+
+  /// Ajustes Cámara y vídeo: título de exportación (VS:355).
+  ///
+  /// In es, this message translates to:
+  /// **'Exportación por defecto'**
+  String get settings_video_exportTitle;
+
+  /// Ajustes Cámara y vídeo: formato (VS:356-370).
+  ///
+  /// In es, this message translates to:
+  /// **'Formato de vídeo'**
+  String get settings_video_format;
+
+  /// Ajustes Cámara y vídeo: fotogramas por segundo (VS:255-271).
+  ///
+  /// In es, this message translates to:
+  /// **'Fotogramas por segundo'**
+  String get settings_video_fps;
+
+  /// Ajustes Cámara y vídeo: cámara en uso (VS:249-251).
+  ///
+  /// In es, this message translates to:
+  /// **'En uso: {name}.'**
+  String settings_video_inUse(String name);
+
+  /// Ajustes Cámara y vídeo: sin cámaras (VS:249-251).
+  ///
+  /// In es, this message translates to:
+  /// **'No hay ninguna cámara conectada.'**
+  String get settings_video_none;
+
+  /// Ajustes Cámara y vídeo: desfase por defecto (VS:340-342).
+  ///
+  /// In es, this message translates to:
+  /// **'Desfase por defecto de esta cámara'**
+  String get settings_video_offset;
+
+  /// Ajustes Cámara y vídeo: error al abrir (VS:117, CP:153).
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo abrir la cámara ({error}).'**
+  String settings_video_openFailed(String error);
+
+  /// Ajustes Cámara y vídeo: abrir ajustes del sistema en macOS (VS:300-301, CP:59).
+  ///
+  /// In es, this message translates to:
+  /// **'Abrir Ajustes del Sistema'**
+  String get settings_video_openSystem_mac;
+
+  /// Ajustes Cámara y vídeo: abrir configuración en Windows (VS:300-301, CP:59).
+  ///
+  /// In es, this message translates to:
+  /// **'Abrir Configuración'**
+  String get settings_video_openSystem_win;
+
+  /// Ajustes Cámara y vídeo: resolución (VS:255-271).
+  ///
+  /// In es, this message translates to:
+  /// **'Resolución'**
+  String get settings_video_resolution;
+
+  /// Ajustes Cámara y vídeo: vista previa simulada (VS:294).
+  ///
+  /// In es, this message translates to:
+  /// **'Vista previa simulada'**
+  String get settings_video_simulated;
+
+  /// Ajustes Cámara y vídeo: exportar stems (VS:372-377).
+  ///
+  /// In es, this message translates to:
+  /// **'WAV de cada pista'**
+  String get settings_video_stemWavs;
+
+  /// Ajustes Cámara y vídeo: nota de sincronía (VS:340-342).
+  ///
+  /// In es, this message translates to:
+  /// **'Se ajusta al terminar cada toma; este es el valor con el que empieza la siguiente.'**
+  String get settings_video_syncNote;
+
+  /// Ajustes Cámara y vídeo: título de sincronía (VS:340-342).
+  ///
+  /// In es, this message translates to:
+  /// **'Sincronía'**
+  String get settings_video_syncTitle;
+
+  /// Ajustes Cámara y vídeo: cámara por defecto del sistema (VS:258).
+  ///
+  /// In es, this message translates to:
+  /// **'Por defecto del sistema'**
+  String get settings_video_systemDefault;
+
+  /// Ajustes Cámara y vídeo: rótulo con el título (VS:372-377).
+  ///
+  /// In es, this message translates to:
+  /// **'Rótulo con el título del tema'**
+  String get settings_video_titleOverlay;
+
+  /// Ajustes Cámara y vídeo: volumen (VS:356-370).
+  ///
+  /// In es, this message translates to:
+  /// **'Volumen'**
+  String get settings_video_volume;
+
+  /// Ajustes Cámara y vídeo: normalización del volumen (VS:356-370).
+  ///
+  /// In es, this message translates to:
+  /// **'normalizado a −14 LUFS'**
+  String get settings_video_volumeValue;
+
   /// Ancla del bloque montage: añade las claves del área debajo, en orden alfabético; no edites otros bloques.
   ///
   /// In es, this message translates to:

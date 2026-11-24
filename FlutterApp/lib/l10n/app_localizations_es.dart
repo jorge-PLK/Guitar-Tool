@@ -1496,6 +1496,366 @@ class AppLocalizationsEs extends AppLocalizations {
   String get takeview_position => 'Posición';
 
   @override
+  String get record_block_busy =>
+      'Hay una calibración o una grabación en marcha.';
+
+  @override
+  String get record_block_invalidChannels =>
+      'Los canales elegidos se repiten: revisa Ajustes · Audio.';
+
+  @override
+  String get record_block_inputDisconnected =>
+      'El dispositivo de entrada no está conectado.';
+
+  @override
+  String get record_block_loop => 'Solo se graba sin bucle: quita el bucle.';
+
+  @override
+  String get record_block_noGuitarInput =>
+      'Asigna la entrada de guitarra en Ajustes · Audio.';
+
+  @override
+  String get record_block_noInputDevice =>
+      'Elige un dispositivo de entrada en Ajustes · Audio.';
+
+  @override
+  String get record_block_noPart => 'Elige una parte.';
+
+  @override
+  String get record_block_outputDisconnected =>
+      'El dispositivo de salida no está conectado.';
+
+  @override
+  String get record_block_punchNoMarks =>
+      'Marca la entrada y la salida del punch-in en la línea de tiempo.';
+
+  @override
+  String get record_block_punchNoTake =>
+      'Elige la toma sobre la que hacer el punch-in.';
+
+  @override
+  String record_block_rateMismatch(num deviceHz, num workingHz) {
+    return 'El dispositivo está a $deviceHz kHz y la frecuencia de trabajo es $workingHz kHz';
+  }
+
+  @override
+  String record_block_sessionUnavailable(String detail) {
+    return '$detail';
+  }
+
+  @override
+  String record_block_speed(num rate) {
+    return 'Solo se graba a velocidad 100 %: pon el tempo al 100 %.';
+  }
+
+  @override
+  String get settingsAudioAnchor => '';
+
+  @override
+  String settings_audio_backingChoice(String l, String r) {
+    return 'Salidas $l y $r · estéreo';
+  }
+
+  @override
+  String get settings_audio_backingOut => 'Salida del backing';
+
+  @override
+  String get settings_audio_block_busy =>
+      'Hay una calibración o una grabación en marcha.';
+
+  @override
+  String get settings_audio_block_invalidChannels =>
+      'Los canales elegidos se repiten: revisa Ajustes · Audio.';
+
+  @override
+  String get settings_audio_block_inputDisconnected =>
+      'El dispositivo de entrada no está conectado.';
+
+  @override
+  String get settings_audio_block_loop =>
+      'Solo se graba sin bucle: quita el bucle.';
+
+  @override
+  String get settings_audio_block_noGuitarInput =>
+      'Asigna la entrada de guitarra en Ajustes · Audio.';
+
+  @override
+  String get settings_audio_block_noInputDevice =>
+      'Elige un dispositivo de entrada en Ajustes · Audio.';
+
+  @override
+  String get settings_audio_block_outputDisconnected =>
+      'El dispositivo de salida no está conectado.';
+
+  @override
+  String settings_audio_block_rateMismatch(num deviceHz, num workingHz) {
+    return 'El dispositivo está a $deviceHz kHz y la frecuencia de trabajo es $workingHz kHz';
+  }
+
+  @override
+  String settings_audio_block_sessionUnavailable(String detail) {
+    return '$detail';
+  }
+
+  @override
+  String settings_audio_block_speed(num rate) {
+    return 'Solo se graba a velocidad 100 %: pon el tempo al 100 %.';
+  }
+
+  @override
+  String get settings_audio_calibrate => 'Calibrar latencia';
+
+  @override
+  String settings_audio_calibrated(num ms, String date) {
+    return 'Calibrada · $ms ms · $date';
+  }
+
+  @override
+  String get settings_audio_calNote =>
+      'Un pulso de prueba mide el retardo de ida y vuelta del dispositivo.';
+
+  @override
+  String get settings_audio_calTitle => 'Calibración';
+
+  @override
+  String get settings_audio_channelsNote =>
+      'Qué entra y qué sale por cada canal del dispositivo.';
+
+  @override
+  String get settings_audio_channelsTitle => 'Canales';
+
+  @override
+  String get settings_audio_chosenFallback => 'Dispositivo elegido';
+
+  @override
+  String settings_audio_deviceDisconnected(String name) {
+    return '$name · desconectado';
+  }
+
+  @override
+  String get settings_audio_deviceNote =>
+      'Por dónde suena el backing y por dónde entra tu guitarra.';
+
+  @override
+  String settings_audio_deviceOption(String name, int channels) {
+    return '$name · $channels can.';
+  }
+
+  @override
+  String get settings_audio_deviceTitle => 'Dispositivo';
+
+  @override
+  String get settings_audio_guitarIn => 'Entrada de guitarra';
+
+  @override
+  String get settings_audio_input => 'Dispositivo de entrada';
+
+  @override
+  String settings_audio_inputN(int n) {
+    return 'Entrada $n';
+  }
+
+  @override
+  String settings_audio_inputsNM(int n, int m) {
+    return 'Entradas $n y $m';
+  }
+
+  @override
+  String get settings_audio_latency => 'Latencia';
+
+  @override
+  String get settings_audio_noInput => 'Ninguna';
+
+  @override
+  String get settings_audio_output => 'Dispositivo de salida';
+
+  @override
+  String get settings_audio_rate => 'Frecuencia de trabajo';
+
+  @override
+  String settings_audio_rateMismatch(String device, String working) {
+    return 'El dispositivo está a $device y la frecuencia de trabajo es $working';
+  }
+
+  @override
+  String get settings_audio_rateMismatchHint =>
+      'Grabar y calibrar quedan bloqueados; el backing suena igual.';
+
+  @override
+  String get settings_audio_systemOutput => 'Salida del sistema';
+
+  @override
+  String get settings_audio_unassigned => 'Sin asignar';
+
+  @override
+  String get settings_audio_uncalibrated => 'Sin calibrar';
+
+  @override
+  String settings_audio_useRate(String rate) {
+    return 'Usar $rate como frecuencia de trabajo';
+  }
+
+  @override
+  String get settings_cal_cancel => 'Cancelar';
+
+  @override
+  String get settings_cal_close => 'Cerrar';
+
+  @override
+  String settings_cal_correctedNote(int n) {
+    return '$n de este tema, hechas sin calibrar';
+  }
+
+  @override
+  String get settings_cal_done => 'Calibrada';
+
+  @override
+  String get settings_cal_errorTitle => 'No se pudo calibrar';
+
+  @override
+  String get settings_cal_noSignalHint =>
+      'Comprueba el cable de una salida del dispositivo a la entrada de guitarra, y que la entrada elegida sea esa. Después repite.';
+
+  @override
+  String get settings_cal_noSignalTitle => 'No llegó la señal de prueba';
+
+  @override
+  String get settings_cal_retry => 'Repetir';
+
+  @override
+  String get settings_cal_rigNone =>
+      'sin canal de referencia: la latencia calibrada vale tal cual';
+
+  @override
+  String settings_cal_rigNote(num ms) {
+    return '$ms ms · se corregirá en cada toma';
+  }
+
+  @override
+  String get settings_cal_rowCorrected => 'Tomas corregidas';
+
+  @override
+  String get settings_cal_rowLatency => 'Latencia';
+
+  @override
+  String get settings_cal_rowRig => 'Retardo del rig';
+
+  @override
+  String get settings_cal_rowSpread => 'Dispersión';
+
+  @override
+  String get settings_cal_running =>
+      'Midiendo… no toques la guitarra ni muevas el cable.';
+
+  @override
+  String get settings_cal_saturatedHint =>
+      'Baja el volumen de salida del dispositivo (con una pedalera, el del rig o el de la salida) y repite.';
+
+  @override
+  String get settings_cal_saturatedTitle => 'La señal llegó saturada';
+
+  @override
+  String get settings_cal_start => 'Empezar';
+
+  @override
+  String get settings_cal_title => 'Calibrar latencia';
+
+  @override
+  String get settings_cal_unstableHint =>
+      'Carga un rig vacío o sin delay ni reverb, cierra otras apps de audio y repite.';
+
+  @override
+  String settings_cal_unstableTitle(num ms) {
+    return 'Las medidas no coinciden entre sí (dispersión de $ms ms)';
+  }
+
+  @override
+  String get settingsVideoAnchor => '';
+
+  @override
+  String get settings_video_camera => 'Cámara';
+
+  @override
+  String settings_video_cameraDisconnected(String name) {
+    return '$name · desconectada';
+  }
+
+  @override
+  String get settings_video_cameraTitle => 'Cámara';
+
+  @override
+  String get settings_video_chosenFallback => 'Cámara elegida';
+
+  @override
+  String get settings_video_chosenOff => 'La cámara elegida está desconectada.';
+
+  @override
+  String get settings_video_denied =>
+      'ToneForge no tiene permiso para usar la cámara.';
+
+  @override
+  String get settings_video_exportNote => 'Se puede cambiar en cada montaje.';
+
+  @override
+  String get settings_video_exportTitle => 'Exportación por defecto';
+
+  @override
+  String get settings_video_format => 'Formato de vídeo';
+
+  @override
+  String get settings_video_fps => 'Fotogramas por segundo';
+
+  @override
+  String settings_video_inUse(String name) {
+    return 'En uso: $name.';
+  }
+
+  @override
+  String get settings_video_none => 'No hay ninguna cámara conectada.';
+
+  @override
+  String get settings_video_offset => 'Desfase por defecto de esta cámara';
+
+  @override
+  String settings_video_openFailed(String error) {
+    return 'No se pudo abrir la cámara ($error).';
+  }
+
+  @override
+  String get settings_video_openSystem_mac => 'Abrir Ajustes del Sistema';
+
+  @override
+  String get settings_video_openSystem_win => 'Abrir Configuración';
+
+  @override
+  String get settings_video_resolution => 'Resolución';
+
+  @override
+  String get settings_video_simulated => 'Vista previa simulada';
+
+  @override
+  String get settings_video_stemWavs => 'WAV de cada pista';
+
+  @override
+  String get settings_video_syncNote =>
+      'Se ajusta al terminar cada toma; este es el valor con el que empieza la siguiente.';
+
+  @override
+  String get settings_video_syncTitle => 'Sincronía';
+
+  @override
+  String get settings_video_systemDefault => 'Por defecto del sistema';
+
+  @override
+  String get settings_video_titleOverlay => 'Rótulo con el título del tema';
+
+  @override
+  String get settings_video_volume => 'Volumen';
+
+  @override
+  String get settings_video_volumeValue => 'normalizado a −14 LUFS';
+
+  @override
   String get montageAnchor => '';
 
   @override
