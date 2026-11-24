@@ -50,6 +50,24 @@ else
   done
 fi
 
+# Turno del Mac: un solo run pesado a la vez entre el repo y todos sus worktrees (olas en
+# paralelo). El cerrojo vive en el .git común; `lockf` espera a que se libere. Libres solo
+# `FlutterApp <Filtro>` (cortos). TF_TEST_NOLOCK=1 lo salta. Quien espera ve quién lo tiene.
+if [ -z "${TF_TEST_LOCKED:-}" ] && [ -z "${TF_TEST_NOLOCK:-}" ] \
+   && ! { [ "$flutter_only" -eq 1 ] && [ -n "$filter" ]; }; then
+  common="$(git rev-parse --git-common-dir 2>/dev/null)" && common="$(cd "$common" && pwd)"
+  if [ -n "$common" ]; then
+    lock="$common/toneforge-test.lock"
+    if ! /usr/bin/lockf -k -s -t 0 "$lock" true; then
+      echo "test.sh: esperando turno del Mac; lo tiene: $(cat "$lock.owner" 2>/dev/null || echo '?')"
+    fi
+    export TF_TEST_LOCKED=1
+    exec /usr/bin/lockf -k "$lock" /bin/bash -c \
+      'echo "$1 · $2 · $(date "+%H:%M:%S")" > "$3.owner"; shift 3; exec "$@"' \
+      _ "$root" "${*:-entero}" "$lock" "$root/Tools/test.sh" "$@"
+  fi
+fi
+
 summary=()
 status=0   # 0 verde, 1 fallos, 2 compilación
 bump() { [ "$1" -gt "$status" ] && status=$1; }
