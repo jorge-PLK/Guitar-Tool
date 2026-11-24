@@ -1,8 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
-import 'core/core_providers.dart';
 import 'l10n/app_localizations.dart';
+import 'shell/locale_pref.dart';
 import 'shell/shell_screen.dart';
 import 'shell/snapshot.dart';
 
@@ -15,12 +15,16 @@ class ToneForgeApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final forced = ref.watch(launchOptionsProvider).locale;
+    final choice = ref.watch(localeChoiceProvider);
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       onGenerateTitle: (context) => AppLocalizations.of(context).shell_appTitle,
       theme: ThemeData(brightness: Brightness.dark),
-      locale: forced == null ? null : Locale(forced),
+      locale: switch (choice) {
+        LocaleChoice.system => null,
+        LocaleChoice.es => const Locale('es'),
+        LocaleChoice.en => const Locale('en'),
+      },
       localeResolutionCallback: (locale, supported) {
         for (final s in supported) {
           if (s.languageCode == locale?.languageCode) return s;
