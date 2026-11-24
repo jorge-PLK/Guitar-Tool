@@ -142,6 +142,21 @@ Dudas que devolvieron las auditorías de fichas y contratos (`Temp/flutter/audit
 | Tablatura: texto genérico de `tabWebError` | El literal que use SwiftUI para ese fallo; si no hay, «No se pudo mostrar la tablatura.» Se fija en la ola 2. | 1:1. |
 | `core_ids_not_uuid` con dos textos (`id`/`takeId` y `projectId`/`takeId`) | Un solo código con argumentos `first` y `second` (los nombres de parámetro). | Un código por fallo, no por punto de llamada; el ARB tiene una sola clave. |
 
+## Cerradas por Jorge al empezar la ola 0 (24/11/2026)
+
+| Pregunta | Resolución |
+| --- | --- |
+| Iconos: licencia y origen | Se portan los `path` de Lucide (licencia ISC, mismo estilo de trazo 24×24, `stroke-width 2`, extremos redondos que `WinApp/Web/icons.js`) a `theme/icons.dart` como `Path`, sin plugin, con la licencia en `assets/licenses/`. Los que Lucide no tenga se dibujan con el mismo trazo. Sustituye a «27 de la web + 28 a mano». |
+| Iconos: trazo o relleno | Trazo. |
+| Acento de `TfCheckbox`, `TfSegmented` y los `TfSwitch` de Ajustes · Vídeo (hoy acento del sistema, azul) | `TF.accent` naranja en todos, como el slider del visor. |
+| `TfApplyButton` | Variante parametrizada de `TfPrimaryButton` (alto 28, body 13 semibold, sin estado deshabilitado propio). |
+| `TfProgress` y `TfAccentBar` | Se quedan separados (1:1). |
+| `TfPopover` | Sin flecha: `OverlayPortal`, fondo `card`, borde `line`, radio 10. |
+| `TfMenu` | Aspecto propio: fondo `card`, radio 10. |
+| `TfScroll` | Barra fina con `fieldLine` y `muted`. |
+| Colores casi iguales (`C8433A`/`E5534B`, `0B0C0E`/`0F1113`, `4CC38A`/`6FD99E`) | No se funden: cada hex es un token con nombre. |
+| Separador decimal de `Fmt.db` y `Fmt.rate` | Según el idioma (coma en español, punto en inglés) con `intl`, coherente con los mensajes del núcleo (`decimalPattern`). |
+
 ## Dudas reales, para Jorge
 
 Ninguna abierta. La rama `fase-7f` existe y la documentación está subida.

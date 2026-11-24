@@ -57,7 +57,7 @@ Nota: `.bold` en `body` (p. ej. `TF.body(11, .bold)`, `MixerToggle` `BackingMixe
 
 ### 1.3 Escalas de formato (`Fmt`, `Theme.swift:138-147` y extensiones)
 
-`Fmt.bytes` (`ByteCountFormatter`, estilo archivo), `Fmt.percent` → «NN %» (con espacio), `Fmt.duration` → `m:ss`, `Fmt.rate` → «44,1 kHz» / «48 kHz» / «N Hz»; extensiones `Fmt.db` (`BackingMixer.swift:277`, «−6,0 dB»: 1 decimal, coma), `Fmt.clock` (`BackingTimeline.swift:473`), otra en `CalibrationSheet.swift:4`. En Dart: `TfFmt` en `lib/theme/fmt.dart` (la regla 5 de textos no la afecta: es formato, no copia; el separador decimal depende del idioma, **decisión de Jorge**: hoy es coma fija también en inglés).
+`Fmt.bytes` (`ByteCountFormatter`, estilo archivo), `Fmt.percent` → «NN %» (con espacio), `Fmt.duration` → `m:ss`, `Fmt.rate` → «44,1 kHz» / «48 kHz» / «N Hz»; extensiones `Fmt.db` (`BackingMixer.swift:277`, «−6,0 dB»: 1 decimal, coma), `Fmt.clock` (`BackingTimeline.swift:473`), otra en `CalibrationSheet.swift:4`. En Dart: `TfFmt` en `lib/theme/fmt.dart` (la regla 5 de textos no la afecta: es formato, no copia; el separador decimal de `Fmt.db` y `Fmt.rate` sigue el idioma, coma en español y punto en inglés, con `intl` y coherente con `decimalPattern` del núcleo (Jorge, 24/11/2026)).
 
 ## 2. Literales fuera del tema
 
@@ -66,15 +66,15 @@ Nota: `.bold` en `body` (p. ej. `TF.body(11, .bold)`, `MixerToggle` `BackingMixe
 | Hex | Usos | Ejemplos | Token propuesto | Observación |
 | --- | --- | --- | --- | --- |
 | `C8433A` | 2 | `RecordView.swift:467`, `BackingRecord.swift:11` | `TfColors.recordButton` | botón Grabar |
-| `E5534B` | 1 | `RecordView.swift:433` | `TfColors.recordLive` | punto de grabación; casi igual que `C8433A` (rojo): probable mismo token, **decisión de Jorge** |
+| `E5534B` | 1 | `RecordView.swift:433` | `TfColors.recordLive` | punto de grabación; casi igual que `C8433A`, pero no se funden: token propio (Jorge, 24/11/2026) |
 | `2F6B45` | 1 | `RecordView.swift:284` | `TfColors.okBorder` | borde de la «mejor toma» |
 | `121417` | 1 | `RecordView.swift:366` | `TfColors.previewDeep` | fin del degradado radial de la vista previa; inicio `2A3036` = `fieldLine` |
 | `0F1113` @0.75 | 1 | `RecordView.swift:456` | `TfColors.bg` + `TfOpacity.scrim75` | duplica `TF.bg`, no es un color nuevo |
-| `0B0C0E` | 1 | `MontageView.swift:351` | `TfColors.videoBg` | fondo de la vista previa de montaje; casi igual que `bg` (`0F1113`) |
+| `0B0C0E` | 1 | `MontageView.swift:351` | `TfColors.videoBg` | fondo de la vista previa de montaje; casi igual que `bg` (`0F1113`), pero no se funden: token propio (Jorge, 24/11/2026) |
 | `5A636C` | 1 | `MontageView.swift:299` | `TfColors.tileGrey` | miniatura de disposición |
 | `5BC0EB` | 2 | `MontageView.swift:509`, `BackingTimeline.swift:581` | `TfColors.timelineBlue` | carril 1 de montaje y barra de progreso de la línea de tiempo |
 | `B79CFF` | 1 | `MontageView.swift:510` | `TfColors.soloViolet` | carril de solos |
-| `4CC38A` | 1 | `RootView.swift:95` | `TfColors.deviceOk` | punto «dispositivo conectado»; casi igual que `ok` (`6FD99E`); la web lo mantiene separado (`--device-ok`) |
+| `4CC38A` | 1 | `RootView.swift:95` | `TfColors.deviceOk` | punto «dispositivo conectado»; casi igual que `ok` (`6FD99E`), pero no se funden: token propio, como la web (`--device-ok`) (Jorge, 24/11/2026) |
 | `F2A33A` `6FD99E` `C97F9E` `5DB5B5` | 4 | `MontageView.swift:509` | `TfColors.laneColors` = [`timelineBlue`, `accent`, `ok`, `sectionPalette[3]`, `sectionPalette[4]`] | reusan tokens existentes |
 | `.white` | ≥8 | `RecordView.swift:478`, `BackingRecord.swift:22`, `ArtistGrid.swift:42` (0.9) | `TfColors.white` | |
 | `.black` | ≥9 | `TakeViewer.swift:320`, `VideoSettingsView.swift:288`, `OffsetSheet.swift:34` | `TfColors.black` | fondos de vídeo |
@@ -159,7 +159,7 @@ Estados: en SwiftUI solo existe «pulsado» (`configuration.isPressed`) y «desh
 | --- | --- | --- |
 | `TfPrimaryButton` | `PrimaryButton` `Theme.swift:60-70` | alto 44, padding h 20, radio 10, body 14 semibold. Normal: fondo `accent`, texto `accentInk`. Pulsado: fondo `accent @0.8`. Deshabilitado: fondo `neutralBg`, texto `muted`, borde `fieldLine` 1. |
 | `TfSecondaryButton({height=44})` | `SecondaryButton` `Theme.swift:72-83` | padding h 16, radio 10, body 14 medium, fondo `field` (pulsado `@0.7`), borde `fieldLine`, texto `text`. Deshabilitado: texto `muted` y todo `@0.6`. Alturas usadas: 36 (`LibraryView.swift:224`), 28 (`GuitarOptionsViews.swift:35`). |
-| `TfApplyButton` | `ApplyButton` `GuitarOptionsViews.swift:44-51` | alto 28, h 16, radio 10, body 13 semibold, `accent`/`accentInk`, pulsado `@0.8`. Sin estado deshabilitado propio. Candidato a `TfPrimaryButton(height: 28)`: **decisión de Jorge**. |
+| `TfApplyButton` | `ApplyButton` `GuitarOptionsViews.swift:44-51` | alto 28, h 16, radio 10, body 13 semibold, `accent`/`accentInk`, pulsado `@0.8`. Sin estado deshabilitado propio. Se implementa como variante parametrizada de `TfPrimaryButton` (alto 28, body 13 semibold) (Jorge, 24/11/2026). |
 | `TfIconButton` | `TrashRowButton` `LibraryView.swift:389-405`; `nudge` `SectionBoxes.swift:380-387`; `SecondaryButton` con icono | Tres variantes. (a) Papelera `TrashRowButton`: 36×36, radio 10, fondo `field`, borde `fieldLine`, icono 14 `muted`, hover `danger` (`LibraryView.swift:389-405`). (b) Carpeta y lápiz de fila: **no** son 36×36 sino `SecondaryButton(height: 36)`: ancho = icono + 2×16, icono con `TF.body(14,.medium)`, color `text` (no `muted`), sin hover (`LibraryView.swift:221-228`); el ancho exacto depende del símbolo SF (confirmar con la captura de referencia, ola 0). (c) `nudge`: 30×24, radio 6, icono 11 bold color `text` (no `muted`) (`SectionBoxes.swift:384-386`). |
 | `TfAccentBar({double? value, height=6})` | `AccentBar` `Theme.swift:87-110` | cápsula `field` de fondo, relleno `accent`; con valor: ancho `max(height, w·clamp(v))`; sin valor: tramo de 30 % del ancho que va y viene con `0.5−0.5·cos(2π t)`, periodo 1,6 s. Alturas usadas 5, 6 (def.), 8. Anchos externos 140, 220, 260, 320, expandido. Sin estados. |
 | `TfCard` | `Card` `Theme.swift:112-119` | fondo `card`, radio 14, borde `line` 1. Sin padding propio. |
@@ -185,7 +185,7 @@ Estados: en SwiftUI solo existe «pulsado» (`configuration.isPressed`) y «desh
 | `TfStateMessage` (estado vacío/aviso) | `emptyLibrary`/`emptyMessage` `LibraryView.swift:~203-205`; `message` `VideoSettingsView.swift:310-316` | icono 18 `muted` + texto body 12 `text2` centrado, separación 6, padding 8; vista previa 16:9 radio 10 borde `fieldLine`. |
 | `TfNotice` | aviso descartable `TabScreen.swift:~170-180` | fila con icono `exclamationmark.triangle` (`accent`/`danger`) y botón `xmark` plain. Detalle de medidas por verificar en la pantalla de Tablatura. |
 | `TfSheet` | `FirstRunSheet` `RootView.swift:122-137`; `CalibrationSheet`; `SongInfoSheet` `ArtistGrid.swift:133`; `TabSourceSheet`; `LinkImportSheet`; `OffsetSheet`; `MontageFramingSheet`; `AddPartSheet` `RecordView.swift:332` | modal de macOS; fondo `card` en `FirstRunSheet`, `MontageFramingSheet`, `RecordView` (`AddPartSheet`) y `bg` en `CalibrationSheet`; padding real 24 (Tab, Montaje, Offset, LinkImport) o 28 (FirstRun, Calibración); título display 22-24, cuerpo `muted`, botones al pie alineados a la derecha: `Cancelar`/`Repetir` `SecondaryButton` de 44 por defecto (`CalibrationSheet.swift:51,83`) + acción `PrimaryButton`; comprobar la altura en el resto de hojas antes de fijarla en 36. Atajos `Esc`/`Intro`. Anchos: 420, 480 (primer arranque), 540 (calibración), 720, 760. Sin cabecera propia: la hoja de macOS no tiene barra de título. |
-| `TfPopover` | `.popover` `MontageView.swift:444,691`; `BackingTimeline.swift:192`; `ChordGrid.swift:251`; `SectionBoxes.swift:101` | popover nativo con flecha (`arrowEdge: .bottom`); contenido propio sobre el fondo del sistema. En Flutter: `OverlayPortal` con fondo `card`, borde `line`, radio 10 (**decisión de Jorge**: sin flecha). |
+| `TfPopover` | `.popover` `MontageView.swift:444,691`; `BackingTimeline.swift:192`; `ChordGrid.swift:251`; `SectionBoxes.swift:101` | popover nativo con flecha (`arrowEdge: .bottom`); contenido propio sobre el fondo del sistema. En Flutter: `OverlayPortal` con fondo `card`, borde `line`, radio 10, sin flecha (Jorge, 24/11/2026). |
 
 ### 3.2 Controles nativos de macOS sin personalizar (hay que dibujarlos en Flutter)
 
@@ -194,25 +194,25 @@ Aspecto actual en macOS con tema oscuro forzado y sin `AccentColor` en el catál
 | Widget Flutter | SwiftUI | Dónde | Cómo se ve hoy |
 | --- | --- | --- | --- |
 | `TfDropdown<T>` | `Picker(...).pickerStyle(.menu)` | 21 `Picker`: `RecordView.swift:500,509`, `MontageView.swift:288,486`, `AudioSettingsView.swift:117,127`, `TabScreen.swift:299` | botón redondeado gris del sistema con etiqueta y chevrones arriba/abajo a la derecha; al pulsar, menú emergente del sistema. `fixedSize()`: ancho = contenido. Anchos fijos en Ajustes: 320 (salida/entrada), 280, 160. |
-| `TfSegmented` | `.pickerStyle(.segmented)` | `LibraryView.swift:133`, `AudioSettingsView.swift:141` (ancho 220), `VideoSettingsView.swift:362` (160) | control segmentado del sistema; segmento activo relleno con el acento del sistema; web lo imita con `--blue 2F7CF6` (`tokens.css:30`). |
-| `TfSwitch` | `Toggle` `.switch` (`.controlSize(.small)`, `.tint(TF.accent)`) | `GuitarOptionsViews.swift:21`, `SectionBoxes.swift:321`, `MontageFramingSheet.swift:34`, `VideoSettingsView.swift:375,380` (sin tint ni `.controlSize(.small)`: tamaño normal, `.switch` + `labelsHidden`, acento del sistema; los de `GuitarOptionsViews.swift:21` sí son small + `accent`) | interruptor pequeño de macOS; encendido naranja `accent` salvo los de `VideoSettingsView`, que salen con el acento del sistema (discrepancia: **decisión de Jorge** si tinta a naranja). |
-| `TfCheckbox` | `Toggle` `.checkbox` | `RecordView.swift:507,520`, `TabScreen.swift:311,449`, `BackingTimeline.swift:464`, `MontageView.swift:493` (`.tint(accent)`), `OffsetSheet.swift:71` | casilla cuadrada del sistema con marca blanca sobre acento del sistema; con `tint` naranja solo en `MontageView.swift:493`. Etiqueta body 13 `text2`. |
+| `TfSegmented` | `.pickerStyle(.segmented)` | `LibraryView.swift:133`, `AudioSettingsView.swift:141` (ancho 220), `VideoSettingsView.swift:362` (160) | control segmentado del sistema; segmento activo relleno con el acento del sistema (la web lo imita con `--blue 2F7CF6`, `tokens.css:30`). En Flutter, segmento activo `TF.accent` naranja (Jorge, 24/11/2026). |
+| `TfSwitch` | `Toggle` `.switch` (`.controlSize(.small)`, `.tint(TF.accent)`) | `GuitarOptionsViews.swift:21`, `SectionBoxes.swift:321`, `MontageFramingSheet.swift:34`, `VideoSettingsView.swift:375,380` (sin tint ni `.controlSize(.small)`: tamaño normal, `.switch` + `labelsHidden`, acento del sistema; los de `GuitarOptionsViews.swift:21` sí son small + `accent`) | interruptor pequeño de macOS; encendido naranja `accent`; los de `VideoSettingsView`, que hoy salen con el acento del sistema, también van en `TF.accent` naranja (Jorge, 24/11/2026). |
+| `TfCheckbox` | `Toggle` `.checkbox` | `RecordView.swift:507,520`, `TabScreen.swift:311,449`, `BackingTimeline.swift:464`, `MontageView.swift:493` (`.tint(accent)`), `OffsetSheet.swift:71` | casilla cuadrada del sistema con marca blanca sobre acento del sistema; con `tint` naranja solo en `MontageView.swift:493`. En Flutter, `TF.accent` naranja en todas (Jorge, 24/11/2026). Etiqueta body 13 `text2`. |
 | `TfSlider` | `Slider(...).tint(TF.accent)` | `BackingMixer.swift:92` (150), `TabScreen.swift:441` (120), `BackingTimeline.swift:377` (70) y `:456` (120), `RecordMixer.swift:72` (40), `MontageFramingSheet.swift:41,209`, `MontageView.swift:367`, `TakeViewer.swift:343` (sin tint) | carril delgado con parte izquierda `accent` y pomo circular blanco del sistema. Pasos: velocidad 5 % (`(v/5).rounded()*0.05`), cents 1, dB con imán a 0 (±1,5). |
 | `TfStepper` | `Stepper(...).labelsHidden()` | `VideoSettingsView.swift:346` | par ▲▼ del sistema junto al campo de «ms». |
 | `TfNumberField` | `TextField(value:format:).textFieldStyle(.roundedBorder)` | `VideoSettingsView.swift:343` (70), `OffsetSheet.swift:58` (76), `BackingMixer.swift:195`, `SectionBoxes.swift:300`, `RecordView.swift:341` | campo con borde redondeado de macOS (oscuro, borde fino gris, foco con halo del acento del sistema). Alto del sistema ≈22 (**medir**). |
 | `TfSpinner` | `ProgressView().controlSize(.small/.mini)` | 27 usos, p. ej. `RecordView.swift:17`, `MontageView.swift:737` (`.mini`) | rueda de aspas gris del sistema, 16 px (small) / 10 px (mini). |
-| `TfProgress` | `ProgressView(value:).tint(accent)` | `SettingsView.swift:123,142,169`, `LibraryView.swift:177` (ancho 160) | barra lineal del sistema, relleno naranja, alto del sistema (≈4-6); distinta de `TfAccentBar`: **decisión de Jorge** unificar con `AccentBar`. |
-| `TfMenu` / `TfContextMenu` | `Menu {}` y `.contextMenu` | `RecordView.swift:273`, `TabScreen.swift:152,458`, `BackingTimeline.swift:198,348`, `LibraryView.swift:245`, `PlaylistImport.swift:393` | menú nativo oscuro de macOS con `Divider`. En Flutter se dibuja con `MenuAnchor` o `OverlayPortal`, fondo `card`, radio 10 (**decisión de Jorge**: aspecto propio). |
+| `TfProgress` | `ProgressView(value:).tint(accent)` | `SettingsView.swift:123,142,169`, `LibraryView.swift:177` (ancho 160) | barra lineal del sistema, relleno naranja, alto del sistema (≈4-6); distinta de `TfAccentBar`: `TfProgress` se queda separado (1:1) (Jorge, 24/11/2026). |
+| `TfMenu` / `TfContextMenu` | `Menu {}` y `.contextMenu` | `RecordView.swift:273`, `TabScreen.swift:152,458`, `BackingTimeline.swift:198,348`, `LibraryView.swift:245`, `PlaylistImport.swift:393` | menú nativo oscuro de macOS con `Divider`. En Flutter se dibuja con `MenuAnchor` o `OverlayPortal`, fondo `card`, radio 10, aspecto propio (Jorge, 24/11/2026). |
 | `TfDivider` | `Divider().overlay(TF.line)` / `Divider()` | 21 usos; con color en `LibraryView.swift:173`; el resto sin color (`MontageView.swift:709`, `BackingMixer.swift:96`: vertical alto 28) | 1 px, color `line` o del sistema (gris translúcido). |
 | `TfAlert` / `TfConfirmDialog` | `.alert` / `confirmationDialog` | `RootView.swift:35,38`; `SettingsView.swift:91,100`; `TakeViewer.swift:295` (+5 más) | alerta nativa modal con título, mensaje y botones; la de confirmación es hoja con botón destructivo rojo. Texto con `Text(...)`. |
 | `TfTooltip` | `.help("…")` | 46 usos, p. ej. `ArtistGrid.swift:120`, `RecordView.swift:449` | etiqueta emergente del sistema tras ~1 s. Flutter: `Tooltip` con tokens. |
-| `TfScroll` | `ScrollView` | todas las pantallas | barras superpuestas del sistema; Flutter: `Scrollbar` fina con `fieldLine`/`muted` (**decisión de Jorge**). |
+| `TfScroll` | `ScrollView` | todas las pantallas | barras superpuestas del sistema; Flutter: `Scrollbar` fina con `fieldLine`/`muted` (Jorge, 24/11/2026). |
 
 Resto del trabajo sin widget propio: arrastrar y soltar (`RootView.swift:28` ficheros; `MontageView.swift:762` carriles) → `desktop_drop` y `Draggable`; `Canvas` (`ChordDiagram.swift:14`, líneas de tiempo, tira de acordes) → `CustomPainter` (regla 7).
 
 ## 4. Iconos
 
-SF Symbols **no es redistribuible fuera de las plataformas de Apple** (licencia de Apple). La web (`WinApp/Web/icons.js`) trae 27 SVG de trazo 24×24, `stroke-width 2`, extremos y uniones redondos, `currentColor`: `library backing tab record montage settings search trash folder pencil chevronLeft close check info warning external play swap person undo redo plus minus music chevronDown` (+ `chevronDown`; `check` es un círculo con marca, `info` y `warning` con relieve). Propuesta: `TfIcons` (`theme/icons.dart`) con esos 27 path portados a `CustomPainter`/`Path`, más los que falten **dibujados a mano con el mismo estilo** (decisión de Jorge: encargar o dibujar).
+SF Symbols **no es redistribuible fuera de las plataformas de Apple** (licencia de Apple). La web (`WinApp/Web/icons.js`) usa SVG de trazo 24×24, `stroke-width 2`, extremos y uniones redondos, `currentColor`. Resolución (Jorge, 24/11/2026): `TfIcons` (`theme/icons.dart`) porta los `path` de Lucide (licencia ISC, mismo estilo de trazo) como `Path`, sin plugin, con la licencia en `assets/licenses/`; los que Lucide no tenga se dibujan con el mismo trazo. Todos de trazo, no rellenos. La columna «Icono web» de la tabla indica el equivalente de `icons.js` y sirve de guía del estilo.
 
 | Símbolo SF | Usos | Ejemplo | Icono web | Nota |
 | --- | --- | --- | --- | --- |
@@ -268,7 +268,7 @@ SF Symbols **no es redistribuible fuera de las plataformas de Apple** (licencia 
 | `speaker.wave.2.fill`, `speaker.slash.fill` | 2+1 | `TakeViewer.swift:348` | **sin** | |
 | `rectangle.dashed` | 1 | `BackingTimeline.swift:100` | **sin** | |
 
-Resumen: 56 símbolos distintos; 25 con equivalente exacto, 3 con aproximación (variante rellena), **28 sin equivalente** (de ellos 2 derivables por espejo). Los iconos de la web son de trazo; los SF usados son en su mayoría rellenos (`.fill`): diferencia de estilo, **decisión de Jorge** (trazo de la web o relleno).
+Resumen: 56 símbolos distintos; 25 con equivalente exacto, 3 con aproximación (variante rellena), **28 sin equivalente en la web** (de ellos 2 derivables por espejo); se toman de Lucide o se dibujan con el mismo trazo. Los SF usados son en su mayoría rellenos (`.fill`), pero en Flutter todos van de trazo (Jorge, 24/11/2026).
 
 ## 5. Fuentes y recursos
 
@@ -302,7 +302,7 @@ Otros recursos que la interfaz carga (`App/Resources`): `AppIcon.svg` (fuente) y
 1. `theme/tokens.dart`: `TfColors` (§1.1 + §2.1), `TfRadius`, `TfSpace`, `TfStroke`, `TfOpacity`, `TfShadow`, `TfSize`. Tabla → constantes; test que compara cada hex con el de `Theme.swift`.
 2. `theme/typography.dart`: `TfText.display/body`, `TfWeight`, `pubspec.yaml` con las 5 fuentes y licencias en `assets/licenses/`.
 3. `theme/fmt.dart` (`TfFmt`, §1.3) con pruebas contra las funciones de `Fmt` (tabla de casos).
-4. `theme/icons.dart`: portar los 27 SVG de `icons.js` a `Path` y un test de goldens por icono (§4).
+4. `theme/icons.dart`: portar los `path` de Lucide (ISC, licencia en `assets/licenses/`) a `Path` y un test de goldens por icono (§4) (Jorge, 24/11/2026).
 5. Test que falla si aparece un literal `Color(0x…)`, `fontSize:`, `BorderRadius.circular(` o `EdgeInsets` numérico en `lib/` fuera de `theme/` (regla 4).
 
 **Sonnet (decisiones de forma, estados, gestos):**
@@ -311,12 +311,8 @@ Otros recursos que la interfaz carga (`App/Resources`): `AppIcon.svg` (fuente) y
 3. `TfFader`, `TfLevelBar`, `TfInputMeters`, `TfMixerChannel` (`CustomPainter`, gestos, doble clic, imán).
 4. `TfSheet`, `TfPopover`, `TfMenu`, `TfAlert`, `TfTooltip`, `TfMarquee`, `TfScroll`: capas, foco, `Esc`/`Intro`.
 5. `TfSidebar`, `TfNavRow`, `TfTabBar`, `TfListRow`, `TfSettingsGroup`, `TfInfoRow`, `TfStateMessage`, `TfNotice`.
-6. Iconos que faltan (§4): 28 símbolos a dibujar con el estilo de trazo.
+6. Iconos que Lucide no tenga (§4): se dibujan con el mismo trazo (Jorge, 24/11/2026).
 
 ## Pendientes de Jorge
 
-- Aspecto de los controles nativos (§3.2): se describen de memoria de macOS; capturas de referencia con `--snapshot` antes de dibujarlos.
-- Todo lo que cambie píxeles respecto a SwiftUI si se funde (§2.2, §2.4, `C8433A`/`E5534B`, `0B0C0E`/`0F1113`, `4CC38A`/`6FD99E`).
-- Iconos: trazo vs relleno, y quién dibuja los 28 que faltan.
-- Casillas, interruptores y segmentado hoy usan el acento del sistema (azul) salvo donde hay `.tint`: ¿naranja en Flutter?
-- Separador decimal de `Fmt.db` y `Fmt.rate`: coma fija hoy.
+- Aspecto de los controles nativos: se fija con las capturas de referencia de la ola 0.
