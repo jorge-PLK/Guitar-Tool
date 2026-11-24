@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/services.dart' show AssetManifest, rootBundle;
 
 import 'core_client.dart';
@@ -70,25 +71,52 @@ class MockCore implements CoreClient {
     Map<String, Object?> results = const {},
     Map<String, Object?> errors = const {},
     Map<String, Object?> events = const {},
+    this.state,
   })  : _results = {...results},
         _errors = {...errors},
-        _events = {...events};
+        _events = {...events} {
+    // Con mapas vacíos los fixtures llegan después (load/lazy) y avisa _loadFrom.
+    if (results.isNotEmpty || errors.isNotEmpty || events.isNotEmpty) _applyState();
+  }
 
-  /// Carga todos los fixtures de [source].
-  static Future<MockCore> load(FixtureSource source) async {
-    final m = MockCore();
+  /// Carga todos los fixtures de [source]. Con [state], `<clave>.<state>` sustituye a `<clave>`
+  /// en resultados y errores, y los eventos `<evento>.<state>` se emiten una vez al primer suscriptor.
+  static Future<MockCore> load(FixtureSource source, {String? state}) async {
+    final m = MockCore(state: state);
     await m._loadFrom(source);
     return m;
   }
 
   /// Síncrono para los providers: los fixtures se cargan en segundo plano y la primera llamada los espera.
-  factory MockCore.lazy(Future<FixtureSource> Function() source) {
-    final m = MockCore();
+  factory MockCore.lazy(Future<FixtureSource> Function() source, {String? state}) {
+    final m = MockCore(state: state);
     m._ready = source().then(m._loadFrom);
     return m;
   }
 
+  /// Variante de fixtures activa (`--state`), o null.
+  final String? state;
   Future<void>? _ready;
+  final _seeds = <String, Object?>{};
+
+  void _applyState() {
+    final s = state;
+    if (s == null) return;
+    final suffix = '.$s';
+    var used = false;
+    void sub(Map<String, Object?> from, Map<String, Object?> into) {
+      for (final k in from.keys.toList()) {
+        if (!k.endsWith(suffix) || k.length == suffix.length) continue;
+        into[k.substring(0, k.length - suffix.length)] = from[k];
+        used = true;
+      }
+    }
+
+    sub(_results, _results);
+    sub(_errors, _errors);
+    sub(_events, _seeds);
+    if (!used) debugPrint('MockCore: el estado "$s" no coincide con ningún fixture.');
+  }
 
   Future<void> _loadFrom(FixtureSource source) async {
     final results = _results, errors = _errors, events = _events;
@@ -102,6 +130,7 @@ class MockCore implements CoreClient {
       target[parts.sublist(0, parts.length - 2).join('.')] =
           json.decode(await source.read(path));
     }
+    _applyState();
   }
 
   final Map<String, Object?> _results;
@@ -163,11 +192,23 @@ class MockCore implements CoreClient {
   }
 
   @override
-  Stream<T> on<T>(String event, T Function(Json) decode) =>
-      _bus.stream.where((e) => e.name == event).map((e) {
-        final p = e.payload;
-        return decode(p is Map ? p.cast<String, Object?>() : <String, Object?>{});
+  Stream<T> on<T>(String event, T Function(Json) decode) {
+    final base = _bus.stream.where((e) => e.name == event).map((e) {
+      final p = e.payload;
+      return decode(p is Map ? p.cast<String, Object?>() : <String, Object?>{});
+    });
+    return Stream<T>.multi((c) {
+      final sub = base.listen(c.add, onError: c.addError, onDone: c.close);
+      c.onCancel = sub.cancel;
+      Future<void>(() async {
+        await _ready;
+        if (!_seeds.containsKey(event)) return;
+        final payload = _seeds.remove(event);
+        await Future<void>.microtask(() {});
+        if (!_bus.isClosed) _bus.add((name: event, payload: payload));
       });
+    }, isBroadcast: true);
+  }
 
   @override
   Future<void> shutdown() async {
