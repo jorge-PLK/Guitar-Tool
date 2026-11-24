@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:toneforge/core/core_client.dart';
 import 'package:toneforge/core/core_providers.dart';
 import 'package:toneforge/core/frame_channel.dart';
+import 'package:toneforge/core/frame_providers.dart';
 import 'package:toneforge/core/mock_core.dart';
 import 'package:toneforge/features/record/take_viewer_store.dart';
 
@@ -47,7 +48,7 @@ Rig setup({bool withVideo = true}) {
       disposeTexture: disposed.add);
   final c = ProviderContainer(overrides: [
     coreClientProvider.overrideWithValue(core),
-    takeFrameChannelProvider.overrideWithValue(channel),
+    frameChannelProvider(FrameChannelId.take).overrideWithValue(channel),
   ]);
   addTearDown(c.dispose);
   c.listen(takeViewerStoreProvider, (_, _) {});

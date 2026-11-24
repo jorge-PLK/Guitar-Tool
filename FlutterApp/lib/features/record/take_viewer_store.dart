@@ -8,10 +8,7 @@ import '../../contract/takeview.dart';
 import '../../core/core_client.dart';
 import '../../core/core_providers.dart';
 import '../../core/frame_channel.dart';
-
-/// Canal de fotogramas `take`. `main` lo sobrescribe con `FrameChannel.ffi(FrameChannelId.take, bindings)`;
-/// sin sobrescribir (tests, `--mock`) no hay textura y el visor pinta el placeholder.
-final takeFrameChannelProvider = Provider<FrameChannel?>((ref) => null);
+import '../../core/frame_providers.dart';
 
 enum TakeViewerPhase { closed, loading, open }
 
@@ -317,7 +314,7 @@ class TakeViewerStore extends Notifier<TakeViewerState> {
   }
 
   void _attachChannel() {
-    final ch = ref.read(takeFrameChannelProvider);
+    final ch = ref.read(frameChannelProvider(FrameChannelId.take));
     if (ch == null) return;
     final id = ch.create();
     _channel = ch;
