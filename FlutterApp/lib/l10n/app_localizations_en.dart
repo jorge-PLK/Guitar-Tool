@@ -1749,6 +1749,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settings_cal_start => 'Start';
 
   @override
+  String get settings_cal_step1 =>
+      'Connect one output of the device to its guitar input with a cable.';
+
+  @override
+  String get settings_cal_step2 =>
+      'With a pedalboard, load an empty rig and lower the output volume: the loop feeds back (input, rig, output, cable, input).';
+
+  @override
+  String get settings_cal_step3 =>
+      'The test is 10 high beeps over about 5 seconds. It measures the round-trip delay, the offset a take will have against the backing you hear.';
+
+  @override
   String get settings_cal_title => 'Calibrate latency';
 
   @override

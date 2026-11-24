@@ -2990,6 +2990,24 @@ abstract class AppLocalizations {
   /// **'Empezar'**
   String get settings_cal_start;
 
+  /// Hoja Calibrar latencia, paso 1 (CS:39-41).
+  ///
+  /// In es, this message translates to:
+  /// **'Conecta con un cable una salida del dispositivo a su entrada de guitarra.'**
+  String get settings_cal_step1;
+
+  /// Hoja Calibrar latencia, paso 2 (CS:39-41).
+  ///
+  /// In es, this message translates to:
+  /// **'Con una pedalera, carga un rig vacío y baja el volumen de salida: el bucle realimenta (entrada, rig, salida, cable, entrada).'**
+  String get settings_cal_step2;
+
+  /// Hoja Calibrar latencia, paso 3 (CS:39-41).
+  ///
+  /// In es, this message translates to:
+  /// **'La prueba son 10 pitidos agudos en unos 5 segundos. Mide el retardo de ida y vuelta, que es el desfase que tendrá una toma respecto al backing que se oye.'**
+  String get settings_cal_step3;
+
   /// Calibrar latencia: título de la hoja (CS:21).
   ///
   /// In es, this message translates to:

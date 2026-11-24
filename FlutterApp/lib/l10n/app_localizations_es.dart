@@ -1758,6 +1758,18 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settings_cal_start => 'Empezar';
 
   @override
+  String get settings_cal_step1 =>
+      'Conecta con un cable una salida del dispositivo a su entrada de guitarra.';
+
+  @override
+  String get settings_cal_step2 =>
+      'Con una pedalera, carga un rig vacío y baja el volumen de salida: el bucle realimenta (entrada, rig, salida, cable, entrada).';
+
+  @override
+  String get settings_cal_step3 =>
+      'La prueba son 10 pitidos agudos en unos 5 segundos. Mide el retardo de ida y vuelta, que es el desfase que tendrá una toma respecto al backing que se oye.';
+
+  @override
   String get settings_cal_title => 'Calibrar latencia';
 
   @override
