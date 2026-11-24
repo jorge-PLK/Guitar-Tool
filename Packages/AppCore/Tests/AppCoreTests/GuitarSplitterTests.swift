@@ -78,8 +78,8 @@ final class GuitarSplitterTests: XCTestCase {
         XCTAssertEqual(ModelResolver.developmentFolders(for: "desconocido", physicalMemory: 8 << 30), [])
         let onnx = try XCTUnwrap(ModelCatalog.leadRhythmMelRoformer.onnxFile(physicalMemory: 4 << 30))
         XCTAssertEqual(onnx.fileName, "lead_rhythm.onnx")
-        XCTAssertEqual(onnx.bytes, 338_871_118)
-        XCTAssertEqual(onnx.sha256, "8a42c4ecf266a8a1cf20641a2cd1756a8b863665877c420bf453dbf425ead51d")
+        XCTAssertEqual(onnx.bytes, 338_894_766)
+        XCTAssertEqual(onnx.sha256, "e0c42b06b617efd1649892d912d721e049eee25ac2dc4ed736762b4a657e34b4")
 
         let folder = dir.appendingPathComponent("lead_rhythm", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)

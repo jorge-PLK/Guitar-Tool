@@ -24,7 +24,7 @@ foreach ($a in (Get-Archs $Arch)) {
     $sw = [Diagnostics.Stopwatch]::StartNew()
     Initialize-StaticNetLibs $a
     $buildArgs = @("build", "--package-path", $pkgPath) + @(Get-SwiftArgs $a)
-    $r = Invoke-Limited "swift" $buildArgs "C:\tf-build-$a.txt" $TimeoutSec 0
+    $r = Invoke-Limited "swift" $buildArgs "$TfDrive\tf-build-$a.txt" $TimeoutSec 0
     $sw.Stop()
     $secs = [math]::Round($sw.Elapsed.TotalSeconds, 1)
     if ($r.Reason -ne "") {

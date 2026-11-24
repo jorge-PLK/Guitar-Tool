@@ -423,7 +423,74 @@ final class ImportTests: XCTestCase {
         await rig.bridge.shutdownAsync()
     }
 
+    /// B2, caso de error: destino con contenido. Se rechaza sin tocar nada y la biblioteca sigue operativa.
+    func testRelocateToNonEmptyFolderFailsAndKeepsEverything() async throws {
+        let host = RemapHost()
+        let rig = try Rig(analyzer: false)
+        rig.bridge.host = host
+        defer { rig.cleanup() }
+        let id = try await rig.importID()
+        let done = await eventually { (await rig.project(id))?["separationState"] as? String == "done" }
+        XCTAssertTrue(done)
+        let dest = rig.dir.appendingPathComponent("Ocupada", isDirectory: true)
+        try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
+        try Data("x".utf8).write(to: dest.appendingPathComponent("ajeno.txt"))
+        let before = await rig.result("settings.get")
+        let e = await rig.call("library.relocate", "{\"path\":\(jsonString(dest.path)),\"mode\":\"move\"}")
+        XCTAssertNotNil(e["error"], "move a una carpeta no vacía debe fallar: \(e)")
+        XCTAssertTrue(host.remapped.isEmpty, "no se remapea el anfitrión si falla")
+        XCTAssertEqual(try ProjectScanner.scan(root: rig.projects).found.count, 1, "el original sigue")
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: dest.path), ["ajeno.txt"], "lo ajeno intacto")
+        XCTAssertEqual(rig.bridge.mediaFolder?.standardizedFileURL.path, rig.projects.standardizedFileURL.path)
+        let s = await rig.result("settings.get")
+        XCTAssertEqual(s["projectsFolder"] as? String, before["projectsFolder"] as? String, "el perfil no cambia")
+        let still = await rig.project(id)
+        XCTAssertNotNil(still, "la biblioteca sigue sirviendo el tema")
+        XCTAssertTrue(rig.events.named("library.relocated").isEmpty)
+    }
+
     // MARK: B3: primer arranque sin reiniciar
+
+    #if os(Windows)
+    /// B3: en Windows la propuesta es `<KnownFolder Música>\ToneForge`, no `~\Music`.
+    func testDefaultProposedFolderUsesKnownMusicFolderOnWindows() throws {
+        let music = try XCTUnwrap(windowsMusicFolder(), "SHGetKnownFolderPath(FOLDERID_Music) falló")
+        XCTAssertEqual(Bridge.defaultProposedFolder.standardizedFileURL.path,
+                       music.appendingPathComponent("ToneForge", isDirectory: true).standardizedFileURL.path)
+        XCTAssertEqual(Bridge.defaultProposedFolder.lastPathComponent, "ToneForge")
+    }
+    #endif
+
+    /// B3: tras aceptar, un segundo arranque con el mismo `supportDir` ya tiene la carpeta (no hay primer arranque).
+    func testSecondLaunchUsesSavedFolderAndDoesNotAskAgain() async throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("appcore-second-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let support = dir.appendingPathComponent("Support", isDirectory: true)
+        let chosen = dir.appendingPathComponent("Elegida", isDirectory: true)
+        func make() throws -> Bridge {
+            let services = JobServices(importer: FakeImporter(), separator: FakeSeparator(gate: Gate(), fail: false, hang: false),
+                                       levelMeter: nil, analyzer: nil, guitarSplitter: nil)
+            return try Bridge(options: LaunchOptions(projectsFolder: nil, supportDir: support),
+                              mediaBase: "https://tf.media/", reveal: nil, services: services)
+        }
+        func call(_ b: Bridge, _ m: String) async -> [String: Any] {
+            let r = await b.router.handle("{\"id\":1,\"method\":\"\(m)\",\"params\":{}}")
+            return (try? JSONSerialization.jsonObject(with: Data(r.utf8))) as? [String: Any] ?? [:]
+        }
+        let first = try make()
+        let host = RemapHost()
+        host.folder = chosen
+        first.host = host
+        _ = await call(first, "host.pickProjectsFolder")
+        await first.shutdownAsync()
+
+        let second = try make()
+        let info = (await call(second, "app.info"))["result"] as? [String: Any]
+        XCTAssertEqual(info?["projectsFolder"] as? String, chosen.path)
+        let list = await call(second, "library.list")
+        XCTAssertNotNil(list["result"], "la biblioteca arranca sola con la carpeta guardada: \(list)")
+        await second.shutdownAsync()
+    }
 
     func testFirstRunAdoptsFolderWithoutRestart() async throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("appcore-first-\(UUID().uuidString)", isDirectory: true)
@@ -634,7 +701,7 @@ final class ImportTests: XCTestCase {
         let found = ModelResolver.developmentModel(folder: "beat_this", environment: ["TF_MODELS_DIR": dir.path])
         XCTAssertNotNil(found, "TF_MODELS_DIR=\(dir.path) model=\(folder.appendingPathComponent("model.onnx").path) existe=\(FileManager.default.fileExists(atPath: folder.appendingPathComponent("model.onnx").path))")
         XCTAssertEqual(ModelResolver.separatorFolders(physicalMemory: 8 << 30), ["bs_roformer"])
-        XCTAssertEqual(ModelResolver.separatorFolders(physicalMemory: 16 << 30).first, "bs_roformer_T575")
+        XCTAssertEqual(ModelResolver.separatorFolders(physicalMemory: 32 << 30), ["bs_roformer"], "T575 desactivado")
 
         let exe = dir.appendingPathComponent(HelperLocator.helperFileName)
         XCTAssertNil(HelperLocator.separateHelper(environment: [:], executableDirectory: dir))

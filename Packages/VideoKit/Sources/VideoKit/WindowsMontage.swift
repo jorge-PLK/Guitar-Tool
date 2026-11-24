@@ -12,8 +12,10 @@ private let frameLookupEpsilon = 1e-6
 
 // MARK: - Fichero de vídeo de una toma
 
-/// `video.mov` de una toma o de un punch: tamaño, fps y tramo con imagen en tiempo del tema. Media Foundation no lee la
-/// lista de ediciones: su marca es el tiempo de los medios, y el PTS del tema = marca − inicio de los medios + tramo vacío.
+/// `video.mov` de una toma o de un punch: tamaño, fps y tramo con imagen en tiempo del tema. El PTS del tema = marca de
+/// Media Foundation + `shift`, y `shift` se MIDE al abrir (`readerShift`): en este PC (Windows 11 x64) Media Foundation
+/// ya aplica el tramo vacío de la lista de ediciones (marca del primer fotograma = PTS del tema, `shift` ≈ 0), pero no
+/// conviene suponerlo, porque con un lector que no lo aplique la marca es el tiempo de los medios.
 final class TakeVideoFile: @unchecked Sendable {
     let url: URL
     let naturalSize: CGSize
@@ -35,10 +37,14 @@ final class TakeVideoFile: @unchecked Sendable {
     static func open(_ url: URL?) throws -> TakeVideoFile? {
         guard let url else { return nil }
         let info: MediaFoundationReader.Info
-        do { info = try MediaFoundationReader.info(url) } catch { throw MontageError.read("\(url.lastPathComponent): \(error)") }
+        do { info = try MediaFoundationReader.info(url) } catch let e as MediaFoundationReader.UndecodableVideo {
+            throw MontageError.read(e.description)
+        } catch { throw MontageError.read("\(url.lastPathComponent): \(error)") }
         guard info.hasVideo, info.width > 0, info.height > 0 else { return nil }
         var empty = 0.0, mediaStart = 0.0, length = info.duration
+        var expectedFirst: Double?
         if let track = try? MP4EditList.tracks(in: url).first(where: { $0.handler == "vide" }) {
+            expectedFirst = TakeVideoProbe.timing(track).first
             let movie = Double(max(1, track.movieTimescale)), media = Double(max(1, track.mediaTimescale))
             if track.edits.isEmpty {
                 length = Double(track.sampleDuration) / media
@@ -58,8 +64,22 @@ final class TakeVideoFile: @unchecked Sendable {
             }
         }
         guard length > 0 else { return nil }
+        var readerFirst: Double?
+        try? MediaFoundationReader.forEachFrame(url) { t, _, _ in readerFirst = t; return false }
+        let shift = readerShift(expectedFirst: expectedFirst, readerFirst: readerFirst, fallback: empty - mediaStart)
         return TakeVideoFile(url: url, naturalSize: CGSize(width: info.width, height: info.height), frameRate: info.fps > 0 ? info.fps : 30,
-                             available: empty...(empty + length), shift: empty - mediaStart)
+                             available: empty...(empty + length), shift: shift)
+    }
+
+    /// Desfase marca de Media Foundation → PTS del tema: PTS del primer fotograma según las cajas (tramo vacío +
+    /// composición del primero − inicio de los medios, `TakeVideoProbe.timing`) − marca que da el lector a ese
+    /// fotograma. Sirve lo aplique o no el lector. Sin una de las dos (cajas ilegibles, fichero sin fotogramas o fallo al
+    /// decodificar el primero) queda `fallback`, la cuenta de un lector que no aplica la lista (tramo vacío − inicio de
+    /// los medios): sin fotogramas no hay nada que colocar, y un fallo de decodificación vuelve a salir, con su error,
+    /// en `TakeFrameReader`.
+    static func readerShift(expectedFirst: Double?, readerFirst: Double?, fallback: Double) -> Double {
+        guard let expectedFirst, let readerFirst else { return fallback }
+        return expectedFirst - readerFirst
     }
 }
 

@@ -45,6 +45,9 @@ export function FramingSheet() {
   const f = framingOf(takeId);
   const [time, setTime] = useState(() => { const p = lane?.presence?.[0] ?? lane?.take ?? { start: 0, end: 0 }; return (p.start + p.end) / 2; });
   const [frame, setFrame] = useState(null);
+  // Fase 7c: vídeo de la toma convirtiéndose a H.264 (o con la conversión fallida): el motivo en lugar del fotograma.
+  // Al acabar la conversión el encuadre se reanaliza; el cambio de `f.status` vuelve a pedir el fotograma.
+  const [frameNote, setFrameNote] = useState(null);
   const [dragBox, setDragBox] = useState(null);
   const area = useRef(null);
   const sent = useRef({ at: 0, timer: 0 });
@@ -55,7 +58,9 @@ export function FramingSheet() {
   useEffect(() => {
     let alive = true;
     const t = setTimeout(async () => {
-      try { const r = await framingFrame(takeId, time); if (alive) setFrame(r); } catch { if (alive) setFrame(null); }
+      try { const r = await framingFrame(takeId, time); if (alive) { setFrame(r); setFrameNote(null); } } catch (e) {
+        if (alive) { setFrame(null); setFrameNote(String(e?.code ?? '').startsWith('video-') ? e.message : null); }
+      }
     }, FRAME_DEBOUNCE_MS);
     return () => { alive = false; clearTimeout(t); };
   }, [takeId, time, f.mode, f.followZoom, f.followOffset?.x, f.followOffset?.y, rotation, f.status, f.manualBox == null]);
@@ -111,7 +116,7 @@ export function FramingSheet() {
     <div class="mt-sheet-body">
       <p class=${'small ' + tone}>${text}</p>
       <div class="mt-frame" ref=${area} style=${`aspect-ratio:${aspect};--ar:${aspect}`} onPointerDown=${pdown}>
-        ${src ? html`<img src=${src} alt="Fotograma de la toma" draggable="false" />` : html`<span class="none muted">Sin imagen en este instante</span>`}
+        ${src ? html`<img src=${src} alt="Fotograma de la toma" draggable="false" />` : html`<span class="none muted" role="status">${frameNote ?? 'Sin imagen en este instante'}</span>`}
         <i class="shade" style=${`top:0;left:0;right:0;height:${pct(box.y)}`}></i>
         <i class="shade" style=${`top:${pct(box.y + box.height)};left:0;right:0;bottom:0`}></i>
         <i class="shade" style=${`top:${pct(box.y)};left:0;width:${pct(box.x)};height:${pct(box.height)}`}></i>

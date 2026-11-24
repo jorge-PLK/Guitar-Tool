@@ -36,6 +36,8 @@ struct TakeViewOffsetSource: Sendable {
     /// `processed.wav` de la toma (lo único que suena en la hoja, como el `TakePreview` del Mac).
     var audioURL: URL
     var songStart: Double
+    /// Vídeo de la base y de los punches (una toma del Mac puede ser HEVC: se convierte como en el visor).
+    var videoURLs: [URL?] = []
 }
 
 /// Reloj que publica el núcleo: la posición del reproductor alisada contra el reloj de host (lazo de fase de primer orden).
@@ -99,6 +101,18 @@ struct TakeViewSnapshot: Codable, Sendable, Equatable {
     var epoch: Int
     var outputName: String
     var audioError: String?
+    /// Fase 7c: el vídeo aún no se puede ver (convirtiéndose a H.264, convertido pero con el original aún en uso por otro
+    /// programa, o fallido); nil = listo. El progreso vivo está en `jobs.progress` con la clave `video.jobId`; el cambio
+    /// con el visor abierto llega por `takeview.video`.
+    var video: TakeVideoStatusInfo? = nil
+}
+
+/// `takeview.video` (Fase 7c, opción b' de Jorge): cambió el vídeo de la toma abierta en el visor o en la hoja de desfase
+/// (sustitución aplicada, fallo o respaldo `busy`). `video` nil = ya se puede ver: la página carga solo el `<video>`,
+/// sincronizado con el reloj del núcleo, sin cerrar el visor ni tocar el audio.
+struct TakeViewVideoEvent: Codable, Sendable, Equatable {
+    var takeId: String
+    var video: TakeVideoStatusInfo?
 }
 
 /// `takeview.position`: reloj del visor.
@@ -227,6 +241,14 @@ final class TakeViewService {
     /// W2-O: la toma de la hoja de desfase abierta en Grabar (nil = no hay hoja); también pausa lo que suene en Grabar.
     /// La pone el `Bridge` al registrar `record.*`.
     nonisolated(unsafe) var offsetSource: (@MainActor @Sendable () -> TakeViewOffsetSource?)?
+    /// Espera a los guardados de tomas pendientes del tema (`StudySession.awaitTakeSaves`) antes de leer `project.json`:
+    /// Grabar anuncia la toma en `record.state` antes de que su `Task` la escriba en disco. La pone el `Bridge`.
+    nonisolated(unsafe) var awaitTakeSaves: (@MainActor @Sendable (_ projectId: UUID) async -> Void)?
+    /// Fase 7c: conversión HEVC → H.264 (la pone el `Bridge`). El visor no se cierra por ella: la sustitución se aplica al
+    /// terminar aunque la toma esté abierta y la página recarga solo el `<video>` (`takeview.video`, opción b' de Jorge).
+    nonisolated(unsafe) var videoConversion: VideoConversionEngine?
+    /// Último `takeview.video` emitido (tests).
+    private(set) var lastVideoEvent: TakeViewVideoEvent?
 
     private(set) var current: TakeViewSession?
     private var ticker: Task<Void, Never>?
@@ -292,7 +314,24 @@ final class TakeViewService {
     func snapshot(_ s: TakeViewSession) -> TakeViewSnapshot {
         TakeViewSnapshot(projectId: s.projectId.uuidString, takeId: s.takeId.uuidString, duration: s.duration, songStart: s.songStart,
                          hasBacking: s.hasBacking, backingOn: s.backingOn, playing: s.isPlaying, position: s.position,
-                         epoch: s.epoch, outputName: s.audio.outputName, audioError: s.audioError)
+                         epoch: s.epoch, outputName: s.audio.outputName, audioError: s.audioError,
+                         video: videoConversion.flatMap { TakeVideoStatusInfo(takeId: s.takeId, state: $0.currentState(takeId: s.takeId)) })
+    }
+
+    /// Pide el vídeo de la toma al motor de conversión (encola si es HEVC). Justo antes de `install`, sin `await` entre
+    /// medias: cuando llegue el fin de la conversión (`videoConversionFinished`, en el hilo principal), `current` ya es esta.
+    private func requestVideo(takeId: UUID, files: [URL?], title: String) {
+        _ = videoConversion?.state(takeId: takeId, files: files, title: title)
+    }
+
+    /// Fase 7c (opción b' de Jorge): fin de una conversión o de su sustitución. Si el visor o la hoja de desfase tiene esa
+    /// toma abierta, emite `takeview.video` para que la página cargue solo el `<video>` (o actualice el aviso); el visor
+    /// sigue abierto y el audio no se para ni se reinicia.
+    func videoConversionFinished(takeId: UUID, state: TakeVideoState) {
+        guard current?.takeId == takeId else { return }
+        let e = TakeViewVideoEvent(takeId: takeId.uuidString, video: TakeVideoStatusInfo(takeId: takeId, state: state))
+        lastVideoEvent = e
+        emit("takeview.video", e)
     }
 
     // MARK: Abrir y cerrar
@@ -301,6 +340,7 @@ final class TakeViewService {
         guard let pid = UUID(uuidString: p.projectId), let tid = UUID(uuidString: p.takeId) else {
             throw RPCError(code: "bad-params", message: "«projectId» y «takeId» deben ser UUID.")
         }
+        await awaitTakeSaves?(pid)
         let lib = try Bridge.service(root)
         let folder = try lib.folder(id: pid)
         let project: Project
@@ -351,6 +391,10 @@ final class TakeViewService {
         audio.player.endTime = base + duration
         let audioError = Self.prepare(audio, first: first)
         audio.player.seek(to: base)
+        let layout = ProjectLayout(folder: folder)
+        requestVideo(takeId: tid, files: [take.videoFile.map { layout.url(relative: $0) }]
+                        + (take.punches ?? []).map { $0.videoFile.map { layout.url(relative: $0) } },
+                     title: "\(project.song.title) · vídeo de la toma")
         return install(TakeViewSession(projectId: pid, takeId: tid, audio: audio, duration: duration, songStart: start, base: base,
                                        backingIDs: ids, hasBacking: !backing.tracks.isEmpty, audioError: audioError))
     }
@@ -374,6 +418,7 @@ final class TakeViewService {
         audio.player.endTime = duration
         let audioError = Self.prepare(audio, first: src.audioURL)
         audio.player.seek(to: 0)
+        requestVideo(takeId: src.takeId, files: src.videoURLs, title: "Vídeo de la toma")
         return install(TakeViewSession(projectId: src.projectId, takeId: src.takeId, audio: audio, duration: duration,
                                        songStart: src.songStart, base: 0, backingIDs: [], hasBacking: false, audioError: audioError,
                                        restartMargin: TakeViewConstants.offsetRestartMargin, isOffset: true))
@@ -424,6 +469,12 @@ final class TakeViewService {
         current = nil
         lastPosition = nil
         s.shutdown()
+        // Respaldo `busy` (opción b' de Jorge): si la sustitución se quedó pendiente porque el original seguía en uso, se
+        // reintenta ahora que el visor soltó sus ficheros.
+        if let engine = videoConversion, engine.currentState(takeId: s.takeId) == .awaitingRelease {
+            let id = s.takeId
+            Task { await engine.applyPendingSoon(takeId: id) }
+        }
     }
 
     static func dB(_ linear: Double) -> Double { 20 * log10(max(linear, 1e-6)) }
@@ -517,6 +568,11 @@ extension Bridge {
 
     func registerTakeViewMethods() {
         takeViewService.setSink { [weak self] in self?.send($0) }
+        // La toma recién grabada puede no estar aún en `project.json` (StudySession.saveTakes la guarda en un `Task`).
+        takeViewService.awaitTakeSaves = { [weak self] pid in
+            guard let s = self?.studyService.current?.session, s.projectID == pid else { return }
+            await s.awaitTakeSaves()
+        }
         takeViewService.register(on: router)
     }
 }

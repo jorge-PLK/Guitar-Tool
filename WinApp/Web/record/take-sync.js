@@ -157,6 +157,16 @@ export class CoreTakeSync {
     this.offsetMs = ms;
     this.offsetEpoch += 1;
   }
+  /// Fase 7c (`takeview.video`, opción b'): el vídeo de la toma ya se puede ver (convertido a H.264 con el visor abierto).
+  /// Carga solo el `<video>`: el reloj del núcleo no se toca (el audio sigue) y un seguidor nuevo lo lleva a la posición
+  /// actual en cuanto tenga metadatos (salto, como tras una búsqueda).
+  setVideo(basePath, punches) {
+    this.basePath = basePath;
+    this.punches = punches ?? [];
+    this.current = null;
+    this.loading = false;
+    this.follower = new VideoFollower();
+  }
   time(now) { return Math.min(Math.max(this.clock.position(now), 0), this.duration || Infinity); }
   step() {
     const now = performance.now() / 1000;

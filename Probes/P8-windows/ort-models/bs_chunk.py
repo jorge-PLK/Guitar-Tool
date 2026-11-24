@@ -68,6 +68,8 @@ if args.stage == "export":
     from torch import nn
     model, _ = C.load_model(log)
     core = C.make_core(model, T)
+    from slice_glu import use_slice_glu                                  # GLU sin Split: DirectML lo calcula mal
+    log.info("GLU por cortes: %d", use_slice_glu(core))
 
     class Pub(nn.Module):
         """Interfaz del ONNX publicado (elicwhite): (1,2,F,T) re/im -> (1,6,2,F,T) re/im."""

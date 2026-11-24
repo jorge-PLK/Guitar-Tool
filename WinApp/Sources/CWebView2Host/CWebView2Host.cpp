@@ -299,12 +299,21 @@ struct MapRequest {
     int rc;
 };
 
+std::string g_mapLog;   // ultima linea de remapeo, para que el llamador (Swift) la registre en el log de la app
+
 void runMap(MapRequest* r) {
     ComPtr<ICoreWebView2_3> v3;
     HRESULT hr = r->h->view.As(&v3);
     if (SUCCEEDED(hr)) {
         std::wstring host = widen(r->host), folder = widenPath(r->folder);
+        // OJO: WebView2 solo aplica un mapeo nuevo a las navegaciones siguientes; la pagina ya cargada sigue sirviendose de la carpeta anterior (ver Temp/win/estado/fetch.md).
+        HRESULT hrClear = v3->ClearVirtualHostNameToFolderMapping(host.c_str());
         hr = v3->SetVirtualHostNameToFolderMapping(host.c_str(), folder.c_str(), COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_ALLOW);
+        char line[512];
+        snprintf(line, sizeof line, "mapeo %s -> %s: Clear=0x%08lX Set=0x%08lX", r->host, r->folder,
+                 static_cast<unsigned long>(hrClear), static_cast<unsigned long>(hr));
+        g_mapLog = line;
+        if (FAILED(hrClear)) setError(hrString("ClearVirtualHostNameToFolderMapping", hrClear));
     }
     if (FAILED(hr)) setError(hrString("SetVirtualHostNameToFolderMapping", hr));
     r->rc = static_cast<int>(hr);
@@ -946,6 +955,8 @@ int tfhost_map_folder(tfhost* h, const char* host_utf8, const char* folder_utf8)
     else runMap(&r);
     return r.rc;
 }
+
+const char* tfhost_last_map_log(void) { return g_mapLog.c_str(); }
 
 void tfhost_post(tfhost* h, const char* utf8) {
     if (!h || !utf8) return;

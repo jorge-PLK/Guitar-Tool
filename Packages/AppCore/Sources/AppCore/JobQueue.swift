@@ -142,9 +142,10 @@ final class JobEngine: @unchecked Sendable {
     }
 
     /// Crea o actualiza un trabajo. Las fracciones sueltas se limitan a `progressInterval`; los cambios de
-    /// etapa o estado salen siempre. Los estados finales emiten y sacan el trabajo de la lista viva.
+    /// etapa o estado salen siempre. Los estados finales emiten y sacan el trabajo de la lista viva. `force`: sale aunque
+    /// solo cambie el texto (la conversión de vídeo que pasa a «se aplicará cuando el fichero original deje de estar en uso»).
     func update(_ id: String, title: String, stage: String, state: String, fraction: Double? = nil,
-                error: String? = nil, expectsAnalysis: Bool? = nil, text: String? = nil) {
+                error: String? = nil, expectsAnalysis: Bool? = nil, text: String? = nil, force: Bool = false) {
         let t = now()
         var toEmit: JobInfo?
         lock.withLock {
@@ -152,7 +153,7 @@ final class JobEngine: @unchecked Sendable {
                                                   text: "", error: nil),
                                     order: { order += 1; return order }(), lastEmit: .distantPast, expectsAnalysis: false)
             let isNew = live[id] == nil
-            let structural = isNew || l.info.stage != stage || l.info.state != state
+            let structural = isNew || force || l.info.stage != stage || l.info.state != state
             l.info.title = title
             l.info.stage = stage
             l.info.state = state

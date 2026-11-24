@@ -113,6 +113,11 @@ final class WASAPIAudioIOTests: XCTestCase {
     func testExclusiveDuplexOpensAndStops() throws {
         let (render, capture) = try Self.defaults()
         guard let capture else { throw XCTSkip("[windows] sin endpoint de entrada") }
+        // El modo exclusivo no remuestrea: con entrada y salida por defecto a frecuencias distintas (p. ej. un micro
+        // de 16 kHz) el dúplex exclusivo no puede abrirse a la frecuencia de salida y no hay nada que probar.
+        guard abs(capture.mix.sampleRate - render.mix.sampleRate) < 0.5 else {
+            throw XCTSkip("[windows] entrada a \(capture.mix.sampleRate) Hz y salida a \(render.mix.sampleRate) Hz: sin dúplex exclusivo posible")
+        }
         let setup = AudioSetup(inputDeviceUID: capture.id, outputDeviceUID: render.id, sampleRate: render.mix.sampleRate)
         let io = try WASAPIAudioIO(setup: setup, options: .init(mode: .exclusive, periodFrames: 0))
         let i = io.streamInfo

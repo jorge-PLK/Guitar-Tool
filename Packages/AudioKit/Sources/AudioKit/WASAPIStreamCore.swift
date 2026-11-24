@@ -49,10 +49,12 @@ final class WASAPIStreamCore: @unchecked Sendable {
     let hostLog: HostTimeLog
 
     private(set) var sync: DuplexClockSync
-    /// Fotogramas de captura descartados porque el offset aún no estaba fijado (arranque o tras una discontinuidad).
-    private(set) var droppedCaptureFrames = 0
-    /// Discontinuidades de captura después del primer paquete (cada una reinicia el offset).
-    private(set) var captureResets = 0
+    /// Fotogramas de captura descartados porque el offset aún no estaba fijado (arranque, o discontinuidad antes de fijarlo).
+    var droppedCaptureFrames: Int { counters.droppedCaptureFrames.load(ordering: .relaxed) }
+    /// Discontinuidades de captura después del primer paquete (con el offset fijado, se conserva: `DuplexClockSync`).
+    var captureResets: Int { counters.captureResets.load(ordering: .relaxed) }
+    /// El primer paquete tras una discontinuidad ya contó su salto en `inGaps`.
+    private var jumpCounted = false
 
     private var render: AudioIORenderHandler?
     private var capture: AudioIOCaptureHandler?
@@ -102,8 +104,7 @@ final class WASAPIStreamCore: @unchecked Sendable {
         self.render = render
         self.capture = capture
         sync = DuplexClockSync(sampleRate: sampleRate, minimumPoints: minimumPoints)
-        droppedCaptureFrames = 0
-        captureResets = 0
+        jumpCounted = false
         expectedOut = nil
         expectedIn = nil
         seenCapture = false
@@ -165,23 +166,27 @@ final class WASAPIStreamCore: @unchecked Sendable {
     /// Paquete de captura: `frames × channels` muestras float32 entrelazadas.
     func capture(interleaved: UnsafePointer<Float>, frames: Int, channels: Int, marks: WASAPICaptureMarks) {
         if marks.flags & WASAPICaptureMarks.discontinuity != 0, seenCapture {
-            // El primer paquete suele traerla (arranque); después, el offset se vuelve a estimar con puntos nuevos.
-            sync.resetCapture()
-            captureResets += 1
+            // El primer paquete suele traerla (arranque). Después se conserva el offset y el hueco es el real
+            // (`DuplexClockSync.captureDiscontinuity`); antes se tiraba 1 s de audio hasta volver a fijarlo.
+            sync.captureDiscontinuity()
+            counters.captureResets.add(1, ordering: .relaxed)
             counters.inGaps.add(1, ordering: .relaxed)
-            expectedIn = nil
+            jumpCounted = true
         }
         seenCapture = true
         let markOK = marks.flags & WASAPICaptureMarks.timestampError == 0 && marks.qpc100ns != 0
         let hostMark = markOK ? DuplexClockSync.seconds(qpc100ns: marks.qpc100ns) : 0
         guard let sampleTime = sync.addCapturePacket(devicePosition: marks.streamPosition, hostSeconds: hostMark) else {
-            droppedCaptureFrames += frames
+            counters.droppedCaptureFrames.add(frames, ordering: .relaxed)
+            expectedIn = nil
             return
         }
         if let e = expectedIn, e != sampleTime {
-            counters.inGaps.add(1, ordering: .relaxed)
+            if !jumpCounted { counters.inGaps.add(1, ordering: .relaxed) }
             IOCounters.raise(counters.inGapMax, Int(abs(sampleTime - e)))
         }
+        jumpCounted = false
+        counters.captureRealigns.store(sync.realigns, ordering: .relaxed)
         expectedIn = sampleTime + Int64(frames)
         if let y = lastRenderSampleTime {
             let skew = Int(y - sampleTime)

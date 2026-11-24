@@ -29,7 +29,7 @@ import lr_common as L  # noqa: E402
 
 L.MSST = C.MSST                                   # clon de MSST, commit 1f700c38
 ONNX = REPO / "Probes/P8-windows/ort-models/out/lead_rhythm/model.onnx"
-ONNX_SHA = "8a42c4ecf266a8a1cf20641a2cd1756a8b863665877c420bf453dbf425ead51d"
+ONNX_SHA = "e0c42b06b617efd1649892d912d721e049eee25ac2dc4ed736762b4a657e34b4"
 CM_ZIP = REPO / "App/Resources/Models/LeadRhythmMelRoformer_fp16.mlpackage.zip"
 GUITAR = REPO / "Probes/testaudio/out/T1/stems/guitar.wav"
 START_S, DUR_S, LISTEN_S = 60, 60, 25

@@ -186,6 +186,9 @@ struct MontagePreviewInfo: Codable, Sendable, Equatable {
     /// W2-E2: composición p50/p95 de los últimos 512 fotogramas (ms).
     var frameP50Ms: Double = 0
     var frameP95Ms: Double = 0
+    /// Fase 7c: tomas cuyo vídeo aún no se puede leer (fase `converting` o `error`). El progreso vivo va por
+    /// `jobs.progress` (clave `jobId`); aquí es el del momento de la instantánea.
+    var videos: [TakeVideoStatusInfo] = []
 }
 
 struct MontageTransportInfo: Codable, Sendable, Equatable {
@@ -315,6 +318,8 @@ final class MontageService {
     var services: MontageServices = .production
     var audioFactory: (@MainActor (LaunchOptions, OutputSelection) -> any MontageAudioPlaying)?
     var timing = MontageController.Timing()
+    /// Fase 7c: conversión HEVC → H.264 de las tomas (la pone el `Bridge`; nil = sin conversión).
+    nonisolated(unsafe) var videoConversion: VideoConversionEngine?
 
     private(set) var current: MontageController?
     private var ticker: Task<Void, Never>?
@@ -472,9 +477,12 @@ final class MontageService {
         }
         router.register("montage.startExport") { [self] (_: Empty) -> MontageSnapshot in
             try await with { c in
+                c.refreshVideoStates()
                 guard c.canExport else {
                     throw RPCError(code: "not-ready", message: c.draft == nil ? "No hay tomas con vídeo que montar."
-                                   : c.isExporting ? "Ya hay una exportación en curso." : "El análisis de encuadre aún no ha terminado.")
+                                   : c.isExporting ? "Ya hay una exportación en curso."
+                                   : !c.videoStates.isEmpty ? MontageController.videoWaitMessage
+                                   : "El análisis de encuadre aún no ha terminado.")
                 }
                 c.startExport()
             }
@@ -553,6 +561,12 @@ final class MontageService {
         c.onChange = { [weak self] in self?.stateChanged() }
         c.onExport = { [weak self] in self?.exportChanged() }
         c.onFraming = { [weak self] id in self?.framingChanged(id) }
+        if let engine = videoConversion {
+            // Abrir de nuevo reintenta las conversiones que fallaron.
+            engine.forget(takeIds: project.takes.map(\.id))
+            let title = "\(project.song.title) · vídeo de la toma"
+            c.videoGate = { id, files in engine.state(takeId: id, files: files, title: title) }
+        }
         current = c
         lastState = nil
         c.open()
@@ -635,7 +649,7 @@ final class MontageService {
                 fps: c.previewFPS, maxDimension: MontagePlanning.previewMaxDimension, width: Int(render.width), height: Int(render.height),
                 duration: c.previewDuration, delivered: c.previewStats.delivered, skipped: c.previewStats.skipped,
                 lastFrameMillis: c.previewStats.lastFrameMillis, frameP50Ms: c.previewStats.percentile(0.5),
-                frameP95Ms: c.previewStats.percentile(0.95)),
+                frameP95Ms: c.previewStats.percentile(0.95), videos: videoStatuses(c)),
             transport: MontageTransportInfo(playing: c.isPlaying, position: c.songTime, videoPosition: c.videoPosition,
                                             span: MontageRangeInfo(start: span.start, end: span.end), audioError: c.audioError))
     }
@@ -677,7 +691,30 @@ final class MontageService {
         s.preview.frameP95Ms = 0
         s.exportStatus.progress = 0
         s.framing = s.framing.map { var f = $0; f.progress = 0; return f }
+        // El porcentaje de una conversión en marcha no cuenta (ni en `progress` ni en el texto); «pendiente» y fallo, sí.
+        s.preview.videos = s.preview.videos.map { v in
+            guard v.code == VideoConversionConstants.convertingCode, v.progress != 1 else { return v }
+            var u = v
+            u.progress = 0
+            u.message = ""
+            return u
+        }
         return s
+    }
+
+    /// Tomas del montaje cuyo vídeo espera (orden de las calles), con el estado vivo del motor.
+    func videoStatuses(_ c: MontageController) -> [TakeVideoStatusInfo] {
+        c.videoLanes.compactMap { l -> TakeVideoStatusInfo? in
+            guard let s = c.videoStates[l.takeID] else { return nil }
+            return TakeVideoStatusInfo(takeId: l.takeID, state: videoConversion?.currentState(takeId: l.takeID) ?? s)
+        }
+    }
+
+    /// Fin de una conversión (el motor avisa desde cualquier hilo; el `Bridge` lo trae aquí).
+    func videoConversionFinished(takeId: UUID, state: TakeVideoState) {
+        guard let c = current else { return }
+        c.videoConversionFinished(takeId: takeId, state: state)
+        stateChanged()
     }
 
     // MARK: Eventos

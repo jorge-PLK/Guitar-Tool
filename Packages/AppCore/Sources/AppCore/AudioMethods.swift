@@ -362,7 +362,7 @@ final class AudioService {
         let outChannels = c.chosenOutput?.outputChannels ?? 2
         let inChannels = c.chosenInput?.inputChannels ?? 2
         let calibration: AudioCalibrationInfo
-        if let l = a.validLatency(sampleRate: rate, wasapi: c.wasapiKeyContext) {
+        if let l = c.validCalibration {
             let ms = l.latencySamples / rate * 1000
             calibration = AudioCalibrationInfo(calibrated: true, label: "Calibrada · \(number(ms, 2)) ms · \(dateText(l.date))",
                                                latencyMS: ms, date: l.date)

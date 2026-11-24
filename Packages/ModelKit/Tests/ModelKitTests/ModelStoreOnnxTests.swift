@@ -33,9 +33,10 @@ final class ModelStoreOnnxTests: XCTestCase {
         let d = ModelCatalog.separatorBSRoformerSW
         XCTAssertEqual(d.onnxFile(physicalMemory: 8 << 30)?.frames, 345, "8 GB: T=345")
         XCTAssertEqual(d.onnxFile(physicalMemory: 12 << 30)?.frames, 345, "12 GB: T=345")
-        // Un equipo de 16 GB en Windows ve ~15,8 GiB (memoria reservada al hardware).
-        XCTAssertEqual(d.onnxFile(physicalMemory: 16_960_000_000)?.frames, 575, "16 GB: T=575")
-        XCTAssertEqual(d.onnxFile(physicalMemory: 64 << 30)?.fileName, "bs_roformer_T575.onnx")
+        // T575 desactivado (GLU en Split roto en DirectML): con cualquier RAM sale T345.
+        XCTAssertEqual(d.onnxFile(physicalMemory: 16_960_000_000)?.frames, 345, "16 GB: T=345")
+        XCTAssertEqual(d.onnxFile(physicalMemory: 32 << 30)?.fileName, "bs_roformer.onnx", "32 GB: T=345")
+        XCTAssertEqual(d.onnxFile(physicalMemory: 64 << 30)?.fileName, "bs_roformer.onnx")
         XCTAssertEqual(ModelCatalog.chordsBTC.onnxFile(physicalMemory: 8 << 30)?.fileName, "btc.onnx")
         XCTAssertEqual(ModelCatalog.all.filter { $0.onnxFiles.isEmpty }.map(\.id), [], "los seis modelos tienen .onnx")
     }

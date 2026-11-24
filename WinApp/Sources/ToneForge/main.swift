@@ -4,6 +4,7 @@
 import AppCore
 import CWebView2Host
 import Foundation
+import NativeONNX
 import NativePlatform
 import WinSDK
 
@@ -120,7 +121,9 @@ final class WindowsHostServices: HostServices, @unchecked Sendable {
         await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
             Thread.detachNewThread { [weak self] in
                 guard let host = self?.app?.host else { continuation.resume(returning: false); return }
-                continuation.resume(returning: url.path.withCString { tfhost_map_folder(host, "media.toneforge", $0) } == 0)
+                let rc = url.path.withCString { tfhost_map_folder(host, "media.toneforge", $0) }
+                tfLog("remapeo de media.toneforge: rc=\(rc) \(String(cString: tfhost_last_map_log()))")
+                continuation.resume(returning: rc == 0)
             }
         }
     }
@@ -334,6 +337,8 @@ func handleDevLog(_ app: App, _ text: String) -> Bool {
 }
 
 tfLog("args parseados: \(arguments.joined(separator: " ")) | pid \(ProcessInfo.processInfo.processIdentifier)")
+// Una línea `onnx| modelo -> proveedor (...)` por sesión ONNX creada (ProviderChoice.swift). Solo Windows: el Mac usa Core ML.
+OnnxModelLoader.setLogHandler { tfLog($0) }
 if arguments.contains("--selftest-mainactor") {
     startMainActorSelfTest()
     dispatchMain()
@@ -379,6 +384,8 @@ func runUI() {
         exit(2)
     }
     startup.mark("Bridge creado")
+    // Líneas de diagnóstico del núcleo (audio.take|, una por toma) al mismo log.
+    CoreLog.setSink { tfLog($0) }
     let app = App(options: options, bridge: bridge, supportDir: supportDir)
     let appContext = Unmanaged.passUnretained(app).toOpaque()
     let size = options.window ?? (width: 1440, height: 900)

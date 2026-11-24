@@ -21,6 +21,54 @@ public enum ModelDownloadError: Error, LocalizedError, Equatable {
     }
 }
 
+/// Fallo al obtener un modelo, con el nombre visible del modelo y qué pasó (llega tal cual al job y a la página).
+public struct ModelUnavailableError: Error, LocalizedError, Equatable {
+    public enum Reason: Sendable, Equatable {
+        case http(Int)
+        case offline
+        case other(String)
+    }
+
+    public let modelName: String
+    public let reason: Reason
+
+    public init(modelName: String, reason: Reason) {
+        self.modelName = modelName
+        self.reason = reason
+    }
+
+    public var errorDescription: String? {
+        switch reason {
+        case .http(let s): return "No se pudo descargar el modelo «\(modelName)» (HTTP \(s))."
+        case .offline: return "Falta el modelo «\(modelName)» y no hay conexión."
+        case .other(let m): return "No se pudo preparar el modelo «\(modelName)»: \(m)"
+        }
+    }
+
+    /// Nombre visible: el del catálogo si el id existe; si no, el propio id.
+    public static func displayName(forModelID id: String) -> String {
+        ModelCatalog.all.first { $0.id == id }?.displayName ?? id
+    }
+
+    /// Envuelve un error de `ModelStore.ensureInstalled`; la cancelación y los errores ya con nombre pasan sin cambios.
+    public static func wrapping(_ error: Error, modelID: String) -> Error {
+        if error is CancellationError || error is ModelUnavailableError { return error }
+        let name = displayName(forModelID: modelID)
+        if let d = error as? ModelDownloadError, case .httpStatus(let s) = d {
+            return ModelUnavailableError(modelName: name, reason: .http(s))
+        }
+        if let u = error as? URLError, offlineCodes.contains(u.code) {
+            return ModelUnavailableError(modelName: name, reason: .offline)
+        }
+        return ModelUnavailableError(modelName: name, reason: .other(error.localizedDescription))
+    }
+
+    private static let offlineCodes: Set<URLError.Code> = [
+        .notConnectedToInternet, .networkConnectionLost, .cannotFindHost, .cannotConnectToHost,
+        .dnsLookupFailed, .timedOut, .internationalRoamingOff,
+    ]
+}
+
 /// Descarga con `URLSessionDownloadTask` (sigue redirecciones) e informa del progreso.
 public struct URLSessionDownloader: ModelDownloading {
     public init() {}

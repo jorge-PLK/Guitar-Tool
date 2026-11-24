@@ -37,6 +37,7 @@ let package = Package(
             dependencies: [
                 .product(name: "AppCore", package: "AppCore"),
                 .product(name: "NativePlatform", package: "NativeKit"),
+                .product(name: "NativeONNX", package: "NativeKit"),
                 "CWebView2Host",
             ],
             linkerSettings: [

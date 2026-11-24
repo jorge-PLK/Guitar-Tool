@@ -118,4 +118,23 @@ final class RecoveryTests: XCTestCase {
         XCTAssertTrue(fm.fileExists(atPath: hidden.path))
         XCTAssertTrue(fm.fileExists(atPath: ProjectLayout(folder: folder).projectFile.path))
     }
+
+    /// Conversión HEVC → H.264 interrumpida (Windows): el temporal `.converting-*` junto al vídeo de la toma o de un punch
+    /// se borra al arrancar; el vídeo y lo que no lleva el prefijo exacto se quedan.
+    func testRemoveOrphanVideoConversionTemporaries() async throws {
+        let env = try await Env(autoSeparate: false)
+        let id = try await env.library.importSong(from: try env.makeSource("a.mp3", content: "A"))
+        let fm = FileManager.default
+        let take = ProjectLayout(folder: try env.folder(id)).takesDir.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let punch = take.appendingPathComponent("punch-1", isDirectory: true)
+        try fm.createDirectory(at: punch, withIntermediateDirectories: true)
+        let temps = [take.appendingPathComponent("\(Library.videoConversionPrefix)video.mov"),
+                     punch.appendingPathComponent("\(Library.videoConversionPrefix)video.mov")]
+        let keep = [take.appendingPathComponent("video.mov"), punch.appendingPathComponent("video.mov"),
+                    take.appendingPathComponent(".convertingvideo.mov")]
+        for u in temps + keep { try Data("x".utf8).write(to: u) }
+        XCTAssertEqual(Library.removeOrphanTemporaries(in: env.root), 2)
+        for u in temps { XCTAssertFalse(fm.fileExists(atPath: u.path), u.lastPathComponent) }
+        for u in keep { XCTAssertTrue(fm.fileExists(atPath: u.path), u.lastPathComponent) }
+    }
 }

@@ -84,9 +84,10 @@ struct ModelResolver: Sendable {
         return FileManager.default.fileExists(atPath: url.path) ? url : nil
     }
 
-    /// Carpeta de desarrollo del separador: T=575 con RAM de sobra (`separationLargeChunkMemory`), si no T=345.
+    /// Carpeta de desarrollo del separador: siempre T=345. T575 sigue con GLU en Split, roto en DirectML; vuelve cuando
+    /// se reescriba y se publique en models-win-v1 (con `separationLargeChunkMemory`).
     static func separatorFolders(physicalMemory: UInt64) -> [String] {
-        physicalMemory >= ModelCatalog.separationLargeChunkMemory ? ["bs_roformer_T575", "bs_roformer"] : ["bs_roformer"]
+        ["bs_roformer"]
     }
 
     /// `lead_rhythm`: misma carpeta que `LeadSeparatorHeavyTests` y que la salida de tf-ml (parte 7.3).
@@ -106,7 +107,12 @@ struct ModelResolver: Sendable {
             if let url = Self.developmentModel(folder: f, environment: environment) { return url }
         }
         #endif
-        return try await store.ensureInstalled(id, progress: progress)
+        do {
+            return try await store.ensureInstalled(id, progress: progress)
+        } catch {
+            // Mejora 1: el error nombra el modelo (en el Mac la descarga es HuggingFace/zip; mismo envoltorio).
+            throw ModelUnavailableError.wrapping(error, modelID: id)
+        }
     }
 
     func isInstalled(_ id: String) async -> Bool {

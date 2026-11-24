@@ -202,6 +202,11 @@ final class SettingsTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: dir) }
         let projects = dir.appendingPathComponent("P")
         try FileManager.default.createDirectory(at: projects, withIntermediateDirectories: true)
+        // Sin depender de las cámaras de la máquina (en Windows el puente lista las reales: la webcam del PC daba
+        // `noCamera: false`): proveedor vacío inyectado, el mismo que usa la app cuando no hay ninguno.
+        let injected = SettingsEnvironment.cameras
+        SettingsEnvironment.cameras = injected ?? NoCameraProvider()
+        defer { SettingsEnvironment.cameras = injected }
         let b = try Bridge(options: LaunchOptions(projectsFolder: projects, supportDir: dir), mediaBase: "https://tf.media/")
         for m in ["settings.get", "video.cameras", "video.settings", "models.list", "library.usage"] {
             let r = await b.router.handle("{\"id\":1,\"method\":\"\(m)\",\"params\":{}}")
@@ -209,7 +214,7 @@ final class SettingsTests: XCTestCase {
         }
         // Sin proveedor de cámaras, la lista sale vacía y la página lo enseña como «no hay cámara».
         let cams = await b.router.handle("{\"id\":1,\"method\":\"video.settings\",\"params\":{}}")
-        XCTAssertTrue(cams.contains("\"noCamera\":true") || SettingsEnvironment.cameras != nil, cams)
+        XCTAssertTrue(cams.contains("\"noCamera\":true") || injected != nil, cams)
     }
 
     /// W2-E2: con `--camera simulated`, Ajustes lista la misma cámara que abre la vista previa (antes: lista vacía y

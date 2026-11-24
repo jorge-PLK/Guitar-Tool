@@ -246,6 +246,62 @@ final class AudioTests: XCTestCase {
         XCTAssertTrue(c.calibrationValid)
     }
 
+    /// Ronda 7c, Parte C (HeadRush por WASAPI compartido): el perfil pide 512 fotogramas y WASAPI concede su periodo
+    /// (480 a 48 kHz). La clave guardada lleva el concedido; `calibrationValid` y Ajustes deben compararla con la clave de
+    /// la sesión, no con la del perfil, o se queda en «Sin calibrar» justo después de calibrar.
+    func testWindowsCalibrationStaysValidWhenWASAPIGrantsAnotherPeriod() async throws {
+        let container = "{1C58EB37-3116-595C-8F20-EC98F026FD5E}"
+        let grantedFrames = 480   // periodo de WASAPI compartido a 48 kHz (10 ms)
+        let base = AudioController.simulatedProvider()
+        let devices = (base.inputDevices() + base.outputDevices()).map { d -> AudioDevice in
+            var d = d
+            d.containerID = container
+            return d
+        }
+        let provider = SimulatedDeviceProvider(devices: devices, defaultID: 2)
+        let store = ProfileStore(url: try tempDir().appendingPathComponent("profile.json"))
+        let c = AudioController(provider: provider, store: store, makeIO: { setup in
+            SimulatedAudioIO(sampleRate: setup.sampleRate,
+                             inputs: [SimulatedInput(source: 1, drive: 2, gain: 0.5, noiseDBFS: -60),
+                                      SimulatedInput(source: 2, drive: 2, gain: 0.5, noiseDBFS: -60)],
+                             latencySamples: AudioController.simulatedLatencySamples, declaredLatencySamples: 1_100,
+                             bufferFrames: grantedFrames, inputDeviceUID: AudioController.simulatedInputUID,
+                             outputDeviceUID: AudioController.simulatedOutputUID, automatic: true,
+                             wasapiIdentity: setup.wasapiMode.map {
+                                 WASAPIIdentity(mode: $0, inputContainer: container, outputContainer: container)
+                             })
+        })
+        c.wasapiMode = .shared
+        c.start()
+        try c.updateAudio {
+            $0.chooseOutput(AudioController.simulatedOutputUID)
+            $0.chooseInput(AudioController.simulatedInputUID)
+            $0.guitarIn = [1, 2]
+        }
+        XCTAssertEqual(c.settings?.bufferFrames, AudioSettings.defaultBufferFrames)
+        await c.calibrate()
+        guard case .finished(.success) = c.calibrationPhase else { return XCTFail("\(c.calibrationPhase)") }
+        let saved = try XCTUnwrap(try store.load().audio?.latency)
+        XCTAssertEqual(saved.key.bufferFrames, grantedFrames, "la clave guarda el periodo concedido")
+        XCTAssertEqual(c.session?.isCalibrated, true)
+        XCTAssertTrue(c.calibrationValid, "recién calibrada no puede salir «Sin calibrar»")
+        XCTAssertTrue(AudioService.stateResult(c).calibrationValid)
+        XCTAssertTrue(AudioService.settingsResult(c).calibration.calibrated)
+        XCTAssertTrue(AudioService.settingsResult(c).calibration.label.hasPrefix("Calibrada · "))
+
+        // Reabrir (o relanzar la app) reaplica la calibración y sigue valiendo.
+        try c.updateAudio { $0.guitarIn = nil }
+        try c.updateAudio { $0.guitarIn = [1, 2] }
+        XCTAssertEqual(c.session?.isCalibrated, true)
+        XCTAssertTrue(c.calibrationValid)
+
+        // Caducidad intacta: otro canal de guitarra es otra clave.
+        try c.updateAudio { $0.guitarIn = [2] }
+        XCTAssertEqual(c.session?.isCalibrated, false)
+        XCTAssertFalse(c.calibrationValid)
+        XCTAssertEqual(AudioService.settingsResult(c).calibration.label, "Sin calibrar")
+    }
+
     func testCalibrationWithoutSignalReportsFailure() async throws {
         let store = ProfileStore(url: try tempDir().appendingPathComponent("profile.json"))
         // Entradas sin cable: nada llega.

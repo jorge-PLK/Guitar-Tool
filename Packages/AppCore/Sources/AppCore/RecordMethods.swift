@@ -744,7 +744,8 @@ extension Bridge {
         takeView.offsetSource = { [weak service] in
             guard let c = service?.controller, let r = c.offsetRequest else { return nil }
             c.player.pause()
-            return TakeViewOffsetSource(projectId: c.session.projectID, takeId: r.takeID, audioURL: r.audioURL, songStart: r.songStart)
+            return TakeViewOffsetSource(projectId: c.session.projectID, takeId: r.takeID, audioURL: r.audioURL, songStart: r.songStart,
+                                        videoURLs: [r.videoURL] + r.punches.map(\.videoURL))
         }
         service.willFinishOffset = { [weak takeView] in await takeView?.closeOffset() }
         service.willDeleteTake = { [weak takeView] takeID in await takeView?.release(takeId: takeID) }

@@ -367,11 +367,12 @@ final class StudySession {
         })
     }
 
-    /// Espera a que terminen los guardados de tomas lanzados.
+    /// Espera a que terminen los guardados de tomas lanzados. Los quita de la lista solo al acabar: con dos esperas a la vez
+    /// (Grabar al guardar y `takeview.open`), la segunda también espera en vez de ver la lista vacía.
     func awaitTakeSaves() async {
         let pending = takeSaves
-        takeSaves = []
         for t in pending { await t.value }
+        takeSaves.removeAll { pending.contains($0) }
     }
 
     /// Guarda el estado de grabación por partes (solo toca `recording`) y lo deja también en el proyecto en memoria.

@@ -44,7 +44,18 @@ extension RecordTests {
         _ = try await snap(r, "record.setStartSection", "{\"sectionId\":\"\(sec.id.uuidString)\"}")
         _ = try await snap(r, "record.start")
         let s = try await until(r, timeout: 8) { $0.phase == "idle" && ($0.parts.first?.takes.count ?? 0) == 1 }
+        try await untilSaved(r, takes: 1)
         return (r, try XCTUnwrap(UUID(uuidString: try XCTUnwrap(s.parts.first?.takes.first?.id))))
+    }
+
+    /// `record.state` anuncia la toma antes de que `StudySession.saveTakes` la escriba (en un `Task`): espera a que
+    /// `project.json` tenga `takes` tomas.
+    func untilSaved(_ r: Rig, takes: Int, timeout: Double = 5) async throws {
+        let end = ProcessInfo.processInfo.systemUptime + timeout
+        while ProcessInfo.processInfo.systemUptime < end, ((try? r.project.takes.count) ?? 0) < takes {
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTAssertEqual(try r.project.takes.count, takes, "project.json no llegó a tener las tomas grabadas")
     }
 
     /// Envuelve el gancho de antes de borrar para anotar qué queda abierto dentro de la carpeta de la toma.
@@ -104,6 +115,7 @@ extension RecordTests {
         let (r, first) = try await rigWithOneTake()
         _ = try await snap(r, "record.start")
         let s = try await until(r, timeout: 8) { $0.phase == "idle" && ($0.parts.first?.takes.count ?? 0) == 2 }
+        try await untilSaved(r, takes: 2)
         let second = try XCTUnwrap(s.parts.first?.takes.map(\.id).first { $0 != first.uuidString })
         let pid = try r.project.id.uuidString
         _ = await call(r.router, "record.prepareViewTake")
