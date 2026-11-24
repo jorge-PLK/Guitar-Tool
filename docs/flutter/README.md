@@ -7,6 +7,7 @@
 | [../adr/ADR-021.md](../adr/ADR-021.md) | Las 25 decisiones de Jorge, lo descartado, riesgos y condición de paso | Orquestador, una vez |
 | [../plan/fase-7f.md](../plan/fase-7f.md) | Olas, casillas y condición de paso | Orquestador, al empezar cada sesión |
 | [orquestador.md](orquestador.md) | Agentes, ciclo de una ola, plantilla de encargo, lista de validación, cuándo preguntar | Orquestador |
+| [worktrees.md](worktrees.md) | Guía de worktrees para las olas 1, 2 y 3 en paralelo: ciclo de integración, enlaces, zonas compartidas | Orquestador y agentes de ola |
 | [arquitectura.md](arquitectura.md) | `AppCoreFFI`, hilos, canal de fotogramas, estructura de `FlutterApp/`, reglas de Dart, WebView, vídeo, arranque y empaquetado | Todos (la sección que cite el encargo) |
 | [contrato.md](contrato.md) | Métodos, eventos y tipos del puente por área; servicios de anfitrión; hilos | Agentes, solo su área (`grep -n '^## '`) |
 | [contrato-tipos-a.md](contrato-tipos-a.md) | Tipos de `link`, `playlist`, `audio`, `frames` y `video.preview` | Agentes de Biblioteca, Ajustes y Grabar |
