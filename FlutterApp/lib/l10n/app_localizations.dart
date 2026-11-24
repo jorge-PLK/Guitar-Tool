@@ -1814,6 +1814,12 @@ abstract class AppLocalizations {
   /// **'Elige un tema'**
   String get backing_chooserPick;
 
+  /// Etiqueta de accesibilidad de un diagrama de acorde (ChordDiagram.swift:65).
+  ///
+  /// In es, this message translates to:
+  /// **'Diagrama del acorde'**
+  String get backing_chordDiagramA11y;
+
   /// No description provided for @backing_chordMajor.
   ///
   /// In es, this message translates to:
@@ -1988,6 +1994,12 @@ abstract class AppLocalizations {
   /// **'Afinación fina'**
   String get backing_fineTune;
 
+  /// Traste base de un diagrama de acorde, p. ej. 3fr (ChordDiagram.swift:38).
+  ///
+  /// In es, this message translates to:
+  /// **'{base}fr'**
+  String backing_fretLabel(int base);
+
   /// No description provided for @backing_goToLibrary.
   ///
   /// In es, this message translates to:
@@ -2041,6 +2053,12 @@ abstract class AppLocalizations {
   /// In es, this message translates to:
   /// **'{note} menor'**
   String backing_keyMinor(String note);
+
+  /// Nombre de la nota de la tonalidad. Clave `tonic` sin «#»: sostenido = s (Cs = C#), bemol = b (Db). Sostenidos como en SpanishNotes.names (BackingView.swift:9). Los bemoles no tienen literal en SwiftUI y caen a `other` (muestran el valor crudo).
+  ///
+  /// In es, this message translates to:
+  /// **'{tonic, select, C{Do} Cs{Do#} D{Re} Ds{Re#} E{Mi} F{Fa} Fs{Fa#} G{Sol} Gs{Sol#} A{La} As{La#} B{Si} other{{tonic}}}'**
+  String backing_keyNote(String tonic);
 
   /// No description provided for @backing_loopClearA11y.
   ///
@@ -2191,6 +2209,12 @@ abstract class AppLocalizations {
   /// In es, this message translates to:
   /// **'Siguiente: {name}'**
   String backing_nextChord(String name);
+
+  /// Etiqueta de accesibilidad cuando el acorde no tiene diagrama (ChordDiagram.swift:65).
+  ///
+  /// In es, this message translates to:
+  /// **'Sin diagrama'**
+  String get backing_noChordDiagramA11y;
 
   /// No description provided for @backing_noChords.
   ///

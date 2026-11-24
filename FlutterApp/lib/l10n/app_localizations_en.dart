@@ -1048,6 +1048,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backing_chooserPick => 'Pick a theme';
 
   @override
+  String get backing_chordDiagramA11y => 'Chord diagram';
+
+  @override
   String get backing_chordMajor => 'major';
 
   @override
@@ -1159,6 +1162,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backing_fineTune => 'Fine tuning';
 
   @override
+  String backing_fretLabel(int base) {
+    return '${base}fr';
+  }
+
+  @override
   String get backing_goToLibrary => 'Go to the library';
 
   @override
@@ -1187,6 +1195,26 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String backing_keyMinor(String note) {
     return '$note minor';
+  }
+
+  @override
+  String backing_keyNote(String tonic) {
+    String _temp0 = intl.Intl.selectLogic(tonic, {
+      'C': 'C',
+      'Cs': 'C#',
+      'D': 'D',
+      'Ds': 'D#',
+      'E': 'E',
+      'F': 'F',
+      'Fs': 'F#',
+      'G': 'G',
+      'Gs': 'G#',
+      'A': 'A',
+      'As': 'A#',
+      'B': 'B',
+      'other': '$tonic',
+    });
+    return '$_temp0';
   }
 
   @override
@@ -1276,6 +1304,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String backing_nextChord(String name) {
     return 'Next: $name';
   }
+
+  @override
+  String get backing_noChordDiagramA11y => 'No diagram';
 
   @override
   String get backing_noChords => 'No chords detected.';
