@@ -219,7 +219,6 @@ class LinkResolveResult {
         : LinkTrackInfo.fromJson(json['possibleDuplicate'] as Json),
     noCloseCandidate: json['noCloseCandidate'] as bool,
     candidates: jsonList(json['candidates'], LinkCandidateInfo.fromJson),
-    // PlaylistSnapshot: lo decodifica contract/playlist.dart (otra parte).
     playlist: json['playlist'] as Json?,
   );
 
@@ -245,7 +244,7 @@ class LinkResolveResult {
   final bool noCloseCandidate;
   final List<LinkCandidateInfo> candidates;
 
-  /// Crudo hasta que exista `PlaylistSnapshot`. Ausente si es nulo.
+  /// `PlaylistSnapshot` crudo. Ausente si es nulo.
   final Json? playlist;
 
   /// [playlist] decodificado como [PlaylistSnapshot]. Nulo si no viene.
