@@ -1,0 +1,4 @@
+{
+  "code" : "bad-params",
+  "message" : "«workingSampleRate» debe ser 44100 o 48000."
+}

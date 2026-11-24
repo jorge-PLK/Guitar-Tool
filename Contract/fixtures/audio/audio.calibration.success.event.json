@@ -1,0 +1,25 @@
+{
+  "outcome" : "success",
+  "phase" : "finished",
+  "success" : {
+    "correctedTakes" : 0,
+    "latencyMS" : 50.009999999999998,
+    "latencySamples" : 2205.3699999999999,
+    "rows" : [
+      {
+        "label" : "Latencia",
+        "value" : "50,01 ms · 2205,4 muestras"
+      },
+      {
+        "label" : "Dispersión",
+        "value" : "0,000 ms · 0,0 muestras"
+      },
+      {
+        "label" : "Retardo del rig",
+        "value" : "sin canal de referencia: la latencia calibrada vale tal cual"
+      }
+    ],
+    "spreadMS" : 0,
+    "spreadSamples" : 0
+  }
+}

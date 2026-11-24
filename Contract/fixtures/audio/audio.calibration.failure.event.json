@@ -1,0 +1,10 @@
+{
+  "failure" : {
+    "hint" : "Comprueba el cable de una salida del dispositivo a la entrada de guitarra, y que la entrada elegida sea esa. Después repite.",
+    "reason" : "noSignal",
+    "spreadMS" : 3,
+    "title" : "No llegó la señal de prueba"
+  },
+  "outcome" : "failure",
+  "phase" : "finished"
+}

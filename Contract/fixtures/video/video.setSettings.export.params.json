@@ -1,0 +1,9 @@
+{
+  "export" : {
+    "codec" : "h264",
+    "titleOverlay" : true
+  },
+  "offset" : {
+    "ms" : 65
+  }
+}

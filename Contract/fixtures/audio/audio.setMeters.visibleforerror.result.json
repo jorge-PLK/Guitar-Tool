@@ -1,0 +1,13 @@
+{
+  "calibrateBlock" : "Asigna la entrada de guitarra en Ajustes · Audio.",
+  "calibrationRunning" : false,
+  "calibrationValid" : false,
+  "hosting" : false,
+  "metersVisible" : true,
+  "recording" : false,
+  "recordingNotices" : [
+
+  ],
+  "sessionOpen" : true,
+  "workingSampleRate" : 44100
+}

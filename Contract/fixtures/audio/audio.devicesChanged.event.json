@@ -1,0 +1,37 @@
+{
+  "inputs" : [
+    {
+      "channels" : 2,
+      "connected" : true,
+      "label" : "Entrada simulada · 2 can.",
+      "name" : "Entrada simulada",
+      "rate" : 44100,
+      "uid" : "sim-in"
+    },
+    {
+      "channels" : 0,
+      "connected" : false,
+      "label" : "Dispositivo elegido · desconectado",
+      "name" : "Dispositivo elegido",
+      "uid" : "ya-no-esta"
+    }
+  ],
+  "outputs" : [
+    {
+      "channels" : 2,
+      "connected" : true,
+      "label" : "Salida simulada · 2 can.",
+      "name" : "Salida simulada",
+      "rate" : 44100,
+      "uid" : "sim-out"
+    }
+  ],
+  "systemDefault" : {
+    "channels" : 2,
+    "connected" : true,
+    "label" : "Salida simulada · 2 can.",
+    "name" : "Salida simulada",
+    "rate" : 44100,
+    "uid" : "sim-out"
+  }
+}

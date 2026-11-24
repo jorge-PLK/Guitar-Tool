@@ -1,0 +1,14 @@
+{
+  "calibrateBlock" : "El dispositivo está a 44,1 kHz y la frecuencia de trabajo es 48 kHz",
+  "calibrationRunning" : false,
+  "calibrationValid" : false,
+  "hosting" : false,
+  "metersVisible" : false,
+  "mismatchedRate" : 44100,
+  "recording" : false,
+  "recordingNotices" : [
+
+  ],
+  "sessionOpen" : false,
+  "workingSampleRate" : 48000
+}

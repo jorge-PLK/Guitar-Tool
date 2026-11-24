@@ -1,0 +1,13 @@
+{
+  "calibrateBlock" : "Elige un dispositivo de entrada en Ajustes · Audio.",
+  "calibrationRunning" : false,
+  "calibrationValid" : false,
+  "hosting" : false,
+  "metersVisible" : false,
+  "recording" : false,
+  "recordingNotices" : [
+
+  ],
+  "sessionOpen" : false,
+  "workingSampleRate" : 44100
+}

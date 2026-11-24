@@ -1,0 +1,62 @@
+{
+  "allowedSampleRates" : [
+    {
+      "label" : "44,1 kHz",
+      "rate" : 44100
+    },
+    {
+      "label" : "48 kHz",
+      "rate" : 48000
+    }
+  ],
+  "backingChoices" : [
+    {
+      "label" : "Salidas 1 y 2 · estéreo",
+      "left" : 1,
+      "right" : 2
+    }
+  ],
+  "backingOut" : {
+    "left" : 1,
+    "right" : 2
+  },
+  "calibrateBlock" : "El dispositivo de entrada no está conectado.",
+  "calibrateInstructions" : [
+    "Conecta con un cable una salida del dispositivo a su entrada de guitarra.",
+    "Con una pedalera, carga un rig vacío y baja el volumen de salida: el bucle realimenta (entrada, rig, salida, cable, entrada).",
+    "La prueba son 10 pitidos agudos en unos 5 segundos. Mide el retardo de ida y vuelta, que es el desfase que tendrá una toma respecto al backing que se oye."
+  ],
+  "calibration" : {
+    "calibrated" : false,
+    "label" : "Sin calibrar"
+  },
+  "guitarChoices" : [
+    {
+      "label" : "Sin asignar"
+    },
+    {
+      "channels" : [
+        1
+      ],
+      "label" : "Entrada 1"
+    },
+    {
+      "channels" : [
+        2
+      ],
+      "label" : "Entrada 2"
+    },
+    {
+      "channels" : [
+        1,
+        2
+      ],
+      "label" : "Entradas 1 y 2"
+    }
+  ],
+  "guitarIn" : [
+    1
+  ],
+  "inputDeviceUID" : "ya-no-esta",
+  "workingSampleRate" : 44100
+}

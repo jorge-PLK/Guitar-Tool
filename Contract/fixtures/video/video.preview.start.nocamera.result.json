@@ -1,0 +1,6 @@
+{
+  "fromRecord" : false,
+  "message" : "No hay ninguna cámara conectada.",
+  "rotation" : 0,
+  "state" : "noCamera"
+}

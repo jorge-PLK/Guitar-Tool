@@ -1,0 +1,67 @@
+{
+  "cameraConnected" : false,
+  "cameraName" : "iPhone (Continuity Camera)",
+  "cameraUID" : "sim-iphone",
+  "choices" : {
+    "codecs" : [
+      "hevc",
+      "h264"
+    ],
+    "exportResolutions" : [
+      {
+        "height" : 720,
+        "label" : "720p",
+        "width" : 1280
+      },
+      {
+        "height" : 1080,
+        "label" : "1080p",
+        "width" : 1920
+      },
+      {
+        "height" : 2160,
+        "label" : "4K",
+        "width" : 3840
+      }
+    ],
+    "offsetRangeMs" : {
+      "max" : 500,
+      "min" : -500
+    },
+    "rotations" : [
+      0,
+      90,
+      180,
+      270
+    ]
+  },
+  "effectiveCameraId" : "sim-iphone",
+  "export" : {
+    "codec" : "hevc",
+    "exportStemWAVs" : true,
+    "normalizeLUFS" : -14,
+    "resolution" : {
+      "height" : 1080,
+      "label" : "1080p",
+      "width" : 1920
+    },
+    "titleOverlay" : true
+  },
+  "fps" : 30,
+  "fpsLabel" : "30 fps",
+  "noCamera" : false,
+  "offsetMs" : 65,
+  "offsetsMs" : {
+    "sim-iphone" : 65
+  },
+  "resolution" : {
+    "height" : 1080,
+    "label" : "1080p",
+    "width" : 1920
+  },
+  "rotation" : 90,
+  "rotations" : {
+    "sim-iphone" : 90
+  },
+  "shown" : null
+}

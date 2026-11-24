@@ -1,0 +1,13 @@
+{
+  "calibrateBlock" : "El dispositivo de entrada no está conectado.",
+  "calibrationRunning" : false,
+  "calibrationValid" : false,
+  "hosting" : false,
+  "metersVisible" : false,
+  "recording" : false,
+  "recordingNotices" : [
+
+  ],
+  "sessionOpen" : false,
+  "workingSampleRate" : 44100
+}

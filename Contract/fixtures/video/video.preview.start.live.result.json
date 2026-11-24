@@ -1,0 +1,10 @@
+{
+  "cameraId" : "sim-camera",
+  "cameraName" : "Cámara simulada",
+  "fps" : 30,
+  "fromRecord" : false,
+  "height" : 1080,
+  "rotation" : 0,
+  "state" : "live",
+  "width" : 1920
+}

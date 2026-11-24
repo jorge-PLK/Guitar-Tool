@@ -1,0 +1,12 @@
+{
+  "calibrationRunning" : false,
+  "calibrationValid" : true,
+  "hosting" : false,
+  "metersVisible" : false,
+  "recording" : false,
+  "recordingNotices" : [
+
+  ],
+  "sessionOpen" : true,
+  "workingSampleRate" : 44100
+}

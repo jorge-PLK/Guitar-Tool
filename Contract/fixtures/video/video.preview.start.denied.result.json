@@ -1,0 +1,8 @@
+{
+  "cameraId" : "sim-camera",
+  "cameraName" : "Cámara simulada",
+  "fromRecord" : false,
+  "message" : "ToneForge no tiene permiso para usar la cámara.",
+  "rotation" : 0,
+  "state" : "denied"
+}
