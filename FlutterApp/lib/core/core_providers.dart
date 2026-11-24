@@ -24,7 +24,7 @@ Future<FixtureSource> _findFixtures() async {
 /// Los tests lo sobrescriben con un `MockCore`.
 final coreClientProvider = Provider<CoreClient>((ref) {
   final o = ref.watch(launchOptionsProvider);
-  if (o.mock) return MockCore.lazy(_findFixtures);
+  if (o.mock) return MockCore.lazy(_findFixtures, state: o.state);
   final client = createFfiCoreClient(o);
   ref.onDispose(() => client.shutdown());
   return client;
