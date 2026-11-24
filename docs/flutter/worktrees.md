@@ -52,6 +52,14 @@ cp -R "$R/Temp/flutter/ref-projects" Temp/flutter/ref-projects
 - Congelados fuera de la ola 0: kit (`lib/widgets`), `core/` y `theme/`. Si falta algo, se pide al orquestador; no se toca.
 - Ajustes: cada ola crea su propio fichero de pestaña; no se edita el de otra.
 
+## PC
+
+- En el PC, un worktree de `fase-7f` junto al checkout existente (p. ej. `D:\Personal\Guitar-Tool-7f`); `PC_REPO` de `Tools/flutter/pc.sh` apunta a él.
+- `Vendor` se enlaza con `mklink /J`.
+- El `.build` de Swift se recompila entero.
+- Antes de abrir ventanas en el PC, Moonlight en el Mac contra Apollo (pantalla virtual).
+- Turno con `pcq acquire "<tarea>" --wait` y `pcq release`.
+
 ## 6. Cerrar la ola
 
 Con todo integrado y empujado:

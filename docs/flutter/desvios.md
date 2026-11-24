@@ -83,6 +83,7 @@ Vienen del apartado 9 de las fichas de `pantallas/`. La clase sigue [decisiones-
 | AJ5 | Ajustes · Vídeo | Previa rotada por Flutter (horario); sin selector de giro en Ajustes | interfaz en Dart | 3 | a:5 |
 | AJ6 | Ajustes · Vídeo | Selector de códec oculto si `codecs.length == 1` (Windows) | interfaz en Dart | 3 | a:6 |
 | AJ8 | Ajustes · Audio | Tarjeta de salida de la barra lateral deducida de `audio.settings` y `audio.devices` (la implementa la carcasa) | interfaz en Dart | 3 | a:8 |
+| FC1 | Grabar, Montaje | `FrameChannel` no da el tamaño del fotograma ni avisa del cambio de `textureId`; `TfVideoSurface` recibe `frameSize` por parámetro | hueco claro | 3, 4 | resolver en Grabar B (ola 3) y Montaje P2 (ola 4) |
 | AJ9 | Ajustes · Vídeo | Texto del botón de permisos de cámara en Windows: variante por plataforma en ARB (por analogía con «Finder»/«Explorador»; no lo cita `decisiones-interfaz.md`) | interfaz en Dart | 3 | a:9 |
 
 Descartados (sin trabajo, constan por si se vuelve a preguntar):

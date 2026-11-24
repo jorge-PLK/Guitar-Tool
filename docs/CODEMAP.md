@@ -21,6 +21,7 @@ Tests del Mac (`tf-qa`, 22/11/2026; entre paréntesis, omitidos): AnalysisKit 1,
 - [Packages/NativeKit](codemap/NativeKit.md)
 - [Packages/AppCore](codemap/AppCore.md)
 - [WinApp](codemap/WinApp.md)
+- [FlutterApp](codemap/FlutterApp.md)
 - [App](codemap/App.md)
 - [Probes](codemap/Probes.md)
 - [Tools](codemap/Tools.md)

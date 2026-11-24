@@ -208,6 +208,16 @@ Aspecto actual en macOS con tema oscuro forzado y sin `AccentColor` en el catál
 | `TfTooltip` | `.help("…")` | 46 usos, p. ej. `ArtistGrid.swift:120`, `RecordView.swift:449` | etiqueta emergente del sistema tras ~1 s. Flutter: `Tooltip` con tokens. |
 | `TfScroll` | `ScrollView` | todas las pantallas | barras superpuestas del sistema; Flutter: `Scrollbar` fina con `fieldLine`/`muted` (Jorge, 24/11/2026). |
 
+Medidas nativas tomadas de las capturas de referencia (`docs/flutter/ref/`, 24/11/2026). Tokens: `TfColors.native{Control,SegmentBg,SegmentText,FieldBg,FieldLine,StepperBg,StepperLine}` y `TfRadius.native` (5).
+
+- `TfDropdown`: relleno `#45474A` sin borde, radio ~5, alto 22, texto 13 regular.
+- `TfSegmented`: contenedor `#2D2E30` sin borde, alto ~24.
+- `TfNumberField`: relleno `#171717`, borde 1 `#26282A`, radio ~4, alto ~24, texto a la derecha.
+- `TfStepper`: `#2D2E30` con borde `#494A4C`, ~18×24.
+- `TfScroll`: el del sistema mide ~8 px y es `#99999A`, pero se mantiene la barra fina con `fieldLine` (decisión de Jorge).
+- `TfNotice` lleva un icono que SwiftUI no tiene (lo pide la ficha); pendiente de que Jorge lo acepte.
+- Valores inventados por confirmar: `TfSize.menuMinWidth` 180, `alertWidth` 320, `tooltipMaxWidth` 280.
+
 Resto del trabajo sin widget propio: arrastrar y soltar (`RootView.swift:28` ficheros; `MontageView.swift:762` carriles) → `desktop_drop` y `Draggable`; `Canvas` (`ChordDiagram.swift:14`, líneas de tiempo, tira de acordes) → `CustomPainter` (regla 7).
 
 ## 4. Iconos
