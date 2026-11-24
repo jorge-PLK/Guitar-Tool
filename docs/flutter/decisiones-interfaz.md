@@ -14,6 +14,7 @@ Criterios, por orden: (0) **robustez, fiabilidad y rendimiento mandan sobre cual
 | P9: el PC «una sola vez, al final» | Dos pasadas: primero solo hilos de Windows y compilación de las candidatas de WebView (prueba 7, primera parte), en cuanto la prueba 2 esté verde en el Mac; el resto al final. | Fallar rápido: los hilos son el riesgo mayor y pueden cambiar la arquitectura (proceso aparte). |
 | Nombres por defecto que el núcleo guarda en español (`Guitarra`, secciones, tomas) | El núcleo recibe el idioma al arrancar (`LaunchOptions`) y genera los nombres nuevos en ese idioma; lo ya guardado no se toca. «Selección» (`TabService:42`) deja de compararse por texto: pasa a ser una marca. | Comparar por un texto traducible es frágil. |
 | Mensajes: código del error de origen | `AppCore` conserva el código del paquete que falló en vez de aplanarlo a texto. | Diagnóstico fiable y traducción completa. |
+| Preferencias de interfaz (vista Temas/Artistas de la Biblioteca, idioma) | `shared_preferences` con `SharedPreferencesAsync`; regla 9 de `arquitectura.md` ampliada de «solo el idioma» a «preferencias de interfaz que no van al perfil del núcleo» (Jorge, 24/11/2026). | Paridad con `@AppStorage` de SwiftUI sin plugin nuevo; el perfil del núcleo es del equipo, no de la interfaz. |
 
 Evidencia oficial: `Temp/research/7f-ui-facts.md` (no versionado). «Sin verificar» = la fuente oficial no se pudo leer; se comprueba en la ola indicada.
 
