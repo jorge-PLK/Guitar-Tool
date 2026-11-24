@@ -1,5 +1,6 @@
 import '../core/core_client.dart' show Json;
 import 'json_read.dart';
+import 'playlist_snapshot.dart';
 
 /// Clase de URL (`LinkClassifyResult.kind`). Valor no previsto → [unknown].
 enum LinkKind {
@@ -246,6 +247,12 @@ class LinkResolveResult {
 
   /// Crudo hasta que exista `PlaylistSnapshot`. Ausente si es nulo.
   final Json? playlist;
+
+  /// [playlist] decodificado como [PlaylistSnapshot]. Nulo si no viene.
+  PlaylistSnapshot? get playlistSnapshot {
+    final raw = playlist;
+    return raw == null ? null : PlaylistSnapshot.fromJson(raw);
+  }
 
   Json toJson() => {
     'link': link.raw,
