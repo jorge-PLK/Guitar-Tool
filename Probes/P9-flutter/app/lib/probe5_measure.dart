@@ -70,6 +70,7 @@ Map<String, Object?> regime(List<Sample> all, {double fromMs = 1000, double? toM
     'withE': es.length,
     'e_ms': {
       'median': round3(_pct(es, .5)),
+      'p05': round3(_pct(es, .05)),
       'p95': round3(_pct(es, .95)),
       'p99': round3(_pct(es, .99)),
       'min': es.isEmpty ? null : round3(es.first),

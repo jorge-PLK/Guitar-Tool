@@ -12,8 +12,8 @@
 // Presentación adelantada (P9 7h, monitor de 60 Hz): el presentador elige el fotograma cuyo [PTS, PTS+T) contiene la
 // posición del reloj en el instante en que se verá, no en el de ahora, y lo sube al empezar la ventana de ese vblank.
 //   TF_P9_VSYNC=0  control: el último fotograma cuyo PTS ya cubre pos(ahora) (comportamiento anterior).
-//   TF_P9_VSYNC=1  (por defecto) visible = próximo vblank (DWM) + TF_P9_VLEAD_MS (por defecto un periodo).
-//   TF_P9_VSYNC=2  visible = vblank siguiente a la próxima copia del motor (fase medida de tf_mfv_copy respecto a la
+//   TF_P9_VSYNC=1  visible = próximo vblank (DWM) + TF_P9_VLEAD_MS (por defecto un periodo); adelanta ~1 vblank: mediana −21 ms con monitor real a 60 Hz, 24/11.
+//   TF_P9_VSYNC=2  (por defecto) visible = vblank siguiente a la próxima copia del motor (fase medida de tf_mfv_copy respecto a la
 //                  rejilla de vblank) + TF_P9_VLEAD_MS (por defecto 0); sin fase fiable usa la fórmula del modo 1.
 // El reloj de vblank sale de DwmGetCompositionTimingInfo (qpcVBlank, qpcRefreshPeriod); si falla, 60 Hz con fase 0
 // de QPC. La métrica e (en tf_mfv_copy) no cambia; se añade e_vb = pos(próximo vblank tras la copia) - n·T.
@@ -743,7 +743,7 @@ static DWORD WINAPI mfv_present(void *arg) {
   SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
   const char *vs = getenv("TF_P9_VSYNC");
   const char *vl = getenv("TF_P9_VLEAD_MS");
-  const int mode = (vs && vs[0] == '0') ? 0 : (vs && vs[0] == '2') ? 2 : (vs && vs[0] == '3') ? 3 : 1;
+  const int mode = (vs && vs[0] == '0') ? 0 : (vs && vs[0] == '2') ? 2 : (vs && vs[0] == '3') ? 3 : (vs && vs[0] == '1') ? 1 : 2;
   double pick_tgt = 0;
   const double lead_env = (vl && vl[0]) ? atof(vl) / 1000.0 : -1.0;  // < 0: por defecto del modo
   double vb_at = -1e9;

@@ -16,6 +16,17 @@ def load(p):
         return None
 
 
+def e_bad(e):
+    """Incumple si |mediana|, |p95| o |p05| > E_MAX_MS (el error puede ser negativo: fotograma adelantado).
+    Sin p05 (informes anteriores a su alta) solo mediana y p95; min/max son muestras sueltas y no cuentan."""
+    if e.get("median") is None or e.get("p95") is None:
+        return True
+    edge = abs(e["p95"])
+    if e.get("p05") is not None:
+        edge = max(edge, abs(e["p05"]))
+    return abs(e["median"]) > E_MAX_MS or edge > E_MAX_MS
+
+
 def checks(r):
     """Lista de incumplimientos."""
     bad = []
@@ -36,8 +47,8 @@ def checks(r):
         for k, v in res.items():
             if k.startswith("rate_"):
                 e = v["e_ms"]
-                if e["median"] is None or abs(e["median"]) > E_MAX_MS or abs(e["p95"]) > E_MAX_MS:
-                    bad.append("%s e med/p95 %s/%s" % (k, e["median"], e["p95"]))
+                if e_bad(e):
+                    bad.append("%s e med/p95 %s/%s (p05 %s)" % (k, e["median"], e["p95"], e.get("p05", e.get("min"))))
     elif c == "seek":
         for j in res.get("jumps", []):
             if j.get("stayOkMs") is None or j["stayOkMs"] > RECOVER_MAX_MS:
@@ -47,8 +58,8 @@ def checks(r):
             if j.get("stayOkMs") is None or j["stayOkMs"] > RECOVER_MAX_MS:
                 bad.append("vuelta stay %s ms" % j.get("stayOkMs"))
         e = (res.get("inLoop") or {}).get("e_ms") or {}
-        if e.get("median") is None or abs(e["median"]) > E_MAX_MS or abs(e["p95"]) > E_MAX_MS:
-            bad.append("en bucle e med/p95 %s/%s" % (e.get("median"), e.get("p95")))
+        if e_bad(e):
+            bad.append("en bucle e med/p95 %s/%s (p05 %s)" % (e.get("median"), e.get("p95"), e.get("p05", e.get("min"))))
     return bad
 
 
