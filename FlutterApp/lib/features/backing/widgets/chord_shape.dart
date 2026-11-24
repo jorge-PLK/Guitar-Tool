@@ -1,3 +1,5 @@
+import 'package:toneforge/contract/study.dart' show StudyChordShape;
+
 /// Cejilla de una forma de acorde: traste y cuerdas extremas (0 = 6.ª cuerda, 5 = 1.ª, en cualquier orden).
 class ChordBarre {
   const ChordBarre({required this.fret, required this.from, required this.to});
@@ -18,6 +20,20 @@ class ChordBarre {
 /// [frets]: 6 entradas de la cuerda grave a la aguda; `null` = no se toca, 0 = al aire.
 class ChordShape {
   const ChordShape({required this.frets, this.baseFret = 1, this.barre});
+
+  /// Forma del núcleo. Sus cuerdas de cejilla van 6 = Mi grave … 1 = Mi agudo;
+  /// aquí 0 = 6.ª … 5 = 1.ª, así que se convierten con `6 - n`.
+  factory ChordShape.fromContract(StudyChordShape s) => ChordShape(
+        frets: List<int?>.unmodifiable(s.frets),
+        baseFret: s.baseFret,
+        barre: s.barre == null
+            ? null
+            : ChordBarre(
+                fret: s.barre!.fret,
+                from: 6 - s.barre!.fromString,
+                to: 6 - s.barre!.toString_,
+              ),
+      );
 
   /// Siempre 6 entradas.
   final List<int?> frets;
