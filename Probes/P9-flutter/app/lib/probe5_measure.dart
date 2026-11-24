@@ -110,5 +110,48 @@ Map<String, Object?> recovery(List<Sample> all, double fromMs, [double? toMs]) {
   return {
     'firstOkMs': first == null ? null : round3(first),
     'stayOkMs': stay == null ? null : round3(stay),
+    ...badTrace(all, fromMs, toMs, stay == null ? null : stay + fromMs),
+  };
+}
+
+/// Máximo de muestras fuera de umbral que se vuelcan por salto (P9 7h, observabilidad).
+const traceMax = 40;
+
+/// Observabilidad de [recovery] (no cambia first/stay): muestras fuera de umbral entre [fromMs] y el stay
+/// (o el final de la ventana si no hay stay), con ms desde el salto, PTS leído de la tira (n·T), PTS esperado
+/// (leído + e), e y e_vb, `readFailed` (n < 0: sin lectura; `recovery` las ignora, no cuentan como fallo) y
+/// el índice de fotograma n. `seq` de la textura no se exporta por stats: va a null.
+/// Campos: badTotal (todas las fuera de umbral con lectura), unreadable (muestras sin lectura válida en la ventana),
+/// badTrace (≤ [traceMax]), badTraceTruncated.
+Map<String, Object?> badTrace(List<Sample> all, double fromMs, double? toMs, double? stayAbsMs) {
+  final win = all.where((s) => s.t >= fromMs && (toMs == null || s.t < toMs)).toList();
+  final end = stayAbsMs ?? double.infinity;
+  final rows = <Map<String, Object?>>[];
+  var bad = 0, unread = 0;
+  for (final s in win) {
+    final readFailed = s.e == null;
+    if (readFailed) unread++;
+    final isBad = readFailed || !_ok(s);
+    if (!isBad) continue;
+    if (!readFailed) bad++;
+    if (s.t >= end) continue;
+    rows.add({
+      'tMs': round3(s.t - fromMs),
+      'readPtsMs': readFailed ? null : round3(s.n * frameMs),
+      'expectedPtsMs': readFailed ? null : round3(s.n * frameMs + s.e!),
+      'eMs': s.e == null ? null : round3(s.e!),
+      'evbMs': s.evb == null ? null : round3(s.evb!),
+      'readFailed': readFailed,
+      'frameIndex': s.n,
+      'itemTimeS': s.item,
+      'epoch': s.epoch,
+      'texSeq': null,
+    });
+  }
+  return {
+    'badTotal': bad,
+    'unreadable': unread,
+    'badTraceTruncated': rows.length > traceMax,
+    'badTrace': rows.take(traceMax).toList(),
   };
 }

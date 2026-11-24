@@ -452,8 +452,8 @@ vid_case() { # caso -> VC_CASE VC_FILE VC_SHOT
     steady-h264g30) VC_CASE=steady; VC_FILE=code-h264-g30.mp4; VC_SHOT=12 ;;  # GOP de 1 s (code-h264.mp4 lo tiene de 250 fotogramas)
     seek-h264g30) VC_CASE=seek; VC_FILE=code-h264-g30.mp4; VC_SHOT=0 ;;
     loop-h264g30) VC_CASE=loop; VC_FILE=code-h264-g30.mp4; VC_SHOT=0 ;;
-    rot-hevc) VC_CASE=rotation; VC_FILE=take-hevc-rot90.mov; VC_SHOT=6 ;;  # a 3 s la captura salía blanca (antes del primer fotograma)
-    rot-h264) VC_CASE=rotation; VC_FILE=take-h264-rot90.mp4; VC_SHOT=6 ;;
+    rot-hevc) VC_CASE=rotation; VC_FILE=take-hevc-rot90.mov; VC_SHOT=4 ;;  # a 3 s la captura salía blanca (antes del primer fotograma)
+    rot-h264) VC_CASE=rotation; VC_FILE=take-h264-rot90.mp4; VC_SHOT=4 ;;
     *) return 1 ;;
   esac
 }
