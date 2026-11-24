@@ -1,0 +1,9 @@
+{
+  "takeId" : "00000000-0000-0000-0000-000000000001",
+  "video" : {
+    "code" : "video-failed",
+    "jobId" : "video-00000000-0000-0000-0000-000000000001",
+    "message" : "No se pudo convertir el vídeo de esta toma a H.264: No se pudo convertir el vídeo..",
+    "takeId" : "00000000-0000-0000-0000-000000000001"
+  }
+}

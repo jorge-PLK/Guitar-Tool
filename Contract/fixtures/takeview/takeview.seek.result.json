@@ -1,0 +1,15 @@
+{
+  "backingOn" : false,
+  "duration" : 3,
+  "epoch" : 1,
+  "hasBacking" : true,
+  "outputName" : "Salida simulada",
+  "playing" : false,
+  "position" : 1.25,
+  "projectId" : "00000000-0000-0000-0000-000000000001",
+  "songStart" : 2,
+  "takeId" : "00000000-0000-0000-0000-000000000002",
+  "videoHeight" : 360,
+  "videoRotation" : 90,
+  "videoWidth" : 640
+}

@@ -1,0 +1,10 @@
+{
+  "takeId" : "00000000-0000-0000-0000-000000000001",
+  "video" : {
+    "code" : "video-converting",
+    "jobId" : "video-00000000-0000-0000-0000-000000000001",
+    "message" : "Esta toma se está convirtiendo a H.264… 40 %",
+    "progress" : 0.40000000000000002,
+    "takeId" : "00000000-0000-0000-0000-000000000001"
+  }
+}

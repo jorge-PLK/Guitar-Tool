@@ -1,0 +1,12 @@
+{
+  "channels" : {
+    "bass" : {
+      "peakDB" : -6.25,
+      "rmsDB" : -18.5
+    },
+    "guitar" : {
+      "peakDB" : -120,
+      "rmsDB" : -120
+    }
+  }
+}
