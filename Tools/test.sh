@@ -50,7 +50,7 @@ bump() { [ "$1" -gt "$status" ] && status=$1; }
 [ "$full" -eq 1 ] && echo "RUNNING $(date '+%Y-%m-%d %H:%M:%S')" > Temp/last-run.txt
 
 # Errores de compilación (no los fallos de XCTest, que también llevan "error: -[").
-compile_errors() { grep -E ': error: ' "$1" | grep -vE 'error: -\[' | sort -u | head -15; }
+compile_errors() { grep -aE ': error: ' "$1" | grep -avE 'error: -\[' | sort -u | head -15; }
 
 for pkg in ${pkgs[@]+"${pkgs[@]}"}; do   # bash 3.2 + set -u: array vacío
   log="Temp/logs/$pkg.log"
@@ -59,8 +59,8 @@ for pkg in ${pkgs[@]+"${pkgs[@]}"}; do   # bash 3.2 + set -u: array vacío
   swift "${args[@]}" > "$log" 2>&1
   rc=$?
 
-  xct=$(grep -E 'Executed [0-9]+ tests?' "$log" | tail -1 | sed -E 's/^[[:space:]]+//')
-  st=$(grep -E 'Test run with [0-9]+ tests?' "$log" | grep -v 'with 0 tests' | tail -1 | sed -E 's/^[^T]*//')
+  xct=$(grep -aE 'Executed [0-9]+ tests?' "$log" | tail -1 | sed -E 's/^[[:space:]]+//')
+  st=$(grep -aE 'Test run with [0-9]+ tests?' "$log" | grep -av 'with 0 tests' | tail -1 | sed -E 's/^[^T]*//')
   totals="${xct}${xct:+${st:+ · }}${st}"
 
   if [ "$rc" -eq 0 ]; then
@@ -69,7 +69,7 @@ for pkg in ${pkgs[@]+"${pkgs[@]}"}; do   # bash 3.2 + set -u: array vacío
     bump 1
     summary+=("FALLO $pkg: $totals")
     while IFS= read -r l; do [ -n "$l" ] && summary+=("      $l"); done < <(
-      grep -E 'error: -\[|✘ Test .*(failed|recorded an issue)' "$log" | sed -E "s#^$root/##" | sort -u | head -15)
+      grep -aE 'error: -\[|✘ Test .*(failed|recorded an issue)' "$log" | sed -E "s#^$root/##" | sort -u | head -15)
   else
     bump 2
     summary+=("COMPILACIÓN $pkg (rc $rc)")
