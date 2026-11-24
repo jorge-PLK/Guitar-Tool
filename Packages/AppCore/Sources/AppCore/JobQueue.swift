@@ -124,7 +124,8 @@ final class JobEngine: @unchecked Sendable {
         for i in out.projects.indices {
             guard let j = snapshot[out.projects[i].id.uuidString]?.info else { continue }
             out.projects[i].separationState = j.state == "running" ? "running" : "queued"
-        }
+            // Los fallos salen de la lista viva al instante (estado final); un tema en cola ya no arrastra el error viejo.
+            out.projects[i].separationError = nil        }
         return out
     }
 
@@ -319,6 +320,13 @@ final class JobEngine: @unchecked Sendable {
             if case .takeNotFound = e { throw RPCError(code: "not-found", message: "No hay ninguna toma con id \(takeID.uuidString).") }
             throw Self.map(e)
         } catch { throw Self.map(error) }
+        emitChanged()
+    }
+
+    /// Guarda el estado de grabación por la `Library` de la cola (`library.markBest`).
+    func saveRecording(id: UUID, _ recording: RecordingState) async throws {
+        let lib = try await library()
+        do { try await lib.saveRecording(id: id, recording) } catch { throw Self.map(error) }
         emitChanged()
     }
 

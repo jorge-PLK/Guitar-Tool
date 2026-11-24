@@ -1,0 +1,48 @@
+{
+  "projects" : [
+    {
+      "bytes" : 1000,
+      "folderName" : "Banda - Alfa",
+      "id" : "00000000-0000-0000-0000-000000000001",
+      "regenerableBytes" : 0
+    },
+    {
+      "bytes" : 2000,
+      "folderName" : "Banda - Borrar",
+      "id" : "00000000-0000-0000-0000-000000000002",
+      "regenerableBytes" : 0
+    },
+    {
+      "bytes" : 3000,
+      "folderName" : "Banda - Bravo",
+      "id" : "00000000-0000-0000-0000-000000000003",
+      "regenerableBytes" : 0
+    },
+    {
+      "bytes" : 4000,
+      "folderName" : "Banda - Delta",
+      "id" : "00000000-0000-0000-0000-000000000004",
+      "regenerableBytes" : 0
+    },
+    {
+      "bytes" : 5000,
+      "folderName" : "Banda - Eco",
+      "id" : "00000000-0000-0000-0000-000000000005",
+      "regenerableBytes" : 0
+    },
+    {
+      "bytes" : 6000,
+      "folderName" : "Banda - Papelera",
+      "id" : "00000000-0000-0000-0000-000000000006",
+      "regenerableBytes" : 0
+    },
+    {
+      "bytes" : 7000,
+      "folderName" : "Charlie",
+      "id" : "00000000-0000-0000-0000-000000000007",
+      "regenerableBytes" : 100
+    }
+  ],
+  "regenerableBytes" : 100,
+  "totalBytes" : 28000
+}

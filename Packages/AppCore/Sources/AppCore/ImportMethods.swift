@@ -70,6 +70,7 @@ struct RenameResult: Codable, Sendable {
 struct CancelResult: Codable, Sendable { var cancelled: Bool }
 struct QueuedResult: Codable, Sendable { var queued: Bool }
 struct RemovedResult: Codable, Sendable { var removed: Bool }
+struct MarkedResult: Codable, Sendable { var marked: Bool }
 struct DeleteTakeParams: Decodable, Sendable { var id: String; var takeId: String }
 struct CleanupInfoResult: Codable, Sendable { var bytes: Int64 }
 struct CleanupResult: Codable, Sendable { var cleaned: Bool; var bytes: Int64 }
@@ -144,6 +145,13 @@ extension Bridge {
         await closeStudy()
     }
 
+    /// Cierra Montage, visor, tablatura y estudio solo si el tema `id` es el abierto en estudio o en Montage.
+    @MainActor func closeProjectFilesIfOpen(_ id: UUID) async {
+        let inStudy = studyService.current?.session.projectID == id
+        let inMontage = montageService.current?.session.projectID == id
+        if inStudy || inMontage { await closeProjectFiles() }
+    }
+
     public func shutdownAsync() async {
         // Primero se corta lo que descarga o lee (yt-dlp, ffmpeg); en Windows los hijos que sigan vivos mueren con el
         // job object «kill on close» de `ChildProcess` al salir el proceso (equivale a `ChildProcesses.terminateAll`).
@@ -192,12 +200,25 @@ extension Bridge {
             await self?.studyService.reloadIfOpen(id)
             return RemovedResult(removed: true)
         }
-        router.register("library.trash") { (p: ProjectIDParams) in
-            try await jobs.remove(id: try uuid(p.id), permanently: false)
+        // Sin sesión de Grabar: como `ProjectRecordingsView.markBest` (fija la toma como mejor de su parte, no alterna).
+        router.register("library.markBest") { [weak self] (p: DeleteTakeParams) in
+            let id = try uuid(p.id), takeID = try uuid(p.takeId)
+            let rec = try Bridge.service(root).recordingMarkingBest(id: id, takeID: takeID)
+            try await jobs.saveRecording(id: id, rec)
+            await self?.studyService.reloadIfOpen(id)
+            return MarkedResult(marked: true)
+        }
+        // Como `AppModel.deleteProject`: si el tema a borrar es el abierto, se cierra su sesión antes (`closeStudy()`).
+        router.register("library.trash") { [weak self] (p: ProjectIDParams) in
+            let id = try uuid(p.id)
+            await self?.closeProjectFilesIfOpen(id)
+            try await jobs.remove(id: id, permanently: false)
             return RemovedResult(removed: true)
         }
-        router.register("library.delete") { (p: ProjectIDParams) in
-            try await jobs.remove(id: try uuid(p.id), permanently: true)
+        router.register("library.delete") { [weak self] (p: ProjectIDParams) in
+            let id = try uuid(p.id)
+            await self?.closeProjectFilesIfOpen(id)
+            try await jobs.remove(id: id, permanently: true)
             return RemovedResult(removed: true)
         }
 

@@ -22,6 +22,35 @@ public struct ProjectSummary: Codable, Sendable, Equatable {
     public var origin: String?
     /// Nombres de las pistas de guitarra separadas (`project.guitars`); vacía si no hay.
     public var guitars: [String]
+    /// Motivo del último fallo de separación (`project.separation.error`) o del trabajo fallido en vivo; `null` si no hay.
+    public var separationError: String? = nil
+
+    private enum CodingKeys: String, CodingKey {
+        case id, title, artist, folderName, duration, sampleRate, cover, createdAt, updatedAt, separationState
+        case stemCount, takeCount, rigCount, hasAnalysis, origin, guitars, separationError
+    }
+
+    /// Como `artist`, `cover` y `origin` (ausentes si son nil), salvo `separationError`, que va siempre (`null`).
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(title, forKey: .title)
+        try c.encodeIfPresent(artist, forKey: .artist)
+        try c.encode(folderName, forKey: .folderName)
+        try c.encode(duration, forKey: .duration)
+        try c.encode(sampleRate, forKey: .sampleRate)
+        try c.encodeIfPresent(cover, forKey: .cover)
+        try c.encode(createdAt, forKey: .createdAt)
+        try c.encode(updatedAt, forKey: .updatedAt)
+        try c.encode(separationState, forKey: .separationState)
+        try c.encode(stemCount, forKey: .stemCount)
+        try c.encode(takeCount, forKey: .takeCount)
+        try c.encode(rigCount, forKey: .rigCount)
+        try c.encode(hasAnalysis, forKey: .hasAnalysis)
+        try c.encodeIfPresent(origin, forKey: .origin)
+        try c.encode(guitars, forKey: .guitars)
+        try c.encode(separationError, forKey: .separationError)
+    }
 }
 
 public struct SkippedInfo: Codable, Sendable, Equatable {
@@ -160,7 +189,20 @@ struct LibraryService: Sendable {
             stemCount: p.stems.count, takeCount: p.takes.count, rigCount: p.rigs.count,
             hasAnalysis: fm.fileExists(atPath: layout.analysisCache.path),
             origin: p.song.origin?.kind.rawValue,
-            guitars: p.guitars.map(\.name))
+            guitars: p.guitars.map(\.name), separationError: p.separation.error)
+    }
+
+    /// Estado de grabación con `takeID` marcada como mejor de su parte (`ProjectRecordingsView.markBest`: fija, no alterna;
+    /// una mejor por parte). `not-found` si el tema no existe o ninguna parte contiene la toma.
+    func recordingMarkingBest(id: UUID, takeID: UUID) throws -> RecordingState {
+        guard let s = ProjectScanner.scan(root: root).found.first(where: { $0.project.id == id }) else {
+            throw RPCError(code: "not-found", message: "No hay ningún tema con id \(id.uuidString).")
+        }
+        guard var rec = s.project.recording, rec.part(containingTake: takeID) != nil else {
+            throw RPCError(code: "not-found", message: "No hay ninguna toma con id \(takeID.uuidString).")
+        }
+        for i in rec.parts.indices where rec.parts[i].takeIDs.contains(takeID) { rec.parts[i].setBest(takeID) }
+        return rec
     }
 
     func list() -> LibraryListResult {

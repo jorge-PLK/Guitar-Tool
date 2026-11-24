@@ -1,0 +1,142 @@
+{
+  "projects" : [
+    {
+      "artist" : "Banda",
+      "createdAt" : "2026-01-01T00:00:00Z",
+      "duration" : 10,
+      "folderName" : "Banda - Alfa",
+      "guitars" : [
+
+      ],
+      "hasAnalysis" : false,
+      "id" : "00000000-0000-0000-0000-000000000001",
+      "rigCount" : 0,
+      "sampleRate" : 44100,
+      "separationError" : null,
+      "separationState" : "none",
+      "stemCount" : 0,
+      "takeCount" : 0,
+      "title" : "Alfa",
+      "updatedAt" : "2026-01-01T00:00:00Z"
+    },
+    {
+      "artist" : "Banda",
+      "createdAt" : "2026-01-01T00:00:00Z",
+      "duration" : 10,
+      "folderName" : "Banda - Borrar",
+      "guitars" : [
+
+      ],
+      "hasAnalysis" : false,
+      "id" : "00000000-0000-0000-0000-000000000002",
+      "rigCount" : 0,
+      "sampleRate" : 44100,
+      "separationError" : null,
+      "separationState" : "none",
+      "stemCount" : 0,
+      "takeCount" : 0,
+      "title" : "Borrar",
+      "updatedAt" : "2026-01-01T00:00:00Z"
+    },
+    {
+      "artist" : "Banda",
+      "createdAt" : "2026-01-01T00:00:00Z",
+      "duration" : 10,
+      "folderName" : "Banda - Bravo",
+      "guitars" : [
+
+      ],
+      "hasAnalysis" : false,
+      "id" : "00000000-0000-0000-0000-000000000003",
+      "rigCount" : 0,
+      "sampleRate" : 44100,
+      "separationError" : null,
+      "separationState" : "queued",
+      "stemCount" : 0,
+      "takeCount" : 0,
+      "title" : "Bravo",
+      "updatedAt" : "2026-01-01T00:00:00Z"
+    },
+    {
+      "createdAt" : "2026-01-01T00:00:00Z",
+      "duration" : 10,
+      "folderName" : "Charlie",
+      "guitars" : [
+
+      ],
+      "hasAnalysis" : false,
+      "id" : "00000000-0000-0000-0000-000000000004",
+      "rigCount" : 0,
+      "sampleRate" : 44100,
+      "separationError" : null,
+      "separationState" : "running",
+      "stemCount" : 0,
+      "takeCount" : 0,
+      "title" : "Charlie",
+      "updatedAt" : "2026-01-01T00:00:00Z"
+    },
+    {
+      "artist" : "Banda",
+      "createdAt" : "2026-01-01T00:00:00Z",
+      "duration" : 10,
+      "folderName" : "Banda - Delta",
+      "guitars" : [
+
+      ],
+      "hasAnalysis" : false,
+      "id" : "00000000-0000-0000-0000-000000000005",
+      "rigCount" : 0,
+      "sampleRate" : 44100,
+      "separationError" : null,
+      "separationState" : "done",
+      "stemCount" : 2,
+      "takeCount" : 4,
+      "title" : "Delta",
+      "updatedAt" : "2026-01-01T00:00:00Z"
+    },
+    {
+      "artist" : "Banda",
+      "createdAt" : "2026-01-01T00:00:00Z",
+      "duration" : 10,
+      "folderName" : "Banda - Eco",
+      "guitars" : [
+
+      ],
+      "hasAnalysis" : false,
+      "id" : "00000000-0000-0000-0000-000000000006",
+      "rigCount" : 0,
+      "sampleRate" : 44100,
+      "separationError" : "Fallo de memoria al separar.",
+      "separationState" : "failed",
+      "stemCount" : 0,
+      "takeCount" : 0,
+      "title" : "Eco",
+      "updatedAt" : "2026-01-01T00:00:00Z"
+    },
+    {
+      "artist" : "Banda",
+      "createdAt" : "2026-01-01T00:00:00Z",
+      "duration" : 10,
+      "folderName" : "Banda - Papelera",
+      "guitars" : [
+
+      ],
+      "hasAnalysis" : false,
+      "id" : "00000000-0000-0000-0000-000000000007",
+      "rigCount" : 0,
+      "sampleRate" : 44100,
+      "separationError" : null,
+      "separationState" : "none",
+      "stemCount" : 0,
+      "takeCount" : 0,
+      "title" : "Papelera",
+      "updatedAt" : "2026-01-01T00:00:00Z"
+    }
+  ],
+  "skipped" : [
+    {
+      "folderName" : "Rota",
+      "reason" : "Unreadable project.json"
+    }
+  ]
+}

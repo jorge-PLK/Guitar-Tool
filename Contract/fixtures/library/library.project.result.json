@@ -1,0 +1,115 @@
+{
+  "artist" : "Banda",
+  "createdAt" : "2026-01-01T00:00:00Z",
+  "duration" : 10,
+  "folderName" : "Banda - Delta",
+  "guitars" : [
+
+  ],
+  "hasAnalysis" : false,
+  "id" : "00000000-0000-0000-0000-000000000001",
+  "parts" : [
+    {
+      "id" : "00000000-0000-0000-0000-000000000002",
+      "isLead" : false,
+      "name" : "Rítmica",
+      "takes" : [
+        {
+          "createdAt" : "2026-01-01T00:00:00Z",
+          "discarded" : false,
+          "hasVideo" : false,
+          "id" : "00000000-0000-0000-0000-000000000003",
+          "isBest" : false,
+          "number" : 1,
+          "punchCount" : 0,
+          "punches" : [
+
+          ],
+          "videoRotation" : 0
+        },
+        {
+          "audio" : "Banda - Delta/takes/00000000-0000-0000-0000-000000000004/processed.wav",
+          "createdAt" : "2026-01-01T00:00:00Z",
+          "discarded" : false,
+          "duration" : 1,
+          "hasVideo" : true,
+          "id" : "00000000-0000-0000-0000-000000000004",
+          "isBest" : true,
+          "number" : 2,
+          "punchCount" : 1,
+          "punches" : [
+            {
+              "end" : 4,
+              "start" : 3,
+              "videoOffsetMs" : 50,
+              "videoPath" : "Banda - Delta/takes/00000000-0000-0000-0000-000000000004/punch1.mov"
+            }
+          ],
+          "songStart" : 2,
+          "video" : "Banda - Delta/takes/00000000-0000-0000-0000-000000000004/video.mov",
+          "videoRotation" : 0
+        },
+        {
+          "audio" : "Banda - Delta/takes/00000000-0000-0000-0000-000000000005/processed.wav",
+          "createdAt" : "2026-01-01T00:00:00Z",
+          "discarded" : true,
+          "duration" : 1,
+          "hasVideo" : false,
+          "id" : "00000000-0000-0000-0000-000000000005",
+          "isBest" : false,
+          "number" : 3,
+          "punchCount" : 0,
+          "punches" : [
+
+          ],
+          "songStart" : 0,
+          "videoRotation" : 0
+        }
+      ]
+    },
+    {
+      "id" : "00000000-0000-0000-0000-000000000006",
+      "isLead" : true,
+      "name" : "Solo",
+      "takes" : [
+        {
+          "audio" : "Banda - Delta/takes/00000000-0000-0000-0000-000000000007/processed.wav",
+          "createdAt" : "2026-01-01T00:00:00Z",
+          "discarded" : false,
+          "duration" : 1,
+          "hasVideo" : false,
+          "id" : "00000000-0000-0000-0000-000000000007",
+          "isBest" : true,
+          "number" : 1,
+          "punchCount" : 0,
+          "punches" : [
+
+          ],
+          "songStart" : 5,
+          "videoRotation" : 0
+        }
+      ]
+    }
+  ],
+  "rigCount" : 0,
+  "sampleRate" : 44100,
+  "separationError" : null,
+  "separationState" : "done",
+  "stemCount" : 2,
+  "stems" : [
+    {
+      "bytes" : 176444,
+      "isEmpty" : false,
+      "kind" : "bass"
+    },
+    {
+      "bytes" : 0,
+      "isEmpty" : true,
+      "kind" : "drums"
+    }
+  ],
+  "takeCount" : 4,
+  "title" : "Delta",
+  "updatedAt" : "2026-01-01T00:00:00Z",
+  "videoCount" : 0
+}
