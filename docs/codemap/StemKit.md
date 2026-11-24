@@ -26,4 +26,5 @@ Separación de stems con BS-RoFormer SW en Core ML, `.cpuAndGPU` (ADR-004, ADR-0
 | `Sources/StemKit/SeparationRunner.swift` (Fase 7c, paso 8) | (ADR-020) Lanza `tf-separate` con `ChildProcess` y `terminationHandler`: en Windows, sin ventana de consola |
 | `Tests/StemKitTests/SeparationTimingTests.swift` (Fase 7c, paso 8) | Tests del desglose de tiempos |
 | `Tests/StemKitTests/SeparationSpectrumLayoutTests.swift` (Fase 7c, paso 7) | (ADR-020) Diseño del espectro y máscara en el Mac |
+| `Tests/StemKitTests/DirectMLParityTests.swift` (Fase 7c, cierre) | (ADR-022) Paridad DirectML frente a CPU con los ONNX de BS y de guitarras reescritos (GLU → Slice): 123,5 dB en guitarras y 116,5 dB en BS; falla con los ONNX originales. Solo con `TF_ORT_DLL` apuntando a la ORT DML |
 | `Tests/StemKitTests/` | 36 tests (`StemLevelMeterTests`); 3 pesados con `TF_MODEL_TESTS=1` y 1 de referencia Python con `TF_REF_DIR` |

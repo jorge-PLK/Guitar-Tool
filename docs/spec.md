@@ -250,6 +250,10 @@ Texto en [spec/fase-7.md](spec/fase-7.md).
 
 Texto en [spec/fase-7b.md](spec/fase-7b.md).
 
+## Cierre de la 7c en Windows (mini-spec de la Fase 7c)
+
+Texto en [spec/fase-7c.md](spec/fase-7c.md).
+
 ## Fuentes
 
 - HeadRush Flex Prime FAQ (Remote Editor, MIDI PC/CC/Clock)

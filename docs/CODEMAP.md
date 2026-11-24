@@ -1,6 +1,6 @@
 # ToneForge · Mapa del código
 
-Última actualización: 2026-11-22 · Fase 7c, paso 8, ola 2 (ADR-020): Grabar, Montaje, Ajustes, «Ver toma», Songsterr y playlists en la interfaz WebView2 (`Packages/AppCore`, `WinApp`, `Tools/webdev`), WASAPI con identidad de aparato, `endTime` en el reproductor y hilo de UI en STA.
+Última actualización: 2026-11-24 · Fase 7c cerrada (ADR-022): `VideoConversion` HEVC→H.264 y evento `takeview.video`, ONNX de BS y guitarras con GLU→Slice (T575 desactivado), ADTOF en CPU, `validCalibration`, `captureDiscontinuity` con `TakeRecorder.filledGaps` y `CoreLog`/`AudioKitLog`.
 
 Una sección por paquete (nombres de `docs/plan.md`, «Forma de trabajo»), más la app, las pruebas y las herramientas. Fila por fichero: `| Fichero | qué hace (ADR-NNN): APIs públicas |`. Cada paquete tiene su ficha en `docs/codemap/`; se lee solo la del paquete que se toca.
 

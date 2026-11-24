@@ -41,7 +41,7 @@ La pedalera se usa solo como interfaz de audio, con el rig que esté cargado: no
 
 - [Fase 7b · Retoques de interfaz (rama desde `fase-7`)](plan/fase-7b.md)
 
-- [Fase 7c · Port a Windows (sin rama aún; rama `fase-7c` desde `main`)](plan/fase-7c.md)
+- [Fase 7c · Port a Windows (cerrada el 24/11/2026 en la rama `pcx64tests`)](plan/fase-7c.md)
 
 - [Fase 7d · Actualizaciones automáticas (sin rama aún; rama `fase-7d` desde `main` después de la migración de la interfaz a Flutter)](plan/fase-7d.md)
 

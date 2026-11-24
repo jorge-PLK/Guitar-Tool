@@ -187,7 +187,7 @@ Ola 2, trabajo ya identificado (además de las partes 8.9+ de la tabla):
 
 - [x] Grabar y Montaje: «Ver toma» (visor de tomas) y los retoques del Mac a 1100×680 (Montaje: columnas 252/276, tiempo en una línea; Grabar: píldora de la toma en una línea y cámara y «Rotar» en segunda fila). *Hecho en la ola 2 (`takeview.*`, `TakeViewTests` 8/8, `OffsetSheetTests` 4/4); verificado en la VM con `takeview.open` sobre una toma existente; falta Grabar real con la HeadRush (abajo).*
 - [x] Importación de Songsterr (hoja, `tab/songsterr-grid.json`) y listas, álbumes y episodios en el enlace. *Hecho en la ola 2; en la VM Songsterr en WebView2 oculto (19 resultados, 6 pistas) y `link.classify` 4/4.*
-- [ ] F3: arena de ONNX Runtime en la separación (desglose con `TF_SEPARATE_TIMING=1`, `StemKit/SeparationTiming.swift`); decidir el arreglo con los números. Propuesto para la fase de arreglos, sin respuesta de Jorge.
+- [x] F3: arena de ONNX Runtime en la separación (desglose con `TF_SEPARATE_TIMING=1`, `StemKit/SeparationTiming.swift`). *Cerrado (Jorge, 22/11/2026): opción C.* La arena ya está apagada (`StemKit/OnnxMaskModel.swift:25`); el 95 % es `session.Run` (12,5 s/trozo en régimen) y fuera del modelo <0,3 s/trozo; DML es la vía por defecto (~21-29 s/min) y CPU queda de respaldo (ADR-022).
 - [ ] Sin probar desde la página: limpieza real de la Biblioteca («Limpiar…»), borrado real de toma y recarga de Backing al borrar con el tema abierto, soltar ficheros, selector múltiple, «Sin artista» al final, ajuste del bucle por arrastre en WebView2, metrónomo con rejilla de Songsterr (oído de Jorge), «Oír transcripción» y vuelta a Backing (oído de Jorge, arreglo de `TabController.close()` en el Mac).
 - [ ] Dudas visuales para Jorge (pierden prioridad por la migración a Flutter, 22/11/2026): color de la casilla marcada, interruptor encendido, triángulos de menú muy pequeños y botones de la barra de edición (12 px frente a 13 pt); error de yt-dlp con la línea cruda en inglés (comparar con el Mac).
 
@@ -218,7 +218,7 @@ Tiempos del paso 7 (VM x64 sana con `dotpr` nuevo; el Mac en Debug). El tope de 
 
 SNR frente a ORT del Mac: 119,3 / 118,9 dB. StemKit con modelo en release: 81/0, 9 saltos de bancos opcionales. `docs/probes/P8-windows.md` enlaza a esta tabla.
 
-Condición de paso: la de la mini-spec del port (aprobada por Jorge el 18/11/2026; solo x64), más la condición de cierre de abajo.
+Condición de paso: la de la mini-spec del port (aprobada por Jorge el 18/11/2026; solo x64), más la condición de cierre de abajo. *Cumplida el 24/11/2026 en el PC x64 (rama `pcx64tests`, ADR-022); suite entera de Windows: 14/14 paquetes en verde (AppCore 271/1 skip, AudioKit 200/4, Store 225/1, TabKit 253/24, SourceKit 116, VideoKit 99/3, StemKit 96/15, NativeKit 59/1, StudyKit 50/4, ModelKit 24/7 y los cuatro de solo versión) y build de WinApp rc=0 (commit `76bc50d`); AudioKit entero tarda 341 s y supera el `-IdleSec 180` de `test.ps1` porque XCTest no vuelca salida hasta el final en Windows: se pasa con `-IdleSec 0`.*
 
 ## Condición de cierre de la 7c (decisión de Jorge, 22/11/2026)
 
@@ -226,20 +226,26 @@ La 7c solo se cierra con todo el núcleo cerrado en las dos plataformas. Orden n
 
 Núcleo pendiente (ids de `Temp/win/appcore-gap-audit.md`; entre paréntesis, agente):
 
-- [ ] B1 · Separador de guitarras en Windows: `AppCore/Services.swift` tiene `guitarSplitter: nil`; falta un `GuitarSplitting` portable con RoFormer sobre ONNX Runtime, el modelo en el catálogo y el cableado en `JobServices.production`; con él, «Generar L y R» (`tf-ml` el modelo, `tf-engineer`).
-- [ ] B2 · Cambio de carpeta de proyectos en caliente: hoy `ImportMethods.swift` guarda el perfil y devuelve `restartRequired`; debe llamar a `Library.relocate` (`tf-implementer`).
-- [ ] B3 · Primer arranque: proponer `~/Music/ToneForge` y crearla, sin reiniciar (`tf-implementer`).
-- [ ] B4 · Fotos de artista por AppCore (`tf-implementer`).
-- [ ] B6 · Cierre ordenado: `terminateAll` y `flush` del estudio (`tf-implementer`).
-- [ ] A1 · Cámaras en Ajustes del Mac por AppCore: hoy `resolvedCameras` da `nil` con cámara real (`tf-implementer`).
-- [x] M1 · Hoja «Encuadre» en el Mac: `takeFrame` tiene rama Mac (`MontageServices.swift:73-78`, commit `a5f9eb6`). *Falta que Jorge compruebe `framingFrame` con vídeo real en el Mac.*
-- [ ] R3 y M2 · Medir en el Mac el rendimiento de la cámara y de la vista previa de Montaje por JPEG y `FrameRelay` (`tf-engineer`).
-- [ ] F3 · Arena de ONNX Runtime en la separación (desglose con `TF_SEPARATE_TIMING=1`): pendiente de decisión de Jorge con los números.
+- [x] B1 · Separador de guitarras en Windows (`GuitarSplitting` portable con RoFormer sobre ONNX Runtime). *Validado por números el 23/11/2026: L/R de Windows frente al del Mac, Tornado y Benito bit a bit; Platero, el único que pasa por el modelo, 55 dB en el tramo del solo; DML y CPU a 127 dB. `DirectMLParityTests`: 123,5 dB en guitarras y 116,5 dB en BS (ADR-022).*
+- [x] B2 · Cambio de carpeta de proyectos en caliente por `Library.relocate`. *Tests de relocate y primer arranque, más 2 nuevos (destino no vacío, segundo arranque); `ImportTests` 22/22. Sin probar: destino sin permiso (ACL).*
+- [x] B3 · Primer arranque: propone la carpeta Música real de Windows (`Store/WindowsKnownFolders.swift`, KnownFolder; decisión 10) y la crea, sin reiniciar.
+- [x] B4 · Fotos de artista por AppCore (`b34-photos` 49/49 en el pase del 23/11/2026).
+- [x] B6 · Cierre ordenado: `terminateAll` y `flush` del estudio (`b6` 7/7 en el pase del 23/11/2026).
+- [ ] A1 · Cámaras en Ajustes del Mac por AppCore. *Sale de la 7c → Flutter (decisión 6, 23/11/2026).*
+- [ ] M1 · Hoja «Encuadre» en el Mac: `takeFrame` tiene rama Mac (`MontageServices.swift:73-78`, commit `a5f9eb6`). *Sale de la 7c → Flutter (decisión 6, 23/11/2026); falta que Jorge compruebe `framingFrame` con vídeo real en el Mac.*
+- [ ] R3 y M2 · Medir en el Mac el rendimiento de la cámara y de la vista previa de Montaje por JPEG y `FrameRelay`. *Sale de la 7c → Flutter (decisión 6, 23/11/2026).*
+- [x] F3 · Arena de ONNX Runtime en la separación (desglose con `TF_SEPARATE_TIMING=1`). *Cerrado con la opción C (Jorge, 22/11/2026): arena apagada, 95 % en `session.Run` (12,5 s/trozo), fuera del modelo <0,3 s/trozo; DML por defecto (~21-29 s/min), CPU de respaldo.*
 - T3 (guardar fichero y abrir URL) y S4 (modelos embebidos en `Bundle.main`) son del anfitrión Flutter, no de la 7c.
-- [ ] Sin probar desde la página y dudas visuales: siguen abiertas en «Ola 2, trabajo ya identificado».
+- [ ] Sin probar desde la página y dudas visuales. *Sale de la 7c → Flutter (decisión 7, 23/11/2026): la UI queda deprecated y lo que falle se ve tras Flutter.*
 
 Pendiente de Jorge (hardware, pasada en un PC):
 
-- [ ] Grabar real en Windows con la HeadRush: calibración con cancelación, vúmetro, toma corta, punch-in y `takeview.openOffset`. *Con un solo dispositivo no aparece el bloqueo de frecuencias distintas de la VM.*
-- [ ] Cámara por Media Foundation y «Rotar»; `tf-webdev --camera real`.
-- [ ] Audio y cámara reales del Mac por el puente de `AppCore`.
+- [x] Parte C, grabar real en Windows con la HeadRush y la C925e (24/11/2026, `Temp\win\partec\resultados.md` en el PC): dispositivos Line 1/2 → Line 3/4 a 48 kHz, vúmetro, calibración 57,10 ms (dispersión 0), toma corta con vídeo 1080p (desfase 0 ms a ojo de Jorge), `takeview.openOffset` y «Rotar» en el núcleo (`videoRotation: 90`). Arreglados dos fallos del núcleo (`validCalibration`, huecos de captura WASAPI) y el caso C (ADR-022). *Sin cancelación de la calibración desde la página ni punch-in oído: Jorge dio por cerradas las pruebas manuales (24/11/2026).*
+- [ ] Parte D (cámara por Media Foundation desde la página y `tf-webdev --camera real`). *Sale de la 7c → Flutter (decisión 7, 23/11/2026).*
+- [ ] Audio y cámara reales del Mac por el puente de `AppCore`. *Sale de la 7c → Flutter (decisión 6, 23/11/2026).*
+
+Cierre del 24/11/2026 (ADR-022). La 7c queda cerrada en la rama `pcx64tests`, validada en el PC x64; falta fusionarla en `main`.
+
+- Hecho en la ronda: motor `VideoConversion` y evento `takeview.video` (VideoConversion 13/13; Montage, TakeView y OffsetSheet 37/37), conversión HEVC real con `-enc_time_base demux` y `verify` del último fotograma (VideoKit 99/99, 3 saltos esperados), GLU→Slice en los ONNX de BS y guitarras, ADTOF en CPU, diagnóstico de modelo (`onnx| <modelo> -> <proveedor>`), `CoreLog` y `AudioKitLog`, `validCalibration`, `TakeRecorder.filledGaps` y `DuplexClockSync.captureDiscontinuity()` con el caso C (`WASAPIStreamCoreTests` 9/9). Pase con DML del 23/11/2026: 28 s/min con BS, 11 s/min con guitarras.
+- Fuera de la 7c: 6b (fuga de piano y otros en 2004 Remix, CPU frente a DML) y CUDA (decisión 12); instalador, ORT DML con el instalador (decisión 8) y publicar `models-win-v1` (con los ONNX reescritos y el catálogo con sus SHA); T575 con GLU→Slice y su SHA (T345 forzado en Windows, decisión 13); `bridge-load.js:99` (filtrar `stage==='separation'`); `library.list` a veces tarda 0,4-0,9 s en reposo; arranque en frío del anfitrión WebView2 fallido 2 de 6 en las sondas del fetch (UI deprecated); fallo conocido del fetch de `media.toneforge` (Clear+Set, WebView2 aplica el mapeo solo a navegaciones nuevas) para Flutter; sin cancelación de la calibración mientras mide, vista previa que no se queda girada (`WinApp/Web/record/preview.js:23-27`) y punch fuera de la toma ignorado sin aviso (`PunchFlattener.swift:52-53`), también para Flutter.
+- Riesgos conocidos: `FrameRelayTests.testPressureWithRealEncoder` intermitente en Windows; `ImportTests.testImportSeparatesAndAnalyzes` intermitente sin reproducir; vídeos con fotogramas B en el desfase medido (los nuestros usan `-bf 0`).

@@ -4,7 +4,7 @@ App de escritorio para macOS (Swift/SwiftUI) que iguala el tono de un tema reamp
 
 ## Estado actual
 
-Fases 5 (ADR-016), 5b (ADR-017), 5c (ADR-019, sin prueba manual de Jorge), 6 (ADR-015) y 7 · Montaje (ADR-018) cerradas en `main` (18/11/2026). Fase 7c (port a Windows, ADR-020, solo x64) en la rama `fase-7c`: pasos 6 y 7 cerrados y paso 8 ola 2 cerrada (22/11/2026); se valida y cierra desde el PC x64 en la rama `pcx64tests`.
+Fases 5 (ADR-016), 5b (ADR-017), 5c (ADR-019, sin prueba manual de Jorge), 6 (ADR-015) y 7 · Montaje (ADR-018) cerradas en `main` (18/11/2026). Fase 7c (port a Windows, ADR-020/ADR-022, solo x64) cerrada el 24/11/2026 en la rama `pcx64tests`, validada en el PC x64; falta fusionarla en `main`.
 Fase 7f (interfaz única en Flutter, ADR-021) en la rama `fase-7f`: P9 cerrada (24/11/2026, ABI de `AppCoreFFI` congelada), siguiente paso la ola 0; los desvíos de núcleo de la 7c se tratan aquí (`docs/flutter/desvios.md`).
 Después: actualizador (7d) → instalador de Windows → fase de cambios de UX (sustituye a la 7b). P1, P3 y P5 quedan para el comienzo de la Etapa 2.
 
