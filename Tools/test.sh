@@ -6,6 +6,8 @@
 #   Tools/test.sh <Paquete> [Filtro]  un paquete, opcionalmente con `swift test --filter <Filtro>`
 #                                     → no escribe last-run.txt
 #   Tools/test.sh App                 solo el build de la app, sin tests → no escribe last-run.txt
+#   Tools/test.sh FlutterApp [Filtro] FlutterApp/: `flutter analyze` + `flutter test` (`--name <Filtro>`)
+#                                     → no escribe last-run.txt (en el run completo va al final)
 #
 # Salida: 0 verde, 1 tests fallidos, 2 errores de compilación o nada que probar.
 # La app se compila (no se testea): la lógica y sus tests viven en los paquetes.
@@ -18,11 +20,16 @@ mkdir -p Temp/logs
 
 full=1
 app_only=0
+flutter_only=0
 pkgs=()
 filter=""
 if [ "${1:-}" = "App" ]; then
   full=0
   app_only=1
+elif [ "${1:-}" = "FlutterApp" ]; then
+  full=0
+  flutter_only=1
+  filter="${2:-}"
 elif [ $# -ge 1 ]; then
   full=0
   pkgs=("$1")
@@ -72,6 +79,97 @@ for pkg in ${pkgs[@]+"${pkgs[@]}"}; do   # bash 3.2 + set -u: array vacío
   fi
 done
 
+# Paso FlutterApp: analyze + test (subshell: no cambia el cwd global). Sale 0 verde, 1 fallos o avisos, 2 compilación.
+flutter_step() {
+  local log="Temp/logs/FlutterApp.log" json="Temp/logs/FlutterApp.json" err="Temp/logs/FlutterApp.err"
+  local targs=(test --reporter=json)
+  [ -n "$filter" ] && targs+=(--name "$filter")
+  (
+    cd "$root/FlutterApp" || exit 2
+    { echo "== flutter analyze"; fvm flutter analyze; echo "analyze-exit=$?"; } > "$root/$log" 2>&1
+    fvm flutter "${targs[@]}" > "$root/$json" 2> "$root/$err"
+  )
+  { echo "== flutter test (json en $json)"; cat "$err"; } >> "$log"
+  local out rc
+  out=$(python3 -I - "$log" "$json" <<'PY'
+import json, re, sys
+log, jpath = sys.argv[1:3]
+issues = []
+for l in open(log, errors="replace"):
+    if l.startswith("== flutter test"):
+        break
+    m = re.match(r"\s+(info|warning|error) • (.*) • (\S+?:\d+):\d+ • ", l)
+    if m:
+        issues.append(f"analyze {m[1]} {m[3]}: {m[2]}")
+names, lines = {}, {}
+passed = failed = skipped = 0
+loadfail, fails = [], []
+try:
+    raw_lines = open(jpath, errors="replace").read().splitlines()
+except OSError:
+    raw_lines = []
+for raw in raw_lines:
+    try:
+        e = json.loads(raw)
+    except ValueError:
+        continue
+    t = e.get("type")
+    if t == "testStart":
+        n = e["test"]
+        names[n["id"]] = n["name"]
+        lines[n["id"]] = (n.get("url") or "", n.get("line"))
+    elif t == "error":
+        tid = e["testID"]
+        msg = " ".join(str(e["error"]).split())[:110]
+        m = re.search(r"^(test/\S+?\.dart|integration_test/\S+?\.dart)[: ](\d+):\d+", e.get("stackTrace", ""), re.M)
+        if m:
+            loc = f"{m[1]}:{m[2]}"
+        else:
+            u, ln = lines.get(tid, ("", None))
+            loc = f"{u.split('/')[-1]}:{ln}"
+        if names.get(tid, "").startswith("loading "):
+            loadfail.append(f"{names[tid][8:].split('/test/')[-1]}: {msg}")
+        else:
+            fails.append(f"{loc} {msg}")
+    elif t == "testDone" and not e.get("hidden"):
+        if e.get("skipped"):
+            skipped += 1
+        elif e["result"] == "success":
+            passed += 1
+        else:
+            failed += 1
+total = passed + failed + skipped
+code = 0
+if loadfail or (total == 0 and not fails):
+    code = 2
+elif failed or issues:
+    code = 1
+head = f"analyze {len(issues)} avisos · tests {passed} pasados, {failed} fallados, {skipped} saltados"
+rest = issues[:8]
+rest += [f"COMPILACIÓN {x}" for x in loadfail[:5]]
+if total == 0 and not loadfail and not fails:
+    rest.append("no hay tests que ejecutar")
+rest += [f"{x}" for x in fails[:10]]
+print(head)
+for r in rest:
+    print(r)
+sys.exit(code)
+PY
+)
+  rc=$?
+  local first rest
+  first=$(printf '%s\n' "$out" | head -1)
+  rest=$(printf '%s\n' "$out" | tail -n +2)
+  case "$rc" in
+    0) summary+=("OK    FlutterApp: $first") ;;
+    1) bump 1; summary+=("FALLO FlutterApp: $first") ;;
+    *) bump 2; summary+=("COMPILACIÓN FlutterApp (rc $rc): $first") ;;
+  esac
+  while IFS= read -r l; do [ -n "$l" ] && summary+=("      $l"); done <<< "$rest"
+  flutter_ran=1
+}
+
+flutter_ran=0
 app_built=0
 if [ "$full" -eq 1 ] || [ "$app_only" -eq 1 ]; then
   for proj in App/*.xcodeproj; do
@@ -94,8 +192,12 @@ if [ "$full" -eq 1 ] || [ "$app_only" -eq 1 ]; then
   done
 fi
 
-if [ "${#pkgs[@]}" -eq 0 ] && [ "$app_built" -eq 0 ]; then
-  echo "Nada que probar: no hay Packages/*/Package.swift ni App/*.xcodeproj."
+if [ "$flutter_only" -eq 1 ] || { [ "$full" -eq 1 ] && [ -f FlutterApp/pubspec.yaml ]; }; then
+  flutter_step
+fi
+
+if [ "${#pkgs[@]}" -eq 0 ] && [ "$app_built" -eq 0 ] && [ "$flutter_ran" -eq 0 ]; then
+  echo "Nada que probar: no hay Packages/*/Package.swift, App/*.xcodeproj ni FlutterApp/pubspec.yaml."
   [ "$full" -eq 1 ] && echo "DONE Empty" > Temp/last-run.txt
   exit 2
 fi

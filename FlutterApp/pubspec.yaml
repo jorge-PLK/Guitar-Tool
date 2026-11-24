@@ -1,0 +1,39 @@
+name: toneforge
+description: "ToneForge para escritorio (macOS y Windows x64)."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+# Flutter 3.50.1 por FVM (.fvmrc en la raíz del repo); este es el Dart que trae.
+environment:
+  sdk: 3.14.0
+
+# Versiones exactas, sin `^` (docs/flutter/arquitectura.md, regla 9). Subir una es una pregunta a Jorge.
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  intl: 0.20.3
+  # Material de Flutter 3.50 (package:flutter/material.dart está deprecado). Pendiente de confirmar con Jorge.
+  material_ui: 1.11.1
+  flutter_riverpod: 3.5.0
+  file_selector: 1.1.0
+  url_launcher: 6.3.3
+  path_provider: 2.1.6
+  desktop_drop: 0.8.4
+  window_manager: 0.7.1
+  shared_preferences: 2.5.6
+  webview_all: 1.5.2
+  webview_all_windows: 1.5.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+  flutter_lints: 6.0.0
+
+flutter:
+  uses-material-design: true
+  generate: true
