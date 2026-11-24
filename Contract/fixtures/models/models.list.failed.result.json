@@ -1,0 +1,15 @@
+{
+  "models" : [
+    {
+      "archiveBytes" : 327743996,
+      "bytes" : null,
+      "fraction" : null,
+      "id" : "bs-roformer-sw",
+      "message" : "La suma SHA-256 no coincide (esperada faa91950a15c…, obtenida b52607e3c746…).",
+      "name" : "Separación de stems",
+      "source" : null,
+      "state" : "failed"
+    }
+  ],
+  "modelsBytes" : 0
+}

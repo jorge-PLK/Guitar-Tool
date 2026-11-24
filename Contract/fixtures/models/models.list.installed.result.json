@@ -1,0 +1,15 @@
+{
+  "models" : [
+    {
+      "archiveBytes" : 327743996,
+      "bytes" : 123456789,
+      "fraction" : null,
+      "id" : "bs-roformer-sw",
+      "message" : null,
+      "name" : "Separación de stems",
+      "source" : "store",
+      "state" : "installed"
+    }
+  ],
+  "modelsBytes" : 123456789
+}
