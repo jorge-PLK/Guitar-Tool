@@ -33,6 +33,17 @@ void main() {
     expect(o.toCoreArgs(), ['--screen', 'home', '--window', '800x600']);
   });
 
+  test('--state se lee; sin la bandera es null', () {
+    expect(LaunchOptions.parse(['--mock', '--screen', 'record', '--state', 'recording']).state, 'recording');
+    expect(LaunchOptions.parse(['--state=idle']).state, 'idle');
+    expect(LaunchOptions.parse(['--mock', '--screen', 'record']).state, isNull);
+  });
+
+  test('--state no va al núcleo', () {
+    final o = LaunchOptions.parse(['--screen', 'record', '--state', 'recording']);
+    expect(o.toCoreArgs(), ['--screen', 'record']);
+  });
+
   test('valores inválidos se ignoran', () {
     final o = LaunchOptions.parse(['--window', 'ax5', '--snapshot-delay', '-1', '--locale', 'fr', '--screen']);
     expect(o.window, isNull);

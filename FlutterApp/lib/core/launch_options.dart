@@ -1,6 +1,6 @@
 /// Argumentos de arranque (arquitectura.md, «Arranque, capturas y desarrollo»).
 /// Mismo formato que `AppCore.LaunchOptions.parse`: `--flag valor` o `--flag=valor`; lo desconocido se ignora.
-/// Solo Dart (no van al núcleo): `--mock`, `--locale`, `--core-lib`.
+/// Solo Dart (no van al núcleo): `--mock`, `--locale`, `--core-lib`, `--state`.
 class LaunchOptions {
   const LaunchOptions({
     this.projectsFolder,
@@ -15,6 +15,7 @@ class LaunchOptions {
     this.mock = false,
     this.locale,
     this.coreLib,
+    this.state,
   });
 
   final String? projectsFolder;
@@ -40,10 +41,13 @@ class LaunchOptions {
   /// Ruta de la biblioteca del núcleo (Mac: si falta, símbolos del proceso).
   final String? coreLib;
 
+  /// Estado de sembrado para `--mock` (`--state recording`); nulo = sin sembrar.
+  final String? state;
+
   static const _valueFlags = {
     '--projects-folder', '--support-dir', '--screen', '--project', '--snapshot',
     '--snapshot-delay', '--window', '--audio', '--camera', '--locale',
-    '--core-lib',
+    '--core-lib', '--state',
   };
 
   factory LaunchOptions.parse(List<String> args) {
@@ -94,6 +98,7 @@ class LaunchOptions {
       mock: mock,
       locale: (loc == 'es' || loc == 'en') ? loc : null,
       coreLib: v['--core-lib'],
+      state: v['--state'],
     );
   }
 
