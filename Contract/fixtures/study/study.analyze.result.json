@@ -1,0 +1,140 @@
+{
+  "analysis" : {
+    "beats" : [
+      0.5,
+      1,
+      1.5,
+      2,
+      2.5,
+      3,
+      3.5,
+      4
+    ],
+    "beatsPerBar" : 4,
+    "bpm" : 120,
+    "chords" : [
+      {
+        "end" : 2,
+        "index" : 0,
+        "name" : "Cm",
+        "overridden" : false,
+        "start" : 0
+      },
+      {
+        "end" : 4,
+        "index" : 7,
+        "name" : "Cm(maj7)",
+        "overridden" : false,
+        "start" : 2
+      }
+    ],
+    "downbeats" : [
+      0.5,
+      2.5
+    ],
+    "key" : {
+      "confidence" : 0.40000000000000002,
+      "detected" : "C:maj",
+      "effective" : "C:maj"
+    },
+    "state" : "ready"
+  },
+  "chordOverrides" : [
+
+  ],
+  "guitars" : {
+    "names" : {
+      "lead" : "Guitarra solista",
+      "left" : "Guitarra izq.",
+      "rhythm" : "Guitarra rítmica",
+      "right" : "Guitarra der."
+    },
+    "process" : "idle",
+    "stereoSplit" : false,
+    "usesSeparatedGuitars" : true
+  },
+  "loops" : [
+    {
+      "end" : 2,
+      "id" : "00000000-0000-0000-0000-000000000001",
+      "name" : "Riff",
+      "start" : 1
+    }
+  ],
+  "sections" : [
+    {
+      "end" : 2,
+      "id" : "00000000-0000-0000-0000-000000000002",
+      "name" : "Intro",
+      "paletteIndex" : 0,
+      "solo" : false,
+      "start" : 0
+    },
+    {
+      "end" : 4,
+      "id" : "00000000-0000-0000-0000-000000000003",
+      "name" : "Solo",
+      "solo" : true,
+      "start" : 2
+    }
+  ],
+  "transport" : {
+    "anySolo" : true,
+    "capo" : 3,
+    "channels" : [
+      {
+        "gainDB" : 0,
+        "id" : "drums",
+        "kind" : "drums",
+        "muted" : false,
+        "name" : "Batería",
+        "solo" : false
+      },
+      {
+        "gainDB" : -3,
+        "id" : "bass",
+        "kind" : "bass",
+        "muted" : false,
+        "name" : "Bajo",
+        "solo" : true
+      },
+      {
+        "gainDB" : 0,
+        "guitarRole" : "left",
+        "id" : "guitar_L",
+        "kind" : "guitar",
+        "muted" : false,
+        "name" : "Guitarra izq.",
+        "solo" : false
+      },
+      {
+        "gainDB" : 0,
+        "guitarRole" : "right",
+        "id" : "guitar_R",
+        "kind" : "guitar",
+        "muted" : false,
+        "name" : "Guitarra der.",
+        "solo" : false
+      }
+    ],
+    "duration" : 8,
+    "fineCents" : 15,
+    "loop" : {
+      "end" : 2,
+      "name" : "Riff",
+      "start" : 1
+    },
+    "masterGainDB" : -1.5,
+    "metronome" : {
+      "available" : true,
+      "gainDB" : -6,
+      "on" : true
+    },
+    "outputName" : "Salida simulada",
+    "playing" : false,
+    "position" : 1.5,
+    "rate" : 0.75,
+    "transpose" : -2
+  },
+  "unappliedSections" : false
+}

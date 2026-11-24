@@ -1,0 +1,86 @@
+{
+  "analysis" : {
+    "beats" : [
+
+    ],
+    "chords" : [
+
+    ],
+    "downbeats" : [
+
+    ],
+    "key" : {
+
+    },
+    "state" : "missing"
+  },
+  "artist" : "Banda",
+  "audio" : {
+    "mode" : "simulated",
+    "outputName" : "Salida simulada"
+  },
+  "chordOverrides" : [
+
+  ],
+  "duration" : 8,
+  "emptyStems" : [
+
+  ],
+  "guitars" : {
+    "names" : {
+      "lead" : "Guitarra solista",
+      "left" : "Guitarra izq.",
+      "rhythm" : "Guitarra rítmica",
+      "right" : "Guitarra der."
+    },
+    "process" : "idle",
+    "stereoSplit" : false,
+    "usesSeparatedGuitars" : false
+  },
+  "loops" : [
+
+  ],
+  "projectId" : "00000000-0000-0000-0000-000000000001",
+  "sampleRate" : 44100,
+  "sections" : [
+
+  ],
+  "title" : "Tema",
+  "transport" : {
+    "anySolo" : false,
+    "capo" : 0,
+    "channels" : [
+      {
+        "gainDB" : 0,
+        "id" : "drums",
+        "kind" : "drums",
+        "muted" : false,
+        "name" : "Batería",
+        "solo" : false
+      },
+      {
+        "gainDB" : 0,
+        "id" : "bass",
+        "kind" : "bass",
+        "muted" : false,
+        "name" : "Bajo",
+        "solo" : false
+      }
+    ],
+    "duration" : 8,
+    "fineCents" : 0,
+    "masterGainDB" : 0,
+    "metronome" : {
+      "available" : false,
+      "gainDB" : 0,
+      "on" : false
+    },
+    "outputName" : "Salida simulada",
+    "playing" : false,
+    "position" : 0,
+    "rate" : 1,
+    "transpose" : 0
+  },
+  "unappliedSections" : false,
+  "usesSeparatedGuitars" : false
+}

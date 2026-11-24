@@ -1,0 +1,80 @@
+{
+  "anySolo" : false,
+  "canRedo" : false,
+  "canUndo" : false,
+  "editMode" : false,
+  "graceMode" : false,
+  "header" : "4/4 · 120 BPM",
+  "listenMode" : "stems",
+  "notices" : [
+    "3 notas con adornos que la tablatura aún no representa se importaron sin ellos."
+  ],
+  "phase" : "ready",
+  "projectId" : "00000000-0000-0000-0000-000000000001",
+  "revision" : 0,
+  "selectedTrack" : "bass",
+  "source" : "songsterr",
+  "tracks" : [
+    {
+      "dimmed" : false,
+      "id" : "bass",
+      "kind" : "bass",
+      "listening" : false,
+      "muted" : false,
+      "name" : "Bajo",
+      "noteCount" : 0,
+      "origin" : "songsterr",
+      "playerTrack" : "bass",
+      "solo" : false,
+      "transcription" : "ready",
+      "tuning" : {
+        "name" : "Estándar",
+        "preset" : "standard",
+        "strings" : [
+          43,
+          38,
+          33,
+          28
+        ]
+      }
+    },
+    {
+      "dimmed" : false,
+      "id" : "drums",
+      "kind" : "drums",
+      "listening" : false,
+      "muted" : false,
+      "name" : "Batería",
+      "noteCount" : 0,
+      "origin" : "songsterr",
+      "playerTrack" : "drums",
+      "solo" : false,
+      "transcription" : "ready"
+    },
+    {
+      "dimmed" : false,
+      "id" : "songsterr-0",
+      "kind" : "guitar",
+      "listening" : true,
+      "muted" : false,
+      "name" : "Rítmica",
+      "noteCount" : 0,
+      "origin" : "songsterr",
+      "solo" : false,
+      "synth" : "rendering",
+      "transcription" : "ready",
+      "tuning" : {
+        "name" : "Estándar",
+        "preset" : "standard",
+        "strings" : [
+          64,
+          59,
+          55,
+          50,
+          45,
+          40
+        ]
+      }
+    }
+  ]
+}

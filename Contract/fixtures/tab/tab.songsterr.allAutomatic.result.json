@@ -1,0 +1,117 @@
+{
+  "busy" : false,
+  "canUse" : true,
+  "open" : true,
+  "pairing" : {
+    "extraNames" : [
+      "Rítmica",
+      "Bajo",
+      "Batería"
+    ],
+    "extraText" : "Pistas extra, sin stem: Rítmica, Bajo, Batería. Entran en la tablatura y en el .gp y solo suenan con «Oír transcripción».",
+    "intro" : "Qué pista de Songsterr va con cada stem. La confianza es el parecido medido con el audio.",
+    "slots" : [
+      {
+        "choices" : [
+          {
+            "label" : "Bajo (80 %)",
+            "name" : "Bajo",
+            "similarity" : 0.80000000000000004,
+            "track" : 1
+          }
+        ],
+        "kind" : "bass",
+        "name" : "Bajo",
+        "role" : "bass",
+        "solos" : [
+
+        ],
+        "stemId" : "bass"
+      },
+      {
+        "choices" : [
+          {
+            "label" : "Batería (90 %)",
+            "name" : "Batería",
+            "similarity" : 0.90000000000000002,
+            "track" : 2
+          }
+        ],
+        "kind" : "drums",
+        "name" : "Batería",
+        "role" : "drums",
+        "solos" : [
+
+        ],
+        "stemId" : "drums"
+      }
+    ],
+    "warnings" : [
+      "3 notas con adornos que la tablatura aún no representa se importaron sin ellos."
+    ]
+  },
+  "query" : "Banda · Tema",
+  "results" : [
+    {
+      "artist" : "Banda",
+      "loading" : false,
+      "previewUrl" : "https://www.songsterr.com/a/wsa/song-tab-s7",
+      "selected" : true,
+      "songId" : 7,
+      "title" : "Tema"
+    },
+    {
+      "artist" : "Banda",
+      "loading" : false,
+      "previewUrl" : "https://www.songsterr.com/a/wsa/song-tab-s8",
+      "selected" : false,
+      "songId" : 8,
+      "title" : "Tema (live)"
+    }
+  ],
+  "search" : {
+    "phase" : "results"
+  },
+  "selected" : {
+    "artist" : "Banda",
+    "previewUrl" : "https://www.songsterr.com/a/wsa/song-tab-s7",
+    "revisionId" : 700,
+    "songId" : 7,
+    "title" : "Tema 7",
+    "tracks" : [
+      {
+        "instrument" : "Overdriven Guitar",
+        "name" : "Rítmica",
+        "partId" : 0,
+        "tuning" : [
+          64,
+          59,
+          55,
+          50,
+          45,
+          40
+        ],
+        "tuningText" : "E A D G B E"
+      },
+      {
+        "instrument" : "Bass",
+        "name" : "Bajo",
+        "partId" : 1,
+        "tuning" : [
+          43,
+          38,
+          33,
+          28
+        ],
+        "tuningText" : "E A D G"
+      },
+      {
+        "instrument" : "Drums",
+        "name" : "Batería",
+        "partId" : 2,
+        "tuningText" : "-"
+      }
+    ]
+  },
+  "stage" : "pairing"
+}

@@ -1,0 +1,18 @@
+{
+  "anySolo" : false,
+  "canRedo" : false,
+  "canUndo" : false,
+  "editMode" : false,
+  "graceMode" : false,
+  "listenMode" : "stems",
+  "notices" : [
+
+  ],
+  "phase" : "waitingAnalysis",
+  "projectId" : "00000000-0000-0000-0000-000000000001",
+  "revision" : 0,
+  "source" : "automatic",
+  "tracks" : [
+
+  ]
+}

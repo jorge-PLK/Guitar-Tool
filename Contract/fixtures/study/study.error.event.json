@@ -1,0 +1,4 @@
+{
+  "code" : "audio-unavailable",
+  "message" : "No se pudo abrir la salida de audio."
+}

@@ -1,0 +1,148 @@
+{
+  "analysis" : {
+    "beats" : [
+      0.5,
+      1,
+      1.5,
+      2,
+      2.5,
+      3,
+      3.5,
+      4
+    ],
+    "beatsPerBar" : 4,
+    "bpm" : 120,
+    "chords" : [
+      {
+        "end" : 2,
+        "index" : 0,
+        "name" : "Cm",
+        "overridden" : false,
+        "start" : 0
+      },
+      {
+        "end" : 4,
+        "index" : 7,
+        "name" : "Cm(maj7)",
+        "overridden" : false,
+        "start" : 2
+      }
+    ],
+    "downbeats" : [
+      0.5,
+      2.5
+    ],
+    "key" : {
+      "confidence" : 0.40000000000000002,
+      "detected" : "C:maj",
+      "effective" : "C:maj"
+    },
+    "state" : "ready"
+  },
+  "artist" : "Banda",
+  "audio" : {
+    "mode" : "simulated",
+    "outputName" : "Salida simulada"
+  },
+  "chordOverrides" : [
+
+  ],
+  "duration" : 8,
+  "emptyStems" : [
+
+  ],
+  "guitars" : {
+    "names" : {
+      "lead" : "Guitarra solista",
+      "left" : "Guitarra izq.",
+      "rhythm" : "Guitarra rítmica",
+      "right" : "Guitarra der."
+    },
+    "process" : "idle",
+    "stereoSplit" : false,
+    "usesSeparatedGuitars" : true
+  },
+  "loops" : [
+    {
+      "end" : 2,
+      "id" : "00000000-0000-0000-0000-000000000001",
+      "name" : "Riff",
+      "start" : 1
+    }
+  ],
+  "projectId" : "00000000-0000-0000-0000-000000000002",
+  "sampleRate" : 44100,
+  "sections" : [
+    {
+      "end" : 2,
+      "id" : "00000000-0000-0000-0000-000000000003",
+      "name" : "Intro",
+      "paletteIndex" : 0,
+      "solo" : false,
+      "start" : 0
+    },
+    {
+      "end" : 4,
+      "id" : "00000000-0000-0000-0000-000000000004",
+      "name" : "Solo",
+      "solo" : true,
+      "start" : 2
+    }
+  ],
+  "title" : "Tema",
+  "transport" : {
+    "anySolo" : false,
+    "capo" : 0,
+    "channels" : [
+      {
+        "gainDB" : 0,
+        "id" : "drums",
+        "kind" : "drums",
+        "muted" : false,
+        "name" : "Batería",
+        "solo" : false
+      },
+      {
+        "gainDB" : 0,
+        "id" : "bass",
+        "kind" : "bass",
+        "muted" : false,
+        "name" : "Bajo",
+        "solo" : false
+      },
+      {
+        "gainDB" : 0,
+        "guitarRole" : "left",
+        "id" : "guitar_L",
+        "kind" : "guitar",
+        "muted" : false,
+        "name" : "Guitarra izq.",
+        "solo" : false
+      },
+      {
+        "gainDB" : 0,
+        "guitarRole" : "right",
+        "id" : "guitar_R",
+        "kind" : "guitar",
+        "muted" : false,
+        "name" : "Guitarra der.",
+        "solo" : false
+      }
+    ],
+    "duration" : 8,
+    "fineCents" : 0,
+    "masterGainDB" : 0,
+    "metronome" : {
+      "available" : true,
+      "gainDB" : 0,
+      "on" : false
+    },
+    "outputName" : "Salida simulada",
+    "playing" : false,
+    "position" : 0,
+    "rate" : 1,
+    "transpose" : 0
+  },
+  "unappliedSections" : false,
+  "usesSeparatedGuitars" : true
+}
