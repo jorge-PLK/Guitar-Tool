@@ -51,20 +51,57 @@ else
 fi
 
 # Turno del Mac: un solo run pesado a la vez entre el repo y todos sus worktrees (olas en
-# paralelo). El cerrojo vive en el .git común; `lockf` espera a que se libere. Libres solo
-# `FlutterApp <Filtro>` (cortos). TF_TEST_NOLOCK=1 lo salta. Quien espera ve quién lo tiene.
-if [ -z "${TF_TEST_LOCKED:-}" ] && [ -z "${TF_TEST_NOLOCK:-}" ] \
+# paralelo), por orden de llegada. Cada run saca número (contador en el .git común), espera a
+# ser el primero vivo de la cola y entonces coge el cerrojo `lockf`. Los números de procesos
+# muertos se limpian solos. Libres: `FlutterApp <Filtro>` y TF_TEST_FORCE=1 (pasadas cortas de
+# un paquete; no vale para la suite entera). TF_TEST_NOLOCK=1: sin turno (solo con Jorge).
+# TF_TEST_LOCKDIR=<dir>: otra cola (pruebas del propio script).
+if [ -n "${TF_TEST_FORCE:-}" ] && [ "$full" -eq 1 ]; then
+  echo "test.sh: TF_TEST_FORCE no vale para la suite entera; hace cola."
+  unset TF_TEST_FORCE
+fi
+if [ -z "${TF_TEST_LOCKED:-}" ] && [ -z "${TF_TEST_NOLOCK:-}" ] && [ -z "${TF_TEST_FORCE:-}" ] \
    && ! { [ "$flutter_only" -eq 1 ] && [ -n "$filter" ]; }; then
-  common="$(git rev-parse --git-common-dir 2>/dev/null)" && common="$(cd "$common" && pwd)"
-  if [ -n "$common" ]; then
-    lock="$common/toneforge-test.lock"
+  lockdir="${TF_TEST_LOCKDIR:-}"
+  if [ -z "$lockdir" ]; then
+    common="$(git rev-parse --git-common-dir 2>/dev/null)" && lockdir="$(cd "$common" && pwd)"
+  fi
+  if [ -n "$lockdir" ]; then
+    lock="$lockdir/toneforge-test.lock"
+    queue="$lockdir/toneforge-test.queue"
+    mkdir -p "$queue"
+    n=$(/usr/bin/lockf -k "$queue/.counter.lock" /bin/bash -c \
+      'c=$(cat "$1/.counter" 2>/dev/null || echo 0); c=$((c+1)); echo "$c" > "$1/.counter"; echo "$c"' \
+      _ "$queue")
+    ticket="$queue/$(printf '%08d' "$n").$$"
+    echo "$root · ${*:-entero} · pedido $(date '+%H:%M:%S')" > "$ticket"
+    trap 'rm -f "$ticket"; exit 130' INT TERM HUP
+    said=""
+    while :; do
+      ahead=0
+      first=""
+      for t in $(ls "$queue" | sort); do
+        if ! kill -0 "${t##*.}" 2>/dev/null; then rm -f "$queue/$t"; continue; fi
+        [ "$t" = "${ticket##*/}" ] && break
+        ahead=$((ahead + 1))
+        [ -z "$first" ] && first="$t"
+      done
+      [ "$ahead" -eq 0 ] && break
+      if [ "$ahead" != "$said" ]; then
+        echo "test.sh: turno $n, $ahead delante (siguiente: $(cat "$queue/$first" 2>/dev/null || echo '?'))"
+        said="$ahead"
+      fi
+      sleep 3
+    done
+    trap - INT TERM HUP
     if ! /usr/bin/lockf -k -s -t 0 "$lock" true; then
-      echo "test.sh: esperando turno del Mac; lo tiene: $(cat "$lock.owner" 2>/dev/null || echo '?')"
+      echo "test.sh: turno $n, el primero; esperando a que acabe: $(cat "$lock.owner" 2>/dev/null || echo '?')"
     fi
     export TF_TEST_LOCKED=1
+    # Mismo PID tras exec: el número sigue «vivo» mientras espera el cerrojo; se borra al cogerlo.
     exec /usr/bin/lockf -k "$lock" /bin/bash -c \
-      'echo "$1 · $2 · $(date "+%H:%M:%S")" > "$3.owner"; shift 3; exec "$@"' \
-      _ "$root" "${*:-entero}" "$lock" "$root/Tools/test.sh" "$@"
+      'rm -f "$4"; echo "$1 · $2 · $(date "+%H:%M:%S")" > "$3.owner"; shift 4; exec "$@"' \
+      _ "$root" "${*:-entero}" "$lock" "$ticket" "$root/Tools/test.sh" "$@"
   fi
 fi
 
