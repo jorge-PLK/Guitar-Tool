@@ -84,6 +84,39 @@ enum StudyKitBridge {
         return label.name
     }
 
+    /// K8: nombre del acorde ya transpuesto `transpose` semitonos (como `BackingTimeline.shown`); «?» y «N» no cambian.
+    static func shownChordName(_ index: Int, transpose: Int) -> String {
+        chordName(shownIndex(index, transpose: transpose))
+    }
+
+    /// Índice del acorde transpuesto `transpose` semitonos (X y N no cambian).
+    static func shownIndex(_ index: Int, transpose: Int) -> Int {
+        (ChordLabel(index: index) ?? .unknown).transposed(by: transpose).index
+    }
+
+    /// K7: forma del acorde mostrado (transpuesto) con capo `capo`, igual que `ChordShapes.shape(for:capo:)` en el Mac.
+    /// nil para «?» y «N».
+    static func shape(index: Int, transpose: Int, capo: Int) -> StudyChordShape? {
+        guard let label = ChordLabel(index: index) else { return nil }
+        guard let s = ChordShapes.shape(for: label.transposed(by: transpose), capo: capo) else { return nil }
+        return StudyChordShape(frets: s.frets, baseFret: s.baseFret,
+                               barre: s.barre.map { StudyBarre(fret: $0.fret, fromString: $0.fromString, toString: $0.toString) })
+    }
+
+    /// K8: tonalidad guardada («C:maj») vista con la transposición; nil si no es mayor ni menor.
+    static func shownKey(_ stored: String?, transpose: Int) -> StudyShownKey? {
+        guard let stored, let c = ChordLabel(labName: stored), let q = c.quality, q == .maj || q == .min else { return nil }
+        let t = c.transposed(by: transpose)
+        guard let tonic = t.labName.split(separator: ":").first else { return nil }
+        return StudyShownKey(tonic: String(tonic), mode: q == .min ? "min" : "maj")
+    }
+
+    /// K8, camino inverso (`storedKeyLabel` de `chords.js`): la tonalidad que ve la interfaz -> la que se guarda.
+    static func storedKey(tonic: String, mode: String, transpose: Int) -> String? {
+        guard mode == "maj" || mode == "min", let c = ChordLabel(labName: "\(tonic):\(mode)") else { return nil }
+        return c.transposed(by: -transpose).labName
+    }
+
     /// Clics de la rejilla como pares, para que el controlador los convierta a `AudioKit.Click`.
     static func clicks(beats: [Double], downbeats: [Double], in range: ClosedRange<Double>) -> [(time: Double, accent: Bool)] {
         guard beats.count >= 2 else { return [] }

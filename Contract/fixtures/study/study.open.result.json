@@ -14,17 +14,51 @@
     "bpm" : 120,
     "chords" : [
       {
+        "display" : "Cm",
         "end" : 2,
         "index" : 0,
         "name" : "Cm",
         "overridden" : false,
+        "shape" : {
+          "barre" : {
+            "fret" : 3,
+            "fromString" : 5,
+            "toString" : 1
+          },
+          "baseFret" : 3,
+          "frets" : [
+            null,
+            3,
+            5,
+            5,
+            4,
+            3
+          ]
+        },
         "start" : 0
       },
       {
+        "display" : "Cm(maj7)",
         "end" : 4,
         "index" : 7,
         "name" : "Cm(maj7)",
         "overridden" : false,
+        "shape" : {
+          "barre" : {
+            "fret" : 3,
+            "fromString" : 5,
+            "toString" : 1
+          },
+          "baseFret" : 3,
+          "frets" : [
+            null,
+            3,
+            5,
+            4,
+            4,
+            3
+          ]
+        },
         "start" : 2
       }
     ],
@@ -35,6 +69,10 @@
     "key" : {
       "confidence" : 0.40000000000000002,
       "detected" : "C:maj",
+      "display" : {
+        "mode" : "maj",
+        "tonic" : "C"
+      },
       "effective" : "C:maj"
     },
     "state" : "ready"

@@ -62,11 +62,39 @@ struct StudyTransport: Codable, Sendable {
     var outputName: String
 }
 
+/// K7: cejilla de una forma. Cuerdas numeradas como en guitarra (6 = Mi grave, 1 = Mi agudo).
+struct StudyBarre: Codable, Sendable, Equatable {
+    var fret: Int
+    var fromString: Int
+    var toString: Int
+}
+
+/// K7: forma de un acorde (de `ChordShapes.shape(for:capo:)`). `frets` va de la 6.ª a la 1.ª cuerda: null = muda, 0 = al aire.
+/// Ausente en «?» y «N».
+struct StudyChordShape: Codable, Sendable, Equatable {
+    var frets: [Int?]
+    var baseFret: Int
+    var barre: StudyBarre?
+}
+
+/// K8: tonalidad neutra de idioma («A» + «min»); los nombres «La menor»/«A minor» los pone la interfaz.
+/// `tonic` en sostenidos («C#»), `mode` = `maj` o `min`.
+struct StudyShownKey: Codable, Sendable, Equatable {
+    var tonic: String
+    var mode: String
+}
+
 struct StudyChord: Codable, Sendable {
     var start: Double
     var end: Double
     var index: Int
+    /// Nombre guardado, sin transponer.
     var name: String
+    /// K8: nombre transpuesto según `transport.transpose` en el momento de emitirse («D» con +2 -> «E»).
+    var display: String
+    /// K7: forma del acorde mostrado (`display`) con el capo del momento; ausente en «?» y «N».
+    /// Como `display`, se queda vieja si cambian `transpose`/`capo` (`study.state`): pídela de nuevo con `study.chordShape`.
+    var shape: StudyChordShape?
     var overridden: Bool
 }
 
@@ -75,6 +103,8 @@ struct StudyKey: Codable, Sendable {
     var override: String?
     var effective: String?
     var confidence: Double?
+    /// K8: `effective` ya transpuesta; ausente si no hay tonalidad o no es mayor/menor.
+    var display: StudyShownKey?
 }
 
 struct StudyAnalysisInfo: Codable, Sendable {
@@ -155,9 +185,16 @@ struct StudyLevelsEvent: Codable, Sendable {
     var channels: [String: StudyMeter]
 }
 
-struct StudyErrorEvent: Codable, Sendable {
-    var code: String
-    var message: String
+// K12: no existe `study.error` (nunca se emitió). Los fallos de audio van por `StudyTransport.audioError`.
+
+/// K7: `capo` por defecto, el del transporte. Siempre con la transposición actual (la forma es la del acorde mostrado).
+struct StudyChordShapeParams: Decodable, Sendable { var index: Int; var capo: Int? }
+
+struct StudyChordShapeResult: Codable, Sendable {
+    var index: Int
+    var display: String
+    var capo: Int
+    var shape: StudyChordShape?
 }
 
 struct StudyOpenParams: Decodable, Sendable { var projectId: String }
@@ -357,7 +394,10 @@ final class StudyService {
     private func with(_ change: @MainActor (BackingController) throws -> Void) async throws -> StudyTransport {
         guard let o = current else { throw RPCError(code: "not-open", message: "No hay ningún tema abierto en Backing.") }
         defer { stateChanged() }
+        let before = (o.controller.settings.transpose, o.controller.settings.capo)
         try change(o.controller)
+        // K7/K8: el nombre mostrado y la forma dependen de la transposición y del capo.
+        if (o.controller.settings.transpose, o.controller.settings.capo) != before { emitAnalysisInfo() }
         return transport(o.session, o.controller)
     }
 
@@ -427,7 +467,7 @@ final class StudyService {
     }
 
     func snapshot(_ s: StudySession, _ c: BackingController) -> StudyOpenResult {
-        let analysis = analysisInfo(s)
+        let analysis = analysisInfo(s, c)
         let sections = sectionInfos(s)
         return StudyOpenResult(
             projectId: s.projectID.uuidString, title: s.project.song.title, artist: s.project.song.artist,

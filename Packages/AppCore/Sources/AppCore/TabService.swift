@@ -164,7 +164,15 @@ final class TabService {
         ctl = o.controller
         o.controller.onMixChanged = { [weak self] in self?.syncSynthMix(); self?.markChanged() }
         load()
+        startQueueIfNeeded()
         return state()
+    }
+
+    /// TB10: como `TabController.start()` del Mac, abrir (también tras `tab.songsterr.accept` y `tab.songsterr.automatic`,
+    /// que reabren) transcribe solo las pistas pendientes; el cliente ya no llama a `tab.transcribe` para eso.
+    private func startQueueIfNeeded() {
+        guard phase == .ready, work == nil, !queued.isEmpty else { return }
+        work = Task { [weak self] in await self?.runQueue() }
     }
 
     /// Guarda lo editado, cancela lo pendiente y suelta la síntesis del reproductor (el estudio sigue abierto).

@@ -40,12 +40,17 @@ struct StudyEditState: Codable, Sendable {
     var transport: StudyTransport
 }
 
+/// `study.analysis` lleva además el análisis completo (`analysis`) cuando cambia algo que afecta a lo que se muestra
+/// (transposición, capo, tonalidad): acordes con `display`/`shape` y `key.display` al día. `study.guitars` no lo usa.
 struct StudyAnalysisEvent: Codable, Sendable {
     var state: String
     var error: String?
+    var analysis: StudyAnalysisInfo?
 }
 
-struct StudySetKeyParams: Decodable, Sendable { var key: String? }
+/// `key` = tonalidad guardada («C:maj»; null = quitar la corrección). K8: `shown` = la tonalidad tal como la ve la interfaz
+/// (ya transpuesta); el núcleo deshace la transposición. Si vienen las dos, manda `shown`.
+struct StudySetKeyParams: Decodable, Sendable { var key: String?; var shown: StudyShownKey? }
 struct StudySetChordParams: Decodable, Sendable { var start: Double; var end: Double; var index: Int?; var label: String? }
 struct StudyChordRangeParams: Decodable, Sendable { var start: Double; var end: Double }
 struct StudySplitChordParams: Decodable, Sendable { var at: Double }
@@ -121,6 +126,9 @@ extension StudyService {
 
     nonisolated func registerEdits(on router: Router) {
         router.register("study.snapshot") { [self] (_: Empty) -> StudyOpenResult in try await snapshotCurrent() }
+        router.register("study.chordShape") { [self] (p: StudyChordShapeParams) -> StudyChordShapeResult in
+            try await chordShape(p)
+        }
         router.register("study.analyze") { [self] (_: Empty) -> StudyEditState in try await analyze() }
         router.register("study.setKey") { [self] (p: StudySetKeyParams) -> StudyEditState in try await setKey(p) }
         router.register("study.setChord") { [self] (p: StudySetChordParams) -> StudyEditState in try await setChord(p) }
@@ -188,6 +196,19 @@ extension StudyService {
         }
     }
 
+    /// K7: forma (y nombre transpuesto) de un acorde con la transposición actual y el capo pedido o el del transporte.
+    func chordShape(_ p: StudyChordShapeParams) async throws -> StudyChordShapeResult {
+        guard let o = current else { throw RPCError(code: "not-open", message: "No hay ningún tema abierto en Backing.") }
+        guard StudyEditsBridge.isValidChordIndex(p.index) else {
+            throw RPCError(code: "bad-params", message: "«index» fuera de 0...169: \(p.index)")
+        }
+        let transpose = o.controller.settings.transpose
+        let capo = p.capo ?? o.controller.settings.capo
+        return StudyChordShapeResult(
+            index: p.index, display: StudyKitBridge.shownChordName(p.index, transpose: transpose), capo: capo,
+            shape: StudyKitBridge.shape(index: p.index, transpose: transpose, capo: capo))
+    }
+
     // MARK: Ayudas
 
     /// Ejecuta una edición y devuelve el estado ya al día; cualquier cambio emite `study.state`.
@@ -221,17 +242,20 @@ extension StudyService {
         let s = o.session
         let guitars = guitarsInfo(s)
         return StudyEditState(
-            analysis: analysisInfo(s),
+            analysis: analysisInfo(s, o.controller),
             chordOverrides: s.study.chordOverrides.map { StudyOverrideInfo(start: $0.start, end: $0.end, index: $0.index) },
             sections: sectionInfos(s), unappliedSections: s.hasUnappliedSections,
             loops: s.study.loops.map { StudySavedLoop(id: $0.id.uuidString, name: $0.name, start: $0.start, end: $0.end) },
             guitars: guitars, added: added?.uuidString, transport: transport(s, o.controller))
     }
 
-    func analysisInfo(_ s: StudySession) -> StudyAnalysisInfo {
+    func analysisInfo(_ s: StudySession, _ c: BackingController) -> StudyAnalysisInfo {
         let detected = Set((s.analysis?.chords ?? []).map { "\($0.start)|\($0.end)|\($0.index)" })
+        let transpose = c.settings.transpose, capo = c.settings.capo
         let chords = s.effectiveChords.map {
             StudyChord(start: $0.start, end: $0.end, index: $0.index, name: StudyKitBridge.chordName($0.index),
+                       display: StudyKitBridge.shownChordName($0.index, transpose: transpose),
+                       shape: StudyKitBridge.shape(index: $0.index, transpose: transpose, capo: capo),
                        overridden: !detected.contains("\($0.start)|\($0.end)|\($0.index)"))
         }
         let (state, error) = Self.analysisLabel(s.analysisState)
@@ -239,7 +263,8 @@ extension StudyService {
         return StudyAnalysisInfo(
             state: state, error: error, beats: s.beats, downbeats: s.downbeats, bpm: a?.bpm, beatsPerBar: a?.beatsPerBar,
             chords: chords,
-            key: StudyKey(detected: a?.key, override: s.study.keyOverride, effective: s.effectiveKey, confidence: a?.keyConfidence))
+            key: StudyKey(detected: a?.key, override: s.study.keyOverride, effective: s.effectiveKey, confidence: a?.keyConfidence,
+                         display: StudyKitBridge.shownKey(s.effectiveKey, transpose: transpose)))
     }
 
     func sectionInfos(_ s: StudySession) -> [StudySectionInfo] { sectionInfos(s.sections) }
@@ -324,6 +349,14 @@ extension StudyService {
         let (state, error) = Self.analysisLabel(s.analysisState)
         guard edits.markAnalysis("\(s.projectID)|\(state)|\(error ?? "")") else { return }
         emit("study.analysis", StudyAnalysisEvent(state: state, error: error))
+    }
+
+    /// K7/K8: reemite `study.analysis` con el análisis completo, sin dedup (la transposición, el capo o la tonalidad no
+    /// cambian el estado del análisis, pero sí `display` y `shape`).
+    func emitAnalysisInfo() {
+        guard let o = current else { return }
+        let info = analysisInfo(o.session, o.controller)
+        emit("study.analysis", StudyAnalysisEvent(state: info.state, error: info.error, analysis: info))
     }
 
     func analyze() async throws -> StudyEditState {
@@ -413,8 +446,16 @@ extension StudyService {
     // MARK: Tonalidad y acordes
 
     func setKey(_ p: StudySetKeyParams) async throws -> StudyEditState {
-        try await edit { s, _ in
-            guard let text = p.key else { s.setKeyOverride(nil); return }
+        let state = try await edit { s, c in
+            let text: String
+            if let shown = p.shown {
+                guard let stored = StudyKitBridge.storedKey(tonic: shown.tonic, mode: shown.mode, transpose: c.settings.transpose) else {
+                    throw RPCError(code: "bad-params", message: "«shown» no es una tonalidad mayor o menor (tonic «C#», mode maj|min).")
+                }
+                text = stored
+            } else if let key = p.key {
+                text = key
+            } else { s.setKeyOverride(nil); return }
             guard let key = StudyEditsBridge.normalizedKey(text) else {
                 throw RPCError(code: "bad-params", message: "«key» no es una tonalidad mayor o menor («C:maj», «A:min»): \(text)")
             }
@@ -423,6 +464,8 @@ extension StudyService {
             }
             s.setKeyOverride(key)
         }
+        emitAnalysisInfo()
+        return state
     }
 
     func setChord(_ p: StudySetChordParams) async throws -> StudyEditState {

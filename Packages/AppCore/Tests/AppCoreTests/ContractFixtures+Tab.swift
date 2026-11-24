@@ -80,14 +80,18 @@ final class ContractFixturesTabTests: XCTestCase {
         try rig.variant("tab.open", "working", opened)
         try rig.eventFromResult("tab.state", opened)
 
-        let queued = try await rig.run("tab.transcribe")
-        XCTAssertFalse((result(queued)["queued"] as? [String] ?? []).isEmpty, "\(queued)")
+        // TB10: `tab.open` ya arranca la cola; se espera a que termine y luego se rehace una pista a mano.
         var last: [String: Any] = [:]
-        let ready = try await rig.until {
+        func allReady() async throws -> Bool {
             last = try await rig.call("tab.state")
             let t = tracks(result(last))
             return !t.isEmpty && t.allSatisfy { $0["transcription"] as? String == "ready" }
         }
+        var ready = try await rig.until { try await allReady() }
+        XCTAssertTrue(ready, "\(last)")
+        let queued = try await rig.run("tab.transcribe", params: "{\"track\":\"bass\"}")
+        XCTAssertEqual(result(queued)["queued"] as? [String], ["bass"], "\(queued)")
+        ready = try await rig.until { try await allReady() }
         XCTAssertTrue(ready, "\(last)")
         try rig.variant("tab.open", "ready", ["result": result(last)])
         try await rig.run("tab.state")

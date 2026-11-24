@@ -124,7 +124,7 @@ final class TabTests: XCTestCase {
     }
 
     func testOpenListsPendingTracksAndScoreNotReady() async throws {
-        let f = try await makeFixture()
+        let f = try makeFixture(slow: true)
         let s = try await openTab(f)
         XCTAssertEqual(s["phase"] as? String, "ready")
         XCTAssertEqual(tracks(s).compactMap { $0["id"] as? String }, ["bass", "drums"])
@@ -134,6 +134,25 @@ final class TabTests: XCTestCase {
         XCTAssertEqual((r["error"] as? [String: Any])?["code"] as? String, "not-ready")
         let noStudy = await call(f, "tab.close")
         XCTAssertNotNil(noStudy["result"])
+    }
+
+    /// TB10: `tab.open` arranca la cola sola, sin `tab.transcribe`.
+    func testOpenStartsQueue() async throws {
+        let f = try makeFixture()
+        _ = try await openTab(f)
+        let s = try await openAndTranscribeWait(f)
+        XCTAssertEqual(track(s, "bass")?["noteCount"] as? Int, 3)
+        XCTAssertTrue(f.events.all("tab.progress").contains { $0.payload["state"] as? String == "done" })
+    }
+
+    /// TB10: `tab.songsterr.automatic` (reabre en automático) también arranca la cola.
+    func testSongsterrAutomaticStartsQueue() async throws {
+        let f = try makeFixture(source: nil)
+        let s0 = try await openTab(f)
+        XCTAssertEqual(s0["phase"] as? String, "choosingSource")
+        _ = try await result(f, "tab.songsterr.automatic")
+        let s = try await openAndTranscribeWait(f)
+        XCTAssertEqual(track(s, "drums")?["noteCount"] as? Int, 3)
     }
 
     func testNotOpenErrors() async throws {
@@ -148,7 +167,7 @@ final class TabTests: XCTestCase {
         let f = try await makeFixture()
         _ = try await openTab(f)
         let q = try await result(f, "tab.transcribe")
-        XCTAssertEqual(q["queued"] as? [String], ["bass", "drums"])
+        XCTAssertNotNil(q["queued"])   // `open` ya arrancó la cola (TB10): lo que queda en ella depende del avance
         let s = try await openAndTranscribeWait(f)
         XCTAssertEqual(track(s, "bass")?["noteCount"] as? Int, 3)
         XCTAssertEqual(track(s, "drums")?["noteCount"] as? Int, 3)

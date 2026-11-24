@@ -119,6 +119,8 @@ final class ContractFixturesStudyTests: XCTestCase {
                                                                        analyzer: EditsAnalyzer(box: box, delay: 0), guitarSplitter: nil))
         defer { rig.cleanup() }
         let p = try FixtureSeed.project(in: rig.projects, guitars: true, sections: true)
+        let captured = StudyCoreDeviationsTests.Captured()
+        rig.bridge.send = { captured.add($0) }
 
         // Sin tema abierto, todo método salvo open/close da not-open.
         try await rig.run("study.play", paramsOnly: true)
@@ -139,6 +141,9 @@ final class ContractFixturesStudyTests: XCTestCase {
         try await rig.run("study.setRate", params: "{\"rate\":0.75}")
         try await rig.run("study.setTranspose", params: "{\"semitones\":-2,\"fineCents\":15}")
         try await rig.run("study.setCapo", params: "{\"capo\":3}")
+        // K7/K8: el cambio de capo reemite `study.analysis` con el análisis al día (acordes con display y shape).
+        let analysisEvent = try XCTUnwrap(captured.payloads("study.analysis").last { $0["analysis"] != nil }, "study.setCapo debía reemitir study.analysis")
+        try rig.goldenFile("study.analysis.event.withChords.json", try FixtureRig.text(analysisEvent))
         try await rig.run("study.setLoop", params: "{\"start\":1,\"end\":2,\"name\":\"Riff\"}")
         // Ajuste por arrastre (D-3): `chord` (pulsos) y `bar` (compases, ⌥), con el nombre por defecto de SwiftUI.
         for snap in ["chord", "bar"] {
@@ -154,6 +159,19 @@ final class ContractFixturesStudyTests: XCTestCase {
         // Ediciones.
         try await rig.run("study.analyze")
         try await rig.run("study.setKey", params: "{\"key\":\"A:min\"}")
+        // K8: la interfaz manda la tonalidad como la ve (transpuesta -2); el núcleo deshace la transposición.
+        do {
+            let params = "{\"shown\":{\"tonic\":\"G\",\"mode\":\"min\"}}"
+            try rig.goldenFile("study.setKey.params.shown.json", params)
+            try rig.variant("study.setKey", "shown", try await rig.call("study.setKey", params))
+        }
+        // K7: forma del acorde mostrado con el capo del transporte (3) y con otro capo.
+        try await rig.run("study.chordShape", params: "{\"index\":15}")
+        do {
+            let params = "{\"index\":15,\"capo\":0}"
+            try rig.goldenFile("study.chordShape.params.capo0.json", params)
+            try rig.variant("study.chordShape", "capo0", try await rig.call("study.chordShape", params))
+        }
         try await rig.run("study.setChord", params: "{\"start\":2,\"end\":4,\"index\":9}")
         try await rig.run("study.splitChord", params: "{\"at\":1}")
         try await rig.run("study.removeChordOverrides", params: "{\"start\":0,\"end\":1}")
@@ -187,8 +205,7 @@ final class ContractFixturesStudyTests: XCTestCase {
         try rig.goldenFile("study.analysis.event.analyzing.json", try FixtureRig.text(["state": "analyzing"]))
         try rig.goldenFile("study.analysis.event.ready.json", try FixtureRig.text(["state": "ready"]))
         try rig.goldenFile("study.guitars.event.idle.json", try FixtureRig.text(["state": "idle"]))
-        // `study.error` está declarado y nada lo emite (D-12): se vuelca el DTO por si el cliente lo escucha.
-        try rig.event("study.error", StudyErrorEvent(code: "audio-unavailable", message: "No se pudo abrir la salida de audio."))
+        // K12: `study.error` ya no existe (nunca se emitió); su fixture se borró.
     }
 
     private func eventFromResult(_ name: String, _ r: [String: Any], _ rig: FixtureRig) throws { try rig.eventFromResult(name, r) }

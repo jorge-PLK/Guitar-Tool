@@ -1,0 +1,21 @@
+{
+  "capo" : 3,
+  "display" : "B",
+  "index" : 15,
+  "shape" : {
+    "barre" : {
+      "fret" : 4,
+      "fromString" : 6,
+      "toString" : 1
+    },
+    "baseFret" : 4,
+    "frets" : [
+      4,
+      6,
+      6,
+      5,
+      4,
+      4
+    ]
+  }
+}
