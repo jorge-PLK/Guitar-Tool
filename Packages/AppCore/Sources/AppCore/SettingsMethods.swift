@@ -263,13 +263,11 @@ final class SettingsService: @unchecked Sendable {
     }
 
     /// W2-E2: las mismas cámaras que Grabar y la vista previa (`RecordCameraSource.resolve`), para que el selector, el
-    /// subtítulo y la imagen hablen de la misma cámara (`--camera simulated` lista la simulada). En el Mac solo si se pidió
-    /// por arranque (`--camera` o `--audio simulated`): sin eso sigue sin cámaras, como antes (tests y `tf-webdev` sin opciones).
+    /// subtítulo y la imagen hablen de la misma cámara (`--camera simulated` lista la simulada). Una sola fuente de verdad
+    /// también en el Mac (desvío AJ1/A1): sin opciones de prueba lista las cámaras reales, como `video.preview.start` y
+    /// Grabar. Los tests inyectan `SettingsEnvironment.cameras` (o pasan `--camera simulated`) y no llegan aquí.
     static func resolvedCameras(_ options: LaunchOptions) -> (any SettingsCameraProviding)? {
-        #if !os(Windows)
-        guard options.camera != nil || options.audio == .simulated else { return nil }
-        #endif
-        return RecordCameraSource.resolve(options).map { VideoKitCameraAdapter($0.provider) }
+        RecordCameraSource.resolve(options).map { VideoKitCameraAdapter($0.provider) }
     }
 
     func setSink(_ f: @escaping @Sendable (String) -> Void) { sinkLock.withLock { _sink = f } }

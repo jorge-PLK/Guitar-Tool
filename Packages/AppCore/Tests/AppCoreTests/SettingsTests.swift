@@ -239,6 +239,44 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(v["noCamera"] as? Bool, false, "\(v)")
     }
 
+    /// Desvío AJ1/A1: con proveedor inyectado, `video.cameras` lo lista y `video.settings` no marca `noCamera`.
+    func testInjectedProviderListsCamerasAndSettingsHasCamera() async throws {
+        let injected = SettingsEnvironment.cameras
+        SettingsEnvironment.cameras = SimulatedSettingsCameras(cameras: [SRig.webcam, SRig.phone])
+        defer { SettingsEnvironment.cameras = injected }
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("appcore-settings-inj-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let b = try Bridge(options: LaunchOptions(projectsFolder: nil, supportDir: dir), mediaBase: "https://tf.media/")
+        func result(_ m: String) async -> [String: Any] {
+            let r = await b.router.handle("{\"id\":1,\"method\":\"\(m)\",\"params\":{}}")
+            return ((try? JSONSerialization.jsonObject(with: Data(r.utf8))) as? [String: Any])?["result"] as? [String: Any] ?? [:]
+        }
+        let c = await result("video.cameras")
+        XCTAssertEqual((c["cameras"] as? [[String: Any]])?.compactMap { $0["id"] as? String }, ["cam-a", "cam-b"], "\(c)")
+        let v = await result("video.settings")
+        XCTAssertEqual(v["noCamera"] as? Bool, false, "\(v)")
+    }
+
+    /// Desvío AJ1/A1: Ajustes resuelve el proveedor con la misma función que la vista previa y Grabar. Solo resuelve,
+    /// no lista ni abre ninguna cámara.
+    func testDefaultCameraProviderIsTheOneUsedByPreview() throws {
+        guard RecordEnvironment.cameras == nil else { throw XCTSkip("proveedor inyectado") }
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("appcore-settings-res")
+        var plain = LaunchOptions(projectsFolder: nil, supportDir: dir)
+        plain.camera = nil
+        #if !os(Windows)
+        XCTAssertEqual(RecordCameraSource.resolve(plain)?.isSimulated, false)
+        XCTAssertNotNil(SettingsService.resolvedCameras(plain))
+        #endif
+        var sim = plain
+        sim.camera = .simulated
+        XCTAssertEqual(RecordCameraSource.resolve(sim)?.isSimulated, true)
+        XCTAssertNotNil(SettingsService.resolvedCameras(sim))
+        var audioSim = plain
+        audioSim.audio = .simulated
+        XCTAssertEqual(RecordCameraSource.resolve(audioSim)?.isSimulated, true)
+    }
+
     // MARK: Modelos
 
     func testModelsListNotInstalledAndDelete() async throws {
