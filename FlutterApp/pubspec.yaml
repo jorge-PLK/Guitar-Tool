@@ -37,3 +37,24 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   generate: true
+
+  # Licencias OFL (texto obligatorio en el paquete). Se lee el directorio entero.
+  assets:
+    - assets/licenses/
+
+  # Caras estáticas latinas (App/Resources/Fonts). Solo existen estos pesos (docs/flutter/tokens-componentes.md §1.2).
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/inter-latin-400.ttf
+          weight: 400
+        - asset: assets/fonts/inter-latin-500.ttf
+          weight: 500
+        - asset: assets/fonts/inter-latin-600.ttf
+          weight: 600
+    - family: SpaceGrotesk
+      fonts:
+        - asset: assets/fonts/space-grotesk-latin-500.ttf
+          weight: 500
+        - asset: assets/fonts/space-grotesk-latin-700.ttf
+          weight: 700
