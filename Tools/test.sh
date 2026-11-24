@@ -6,8 +6,15 @@
 #   Tools/test.sh <Paquete> [Filtro]  un paquete, opcionalmente con `swift test --filter <Filtro>`
 #                                     → no escribe last-run.txt
 #   Tools/test.sh App                 solo el build de la app, sin tests → no escribe last-run.txt
-#   Tools/test.sh FlutterApp [Filtro] FlutterApp/: `flutter analyze` + `flutter test` (`--name <Filtro>`)
+#   Tools/test.sh FlutterApp [Filtro] FlutterApp/: `flutter analyze` + `flutter test`
+#                                     Filtro = ruta existente bajo FlutterApp/ (p. ej. test/widgets/k1 o un
+#                                     fichero .dart) → objetivo de `flutter test`; si no, `--name <Filtro>`
+#                                     (regex sobre el nombre completo, group incluido).
+#                                     Con filtro los logs son Temp/logs/FlutterApp-<filtro>-<pid>.{log,json,err}
+#                                     (no se pisan entre agentes). Sin filtro: FlutterApp.{log,json,err}.
 #                                     → no escribe last-run.txt (en el run completo va al final)
+#   TF_UPDATE_GOLDENS=1 Tools/test.sh FlutterApp <Filtro>
+#                                     añade `--update-goldens` (solo con filtro; se ignora sin él)
 #
 # Salida: 0 verde, 1 tests fallidos, 2 errores de compilación o nada que probar.
 # La app se compila (no se testea): la lógica y sus tests viven en los paquetes.
@@ -81,9 +88,20 @@ done
 
 # Paso FlutterApp: analyze + test (subshell: no cambia el cwd global). Sale 0 verde, 1 fallos o avisos, 2 compilación.
 flutter_step() {
-  local log="Temp/logs/FlutterApp.log" json="Temp/logs/FlutterApp.json" err="Temp/logs/FlutterApp.err"
+  local base="Temp/logs/FlutterApp"
   local targs=(test --reporter=json)
-  [ -n "$filter" ] && targs+=(--name "$filter")
+  if [ -n "$filter" ]; then
+    local safe
+    safe=$(printf '%s' "$filter" | tr -c 'A-Za-z0-9._-' '_' | cut -c1-60)
+    base="Temp/logs/FlutterApp-$safe-$$"
+    if [ -e "FlutterApp/$filter" ]; then
+      targs+=("$filter")
+    else
+      targs+=(--name "$filter")
+    fi
+    [ "${TF_UPDATE_GOLDENS:-0}" = "1" ] && targs+=(--update-goldens)
+  fi
+  local log="$base.log" json="$base.json" err="$base.err"
   (
     cd "$root/FlutterApp" || exit 2
     { echo "== flutter analyze"; fvm flutter analyze; echo "analyze-exit=$?"; } > "$root/$log" 2>&1
