@@ -1,35 +1,39 @@
-import 'package:flutter_localizations/flutter_localizations.dart' show GlobalWidgetsLocalizations;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
+import 'core/core_providers.dart';
 import 'l10n/app_localizations.dart';
+import 'shell/shell_screen.dart';
+import 'shell/snapshot.dart';
 
-/// Raíz de la app. Tema oscuro forzado (sin tema claro); el tema real llega con `lib/theme/`.
-class ToneForgeApp extends StatelessWidget {
+/// Idioma de respaldo cuando el del sistema no está entre los soportados.
+const Locale _fallbackLocale = Locale('es');
+
+/// Raíz de la app. Tema oscuro único; idioma de `--locale` o del sistema (es de respaldo).
+class ToneForgeApp extends ConsumerWidget {
   const ToneForgeApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final forced = ref.watch(launchOptionsProvider).locale;
     return MaterialApp(
-      onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
+      debugShowCheckedModeBanner: false,
+      onGenerateTitle: (context) => AppLocalizations.of(context).shell_appTitle,
       theme: ThemeData(brightness: Brightness.dark),
+      locale: forced == null ? null : Locale(forced),
+      localeResolutionCallback: (locale, supported) {
+        for (final s in supported) {
+          if (s.languageCode == locale?.languageCode) return s;
+        }
+        return _fallbackLocale;
+      },
       localizationsDelegates: const [
         AppLocalizations.delegate,
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
+        ...GlobalMaterialLocalizations.delegates,
       ],
       supportedLocales: AppLocalizations.supportedLocales,
-      home: const _Placeholder(),
-    );
-  }
-}
-
-class _Placeholder extends StatelessWidget {
-  const _Placeholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(child: Text(AppLocalizations.of(context).appTitle)),
+      builder: (context, child) => SnapshotHost(child: child!),
+      home: const ShellScreen(),
     );
   }
 }

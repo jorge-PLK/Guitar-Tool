@@ -1,4 +1,65 @@
 {
   "@@locale": "es",
-  "appTitle": "ToneForge"
+  "commonAnchor": "",
+  "@commonAnchor": {
+    "description": "Ancla del bloque common: añade las claves del área debajo, en orden alfabético; no edites otros bloques."
+  },
+  "common_accept": "Aceptar",
+  "common_cancel": "Cancelar",
+  "common_delete": "Borrar",
+  "shellAnchor": "",
+  "@shellAnchor": {
+    "description": "Ancla del bloque shell: añade las claves del área debajo, en orden alfabético; no edites otros bloques."
+  },
+  "shell_appTitle": "ToneForge",
+  "shell_logoForge": "Forge",
+  "shell_logoTone": "Tone",
+  "shell_navBacking": "Backing track",
+  "shell_navLibrary": "Biblioteca",
+  "shell_navMontage": "Montaje",
+  "shell_navRecord": "Grabar",
+  "shell_navSettings": "Ajustes",
+  "shell_navTab": "Tablatura",
+  "shell_selectedThemeHelp": "Abrir la página del tema",
+  "shell_selectedThemeLabel": "Tema seleccionado: {title}",
+  "@shell_selectedThemeLabel": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "libraryAnchor": "",
+  "@libraryAnchor": {
+    "description": "Ancla del bloque library: añade las claves del área debajo, en orden alfabético; no edites otros bloques."
+  },
+  "backingAnchor": "",
+  "@backingAnchor": {
+    "description": "Ancla del bloque backing: añade las claves del área debajo, en orden alfabético; no edites otros bloques."
+  },
+  "tabAnchor": "",
+  "@tabAnchor": {
+    "description": "Ancla del bloque tab: añade las claves del área debajo, en orden alfabético; no edites otros bloques."
+  },
+  "recordAnchor": "",
+  "@recordAnchor": {
+    "description": "Ancla del bloque record: añade las claves del área debajo, en orden alfabético; no edites otros bloques."
+  },
+  "montageAnchor": "",
+  "@montageAnchor": {
+    "description": "Ancla del bloque montage: añade las claves del área debajo, en orden alfabético; no edites otros bloques."
+  },
+  "settingsAnchor": "",
+  "@settingsAnchor": {
+    "description": "Ancla del bloque settings: añade las claves del área debajo, en orden alfabético; no edites otros bloques."
+  },
+  "settings_subtitle": "Se configura una vez y lo usan todas las pantallas. Se guarda en tu perfil de equipo.",
+  "settings_tabAudio": "Audio",
+  "settings_tabLibrary": "Biblioteca",
+  "settings_tabVideo": "Cámara y vídeo",
+  "errorAnchor": "",
+  "@errorAnchor": {
+    "description": "Ancla del bloque error: añade las claves del área debajo, en orden alfabético; no edites otros bloques."
+  },
+  "error_unknown": "Error desconocido"
 }

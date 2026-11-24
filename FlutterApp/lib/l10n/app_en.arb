@@ -1,4 +1,65 @@
 {
   "@@locale": "en",
-  "appTitle": "ToneForge"
+  "commonAnchor": "",
+  "@commonAnchor": {
+    "description": "Anchor for the common block: add this area's keys below, in alphabetical order; do not edit other blocks."
+  },
+  "common_accept": "OK",
+  "common_cancel": "Cancel",
+  "common_delete": "Delete",
+  "shellAnchor": "",
+  "@shellAnchor": {
+    "description": "Anchor for the shell block: add this area's keys below, in alphabetical order; do not edit other blocks."
+  },
+  "shell_appTitle": "ToneForge",
+  "shell_logoForge": "Forge",
+  "shell_logoTone": "Tone",
+  "shell_navBacking": "Backing track",
+  "shell_navLibrary": "Library",
+  "shell_navMontage": "Montage",
+  "shell_navRecord": "Record",
+  "shell_navSettings": "Settings",
+  "shell_navTab": "Tabs",
+  "shell_selectedThemeHelp": "Open the theme page",
+  "shell_selectedThemeLabel": "Selected theme: {title}",
+  "@shell_selectedThemeLabel": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "libraryAnchor": "",
+  "@libraryAnchor": {
+    "description": "Anchor for the library block: add this area's keys below, in alphabetical order; do not edit other blocks."
+  },
+  "backingAnchor": "",
+  "@backingAnchor": {
+    "description": "Anchor for the backing block: add this area's keys below, in alphabetical order; do not edit other blocks."
+  },
+  "tabAnchor": "",
+  "@tabAnchor": {
+    "description": "Anchor for the tab block: add this area's keys below, in alphabetical order; do not edit other blocks."
+  },
+  "recordAnchor": "",
+  "@recordAnchor": {
+    "description": "Anchor for the record block: add this area's keys below, in alphabetical order; do not edit other blocks."
+  },
+  "montageAnchor": "",
+  "@montageAnchor": {
+    "description": "Anchor for the montage block: add this area's keys below, in alphabetical order; do not edit other blocks."
+  },
+  "settingsAnchor": "",
+  "@settingsAnchor": {
+    "description": "Anchor for the settings block: add this area's keys below, in alphabetical order; do not edit other blocks."
+  },
+  "settings_subtitle": "Set it up once and every screen uses it. It is saved in your machine profile.",
+  "settings_tabAudio": "Audio",
+  "settings_tabLibrary": "Library",
+  "settings_tabVideo": "Camera & video",
+  "errorAnchor": "",
+  "@errorAnchor": {
+    "description": "Anchor for the error block: add this area's keys below, in alphabetical order; do not edit other blocks."
+  },
+  "error_unknown": "Unknown error"
 }

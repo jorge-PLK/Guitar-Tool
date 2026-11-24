@@ -98,11 +98,173 @@ abstract class AppLocalizations {
     Locale('es'),
   ];
 
-  /// No description provided for @appTitle.
+  /// Ancla del bloque common: añade las claves del área debajo, en orden alfabético; no edites otros bloques.
+  ///
+  /// In es, this message translates to:
+  /// **''**
+  String get commonAnchor;
+
+  /// No description provided for @common_accept.
+  ///
+  /// In es, this message translates to:
+  /// **'Aceptar'**
+  String get common_accept;
+
+  /// No description provided for @common_cancel.
+  ///
+  /// In es, this message translates to:
+  /// **'Cancelar'**
+  String get common_cancel;
+
+  /// No description provided for @common_delete.
+  ///
+  /// In es, this message translates to:
+  /// **'Borrar'**
+  String get common_delete;
+
+  /// Ancla del bloque shell: añade las claves del área debajo, en orden alfabético; no edites otros bloques.
+  ///
+  /// In es, this message translates to:
+  /// **''**
+  String get shellAnchor;
+
+  /// No description provided for @shell_appTitle.
   ///
   /// In es, this message translates to:
   /// **'ToneForge'**
-  String get appTitle;
+  String get shell_appTitle;
+
+  /// No description provided for @shell_logoForge.
+  ///
+  /// In es, this message translates to:
+  /// **'Forge'**
+  String get shell_logoForge;
+
+  /// No description provided for @shell_logoTone.
+  ///
+  /// In es, this message translates to:
+  /// **'Tone'**
+  String get shell_logoTone;
+
+  /// No description provided for @shell_navBacking.
+  ///
+  /// In es, this message translates to:
+  /// **'Backing track'**
+  String get shell_navBacking;
+
+  /// No description provided for @shell_navLibrary.
+  ///
+  /// In es, this message translates to:
+  /// **'Biblioteca'**
+  String get shell_navLibrary;
+
+  /// No description provided for @shell_navMontage.
+  ///
+  /// In es, this message translates to:
+  /// **'Montaje'**
+  String get shell_navMontage;
+
+  /// No description provided for @shell_navRecord.
+  ///
+  /// In es, this message translates to:
+  /// **'Grabar'**
+  String get shell_navRecord;
+
+  /// No description provided for @shell_navSettings.
+  ///
+  /// In es, this message translates to:
+  /// **'Ajustes'**
+  String get shell_navSettings;
+
+  /// No description provided for @shell_navTab.
+  ///
+  /// In es, this message translates to:
+  /// **'Tablatura'**
+  String get shell_navTab;
+
+  /// No description provided for @shell_selectedThemeHelp.
+  ///
+  /// In es, this message translates to:
+  /// **'Abrir la página del tema'**
+  String get shell_selectedThemeHelp;
+
+  /// No description provided for @shell_selectedThemeLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Tema seleccionado: {title}'**
+  String shell_selectedThemeLabel(String title);
+
+  /// Ancla del bloque library: añade las claves del área debajo, en orden alfabético; no edites otros bloques.
+  ///
+  /// In es, this message translates to:
+  /// **''**
+  String get libraryAnchor;
+
+  /// Ancla del bloque backing: añade las claves del área debajo, en orden alfabético; no edites otros bloques.
+  ///
+  /// In es, this message translates to:
+  /// **''**
+  String get backingAnchor;
+
+  /// Ancla del bloque tab: añade las claves del área debajo, en orden alfabético; no edites otros bloques.
+  ///
+  /// In es, this message translates to:
+  /// **''**
+  String get tabAnchor;
+
+  /// Ancla del bloque record: añade las claves del área debajo, en orden alfabético; no edites otros bloques.
+  ///
+  /// In es, this message translates to:
+  /// **''**
+  String get recordAnchor;
+
+  /// Ancla del bloque montage: añade las claves del área debajo, en orden alfabético; no edites otros bloques.
+  ///
+  /// In es, this message translates to:
+  /// **''**
+  String get montageAnchor;
+
+  /// Ancla del bloque settings: añade las claves del área debajo, en orden alfabético; no edites otros bloques.
+  ///
+  /// In es, this message translates to:
+  /// **''**
+  String get settingsAnchor;
+
+  /// No description provided for @settings_subtitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Se configura una vez y lo usan todas las pantallas. Se guarda en tu perfil de equipo.'**
+  String get settings_subtitle;
+
+  /// No description provided for @settings_tabAudio.
+  ///
+  /// In es, this message translates to:
+  /// **'Audio'**
+  String get settings_tabAudio;
+
+  /// No description provided for @settings_tabLibrary.
+  ///
+  /// In es, this message translates to:
+  /// **'Biblioteca'**
+  String get settings_tabLibrary;
+
+  /// No description provided for @settings_tabVideo.
+  ///
+  /// In es, this message translates to:
+  /// **'Cámara y vídeo'**
+  String get settings_tabVideo;
+
+  /// Ancla del bloque error: añade las claves del área debajo, en orden alfabético; no edites otros bloques.
+  ///
+  /// In es, this message translates to:
+  /// **''**
+  String get errorAnchor;
+
+  /// No description provided for @error_unknown.
+  ///
+  /// In es, this message translates to:
+  /// **'Error desconocido'**
+  String get error_unknown;
 }
 
 class _AppLocalizationsDelegate
