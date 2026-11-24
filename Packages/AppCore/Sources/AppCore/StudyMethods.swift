@@ -165,7 +165,9 @@ struct StudySeekParams: Decodable, Sendable { var seconds: Double }
 struct StudyRateParams: Decodable, Sendable { var rate: Double }
 struct StudyTransposeParams: Decodable, Sendable { var semitones: Int?; var fineCents: Double? }
 struct StudyCapoParams: Decodable, Sendable { var capo: Int }
-struct StudyLoopParams: Decodable, Sendable { var start: Double?; var end: Double?; var name: String? }
+/// `snap` (D-3): `none` (por defecto, el rango tal cual), `chord` (a pulsos, SwiftUI sin ⌥) o `bar` (a compases, ⌥).
+/// Sin `name`, el bucle ajustado se llama «acordes»/«compases» como en SwiftUI.
+struct StudyLoopParams: Decodable, Sendable { var start: Double?; var end: Double?; var name: String?; var snap: String? }
 struct StudyMixParams: Decodable, Sendable { var channel: String; var gainDB: Double?; var mute: Bool?; var solo: Bool? }
 struct StudyMasterParams: Decodable, Sendable { var gainDB: Double }
 struct StudyMetronomeParams: Decodable, Sendable { var on: Bool?; var gainDB: Double? }
@@ -253,7 +255,20 @@ final class StudyService {
         }
         router.register("study.setLoop") { [self] (p: StudyLoopParams) -> StudyTransport in
             try await with { c in
-                if let s = p.start, let e = p.end, s.isFinite, e.isFinite { c.setLoop(s...max(s, e), name: p.name) } else { c.setLoop(nil) }
+                guard let s = p.start, let e = p.end, s.isFinite, e.isFinite else { c.setLoop(nil); return }
+                var range = s...max(s, e)
+                var name = p.name
+                switch p.snap ?? "none" {
+                case "none": break
+                case "chord", "bar":
+                    let bar = p.snap == "bar"
+                    guard let o = self.current else { break }
+                    // `StudyBridge.snap(session.beats, r, bar:)` de `BackingTimeline`/`ChordGrid`.
+                    range = StudyEditsBridge.snap(beats: o.session.beats, downbeats: o.session.downbeats, range, bar: bar)
+                    name = name ?? (bar ? "compases" : "acordes")
+                default: throw RPCError(code: "bad-params", message: "«snap» debe ser none, chord o bar.")
+                }
+                c.setLoop(range, name: name)
             }
         }
         router.register("study.setMix") { [self] (p: StudyMixParams) -> StudyTransport in

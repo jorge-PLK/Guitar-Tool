@@ -51,7 +51,8 @@ struct StudyChordRangeParams: Decodable, Sendable { var start: Double; var end: 
 struct StudySplitChordParams: Decodable, Sendable { var at: Double }
 struct StudyMarkSectionParams: Decodable, Sendable { var start: Double; var end: Double; var solo: Bool?; var snap: String? }
 struct StudyDeleteSectionParams: Decodable, Sendable { var id: String }
-struct StudyPreviewSectionEdgeParams: Decodable, Sendable { var id: String; var start: Bool; var to: Double }
+/// `snap`: `none` (por defecto), `chord` o `bar` (⌥): imán de `SectionEdgeDrag` (mini-spec Fase 7b, punto 7).
+struct StudyPreviewSectionEdgeParams: Decodable, Sendable { var id: String; var start: Bool; var to: Double; var snap: String? }
 struct StudyNudgeSectionParams: Decodable, Sendable { var id: String; var start: Bool; var forward: Bool; var bar: Bool? }
 struct StudyRenameGuitarParams: Decodable, Sendable { var role: String; var name: String }
 struct StudyGuitarStereoParams: Decodable, Sendable { var on: Bool }
@@ -262,6 +263,16 @@ extension StudyService {
 
     static func chordBoundaries(_ s: StudySession) -> [Double] {
         Array(Set(s.effectiveChords.flatMap { [$0.start, $0.end] })).sorted()
+    }
+
+    /// Imán del arrastre de un borde, la regla de `SectionEdgeDrag.snappedTime`: los límites de acorde (o los compases con
+    /// `bar`, si hay) más el borde original. `none` = sin imán (nil). Probado contra `SectionEdgeDrag` en `StudySnapTests`.
+    static func edgeMagnet(_ snap: String, _ s: StudySession, original: Double) -> [Double]? {
+        switch snap {
+        case "chord": return chordBoundaries(s) + [original]
+        case "bar": return (s.downbeats.isEmpty ? chordBoundaries(s) : Array(Set(s.downbeats)).sorted()) + [original]
+        default: return nil
+        }
     }
 
     static func sectionID(_ text: String, in s: StudySession) throws -> UUID {
@@ -486,8 +497,16 @@ extension StudyService {
         let s = o.session
         let id = try Self.sectionID(p.id, in: s)
         guard p.to.isFinite else { throw RPCError(code: "bad-params", message: "«to» debe ser un tiempo.") }
+        let snap = p.snap ?? "none"
+        guard ["none", "chord", "bar"].contains(snap) else {
+            throw RPCError(code: "bad-params", message: "«snap» debe ser none, chord o bar.")
+        }
         var e = SectionEditor(sections: s.sections, duration: s.project.song.duration)
-        e.setEdge(id, start: p.start, to: p.to)
+        var to = p.to
+        if let original = e.section(id).map({ p.start ? $0.start : $0.end }), let m = Self.edgeMagnet(snap, s, original: original) {
+            to = SectionEditor.snap(to, to: m)
+        }
+        e.setEdge(id, start: p.start, to: to)
         return StudyPreviewSections(sections: sectionInfos(e.sections))
     }
 
@@ -504,8 +523,7 @@ extension StudyService {
             guard ["none", "beat", "bar", "chord"].contains(snap) else {
                 throw RPCError(code: "bad-params", message: "«snap» debe ser none, beat, bar o chord.")
             }
-            let beats = s.beats, downbeats = s.downbeats
-            let chordMagnet = Self.chordBoundaries(s)
+            let beats = s.beats
             // El nombre explícito va después de «solo»: así manda sobre el nombre por defecto que sigue a la marca.
             if let solo = p.solo { Self.editSections(s) { $0.setSolo(id, solo) } }
             if let name = p.name { Self.editSections(s) { $0.rename(id, to: name) } }
@@ -514,8 +532,11 @@ extension StudyService {
                 Self.editSections(s) { e in
                     switch snap {
                     case "beat": e.setEdge(id, start: start, to: StudyEditsBridge.nearestBeat(beats, to: time))
-                    case "bar": e.setEdge(id, start: start, to: StudyEditsBridge.nearestBar(beats: beats, downbeats: downbeats, to: time))
-                    case "chord": e.snapEdge(id, start: start, to: time, boundaries: chordMagnet)
+                    case "bar", "chord":
+                        // Imán de `SectionEdgeDrag`: incluye el borde original (`edgeMagnet`).
+                        let original = e.section(id).map { start ? $0.start : $0.end } ?? time
+                        let m = Self.edgeMagnet(snap, s, original: original) ?? []
+                        e.setEdge(id, start: start, to: SectionEditor.snap(time, to: m))
                     default: e.setEdge(id, start: start, to: time)
                     }
                 }
