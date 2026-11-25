@@ -327,4 +327,19 @@ abstract final class TfSize {
   static const double compactMasterWidth = 40; // RM:71
   static const double compactChannelWidth = 76; // RM:123
   static const double foldButtonHeight = 30; // RM:29-33
+
+  // Ola 2 · Backing: acordes, marcos de sección y popover de sección.
+  static const double chordChipHeight = 30;
+  static const double chordQualityCellWidth = 60;
+  static const double control32 = 32;
+  static const double sectionEdgeGrab = 16;
+  static const double sectionEdgeBarWidth = 6;
+  static const double sectionEdgeBarMin = 16;
+  static const double sectionEdgeBarMax = 30;
+  static const double sectionEdgeBarInset = 10;
+  static const double sectionPopoverWidth = 300;
+  static const double sectionPopoverLabelWidth = 46;
+  static const double sectionColorDot = 20;
+  static const double sectionSuggestionHeight = 24;
+  static const double sectionTimeMinWidth = 64;
 }
