@@ -204,7 +204,8 @@ class OffsetLabel extends StatelessWidget {
           maxLines: 1,
           softWrap: false,
           overflow: TextOverflow.ellipsis,
-          style: base.copyWith(fontSize: (base.fontSize ?? TfSize.font13) * scale),
+          style: base,
+          textScaler: TextScaler.linear(MediaQuery.textScalerOf(context).scale(1) * scale),
         ),
       );
     });

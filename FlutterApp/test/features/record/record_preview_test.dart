@@ -196,10 +196,10 @@ void main() {
   testWidgets('etiqueta de desfase: sin escalar si cabe; escala >= 0,75 si no cabe', (tester) async {
     await _pump(tester, snap('camera-simulated'), width: 400, height: 100,
         child: const Align(alignment: Alignment.topLeft, child: SizedBox(width: 400, child: OffsetLabel(ms: 65))));
-    final double full = tester.widget<Text>(find.byType(Text)).style!.fontSize!;
+    final double full = tester.widget<Text>(find.byType(Text)).textScaler!.scale(1);
     await _pump(tester, snap('camera-simulated'), width: 100, height: 100,
         child: const Align(alignment: Alignment.topLeft, child: SizedBox(width: 100, child: OffsetLabel(ms: 65))));
-    final double small = tester.widget<Text>(find.byType(Text)).style!.fontSize!;
+    final double small = tester.widget<Text>(find.byType(Text)).textScaler!.scale(1);
     expect(small, greaterThanOrEqualTo(full * offsetMinScale - 0.001));
     expect(small, closeTo(full * offsetMinScale, 0.001));
   });
