@@ -8,7 +8,9 @@ Documentación de la fase, por piezas: `docs/flutter/README.md` (índice). El or
 - [x] **Ola 0 · Cimientos:** actualizar las reglas de `CLAUDE.md` (UIs viejas congeladas, paridad sobre Flutter, agentes nuevos); `AppCoreFFI` completo (ABI congelada, canal de píxeles, servicios de anfitrión por `hostRequest`); test que vuelca `Contract/fixtures/`; forma `{code, message, args}` de los errores del núcleo; `FlutterApp/` con `core/` (`CoreClient`, `FrameChannel`, `HostServices`, `MockCore`, `LaunchOptions`), `theme/`, kit de `widgets/`, ARB es/en, carcasa con barra lateral y `--snapshot`; `Tools/flutter/*.sh` y paso `FlutterApp` en `Tools/test.sh`; capturas de referencia de SwiftUI en `docs/flutter/ref/`.
 
 Cerrada 24/11/2026 con visto bueno de Jorge (suite 20:51, Flutter 328 tests); la parte de Windows (AppCoreFFI, runner, sumideros D3D) queda para la pasada del PC al final.
-- [ ] **Ola 1 · Biblioteca:** Biblioteca, detalle de tema, grabaciones del tema, importación por fichero y por enlace, listas y álbumes, cola de trabajos, primer arranque, Ajustes · Biblioteca y selector de idioma (`pantallas/biblioteca.md`, `pantallas/ajustes.md`).
+- [x] **Ola 1 · Biblioteca:** Biblioteca, detalle de tema, grabaciones del tema, importación por fichero y por enlace, listas y álbumes, cola de trabajos, primer arranque, Ajustes · Biblioteca y selector de idioma (`pantallas/biblioteca.md`, `pantallas/ajustes.md`).
+
+Cerrada 25/11/2026 con visto bueno de Jorge tras su prueba a mano. Pendiente de Windows en «Pendiente de Windows»; desvíos L14-L16 abiertos para la ola 5 (`docs/flutter/desvios.md`).
 - [ ] **Ola 2 · Estudio:** Backing (mezclador, rejilla de acordes, secciones, bucle, metrónomo) y Tablatura (WebView de alphaTab, edición, Songsterr, exportar `.gp`) (`pantallas/backing.md`, `pantallas/tablatura.md`).
 - [ ] **Ola 3 · Grabación:** Grabar, Ver toma, Ajustar desfase, Ajustes · Audio (calibración) y Ajustes · Cámara y vídeo (`pantallas/grabar.md`, `pantallas/ajustes.md`).
 - [ ] **Ola 4 · Montaje:** Montaje y hoja «Encuadre» (`pantallas/montaje.md`).
