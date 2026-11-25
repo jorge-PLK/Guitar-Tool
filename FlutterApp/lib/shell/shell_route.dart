@@ -7,7 +7,7 @@ enum ShellRoute {
   library(TfIcon.musicNoteList),
   backing(TfIcon.sliderVertical3),
   tab(TfIcon.musicQuarternote3),
-  record(TfIcon.recordCircle),
+  record(TfIcon.video), // Jorge 25/11: cámara de vídeo en vez de record.circle
   montage(TfIcon.film),
   settings(TfIcon.gearshape);
 
