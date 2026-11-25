@@ -303,4 +303,28 @@ abstract final class TfSize {
   static const double tabTuningWidth = 170;
   static const double tabNameWidth = 150; // nombre de pista (pairing y fases)
   static const double tabPhaseBarWidth = 220;
+  // Ola 3 · Grabar y Ajustes
+  static const double settingsCameraWidth = 280; // VS:244-284
+  static const double settingsResFpsWidth = 160; // VS:244-284
+  static const double settingsPreviewWidth = 240; // VS:244-284
+  static const double previewAspect = 16 / 9; // RV:386, VS:286-321
+  static const double exportCodecWidth = 160; // VS:354-383
+  static const double exportResolutionWidth = 100; // VS:354-383
+  static const double sheetWidthWide = 720; // TV:282, OS
+  static const double sheetWidthNarrow = 420; // RV:332-356
+  static const double viewerCloseIcon = 13; // TV: botón cerrar
+  static const double viewerPlayIcon = 15; // TV: icono de reproducción
+  static const double offsetButtonHeight = 34; // OS
+  static const double offsetFieldWidth = 76; // OS
+  static const double compactMeterWidth = 22; // RM:78-85
+  static const double compactMeterHeight = 8; // RM:78-85
+  static const double recordButtonPaddingH = 22; // RV:482
+  static const double recDot = 10; // RV:433
+  static const double previewGradientRadius = 520; // RV:367
+  static const double previewPlaceholderIcon = 28; // RV:411
+  static const double inputLevelBarWidth = 12; // RM:198-207
+  static const double mixerDividerHeight = 200; // RM:47
+  static const double compactMasterWidth = 40; // RM:71
+  static const double compactChannelWidth = 76; // RM:123
+  static const double foldButtonHeight = 30; // RM:29-33
 }

@@ -44,7 +44,7 @@ void main() {
     });
   });
 
-  group('TfSecondaryButton icon y labelColor', () {
+  group('TfSecondaryButton icon y color', () {
     testWidgets('con icono hay TfIconView y el color de etiqueta se aplica', (WidgetTester tester) async {
       int taps = 0;
       await pumpK4(
@@ -54,7 +54,7 @@ void main() {
             label: 'Tablatura',
             height: 34,
             icon: TfIcon.musicQuarternote3,
-            labelColor: TfColors.accent,
+            color: TfColors.accent,
             onPressed: () => taps++,
           ),
         ),
