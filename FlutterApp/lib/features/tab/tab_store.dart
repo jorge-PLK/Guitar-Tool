@@ -286,6 +286,15 @@ class TabStore extends Notifier<TabStoreState> {
   /// `tab.edit {op,...}`; con `op:"key"` el `handled` de la respuesta dice si el núcleo usó la tecla.
   Future<TabState?> edit(TabEditParams p) => _call('tab.edit', p.toJson());
 
+  /// `tab.edit {op:key}`: `true` si el núcleo usó la tecla (`TabState.handled`). Falla = `false`.
+  Future<bool> key(String key, {bool shift = false, bool ctrl = false, bool alt = false}) async {
+    final t = await edit(TabEditParams.key(key: key, shift: shift, ctrl: ctrl, alt: alt));
+    return t?.handled ?? false;
+  }
+
+  /// `tab.edit {op:redo}` directo (Ctrl+Y en Windows).
+  Future<TabState?> redo() => edit(TabEditParams.redo());
+
   Future<TabState?> setEditMode({required bool on}) => edit(TabEditParams.editMode(on: on));
 
   /// `tab.exportName`: nombre sugerido del `.gp`; queda en el estado.

@@ -8,6 +8,7 @@ import 'package:toneforge/features/tab/tab_card.dart';
 import 'package:toneforge/features/tab/tab_edit_bar.dart';
 import 'package:toneforge/features/tab/tab_header.dart';
 import 'package:toneforge/features/tab/tab_notice.dart';
+import 'package:toneforge/features/tab/tab_shortcuts.dart';
 import 'package:toneforge/features/tab/tab_stage.dart';
 import 'package:toneforge/features/tab/tab_store.dart';
 import 'package:toneforge/features/tab/tab_theme_chooser.dart';
@@ -50,7 +51,7 @@ class TabScreen extends ConsumerWidget {
       ),
     );
     // La hoja de Songsterr se abre y cierra sola según `songsterrStoreProvider` (TabScreen.swift:99-102).
-    return Stack(children: [body, const SongsterrSheetHost()]);
+    return TabShortcuts(child: Stack(children: [body, const SongsterrSheetHost()]));
   }
 }
 
