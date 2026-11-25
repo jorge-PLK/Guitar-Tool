@@ -36,6 +36,23 @@ class SettingsVideoTab extends ConsumerWidget {
   }
 }
 
+/// `.frame(maxWidth: N)` de VS:261/268/276: el desplegable mide como su opción más ancha, con tope `cap`.
+/// `TfDropdown` no admite tope: sin `width` es intrínseco; si la opción más ancha lo pasa, se fija `cap` (recorta con «…»).
+double? _cappedWidth(List<String> labels, double cap) {
+  double widest = 0;
+  for (final String t in labels) {
+    final TextPainter p = TextPainter(
+      text: TextSpan(text: t, style: TfText.body(13)),
+      textDirection: TextDirection.ltr,
+      maxLines: 1,
+    )..layout();
+    if (p.width > widest) widest = p.width;
+    p.dispose();
+  }
+  const double chrome = 2 * TfSize.dropdownPadH + TfSize.dropdownGap + TfSize.dropdownChevron;
+  return widest + chrome > cap ? cap : null;
+}
+
 class _CameraGroup extends ConsumerWidget {
   const _CameraGroup({required this.state, required this.settings});
 
@@ -98,7 +115,7 @@ class _CameraGroup extends ConsumerWidget {
                   TfInfoRow(
                     label: l.settings_video_camera,
                     trailing: TfDropdown<String>(
-                      width: TfSize.settingsCameraWidth,
+                      width: _cappedWidth(<String>[for (final i in cams) i.label], TfSize.settingsCameraWidth),
                       value: uid ?? _systemDefault,
                       items: cams,
                       onChanged: (String id) => store.setCamera(id == _systemDefault ? null : id),
@@ -107,7 +124,7 @@ class _CameraGroup extends ConsumerWidget {
                   TfInfoRow(
                     label: l.settings_video_resolution,
                     trailing: TfDropdown<int>(
-                      width: TfSize.settingsResFpsWidth,
+                      width: _cappedWidth(<String>[for (final r in resolutions) r.label ?? '${r.height}p'], TfSize.settingsResFpsWidth),
                       value: ri < 0 ? null : ri,
                       items: <TfDropdownItem<int>>[
                         for (int i = 0; i < resolutions.length; i++)
@@ -121,7 +138,7 @@ class _CameraGroup extends ConsumerWidget {
                   TfInfoRow(
                     label: l.settings_video_fps,
                     trailing: TfDropdown<double>(
-                      width: TfSize.settingsResFpsWidth,
+                      width: _cappedWidth(<String>[for (final f in fpsList) f.label], TfSize.settingsResFpsWidth),
                       value: fpsList.any((VideoFps f) => f.value == fps) ? fps : null,
                       items: <TfDropdownItem<double>>[
                         for (final VideoFps f in fpsList) TfDropdownItem<double>(value: f.value, label: f.label),

@@ -62,7 +62,10 @@ class _RecordPreviewState extends ConsumerState<RecordPreview> {
   Widget build(BuildContext context) {
     final RecordState s = ref.watch(recordStoreProvider);
     final BorderRadius radius = BorderRadius.circular(TfRadius.hero);
-    return Center(
+    // Arriba y a lo ancho; la altura es la del 16:9 (o la libre si es menor) y el sobrante queda abajo (RV:386-390).
+    return Align(
+      alignment: Alignment.topCenter,
+      heightFactor: 1,
       child: AspectRatio(
         aspectRatio: TfSize.previewAspect,
         child: ClipRRect(

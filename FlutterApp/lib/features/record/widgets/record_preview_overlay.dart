@@ -178,7 +178,7 @@ class FormatPill extends StatelessWidget {
       _Pill(child: Text(label, style: _pillStyle().copyWith(color: TfColors.text2)));
 }
 
-/// Píldora «Rotar» (RV:438-451): `text2` con 0°, `accent` con giro. Sin cambio visual al deshabilitarse.
+/// Píldora «Rotar» (RV:438-451): `text2` con 0°, `accent` con giro. Atenuada al deshabilitarse.
 class RotatePill extends StatelessWidget {
   const RotatePill({
     super.key,
@@ -210,14 +210,18 @@ class RotatePill extends StatelessWidget {
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: enabled ? onTap : null,
-            child: _Pill(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                spacing: TfSpace.s6,
-                children: <Widget>[
-                  TfIconView(TfIcon.rotateRight, size: TfSize.iconButtonIcon, color: fg),
-                  Text(label, style: _pillStyle().copyWith(color: fg)),
-                ],
+            // `.disabled(phase != .idle)` (RV:448): el botón plano de macOS atenúa su etiqueta.
+            child: Opacity(
+              opacity: enabled ? 1 : TfOpacity.dim,
+              child: _Pill(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  spacing: TfSpace.s6,
+                  children: <Widget>[
+                    TfIconView(TfIcon.rotateRight, size: TfSize.iconButtonIcon, color: fg),
+                    Text(label, style: _pillStyle().copyWith(color: fg)),
+                  ],
+                ),
               ),
             ),
           ),

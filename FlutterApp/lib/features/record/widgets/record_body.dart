@@ -89,7 +89,7 @@ class _RecordBodyState extends ConsumerState<RecordBody> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: <Widget>[
                       // La vista previa toma el espacio libre conservando 16:9; el mezclador expandido se lo quita.
-                      const Expanded(child: RecordPreview()),
+                      const Flexible(child: RecordPreview()),
                       const SizedBox(height: TfSpace.s14),
                       const RecordBar(),
                       const SizedBox(height: TfSpace.s14),

@@ -9,6 +9,7 @@ import 'package:toneforge/core/core_client.dart' show Json;
 import 'package:toneforge/core/frame_channel.dart';
 import 'package:toneforge/core/frame_providers.dart';
 import 'package:toneforge/features/record/record_store.dart';
+import 'package:toneforge/features/record/widgets/record_bar.dart';
 import 'package:toneforge/features/record/widgets/record_preview.dart';
 import 'package:toneforge/l10n/app_localizations.dart';
 import 'package:toneforge/theme/tokens.dart';
@@ -57,9 +58,9 @@ class _Fake {
   );
 }
 
-Future<_Fake> _pump(WidgetTester tester, RecordSnapshot s) async {
+Future<_Fake> _pump(WidgetTester tester, RecordSnapshot s, {double height = 450, Widget? child, double width = 800}) async {
   await tester.runAsync(loadTfFonts);
-  setTestSurface(tester, const Size(800, 450));
+  setTestSurface(tester, Size(width, height));
   final _Fake f = _Fake(_FakeStore(RecordState(snapshot: s, opened: true)));
   await tester.pumpWidget(
     ProviderScope(
@@ -76,7 +77,7 @@ Future<_Fake> _pump(WidgetTester tester, RecordSnapshot s) async {
           ],
           child: DefaultTextStyle(
             style: TfText.body().copyWith(color: TfColors.text),
-            child: const SizedBox(width: 800, height: 450, child: RecordPreview()),
+            child: SizedBox(width: width, height: height, child: child ?? const RecordPreview()),
           ),
         ),
       ),
@@ -167,5 +168,39 @@ void main() {
     expect(find.text('Rotar · 90°'), findsOneWidget);
     await tester.tap(find.text('Rotar · 90°'));
     expect(f.store.rotations, 1);
+  });
+
+  testWidgets('cuenta atrás: «Rotar» atenuado (0,4) y sin llamar al store', (tester) async {
+    final _Fake f = await _pump(tester, snap('counting'));
+    final Finder op = find.ancestor(of: find.textContaining('Rotar'), matching: find.byType(Opacity));
+    expect(tester.widget<Opacity>(op.first).opacity, TfOpacity.dim);
+    await tester.tap(find.textContaining('Rotar'), warnIfMissed: false);
+    expect(f.store.rotations, 0);
+  });
+
+  testWidgets('reposo: «Rotar» a opacidad plena', (tester) async {
+    await _pump(tester, snap('camera-live'));
+    final Finder op = find.ancestor(of: find.textContaining('Rotar'), matching: find.byType(Opacity));
+    for (final Opacity o in tester.widgetList<Opacity>(op)) {
+      expect(o.opacity, 1);
+    }
+  });
+
+  testWidgets('la caja 16:9 va arriba del hueco, no centrada', (tester) async {
+    await _pump(tester, snap('camera-simulated'), height: 700);
+    final Finder box = find.byType(AspectRatio);
+    expect(tester.getTopLeft(box).dy, 0);
+    expect(tester.getSize(box).height, 450);
+  });
+
+  testWidgets('etiqueta de desfase: sin escalar si cabe; escala >= 0,75 si no cabe', (tester) async {
+    await _pump(tester, snap('camera-simulated'), width: 400, height: 100,
+        child: const Align(alignment: Alignment.topLeft, child: SizedBox(width: 400, child: OffsetLabel(ms: 65))));
+    final double full = tester.widget<Text>(find.byType(Text)).style!.fontSize!;
+    await _pump(tester, snap('camera-simulated'), width: 100, height: 100,
+        child: const Align(alignment: Alignment.topLeft, child: SizedBox(width: 100, child: OffsetLabel(ms: 65))));
+    final double small = tester.widget<Text>(find.byType(Text)).style!.fontSize!;
+    expect(small, greaterThanOrEqualTo(full * offsetMinScale - 0.001));
+    expect(small, closeTo(full * offsetMinScale, 0.001));
   });
 }

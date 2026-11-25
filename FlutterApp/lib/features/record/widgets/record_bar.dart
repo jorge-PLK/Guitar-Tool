@@ -183,16 +183,33 @@ class OffsetLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final AppLocalizations l = AppLocalizations.of(context);
-    return Align(
-      alignment: Alignment.centerRight,
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
+    final String text = recordOffsetText(l, ms);
+    final Color color = ms == 0 ? TfColors.muted : TfColors.ok;
+    return LayoutBuilder(builder: (BuildContext context, BoxConstraints c) {
+      // `lineLimit(1).minimumScaleFactor(0.75)` (RV:535): encoge hasta 0,75 y, si aun así no cabe, corta con «…».
+      final TextStyle base = TfText.body(TfSize.font13, TfWeight.semibold).copyWith(color: color);
+      final TextPainter p = TextPainter(
+        text: TextSpan(text: text, style: base),
+        textDirection: TextDirection.ltr,
+        textScaler: MediaQuery.textScalerOf(context),
+        maxLines: 1,
+      )..layout();
+      final double natural = p.width;
+      p.dispose();
+      final double scale = natural <= c.maxWidth || natural == 0 ? 1 : (c.maxWidth / natural).clamp(offsetMinScale, 1.0);
+      return Align(
+        alignment: Alignment.centerRight,
         child: Text(
-          recordOffsetText(l, ms),
+          text,
           maxLines: 1,
-          style: TfText.body(TfSize.font13, TfWeight.semibold).copyWith(color: ms == 0 ? TfColors.muted : TfColors.ok),
+          softWrap: false,
+          overflow: TextOverflow.ellipsis,
+          style: base.copyWith(fontSize: (base.fontSize ?? TfSize.font13) * scale),
         ),
-      ),
-    );
+      );
+    });
   }
 }
+
+/// Escala mínima de la etiqueta de desfase (`minimumScaleFactor(0.75)`, RV:535).
+const double offsetMinScale = 0.75;
