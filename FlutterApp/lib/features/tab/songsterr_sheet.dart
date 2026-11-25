@@ -4,7 +4,10 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:toneforge/contract/tab.dart';
 import 'package:toneforge/features/tab/songsterr_choosing.dart';
+import 'package:toneforge/features/tab/songsterr_failed.dart';
+import 'package:toneforge/features/tab/songsterr_pairing.dart';
 import 'package:toneforge/features/tab/songsterr_store.dart';
+import 'package:toneforge/features/tab/songsterr_working.dart';
 import 'package:toneforge/l10n/app_localizations.dart';
 import 'package:toneforge/theme/tokens.dart';
 import 'package:toneforge/theme/typography.dart';
@@ -142,14 +145,11 @@ class _SongsterrSheetState extends ConsumerState<SongsterrSheet> {
           onOpenPreview: () => setState(() => _previewOpen = true),
         );
       case TabSongsterrStage.working:
-        // SLOT: SongsterrWorking (recibe `sheet.workingText`)
-        return const SizedBox.shrink();
+        return SongsterrWorking(text: sheet?.workingText);
       case TabSongsterrStage.failed:
-        // SLOT: SongsterrFailed (recibe `sheet.failure`)
-        return const SizedBox.shrink();
+        return SongsterrFailed(issue: sheet?.failure);
       case TabSongsterrStage.pairing:
-        // SLOT: SongsterrPairing (recibe `sheet.pairing`)
-        return const SizedBox.shrink();
+        return SongsterrPairing(pairing: sheet?.pairing);
       case TabSongsterrStage.unknown:
         return const SizedBox.shrink();
     }
