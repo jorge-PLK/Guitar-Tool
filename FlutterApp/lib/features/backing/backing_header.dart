@@ -5,6 +5,7 @@ import 'package:toneforge/features/backing/study_store.dart';
 import 'package:toneforge/l10n/app_localizations.dart';
 import 'package:toneforge/shell/shell_providers.dart';
 import 'package:toneforge/shell/shell_route.dart';
+import 'package:toneforge/theme/icons.dart';
 import 'package:toneforge/theme/tokens.dart';
 import 'package:toneforge/theme/typography.dart';
 import 'package:toneforge/widgets/tf_buttons.dart';
@@ -59,6 +60,7 @@ class BackingHeader extends ConsumerWidget {
               message: l.backing_tabButtonTooltip,
               child: TfSecondaryButton(
                 label: l.backing_tabButton,
+                icon: TfIcon.musicQuarternote3,
                 height: TfSize.pillHeight,
                 onPressed: () => ref.read(shellRouteProvider.notifier).select(ShellRoute.tab),
               ),

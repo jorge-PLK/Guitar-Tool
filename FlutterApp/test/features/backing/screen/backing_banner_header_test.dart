@@ -2,6 +2,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:toneforge/core/core_client.dart';
 import 'package:toneforge/shell/shell_providers.dart';
 import 'package:toneforge/shell/shell_route.dart';
+import 'package:toneforge/theme/icons.dart';
+import 'package:toneforge/widgets/tf_buttons.dart';
 import 'package:toneforge/widgets/tf_progress.dart';
 
 import 'screen_support.dart';
@@ -84,6 +86,23 @@ void main() {
       });
       expect(find.text(es.backing_withoutGuitars), findsNothing);
       expect(find.text(es.backing_tabButton), findsOneWidget);
+    });
+
+    testWidgets('«Tablatura» lleva el icono de notas delante del texto', (tester) async {
+      await pumpBacking(tester);
+      final Finder button = find.ancestor(
+        of: find.text(es.backing_tabButton),
+        matching: find.byType(TfSecondaryButton),
+      );
+      expect(button, findsOneWidget);
+      expect(
+        find.descendant(of: button, matching: find.byType(TfIconView)),
+        findsOneWidget,
+      );
+      final TfIconView icon = tester.widget(
+        find.descendant(of: button, matching: find.byType(TfIconView)),
+      );
+      expect(icon.icon, TfIcon.musicQuarternote3);
     });
 
     testWidgets('«Tablatura» navega a la pestaña', (tester) async {
