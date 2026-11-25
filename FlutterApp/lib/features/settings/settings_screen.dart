@@ -43,6 +43,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final l = AppLocalizations.of(context);
     final tab = ref.watch(settingsTabProvider);
     return TfScroll(
+      alwaysVisible: true, // como la barra nativa de macOS con ratón (SettingsView.swift:10)
       builder: (context, controller) => SingleChildScrollView(
         controller: controller,
         padding: const EdgeInsets.symmetric(horizontal: TfSpace.s36, vertical: TfSpace.s28),

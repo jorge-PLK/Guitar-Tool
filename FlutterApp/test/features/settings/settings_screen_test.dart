@@ -17,6 +17,14 @@ void main() {
     expect(find.byType(CalibrationSheet), findsOneWidget);
   });
 
+  testWidgets('la barra de scroll de Ajustes es siempre visible y deja margen inferior 28', (tester) async {
+    await pumpSettings(tester, 'settings-audio');
+    final RawScrollbar bar = tester.widget(find.byType(RawScrollbar));
+    expect(bar.thumbVisibility, isTrue);
+    final SingleChildScrollView sv = tester.widget(find.byType(SingleChildScrollView));
+    expect((sv.padding! as EdgeInsets).bottom, TfSpace.s28);
+  });
+
   testWidgets('«Calibrar latencia» abre la hoja de calibración', (tester) async {
     await pumpSettings(tester, 'settings-audio');
     expect(find.byType(CalibrationSheet), findsNothing);
