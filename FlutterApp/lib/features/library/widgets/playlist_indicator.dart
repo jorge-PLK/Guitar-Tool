@@ -76,7 +76,7 @@ class PlaylistIndicator extends ConsumerWidget {
                     const SizedBox(width: TfSpace.s8),
                     Text(
                       text,
-                      style: TfText.body(13, TfWeight.medium).copyWith(color: TfColors.accent),
+                      style: TfText.body(TfSize.font13, TfWeight.medium).copyWith(color: TfColors.accent),
                     ),
                   ],
                 ),

@@ -54,7 +54,7 @@ class _Waiting extends ConsumerWidget {
         ),
         if (hint != null) ...[
           const SizedBox(height: TfSpace.s16),
-          Text(hint!, style: TfText.body(12).copyWith(color: TfColors.muted)),
+          Text(hint!, style: TfText.body(TfSize.font12).copyWith(color: TfColors.muted)),
         ],
         const SizedBox(height: TfSpace.s16),
         _Actions([
@@ -126,12 +126,12 @@ class ImportErrorView extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(t.title, style: TfText.body(15, TfWeight.semibold).copyWith(color: TfColors.text)),
+                  Text(t.title, style: TfText.body(TfSize.font15, TfWeight.semibold).copyWith(color: TfColors.text)),
                   if (t.detail.isNotEmpty) ...[
                     const SizedBox(height: TfSpace.s6),
                     SelectableRegion(
                       selectionControls: emptyTextSelectionControls,
-                      child: Text(t.detail, style: TfText.body(13).copyWith(color: TfColors.muted)),
+                      child: Text(t.detail, style: TfText.body(TfSize.font13).copyWith(color: TfColors.muted)),
                     ),
                   ],
                 ],
@@ -200,7 +200,7 @@ class _Headline extends StatelessWidget {
         const SizedBox(width: TfSpace.s8),
         Text(
           repeated ? l.library_importRepeatedTitle : l.library_importDone,
-          style: TfText.body(15, TfWeight.semibold).copyWith(color: TfColors.ok),
+          style: TfText.body(TfSize.font15, TfWeight.semibold).copyWith(color: TfColors.ok),
         ),
       ],
     );
@@ -239,18 +239,18 @@ class ImportRepeatedView extends ConsumerWidget {
                   existing.title,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: TfText.body(15, TfWeight.semibold).copyWith(color: TfColors.text),
+                  style: TfText.body(TfSize.font15, TfWeight.semibold).copyWith(color: TfColors.text),
                 ),
                 if (artist != null && artist.isNotEmpty) ...[
                   const SizedBox(height: TfSpace.s2),
-                  Text(artist, style: TfText.body(13).copyWith(color: TfColors.muted)),
+                  Text(artist, style: TfText.body(TfSize.font13).copyWith(color: TfColors.muted)),
                 ],
               ],
             ),
           ),
         ],
         const SizedBox(height: TfSpace.s14),
-        Text(l.library_importRepeatedBody, style: TfText.body(12).copyWith(color: TfColors.muted)),
+        Text(l.library_importRepeatedBody, style: TfText.body(TfSize.font12).copyWith(color: TfColors.muted)),
         const SizedBox(height: TfSpace.s14),
         _Actions([
           TfSecondaryButton(label: l.library_importClose, onPressed: onClose),

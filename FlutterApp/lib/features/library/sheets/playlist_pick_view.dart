@@ -107,7 +107,7 @@ class _TrackRow extends ConsumerWidget {
             child: Text(
               item.duration == null ? '—' : TfFmt.duration(item.duration!),
               textAlign: TextAlign.right,
-              style: TfText.body(13).copyWith(color: TfColors.muted),
+              style: TfText.body(TfSize.font13).copyWith(color: TfColors.muted),
             ),
           ),
         ],

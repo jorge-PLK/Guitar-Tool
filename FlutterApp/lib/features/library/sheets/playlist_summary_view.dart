@@ -41,13 +41,13 @@ class PlaylistSummaryView extends ConsumerWidget {
           ],
         ),
         if (t.imported > 0)
-          Text(l.library_plSeparatingNote, style: TfText.body(12).copyWith(color: TfColors.muted)),
+          Text(l.library_plSeparatingNote, style: TfText.body(TfSize.font12).copyWith(color: TfColors.muted)),
         if (failed.isEmpty)
           const Spacer()
         else ...[
           Text(
             l.library_plFailedHeader,
-            style: TfText.body(12, TfWeight.medium).copyWith(
+            style: TfText.body(TfSize.font12, TfWeight.medium).copyWith(
               color: TfColors.muted,
               letterSpacing: TfSize.trackingTableHeader,
             ),
@@ -89,9 +89,9 @@ class _Stat extends StatelessWidget {
         children: [
           Text(
             label.toUpperCase(),
-            style: TfText.body(11).copyWith(color: TfColors.muted, letterSpacing: TfSize.trackingTableHeader),
+            style: TfText.body(TfSize.font11).copyWith(color: TfColors.muted, letterSpacing: TfSize.trackingTableHeader),
           ),
-          Text('$value', style: TfText.display(26).copyWith(color: color)),
+          Text('$value', style: TfText.display(TfSize.font26).copyWith(color: color)),
         ],
       ),
     ),
@@ -121,13 +121,13 @@ class _FailedRow extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 spacing: TfSpace.s2,
                 children: [
-                  Text(e.title, style: TfText.body(13, TfWeight.semibold).copyWith(color: TfColors.danger)),
+                  Text(e.title, style: TfText.body(TfSize.font13, TfWeight.semibold).copyWith(color: TfColors.danger)),
                   if (e.detail.isNotEmpty)
                     Text(
                       e.detail,
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
-                      style: TfText.body(12).copyWith(color: TfColors.muted),
+                      style: TfText.body(TfSize.font12).copyWith(color: TfColors.muted),
                     ),
                 ],
               ),

@@ -59,14 +59,14 @@ class _ImportCandidatesViewState extends ConsumerState<ImportCandidatesView> {
     crossAxisAlignment: CrossAxisAlignment.start,
     spacing: TfSpace.s4,
     children: [
-      Text(label, style: TfText.body(12).copyWith(color: TfColors.muted)),
+      Text(label, style: TfText.body(TfSize.font12).copyWith(color: TfColors.muted)),
       child,
     ],
   );
 
   Widget _caption(String t) => Text(
     t,
-    style: TfText.body(12, TfWeight.medium).copyWith(color: TfColors.muted, letterSpacing: TfSize.trackingTableHeader),
+    style: TfText.body(TfSize.font12, TfWeight.medium).copyWith(color: TfColors.muted, letterSpacing: TfSize.trackingTableHeader),
   );
 
   @override
@@ -145,7 +145,7 @@ class _ImportCandidatesViewState extends ConsumerState<ImportCandidatesView> {
               l.library_importPossible(name),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: TfText.body(13).copyWith(color: TfColors.text2),
+              style: TfText.body(TfSize.font13).copyWith(color: TfColors.text2),
             ),
           ),
           TfSecondaryButton(
@@ -178,9 +178,9 @@ class _ImportCandidatesViewState extends ConsumerState<ImportCandidatesView> {
                     c.title,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: TfText.body(14, TfWeight.semibold).copyWith(color: TfColors.text),
+                    style: TfText.body(TfSize.font14, TfWeight.semibold).copyWith(color: TfColors.text),
                   ),
-                  Text(candidateSubtitle(c), style: TfText.body(13).copyWith(color: TfColors.muted)),
+                  Text(candidateSubtitle(c), style: TfText.body(TfSize.font13).copyWith(color: TfColors.muted)),
                 ],
               ),
             ),
@@ -205,7 +205,7 @@ class _ImportCandidatesViewState extends ConsumerState<ImportCandidatesView> {
             if (dur != null)
               Text(
                 l.library_importSpotifyDuration(TfFmt.duration(dur)),
-                style: TfText.body(12).copyWith(color: TfColors.muted),
+                style: TfText.body(TfSize.font12).copyWith(color: TfColors.muted),
               ),
           ],
         ),
@@ -265,7 +265,7 @@ class _ImportCandidatesViewState extends ConsumerState<ImportCandidatesView> {
         if (err != null)
           Text(
             sourceErrorTexts(l, LinkImportError(code: err.code, message: err.message)).title,
-            style: TfText.body(12).copyWith(color: TfColors.danger),
+            style: TfText.body(TfSize.font12).copyWith(color: TfColors.danger),
           ),
       ],
     );

@@ -21,7 +21,7 @@ class RelocationProgress extends StatelessWidget {
         Expanded(child: TfProgress(value: fraction)),
         Text(
           l.settings_lib_moving(TfFmt.percent(fraction)),
-          style: TfText.body(13).copyWith(color: TfColors.muted),
+          style: TfText.body(TfSize.font13).copyWith(color: TfColors.muted),
         ),
       ],
     );

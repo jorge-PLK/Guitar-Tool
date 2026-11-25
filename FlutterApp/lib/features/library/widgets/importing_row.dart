@@ -34,7 +34,7 @@ class ImportingRow extends StatelessWidget {
                   job.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TfText.body(14, TfWeight.semibold).copyWith(color: TfColors.text),
+                  style: TfText.body(TfSize.font14, TfWeight.semibold).copyWith(color: TfColors.text),
                 ),
               ),
               const Spacer(),

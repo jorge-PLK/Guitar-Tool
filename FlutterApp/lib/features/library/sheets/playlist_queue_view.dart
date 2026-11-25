@@ -43,9 +43,9 @@ class PlaylistQueueView extends ConsumerWidget {
           children: [
             Text(
               l.library_plQueueCount(q.done, q.total),
-              style: TfText.body(14).copyWith(color: TfColors.text),
+              style: TfText.body(TfSize.font14).copyWith(color: TfColors.text),
             ),
-            Text(TfFmt.percent(progress), style: TfText.body(14).copyWith(color: TfColors.muted)),
+            Text(TfFmt.percent(progress), style: TfText.body(TfSize.font14).copyWith(color: TfColors.muted)),
           ],
         ),
         TfAccentBar(value: progress),
@@ -84,7 +84,7 @@ class PlaylistQueueRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    final accent = TfText.body(12).copyWith(color: TfColors.accent);
+    final accent = TfText.body(TfSize.font12).copyWith(color: TfColors.accent);
     final p = item.progress;
     final downloading = item.stage != PlaylistItemStage.convert;
     final Widget status = switch (item.status) {
@@ -107,7 +107,7 @@ class PlaylistQueueRow extends StatelessWidget {
       PlaylistItemStatus.skipped => TfChip(l.library_plQSkipped, kind: TfChipKind.neutral),
       PlaylistItemStatus.inLibrary => TfChip(l.library_plQInLibrary, kind: TfChipKind.neutral),
       PlaylistItemStatus.failed => TfChip(item.error?.title ?? '', kind: TfChipKind.error),
-      _ => Text(l.library_plQQueued, style: TfText.body(12).copyWith(color: TfColors.muted)),
+      _ => Text(l.library_plQQueued, style: TfText.body(TfSize.font12).copyWith(color: TfColors.muted)),
     };
     return PlaylistRow(
       child: Row(

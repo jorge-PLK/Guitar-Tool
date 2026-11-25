@@ -93,13 +93,13 @@ class CandidateRow extends StatelessWidget {
                   candidate.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TfText.body(14, TfWeight.semibold).copyWith(color: TfColors.text),
+                  style: TfText.body(TfSize.font14, TfWeight.semibold).copyWith(color: TfColors.text),
                 ),
                 Text(
                   candidateSubtitle(candidate),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TfText.body(12).copyWith(color: TfColors.muted),
+                  style: TfText.body(TfSize.font12).copyWith(color: TfColors.muted),
                 ),
               ],
             ),
@@ -107,7 +107,7 @@ class CandidateRow extends StatelessWidget {
           if (diff != null)
             Text(
               signedSeconds(diff, locale),
-              style: TfText.body(12, TfWeight.medium).copyWith(color: TfColors.text2),
+              style: TfText.body(TfSize.font12, TfWeight.medium).copyWith(color: TfColors.text2),
             ),
           if (candidate.isClose) TfChip(l.library_importChipClose, kind: TfChipKind.ok),
           if (candidate.isLive) TfChip(l.library_importChipLive, kind: TfChipKind.neutral),

@@ -39,9 +39,9 @@ class ImportWorkingView extends ConsumerWidget {
                 s.title,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: TfText.body(15, TfWeight.semibold).copyWith(color: TfColors.text),
+                style: TfText.body(TfSize.font15, TfWeight.semibold).copyWith(color: TfColors.text),
               ),
-              if (s.artist.isNotEmpty) Text(s.artist, style: TfText.body(13).copyWith(color: TfColors.muted)),
+              if (s.artist.isNotEmpty) Text(s.artist, style: TfText.body(TfSize.font13).copyWith(color: TfColors.muted)),
             ],
           ),
         Row(

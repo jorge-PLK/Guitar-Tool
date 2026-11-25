@@ -132,7 +132,7 @@ class _ImportSheetBodyState extends ConsumerState<ImportSheetBody> {
               crossAxisAlignment: CrossAxisAlignment.start,
               spacing: TfSpace.s18,
               children: [
-                Text(title, style: TfText.display(22).copyWith(color: TfColors.text)),
+                Text(title, style: TfText.display(TfSize.font22).copyWith(color: TfColors.text)),
                 wide ? Expanded(child: body) : Flexible(child: body),
               ],
             ),

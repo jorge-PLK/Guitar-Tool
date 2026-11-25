@@ -26,7 +26,7 @@ class ToolsGroup extends ConsumerWidget {
     final origin = info?.ytDlpOrigin;
     String version(String? v) => info == null ? l.settings_tools_checking : (v ?? l.settings_tools_unavailable);
     Widget value(String text) =>
-        Text(text, style: TfText.body(14, TfWeight.semibold).copyWith(color: TfColors.text2));
+        Text(text, style: TfText.body(TfSize.font14, TfWeight.semibold).copyWith(color: TfColors.text2));
     final result = s.updateResult;
     return TfSettingsGroup(
       title: l.settings_tools_title,
@@ -55,10 +55,10 @@ class ToolsGroup extends ConsumerWidget {
             result.alreadyLatest
                 ? l.settings_tools_upToDate(result.version)
                 : l.settings_tools_updateDone(result.version),
-            style: TfText.body(13).copyWith(color: TfColors.ok),
+            style: TfText.body(TfSize.font13).copyWith(color: TfColors.ok),
           ),
         if (s.status == YtDlpUpdateStatus.failed && s.error != null)
-          Text(coreErrorText(l, s.error!), style: TfText.body(13).copyWith(color: TfColors.danger)),
+          Text(coreErrorText(l, s.error!), style: TfText.body(TfSize.font13).copyWith(color: TfColors.danger)),
         Wrap(
           spacing: SettingsMetrics.buttonGap,
           runSpacing: SettingsMetrics.buttonGap,

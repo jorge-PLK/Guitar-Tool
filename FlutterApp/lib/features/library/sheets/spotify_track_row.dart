@@ -35,15 +35,15 @@ class SpotifyTrackRow extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               spacing: TfSpace.s1,
               children: [
-                line(track.name, TfText.body(13, TfWeight.semibold).copyWith(color: TfColors.text)),
-                line(artists, TfText.body(12).copyWith(color: TfColors.text2)),
-                line(album, TfText.body(11).copyWith(color: TfColors.muted)),
+                line(track.name, TfText.body(TfSize.font13, TfWeight.semibold).copyWith(color: TfColors.text)),
+                line(artists, TfText.body(TfSize.font12).copyWith(color: TfColors.text2)),
+                line(album, TfText.body(TfSize.font11).copyWith(color: TfColors.muted)),
               ],
             ),
           ),
           Text(
             track.durationText,
-            style: TfText.body(12).copyWith(
+            style: TfText.body(TfSize.font12).copyWith(
               color: TfColors.muted,
               fontFeatures: const [FontFeature.tabularFigures()],
             ),

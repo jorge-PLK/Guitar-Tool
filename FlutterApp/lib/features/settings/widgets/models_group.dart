@@ -63,7 +63,7 @@ class ModelRow extends ConsumerWidget {
     final locale = Localizations.localeOf(context).languageCode;
     final store = ref.read(settingsModelsStoreProvider.notifier);
     final fraction = entry.fraction ?? 0;
-    final TextStyle base = TfText.body(14, TfWeight.semibold);
+    final TextStyle base = TfText.body(TfSize.font14, TfWeight.semibold);
     final (String text, Color color) = switch (entry.state) {
       ModelState.downloading => (l.settings_models_downloading(TfFmt.percent(fraction)), TfColors.accent),
       ModelState.verifying => (l.settings_models_verifying, TfColors.accent),

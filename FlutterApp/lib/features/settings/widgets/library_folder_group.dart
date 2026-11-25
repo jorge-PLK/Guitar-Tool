@@ -51,7 +51,7 @@ class LibraryFolderGroup extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           spacing: SettingsMetrics.folderLabelGap,
           children: <Widget>[
-            Text(l.settings_lib_folder, style: TfText.body(13).copyWith(color: TfColors.muted)),
+            Text(l.settings_lib_folder, style: TfText.body(TfSize.font13).copyWith(color: TfColors.muted)),
             _FolderField(path: s.projectsFolder ?? '—'),
           ],
         ),
@@ -59,7 +59,7 @@ class LibraryFolderGroup extends ConsumerWidget {
           label: l.settings_lib_usage,
           trailing: Text(
             usage == null ? '—' : TfFmt.bytes(usage.totalBytes, locale),
-            style: TfText.body(14, TfWeight.semibold).copyWith(color: TfColors.text2),
+            style: TfText.body(TfSize.font14,TfWeight.semibold).copyWith(color: TfColors.text2),
           ),
         ),
         if (s.showRelocateProgress) RelocationProgress(fraction: s.relocateFraction),

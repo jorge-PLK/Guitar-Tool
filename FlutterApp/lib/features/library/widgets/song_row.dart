@@ -59,7 +59,7 @@ class SongRow extends ConsumerWidget {
                           entry.title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TfText.body(14, TfWeight.semibold).copyWith(color: TfColors.text),
+                          style: TfText.body(TfSize.font14, TfWeight.semibold).copyWith(color: TfColors.text),
                         ),
                         if (showArtist && artist != null) ...[
                           const SizedBox(height: TfSpace.s2),
@@ -67,7 +67,7 @@ class SongRow extends ConsumerWidget {
                             artist,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: TfText.body(13).copyWith(color: TfColors.muted),
+                            style: TfText.body(TfSize.font13).copyWith(color: TfColors.muted),
                           ),
                         ],
                       ],

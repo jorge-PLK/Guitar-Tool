@@ -28,7 +28,7 @@ class StemsCard extends StatelessWidget {
               width: double.infinity,
               child: Text(
                 l.library_stemsTitle,
-                style: TfText.display(18).copyWith(color: TfColors.text, decoration: TextDecoration.none),
+                style: TfText.display(TfSize.font18).copyWith(color: TfColors.text, decoration: TextDecoration.none),
               ),
             ),
             if (stems.isEmpty) Text(l.library_stemsNone, style: body(TfColors.muted)),

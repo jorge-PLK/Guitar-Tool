@@ -26,7 +26,7 @@ class ImportBanner extends StatelessWidget {
       ),
       child: Text(
         text,
-        style: TfText.body(13).copyWith(color: error ? TfColors.danger : TfColors.accent),
+        style: TfText.body(TfSize.font13).copyWith(color: error ? TfColors.danger : TfColors.accent),
       ),
     );
   }

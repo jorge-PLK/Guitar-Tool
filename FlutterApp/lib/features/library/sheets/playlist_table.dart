@@ -72,9 +72,9 @@ class PlaylistHeader extends ConsumerWidget {
           name.isEmpty ? AppLocalizations.of(context).library_plDefaultName : name,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: TfText.body(16, TfWeight.semibold).copyWith(color: TfColors.text),
+          style: TfText.body(TfSize.font16, TfWeight.semibold).copyWith(color: TfColors.text),
         ),
-        Text(subtitle, style: TfText.body(13).copyWith(color: TfColors.muted)),
+        Text(subtitle, style: TfText.body(TfSize.font13).copyWith(color: TfColors.muted)),
       ],
     );
   }
@@ -96,13 +96,13 @@ class PlaylistTrackTitle extends StatelessWidget {
         title,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: TfText.body(14, TfWeight.semibold).copyWith(color: TfColors.text),
+        style: TfText.body(TfSize.font14, TfWeight.semibold).copyWith(color: TfColors.text),
       ),
       Text(
         artist,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: TfText.body(12).copyWith(color: TfColors.muted),
+        style: TfText.body(TfSize.font12).copyWith(color: TfColors.muted),
       ),
     ],
   );

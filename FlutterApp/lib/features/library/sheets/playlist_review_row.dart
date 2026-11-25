@@ -39,7 +39,7 @@ class PlaylistReviewRow extends ConsumerWidget {
                 child: Text(
                   playlistDuration(item.duration),
                   textAlign: TextAlign.right,
-                  style: TfText.body(12).copyWith(color: TfColors.muted),
+                  style: TfText.body(TfSize.font12).copyWith(color: TfColors.muted),
                 ),
               ),
               Expanded(child: _CandidateMenu(item: item)),
@@ -102,7 +102,7 @@ class _CandidateMenu extends ConsumerWidget {
       if (item.candidates.isNotEmpty) const TfMenuDivider(),
       TfMenuItem(label: l.library_plSkipItem, onSelected: () => store.skip(item.id)),
     ];
-    final muted = TfText.body(11).copyWith(color: TfColors.muted);
+    final muted = TfText.body(TfSize.font11).copyWith(color: TfColors.muted);
     return TfMenu(
       entries: entries,
       builder: (context, toggle) => GestureDetector(
@@ -132,7 +132,7 @@ class _CandidateMenu extends ConsumerWidget {
                               chosen.title,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: TfText.body(13, TfWeight.medium).copyWith(color: TfColors.text),
+                              style: TfText.body(TfSize.font13, TfWeight.medium).copyWith(color: TfColors.text),
                             ),
                             Text(
                               candidateSubtitle(chosen),
@@ -146,7 +146,7 @@ class _CandidateMenu extends ConsumerWidget {
                       if (ranked?.difference != null)
                         Text(
                           signedSeconds(ranked!.difference!, Localizations.localeOf(context).languageCode),
-                          style: TfText.body(12, TfWeight.medium).copyWith(color: TfColors.text2),
+                          style: TfText.body(TfSize.font12, TfWeight.medium).copyWith(color: TfColors.text2),
                         ),
                       if (ranked?.isClose ?? false) TfChip(l.library_importChipClose, kind: TfChipKind.ok),
                       if (ranked?.isLive ?? false) TfChip(l.library_importChipLive, kind: TfChipKind.neutral),
@@ -161,7 +161,7 @@ class _CandidateMenu extends ConsumerWidget {
                     _placeholder(l),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TfText.body(13).copyWith(
+                    style: TfText.body(TfSize.font13).copyWith(
                       color: item.status == PlaylistItemStatus.skipped ? TfColors.muted : TfColors.text2,
                     ),
                   ),

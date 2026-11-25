@@ -42,7 +42,7 @@ class ArtistBar extends ConsumerWidget {
             name.isEmpty ? l.library_noArtist : name,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TfText.display(22).copyWith(color: TfColors.text, decoration: TextDecoration.none),
+            style: TfText.display(TfSize.font22).copyWith(color: TfColors.text, decoration: TextDecoration.none),
           ),
         ),
       ],

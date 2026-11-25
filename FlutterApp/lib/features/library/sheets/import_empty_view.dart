@@ -42,7 +42,7 @@ class _ImportEmptyViewState extends ConsumerState<ImportEmptyView> {
       _ctrl.value = TextEditingValue(text: s.text, selection: TextSelection.collapsed(offset: s.text.length));
     }
     final importing = ref.watch(importStoreProvider.select((x) => x.importing));
-    Widget help() => Text(l.library_importSupported, style: TfText.body(12).copyWith(color: TfColors.muted));
+    Widget help() => Text(l.library_importSupported, style: TfText.body(TfSize.font12).copyWith(color: TfColors.muted));
     final err = s.spotifyError;
     final tracks = s.spotifyTracks;
     final Widget area;
@@ -58,7 +58,7 @@ class _ImportEmptyViewState extends ConsumerState<ImportEmptyView> {
     } else if (tracks.isEmpty) {
       area = Text(
         l.library_importSpotifyNone(s.spotifyQuery ?? ''),
-        style: TfText.body(13).copyWith(color: TfColors.muted),
+        style: TfText.body(TfSize.font13).copyWith(color: TfColors.muted),
       );
     } else {
       area = DecoratedBox(

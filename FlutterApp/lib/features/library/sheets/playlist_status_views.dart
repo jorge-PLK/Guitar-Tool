@@ -80,7 +80,7 @@ class PlaylistSearchingView extends ConsumerWidget {
         ),
         TfAccentBar(value: s.fraction),
         if (current != null) PlaylistTrackTitle(title: current.title, artist: current.artist),
-        Text(l.library_plNothingYet, style: TfText.body(12).copyWith(color: TfColors.muted)),
+        Text(l.library_plNothingYet, style: TfText.body(TfSize.font12).copyWith(color: TfColors.muted)),
         const Spacer(),
         PlaylistActions([
           TfSecondaryButton(
@@ -116,10 +116,10 @@ class PlaylistErrorView extends ConsumerWidget {
                 children: [
                   Text(
                     error?.title ?? l.library_importFailTitle,
-                    style: TfText.body(15, TfWeight.semibold).copyWith(color: TfColors.text),
+                    style: TfText.body(TfSize.font15, TfWeight.semibold).copyWith(color: TfColors.text),
                   ),
                   if (error != null && error.detail.isNotEmpty)
-                    Text(error.detail, style: TfText.body(13).copyWith(color: TfColors.muted)),
+                    Text(error.detail, style: TfText.body(TfSize.font13).copyWith(color: TfColors.muted)),
                 ],
               ),
             ),

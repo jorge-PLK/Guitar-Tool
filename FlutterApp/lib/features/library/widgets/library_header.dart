@@ -25,7 +25,7 @@ class LibraryHeader extends ConsumerWidget {
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(l.library_title, style: TfText.display(32).copyWith(color: TfColors.text)),
+            Text(l.library_title, style: TfText.display(TfSize.font32).copyWith(color: TfColors.text)),
             const SizedBox(height: TfSpace.s6),
             Text(l.library_subtitle, style: TfText.body().copyWith(color: TfColors.muted)),
           ],

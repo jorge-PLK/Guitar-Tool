@@ -31,7 +31,7 @@ class RecordingsCard extends ConsumerWidget {
               width: double.infinity,
               child: Text(
                 l.library_recordingsTitle,
-                style: TfText.display(18).copyWith(color: TfColors.text, decoration: TextDecoration.none),
+                style: TfText.display(TfSize.font18).copyWith(color: TfColors.text, decoration: TextDecoration.none),
               ),
             ),
             if (withTakes.isEmpty)

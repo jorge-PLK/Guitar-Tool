@@ -20,7 +20,7 @@ class LibraryEmpty extends StatelessWidget {
             Text(
               l.library_emptyTitle,
               textAlign: TextAlign.center,
-              style: TfText.body(15, TfWeight.semibold).copyWith(color: TfColors.text),
+              style: TfText.body(TfSize.font15, TfWeight.semibold).copyWith(color: TfColors.text),
             ),
             const SizedBox(height: TfSpace.s6),
             Text(
