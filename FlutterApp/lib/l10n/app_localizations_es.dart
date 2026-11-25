@@ -1165,6 +1165,12 @@ class AppLocalizationsEs extends AppLocalizations {
   String get record_mixerTitle => 'Mezclador';
 
   @override
+  String get record_mixer_muteShort => 'M';
+
+  @override
+  String get record_mixer_soloShort => 'S';
+
+  @override
   String record_muteA11y(String name) {
     return 'Silenciar $name';
   }
@@ -1191,8 +1197,13 @@ class AppLocalizationsEs extends AppLocalizations {
   String get record_offsetDiscard => 'Descartar toma';
 
   @override
-  String record_offsetFrameNote(int ms) {
-    return 'Fotograma = $ms ms';
+  String record_offsetFrameNote(double ms) {
+    final intl.NumberFormat msNumberFormat = intl.NumberFormat.decimalPattern(
+      localeName,
+    );
+    final String msString = msNumberFormat.format(ms);
+
+    return 'Fotograma = $msString ms';
   }
 
   @override
@@ -1535,7 +1546,14 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String record_block_rateMismatch(num deviceHz, num workingHz) {
-    return 'El dispositivo está a $deviceHz kHz y la frecuencia de trabajo es $workingHz kHz';
+    final intl.NumberFormat deviceHzNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String deviceHzString = deviceHzNumberFormat.format(deviceHz);
+    final intl.NumberFormat workingHzNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String workingHzString = workingHzNumberFormat.format(workingHz);
+
+    return 'El dispositivo está a $deviceHzString kHz y la frecuencia de trabajo es $workingHzString kHz';
   }
 
   @override
@@ -1589,7 +1607,14 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String settings_audio_block_rateMismatch(num deviceHz, num workingHz) {
-    return 'El dispositivo está a $deviceHz kHz y la frecuencia de trabajo es $workingHz kHz';
+    final intl.NumberFormat deviceHzNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String deviceHzString = deviceHzNumberFormat.format(deviceHz);
+    final intl.NumberFormat workingHzNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String workingHzString = workingHzNumberFormat.format(workingHz);
+
+    return 'El dispositivo está a $deviceHzString kHz y la frecuencia de trabajo es $workingHzString kHz';
   }
 
   @override
@@ -1607,7 +1632,12 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String settings_audio_calibrated(num ms, String date) {
-    return 'Calibrada · $ms ms · $date';
+    final intl.NumberFormat msNumberFormat = intl.NumberFormat.decimalPattern(
+      localeName,
+    );
+    final String msString = msNumberFormat.format(ms);
+
+    return 'Calibrada · $msString ms · $date';
   }
 
   @override

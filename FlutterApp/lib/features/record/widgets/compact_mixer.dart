@@ -87,20 +87,19 @@ class MixerToggles extends ConsumerWidget {
     final AppLocalizations l = AppLocalizations.of(context);
     final MixerStore store = ref.read(mixerStoreProvider.notifier);
     final bool on = !row.forced;
-    // TODO(ola3): falta clave ARB para las letras «M»/«S» de los botones.
     return Row(
       mainAxisSize: MainAxisSize.min,
       spacing: TfSpace.s6,
       children: <Widget>[
         TfToggleButton(
-          text: 'M',
+          text: l.record_mixer_muteShort,
           on: row.muted,
           size: size,
           semanticLabel: row.muted ? l.record_unmuteA11y(row.name) : l.record_muteA11y(row.name),
           onPressed: on ? () => store.setMute(row.id, !row.muted) : null,
         ),
         TfToggleButton(
-          text: 'S',
+          text: l.record_mixer_soloShort,
           on: row.solo,
           size: size,
           semanticLabel: l.record_soloA11y(row.name),

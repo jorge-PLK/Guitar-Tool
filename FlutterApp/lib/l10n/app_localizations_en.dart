@@ -1156,6 +1156,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get record_mixerTitle => 'Mixer';
 
   @override
+  String get record_mixer_muteShort => 'M';
+
+  @override
+  String get record_mixer_soloShort => 'S';
+
+  @override
   String record_muteA11y(String name) {
     return 'Mute $name';
   }
@@ -1182,8 +1188,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get record_offsetDiscard => 'Discard take';
 
   @override
-  String record_offsetFrameNote(int ms) {
-    return 'Frame = $ms ms';
+  String record_offsetFrameNote(double ms) {
+    final intl.NumberFormat msNumberFormat = intl.NumberFormat.decimalPattern(
+      localeName,
+    );
+    final String msString = msNumberFormat.format(ms);
+
+    return 'Frame = $msString ms';
   }
 
   @override
@@ -1526,7 +1537,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String record_block_rateMismatch(num deviceHz, num workingHz) {
-    return 'The device runs at $deviceHz kHz and the working rate is $workingHz kHz';
+    final intl.NumberFormat deviceHzNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String deviceHzString = deviceHzNumberFormat.format(deviceHz);
+    final intl.NumberFormat workingHzNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String workingHzString = workingHzNumberFormat.format(workingHz);
+
+    return 'The device runs at $deviceHzString kHz and the working rate is $workingHzString kHz';
   }
 
   @override
@@ -1580,7 +1598,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String settings_audio_block_rateMismatch(num deviceHz, num workingHz) {
-    return 'The device runs at $deviceHz kHz and the working rate is $workingHz kHz';
+    final intl.NumberFormat deviceHzNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String deviceHzString = deviceHzNumberFormat.format(deviceHz);
+    final intl.NumberFormat workingHzNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String workingHzString = workingHzNumberFormat.format(workingHz);
+
+    return 'The device runs at $deviceHzString kHz and the working rate is $workingHzString kHz';
   }
 
   @override
@@ -1598,7 +1623,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String settings_audio_calibrated(num ms, String date) {
-    return 'Calibrated · $ms ms · $date';
+    final intl.NumberFormat msNumberFormat = intl.NumberFormat.decimalPattern(
+      localeName,
+    );
+    final String msString = msNumberFormat.format(ms);
+
+    return 'Calibrated · $msString ms · $date';
   }
 
   @override

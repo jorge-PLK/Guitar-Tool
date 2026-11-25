@@ -57,7 +57,7 @@ class _Fake {
   );
 }
 
-Future<_Fake> pump(WidgetTester tester, RecordSnapshot s) async {
+Future<_Fake> _pump(WidgetTester tester, RecordSnapshot s) async {
   await tester.runAsync(loadTfFonts);
   setTestSurface(tester, const Size(800, 450));
   final _Fake f = _Fake(_FakeStore(RecordState(snapshot: s, opened: true)));
@@ -96,20 +96,20 @@ void main() {
   const String noVideo = 'Sin vídeo: se grabará solo el audio';
 
   testWidgets('sin cámara (none): marcador sin vídeo, sin formato ni Rotar', (tester) async {
-    await pump(tester, snap('camera-none'));
+    await _pump(tester, snap('camera-none'));
     expect(find.text(noVideo), findsOneWidget);
     expect(find.textContaining('Rotar'), findsNothing);
     expect(find.byType(TfVideoSurface), findsNothing);
   });
 
   testWidgets('sin permiso (denied): mismo marcador que sin cámara', (tester) async {
-    await pump(tester, snap('camera-denied'));
+    await _pump(tester, snap('camera-denied'));
     expect(find.text(noVideo), findsOneWidget);
     expect(find.textContaining('Rotar'), findsNothing);
   });
 
   testWidgets('cámara simulada: marcador con nombre, formato y Rotar', (tester) async {
-    await pump(tester, snap('camera-simulated'));
+    await _pump(tester, snap('camera-simulated'));
     expect(find.textContaining('Vista previa de la cámara · '), findsOneWidget);
     expect(find.textContaining('(simulada)'), findsOneWidget);
     expect(find.textContaining('fps'), findsOneWidget);
@@ -117,13 +117,13 @@ void main() {
   });
 
   testWidgets('buscando cámara (estado aún desconocido): spinner', (tester) async {
-    await pump(tester, snap('camera-simulated', camera: {'state': 'idle'}));
+    await _pump(tester, snap('camera-simulated', camera: {'state': 'idle'}));
     expect(find.byType(TfSpinner), findsOneWidget);
     expect(find.byType(TfVideoSurface), findsNothing);
   });
 
   testWidgets('live: TfVideoSurface con canal falso, tamaño y giro; se suelta al salir', (tester) async {
-    final _Fake f = await pump(tester, snap('camera-live'));
+    final _Fake f = await _pump(tester, snap('camera-live'));
     final TfVideoSurface v = tester.widget(find.byType(TfVideoSurface));
     expect(v.textureId, 7);
     expect(v.frameSize, const Size(640, 360));
@@ -135,7 +135,7 @@ void main() {
   });
 
   testWidgets('cuenta atrás: número y REC rojo con prefijo', (tester) async {
-    await pump(tester, snap('counting'));
+    await _pump(tester, snap('counting'));
     final int beat = snap('counting').countBeat!;
     expect(find.text('$beat'), findsOneWidget);
     expect(find.textContaining('REC · Toma '), findsOneWidget);
@@ -143,7 +143,7 @@ void main() {
   });
 
   testWidgets('reposo: REC gris sin prefijo y sin número', (tester) async {
-    await pump(tester, snap('idle'));
+    await _pump(tester, snap('idle'));
     expect(find.textContaining('REC · '), findsNothing);
     expect(find.textContaining('Toma '), findsOneWidget);
     expect(dotIs(tester, TfColors.muted), isTrue);
@@ -151,19 +151,19 @@ void main() {
   });
 
   testWidgets('grabando: REC rojo y Rotar deshabilitado (no llama al store)', (tester) async {
-    final _Fake f = await pump(tester, snap('recording'));
+    final _Fake f = await _pump(tester, snap('recording'));
     expect(dotIs(tester, TfColors.recordLive), isTrue);
     await tester.tap(find.textContaining('Rotar'), warnIfMissed: false);
     expect(f.store.rotations, 0);
   });
 
   testWidgets('ajustando desfase: REC gris', (tester) async {
-    await pump(tester, snap('adjusting'));
+    await _pump(tester, snap('adjusting'));
     expect(dotIs(tester, TfColors.muted), isTrue);
   });
 
   testWidgets('reposo: «Rotar · 90°» llama a rotateCamera', (tester) async {
-    final _Fake f = await pump(tester, snap('camera-live'));
+    final _Fake f = await _pump(tester, snap('camera-live'));
     expect(find.text('Rotar · 90°'), findsOneWidget);
     await tester.tap(find.text('Rotar · 90°'));
     expect(f.store.rotations, 1);

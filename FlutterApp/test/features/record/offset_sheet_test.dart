@@ -98,7 +98,7 @@ void main() {
     expect(find.byType(TfVideoSurface), findsOneWidget);
     expect(find.text('Cancelar'), findsOneWidget);
     expect(find.text('Guardar'), findsOneWidget);
-    expect(find.text('Fotograma = 33 ms'), findsOneWidget);
+    expect(find.text('Fotograma = 33,3 ms'), findsOneWidget);
     expect(find.text('Guardar como desfase por defecto de esta cámara (Cámara simulada)'), findsOneWidget);
     expect(t.widget<TfCheckbox>(find.byKey(const ValueKey('offset-default'))).value, isTrue);
     expect(t.widget<TfSecondaryButton>(find.byKey(const ValueKey('offset-play'))).onPressed, isNotNull);

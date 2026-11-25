@@ -1,4 +1,3 @@
-import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
 import 'package:toneforge/contract/record.dart';
 
@@ -6,7 +5,6 @@ import '../../../l10n/app_localizations.dart';
 import '../../../theme/icons.dart';
 import '../../../theme/tokens.dart';
 import '../../../theme/typography.dart';
-import '../../../widgets/tf_buttons.dart';
 import '../../../widgets/tf_menu.dart';
 
 /// Toma en el panel «Partes» (RV:257-292): botón-menú «Toma N» + botón ▶ 32×32.

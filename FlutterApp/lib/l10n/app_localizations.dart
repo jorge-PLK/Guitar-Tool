@@ -2018,6 +2018,18 @@ abstract class AppLocalizations {
   /// **'Mezclador'**
   String get record_mixerTitle;
 
+  /// Grabar, mezclador: letra del botón silenciar (RM:129).
+  ///
+  /// In es, this message translates to:
+  /// **'M'**
+  String get record_mixer_muteShort;
+
+  /// Grabar, mezclador: letra del botón solo (RM:129).
+  ///
+  /// In es, this message translates to:
+  /// **'S'**
+  String get record_mixer_soloShort;
+
   /// Grabar, mezclador: botón M, accesibilidad (BM:181; RM:129).
   ///
   /// In es, this message translates to:
@@ -2064,7 +2076,7 @@ abstract class AppLocalizations {
   ///
   /// In es, this message translates to:
   /// **'Fotograma = {ms} ms'**
-  String record_offsetFrameNote(int ms);
+  String record_offsetFrameNote(double ms);
 
   /// Ajustar desfase: ayuda (OS:31).
   ///

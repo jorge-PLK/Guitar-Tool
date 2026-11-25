@@ -132,8 +132,7 @@ class _OffsetSheetState extends ConsumerState<OffsetSheet> {
                   ],
                 ),
               ),
-              // TODO(ola3): ARB record_offsetFrameNote es int; SwiftUI muestra 33,3.
-              Text(l.record_offsetFrameNote(frameMs.round()), style: TfText.body(TfSize.font12).copyWith(color: TfColors.muted)),
+              Text(l.record_offsetFrameNote(double.parse(frameMs.toStringAsFixed(1))), style: TfText.body(TfSize.font12).copyWith(color: TfColors.muted)),
             ],
           ),
           TfCheckbox(

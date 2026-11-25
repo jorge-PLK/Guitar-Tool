@@ -76,8 +76,9 @@ void main() {
   testWidgets('desajuste de frecuencia: aviso y «Usar la del dispositivo»', (tester) async {
     final core = await _core(tester, state: 'ratemismatch');
     await _open(tester, core);
+    // Como SwiftUI: aviso de frecuencia y motivo bajo «Calibrar latencia» (AudioSettingsView:143, :215).
     expect(find.text('El dispositivo está a 44,1 kHz y la frecuencia de trabajo es 48 kHz'),
-        findsOneWidget);
+        findsNWidgets(2));
     expect(find.text('Grabar y calibrar quedan bloqueados; el backing suena igual.'), findsOneWidget);
     expect(_calButton(tester).onPressed, isNull);
     await tester.tap(find.text('Usar 44,1 kHz como frecuencia de trabajo'));
