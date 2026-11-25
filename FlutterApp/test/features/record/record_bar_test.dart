@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -12,12 +13,15 @@ import 'package:toneforge/features/record/widgets/record_bar.dart';
 import 'package:toneforge/features/record/widgets/status_lines.dart';
 import 'package:toneforge/l10n/app_localizations.dart';
 
+import '../../support/harness.dart';
+
 Json fx(String path) =>
     (json.decode(File('../Contract/fixtures/$path.json').readAsStringSync()) as Map).cast<String, Object?>();
 
 Json state(String name) => fx('record/record.state.$name.event');
 
-Future<MockCore> pump(WidgetTester tester, String variant, {bool? calibrated}) async {
+Future<MockCore> pump(WidgetTester tester, String variant, {bool? calibrated, double width = 800}) async {
+  if (width != 800) await tester.runAsync(loadTfFonts); // métricas reales solo en el test de ancho
   tester.view.physicalSize = const Size(900, 400);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
@@ -45,11 +49,11 @@ Future<MockCore> pump(WidgetTester tester, String variant, {bool? calibrated}) a
     child: Localizations(
       locale: const Locale('es'),
       delegates: AppLocalizations.localizationsDelegates,
-      child: const Directionality(
+      child: Directionality(
         textDirection: TextDirection.ltr,
         child: Align(
           alignment: Alignment.topLeft,
-          child: SizedBox(width: 800, child: Column(children: [RecordBar(), RecordStatusLines()])),
+          child: SizedBox(width: width, child: const Column(children: [RecordBar(), RecordStatusLines()])),
         ),
       ),
     ),
@@ -109,6 +113,16 @@ void main() {
     await pump(tester, 'idle', calibrated: false);
     expect(find.textContaining('Sin calibrar'), findsOneWidget);
     expect(opacity(tester), 1);
+  });
+
+  testWidgets('ancho justo: la etiqueta de desfase ocupa el hueco libre y no se trunca con «…»', (tester) async {
+    await pump(tester, 'camera-live', width: 560);
+    final Finder label = find.textContaining('Desfase de la cámara');
+    expect(label, findsOneWidget);
+    final RenderParagraph p = tester.renderObject<RenderParagraph>(label);
+    expect(p.didExceedMaxLines, isFalse);
+    // El hueco libre es ~ todo el sobrante, no la mitad: la etiqueta supera los 100 px.
+    expect(tester.getSize(label).width, greaterThan(150));
   });
 
   testWidgets('calibrado: sin aviso', (tester) async {

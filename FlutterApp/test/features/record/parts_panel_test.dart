@@ -204,6 +204,17 @@ void main() {
     expect(log.last, 'add');
   });
 
+  testWidgets('cuenta atrás: la parte activa (con tomas) muestra «Grabando», no «Hecha»', (tester) async {
+    await _pump(tester, _snap('counting'));
+    expect(find.text('Grabando'), findsOneWidget);
+    expect(find.text('Hecha'), findsNothing);
+  });
+
+  testWidgets('ajustando: vuelve «Hecha»', (tester) async {
+    await _pump(tester, _snap('adjusting'));
+    expect(find.text('Grabando'), findsNothing);
+  });
+
   testWidgets('grabando: todo deshabilitado y solo la activa muestra «Grabando»', (tester) async {
     final List<String> log = <String>[];
     final _FakeStore s = await _pump(tester, _snap('recording'), log: log);

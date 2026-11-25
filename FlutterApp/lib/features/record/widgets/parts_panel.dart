@@ -50,7 +50,8 @@ class PartsPanel extends ConsumerWidget {
               PartBox(
                 part: p,
                 active: p.id == snap?.activePartId,
-                recording: st.phase == RecordPhase.recording,
+                // RecordController.status(of:) (RC:211): activa y fase distinta de idle/adjusting.
+                recording: st.phase != RecordPhase.idle && st.phase != RecordPhase.adjusting && st.phase != RecordPhase.unknown,
                 busy: busy,
                 replacesName: _replacesName(p, snap),
                 selectedTakeId: snap?.selectedTakeId,

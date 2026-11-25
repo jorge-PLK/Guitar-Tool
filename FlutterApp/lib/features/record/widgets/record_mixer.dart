@@ -60,13 +60,16 @@ class _RecordMixerState extends ConsumerState<RecordMixer> {
               spacing: TfSpace.s12,
               children: <Widget>[
                 Text(l.record_mixerTitle, style: TfText.display(18).copyWith(color: TfColors.text)),
-                const Spacer(),
-                Flexible(
-                  child: Text(
-                    l.record_mixerOutput(output.isEmpty ? '—' : output),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TfText.body(TfSize.font12).copyWith(color: TfColors.muted),
+                // Un solo Expanded: con Spacer + Flexible el hueco se repartía 50/50.
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Text(
+                      l.record_mixerOutput(output.isEmpty ? '—' : output),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TfText.body(TfSize.font12).copyWith(color: TfColors.muted),
+                    ),
                   ),
                 ),
                 _FoldButton(
