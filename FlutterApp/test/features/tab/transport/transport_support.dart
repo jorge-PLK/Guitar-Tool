@@ -73,7 +73,7 @@ Future<Rig> pumpTransport(
   await tester.runAsync(loadTfFonts);
   final core = (await tester.runAsync(() async => MockCore.load((await DirectoryFixtureSource.find())!)))!;
   final src = (await tester.runAsync(DirectoryFixtureSource.find))!;
-  final path = (await tester.runAsync(src!.list))!.firstWhere((p) => p.endsWith('study.open.result.json'));
+  final path = (await tester.runAsync(src.list))!.firstWhere((p) => p.endsWith('study.open.result.json'));
   final open = (json.decode((await tester.runAsync(() => src.read(path)))!) as Map).cast<String, Object?>();
   tweak?.call(open);
   core.result('study.open', open);

@@ -6,6 +6,7 @@ import 'package:toneforge/contract/tab.dart';
 import 'package:toneforge/core/core_client.dart';
 import 'package:toneforge/core/core_providers.dart';
 import 'package:toneforge/features/backing/study_store.dart';
+import 'package:toneforge/features/tab/tab_store_edit.dart';
 
 /// Id del proyecto con estudio abierto, o `null`. Tablatura se abre y se cierra con él.
 final tabStudyProjectProvider = Provider<String?>(
@@ -93,7 +94,7 @@ final tabStoreProvider = NotifierProvider<TabStore, TabStoreState>(TabStore.new)
 
 const Map<String, Object?> _empty = <String, Object?>{};
 
-class TabStore extends Notifier<TabStoreState> {
+class TabStore extends Notifier<TabStoreState> with TabStoreEdit {
   Timer? _flashTimer;
   String? _target;
   int _gen = 0;
@@ -228,6 +229,9 @@ class TabStore extends Notifier<TabStoreState> {
     return t;
   }
 
+  @override
+  Future<TabState?> callTab(String method, Object? params) => _call(method, params);
+
   /// `tab.close`: guarda lo editado y deja la pantalla sin tablatura.
   Future<void> close() async {
     _target = null;
@@ -259,40 +263,6 @@ class TabStore extends Notifier<TabStoreState> {
   Future<bool> cancel() async =>
       (await _run(() => _core.call('tab.cancel', _empty, TabCancelResult.fromJson)))?.cancelled ??
       false;
-
-  Future<TabState?> beatClick(TabClickParams p) => _call('tab.beatClick', p.toJson());
-  Future<TabState?> beatDrag(TabClickParams p) => _call('tab.beatDrag', p.toJson());
-  Future<TabState?> noteClick(TabClickParams p) => _call('tab.noteClick', p.toJson());
-  Future<TabState?> select(TabSelectParams p) => _call('tab.select', p.toJson());
-
-  Future<TabState?> span(TabSpanAction action, {bool? keepAnchor}) =>
-      _call('tab.span', TabSpanParams(action: action, keepAnchor: keepAnchor).toJson());
-
-  Future<TabState?> toggleMute(String track) =>
-      _call('tab.toggleMute', TabTrackParams(track: track).toJson());
-
-  Future<TabState?> toggleSolo(String track) =>
-      _call('tab.toggleSolo', TabTrackParams(track: track).toJson());
-
-  Future<TabState?> setListening(String track, {required bool on}) =>
-      _call('tab.setListening', TabListeningParams(track: track, on: on).toJson());
-
-  Future<TabState?> setAllListening({required bool on}) =>
-      _call('tab.setAllListening', TabListeningParams(on: on).toJson());
-
-  /// `tab.edit {op,...}`; con `op:"key"` el `handled` de la respuesta dice si el núcleo usó la tecla.
-  Future<TabState?> edit(TabEditParams p) => _call('tab.edit', p.toJson());
-
-  /// `tab.edit {op:key}`: `true` si el núcleo usó la tecla (`TabState.handled`). Falla = `false`.
-  Future<bool> key(String key, {bool shift = false, bool ctrl = false, bool alt = false}) async {
-    final t = await edit(TabEditParams.key(key: key, shift: shift, ctrl: ctrl, alt: alt));
-    return t?.handled ?? false;
-  }
-
-  /// `tab.edit {op:redo}` directo (Ctrl+Y en Windows).
-  Future<TabState?> redo() => edit(TabEditParams.redo());
-
-  Future<TabState?> setEditMode({required bool on}) => edit(TabEditParams.editMode(on: on));
 
   /// `tab.exportName`: nombre sugerido del `.gp`; queda en el estado.
   Future<String?> loadExportName() async {

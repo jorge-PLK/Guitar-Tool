@@ -197,7 +197,7 @@ void main() {
       'tab.select', 'tab.span', 'tab.toggleMute', 'tab.toggleSolo', 'tab.setListening',
       'tab.setAllListening', 'tab.edit', 'tab.edit', 'tab.state',
     ]);
-    Map p(int i) => core.calls[i].params! as Map;
+    Map<String, dynamic> p(int i) => core.calls[i].params! as Map<String, dynamic>;
     expect(p(0), {'source': 'automatic'});
     expect(p(1), {'track': 'bass'});
     expect(p(2), {'track': 0, 'bar': 1, 'beat': 2, 'shift': true});
