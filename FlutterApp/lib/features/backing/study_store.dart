@@ -194,6 +194,10 @@ class StudyStore extends Notifier<StudyStoreState> {
 
   // Eventos
 
+  /// Acceso al estado para las extensiones de `study_store_sections.dart` (`state` es protegido).
+  StudyStoreState get _cur => state;
+  set _cur(StudyStoreState s) => state = s;
+
   bool get _isOpen => !_disposed && state.status == StudyLoadStatus.open;
 
   void _onTransport(StudyTransport t) {

@@ -66,14 +66,14 @@ extension StudyStoreSections on StudyStore {
       _showLocalGain();
       await refresh();
     } else {
-      state = state.copyWith(study: _withTransport(state.study!, _overlayGain(last)), clearError: true);
+      _cur = _cur.copyWith(study: _withTransport(_cur.study!, _overlayGain(last)), clearError: true);
     }
   }
 
   void _showLocalGain() {
-    final t = state.transport;
+    final t = _cur.transport;
     if (!_isOpen || t == null) return;
-    state = state.copyWith(study: _withTransport(state.study!, _overlayGain(t)));
+    _cur = _cur.copyWith(study: _withTransport(_cur.study!, _overlayGain(t)));
   }
 
   StudyTransport _overlayGain(StudyTransport t) {
@@ -113,7 +113,7 @@ extension StudyStoreSections on StudyStore {
   /// «Sin guitarras» (D-9): un `setMix` por canal de guitarra. Activo = todas silenciadas; entonces restaura.
   Future<void> toggleNoGuitars() async {
     final guitars = [
-      for (final c in state.transport?.channels ?? const <StudyChannel>[])
+      for (final c in _cur.transport?.channels ?? const <StudyChannel>[])
         if (c.kind == StudyStemKind.guitar) c,
     ];
     if (guitars.isEmpty) return;
