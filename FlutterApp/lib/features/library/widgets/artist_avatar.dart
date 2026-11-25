@@ -44,7 +44,7 @@ class ArtistAvatar extends StatelessWidget {
     if (isUnknown) {
       return const ColoredBox(
         color: TfColors.field,
-        child: Center(child: TfIconView(TfIcon.personFill, size: _unknownIconSize, color: TfColors.muted)),
+        child: Center(child: TfIconView(TfIcon.personFill, size: _unknownIconSize, color: TfColors.muted, filled: true)),
       );
     }
     return ColoredBox(

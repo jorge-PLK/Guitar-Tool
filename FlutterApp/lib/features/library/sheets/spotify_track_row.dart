@@ -54,7 +54,7 @@ class SpotifyTrackRow extends ConsumerWidget {
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: () => store.openSpotify(track.appURL, fallback: track.trackURL),
-              child: const TfIconView(TfIcon.playFill, size: TfSize.font13, color: TfColors.accent),
+              child: const TfIconView(TfIcon.playFill, size: TfSize.font13, color: TfColors.accent, filled: true),
             ),
           ),
           TfSecondaryButton(

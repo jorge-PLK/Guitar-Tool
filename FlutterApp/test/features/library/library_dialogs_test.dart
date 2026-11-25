@@ -16,7 +16,9 @@ import 'package:toneforge/shell/shell_providers.dart';
 import 'package:toneforge/shell/shell_route.dart';
 import 'package:toneforge/theme/fmt.dart';
 import 'package:toneforge/theme/tokens.dart';
+import 'package:toneforge/widgets/tf_sheet.dart';
 
+import '../../support/harness.dart';
 import 'library_store_test.dart' show project, setup;
 
 const _id = '00000000-0000-0000-0000-000000000005';
@@ -97,6 +99,17 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     expect(core.calls.where((x) => x.method == 'library.trash').length, 1);
     expect(res, isTrue);
+  });
+
+  testWidgets('eliminar: golden', (tester) async {
+    await tester.runAsync(loadTfFonts);
+    setTestSurface(tester, const Size(640, 420));
+    await _pump(tester, (ctx, ref) async {
+      await showTrashDialog(ctx, ref, projectId: _id, title: 'Delta');
+    }, stems: 3, takes: 2, videos: 1);
+    await tester.pump(const Duration(milliseconds: 300));
+    final boundary = find.ancestor(of: find.byType(TfSheetScaffold), matching: find.byType(RepaintBoundary)).first;
+    await expectLater(boundary, matchesGoldenFile('goldens/trash_dialog.png'));
   });
 
   testWidgets('eliminar: Esc cancela sin llamar', (tester) async {

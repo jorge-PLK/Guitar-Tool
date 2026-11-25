@@ -183,10 +183,11 @@ void main() {
   });
 
   testWidgets('error de Spotify: banner y ayuda', (tester) async {
-    await _open(tester, const LinkImportState(text: 'x'));
-    await _put(tester, const LinkImportState(text: 'x', spotifyError: CoreError('offline', 'Sin conexión')));
+    await _open(tester, const LinkImportState(text: 'metallica one'));
+    await _put(tester, const LinkImportState(text: 'metallica one', spotifyError: CoreError('offline', 'Sin conexión')));
     expect(find.byType(ImportBanner), findsOneWidget);
     expect(find.text(_l.library_importSupported), findsOneWidget);
+    await expectLater(find.byType(ImportSheetBody), matchesGoldenFile('goldens/import_spotify_error.png'));
   });
 
   testWidgets('duplicado cierra y abre la alerta', (tester) async {

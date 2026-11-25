@@ -148,6 +148,7 @@ void main() {
     );
     expect(find.text(l.library_importSearchingYt), findsOneWidget);
     expect(find.text(l.library_importSlow), findsOneWidget);
+    await expectLater(find.byKey(k5Boundary), matchesGoldenFile('goldens/import_resolving.png'));
   });
 
   testWidgets('preparando: texto y Cancelar', (tester) async {
@@ -155,6 +156,7 @@ void main() {
     expect(find.text(l.library_importPreparing), findsOneWidget);
     await tester.tap(find.text(l.library_importCancel));
     expect(_calls, ['cancel']);
+    await expectLater(find.byKey(k5Boundary), matchesGoldenFile('goldens/import_preparing.png'));
   });
 
   testWidgets('error: botón por cada LinkErrorAction', (tester) async {
