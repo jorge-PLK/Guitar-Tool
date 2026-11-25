@@ -103,6 +103,7 @@ class TakeRow extends ConsumerWidget {
           label: l.library_takeView,
           height: _buttonHeight,
           icon: TfIcon.playFill,
+          iconFilled: true,
           onPressed: take.audio == null || take.songStart == null
               ? null
               : () => openTakeViewer(context, projectId: projectId, takeId: take.id),
