@@ -4,12 +4,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:toneforge/core/core_client.dart';
 import 'package:toneforge/core/core_providers.dart';
 import 'package:toneforge/core/launch_options.dart';
 import 'package:toneforge/core/mock_core.dart';
 import 'package:toneforge/features/backing/backing_shortcuts.dart';
 import 'package:toneforge/features/backing/study_store.dart';
+import 'package:toneforge/features/backing/widgets/section_popover_state.dart';
 import 'package:toneforge/features/backing/widgets/section_selection.dart';
 import 'package:toneforge/shell/selected_project.dart';
 import 'package:toneforge/theme/tokens.dart';
@@ -149,6 +149,20 @@ void main() {
     await key(tester, LogicalKeyboardKey.escape);
     expect(container.read(sectionSelectionProvider), isNull);
     expect(_methods, isNot(contains('study.deleteSection')));
+  });
+
+  testWidgets('con la hoja de sección abierta, Supr/Retroceso no borran y Esc no deselecciona', (tester) async {
+    await _pump(tester);
+    container.read(sectionSelectionProvider.notifier).select(section);
+    container.read(sectionPopoverProvider.notifier).open(section);
+    await key(tester, LogicalKeyboardKey.delete);
+    await key(tester, LogicalKeyboardKey.backspace);
+    await key(tester, LogicalKeyboardKey.escape);
+    expect(_methods, isNot(contains('study.deleteSection')));
+    expect(container.read(sectionSelectionProvider), section);
+    container.read(sectionPopoverProvider.notifier).close();
+    await key(tester, LogicalKeyboardKey.escape);
+    expect(container.read(sectionSelectionProvider), isNull);
   });
 
   testWidgets('sin selección, Supr y Esc no hacen nada', (tester) async {

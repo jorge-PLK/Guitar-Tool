@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:toneforge/features/backing/study_position.dart';
 import 'package:toneforge/features/backing/study_store.dart';
+import 'package:toneforge/features/backing/widgets/section_popover_state.dart';
 import 'package:toneforge/features/backing/widgets/section_selection.dart';
 
 /// Espacio: reproducir/pausar (`ctl.togglePlay()`, SectionGridBoxes.swift:114-130).
@@ -25,7 +26,7 @@ class DeleteSectionIntent extends Intent {
   const DeleteSectionIntent();
 }
 
-/// Esc: quita la selección de sección (SGB:155).
+/// Esc: quita la selección de sección (SGB:155); no con la hoja de sección abierta.
 class ClearSectionSelectionIntent extends Intent {
   const ClearSectionSelectionIntent();
 }
@@ -58,7 +59,9 @@ class _BackingShortcutsState extends ConsumerState<BackingShortcuts> {
     unawaited(playing ? store.pause() : store.play());
   }
 
-  bool get _hasSelection => ref.read(sectionSelectionProvider) != null;
+  /// Con la hoja de sección abierta, Supr/Retroceso no borran y Esc lo cierra la propia hoja.
+  bool get _hasSelection =>
+      ref.read(sectionSelectionProvider) != null && ref.read(sectionPopoverProvider) == null;
 
   void _deleteSection() {
     final String? id = ref.read(sectionSelectionProvider);
