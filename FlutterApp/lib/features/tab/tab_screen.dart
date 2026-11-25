@@ -36,10 +36,12 @@ class TabScreen extends ConsumerWidget {
       return const _Frame(children: [TabHeader(), Spacer()]);
     }
     final editing = tab.editMode && tab.phase == TabPhase.ready;
+    // Sin avisos no entra en la columna (TabScreen.swift:62): evita un hueco extra de 14.
+    final hasNotices = ref.watch(tabStoreProvider.select((s) => s.notices.isNotEmpty));
     final body = _Frame(
       children: [
         const TabHeader(),
-        const TabNotice(),
+        if (hasNotices) const TabNotice(),
         const Expanded(child: TabCard(stage: _Stage())),
         if (editing) const TabEditBar(),
         const TabTransport(),

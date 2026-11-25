@@ -5,6 +5,7 @@ import 'package:toneforge/features/tab/songsterr_store.dart';
 import 'package:toneforge/features/tab/tab_confirm_auto.dart';
 import 'package:toneforge/features/tab/tab_store.dart';
 import 'package:toneforge/l10n/app_localizations.dart';
+import 'package:toneforge/theme/icons.dart';
 import 'package:toneforge/theme/tokens.dart';
 import 'package:toneforge/theme/typography.dart';
 import 'package:toneforge/widgets/tf_menu.dart';
@@ -76,10 +77,14 @@ class _Label extends StatelessWidget {
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: onTap,
-            child: Text(
-              label,
-              style: TfText.body(TfSize.font13, TfWeight.medium).copyWith(color: TfColors.text2),
-            ),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Text(
+                label,
+                style: TfText.body(TfSize.font13, TfWeight.medium).copyWith(color: TfColors.text2),
+              ),
+              const SizedBox(width: TfSpace.s4),
+              const TfIconView(TfIcon.chevronDown, size: TfSize.backingInfoChevron, color: TfColors.text2),
+            ]),
           ),
         ),
       ),
