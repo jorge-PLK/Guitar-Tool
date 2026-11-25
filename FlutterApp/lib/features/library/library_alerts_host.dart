@@ -30,14 +30,29 @@ class _LibraryAlertsHostState extends ConsumerState<LibraryAlertsHost> {
     _firstRunOpen = false;
   }
 
-  Future<void> _duplicate(String id) async {
-    ref.read(importStoreProvider.notifier).dismissDuplicate();
-    await showDuplicateDialog(context, ref, id);
+  // Cola FIFO: una sola alerta visible; al cerrarla sale la siguiente.
+  final List<Future<void> Function()> _queue = [];
+  bool _draining = false;
+
+  Future<void> _drain() async {
+    if (_draining) return;
+    _draining = true;
+    while (_queue.isNotEmpty && mounted) {
+      await _queue.removeAt(0)();
+    }
+    _draining = false;
   }
 
-  Future<void> _notice(ImportNotice n) async {
+  void _duplicate(String id) {
+    ref.read(importStoreProvider.notifier).dismissDuplicate();
+    _queue.add(() => showDuplicateDialog(context, ref, id));
+    _drain();
+  }
+
+  void _notice(ImportNotice n) {
     ref.read(importStoreProvider.notifier).dismissNotice();
-    await showCoreErrorAlert(context, CoreError(n.code, n.message));
+    _queue.add(() => showCoreErrorAlert(context, CoreError(n.code, n.message)));
+    _drain();
   }
 
   @override
