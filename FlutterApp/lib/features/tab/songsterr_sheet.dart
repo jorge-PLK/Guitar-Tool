@@ -77,8 +77,7 @@ class _SongsterrSheetState extends ConsumerState<SongsterrSheet> {
     final TabSongsterrStage stage = sheet?.stage ?? TabSongsterrStage.choosing;
     final bool preview =
         _previewOpen && stage == TabSongsterrStage.choosing && sheet?.selected != null;
-    final double width =
-        songsterrSheetWidth(MediaQuery.sizeOf(context).width, preview: preview);
+    final double width = songsterrSheetWidth(MediaQuery.sizeOf(context).width, preview: preview);
     const double padding = TfSpace.s24;
     final double previewWidth = width - 2 * padding - TfSize.songsterrListWidth - TfSpace.s20;
     return Semantics(
@@ -87,49 +86,51 @@ class _SongsterrSheetState extends ConsumerState<SongsterrSheet> {
       scopesRoute: true,
       namesRoute: true,
       label: l.tab_sheetTitle,
-      child: Container(
+      child: SizedBox(
         width: width,
         height: TfSize.songsterrSheetHeight,
-        padding: const EdgeInsets.all(padding),
-        decoration: BoxDecoration(
-          color: TfColors.bg,
-          borderRadius: BorderRadius.circular(TfRadius.card),
-        ),
-        // El borde se pinta encima para no restar ancho a la lista de 612.
-        foregroundDecoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(TfRadius.card),
-          border: Border.all(color: TfColors.line, width: TfStroke.hairline),
-        ),
-        child: DefaultTextStyle(
-          style: TfText.body(13).copyWith(color: TfColors.text2),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            spacing: TfSpace.s20,
-            children: <Widget>[
-              SizedBox(
-                width: TfSize.songsterrListWidth,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  spacing: TfSpace.s14,
-                  children: <Widget>[
-                    Text(
-                      l.tab_sheetTitle,
-                      style: TfText.display(22).copyWith(color: TfColors.text),
+        // Borde en un DecoratedBox (no en el Container): no resta ancho a la lista de 612 y, al ir de fondo,
+        // no se pinta sobre la vista previa nativa (WKWebView), que dejaría de recibir clics en macOS.
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: TfColors.bg,
+            borderRadius: BorderRadius.circular(TfRadius.card),
+            border: Border.all(color: TfColors.line, width: TfStroke.hairline),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(padding),
+            child: DefaultTextStyle(
+              style: TfText.body(13).copyWith(color: TfColors.text2),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                spacing: TfSpace.s20,
+                children: <Widget>[
+                  SizedBox(
+                    width: TfSize.songsterrListWidth,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      spacing: TfSpace.s14,
+                      children: <Widget>[
+                        Text(
+                          l.tab_sheetTitle,
+                          style: TfText.display(22).copyWith(color: TfColors.text),
+                        ),
+                        Expanded(child: _step(stage, sheet)),
+                      ],
                     ),
-                    Expanded(child: _step(stage, sheet)),
-                  ],
-                ),
-              ),
-              if (preview)
-                SizedBox(
-                  key: const ValueKey<String>('songsterr-preview-slot'),
-                  width: previewWidth,
-                  child: SongsterrPreview(
-                    selected: sheet?.selected,
-                    onClose: () => setState(() => _previewOpen = false),
                   ),
-                ),
-            ],
+                  if (preview)
+                    SizedBox(
+                      key: const ValueKey<String>('songsterr-preview-slot'),
+                      width: previewWidth,
+                      child: SongsterrPreview(
+                        selected: sheet?.selected,
+                        onClose: () => setState(() => _previewOpen = false),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ),
         ),
       ),

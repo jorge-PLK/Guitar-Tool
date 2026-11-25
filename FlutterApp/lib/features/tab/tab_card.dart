@@ -7,7 +7,6 @@ import 'package:toneforge/features/tab/tab_store.dart';
 import 'package:toneforge/features/tab/tab_track_controls.dart';
 import 'package:toneforge/features/tab/tab_track_strip.dart';
 import 'package:toneforge/theme/tokens.dart';
-import 'package:toneforge/widgets/tf_card.dart';
 
 /// Alto mínimo de la zona del lienzo (`TabScreen.swift:191-198`). Alias del token para los tests.
 const double tabStageMinHeight = TfSize.tabStageMinHeight;
@@ -27,7 +26,14 @@ class TabCard extends ConsumerWidget {
     for (final TabTrackInfo t in entries) {
       if (t.id == tab?.selectedTrack) selected = t;
     }
-    return TfCard(
+    // Como TfCard, pero con el borde en el fondo: el borde en primer plano de TfCard se pinta después del
+    // lienzo y el motor lo toma como contenido sobre la vista nativa (WKWebView deja de recibir clics).
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: TfColors.card,
+        borderRadius: BorderRadius.circular(TfRadius.card),
+        border: Border.all(color: TfColors.line, width: TfStroke.hairline),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(TfSpace.s18),
         child: Column(

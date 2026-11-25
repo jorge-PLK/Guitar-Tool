@@ -87,14 +87,15 @@ class _SongsterrPreviewState extends ConsumerState<SongsterrPreview> {
           ],
         ),
         Expanded(
+          // Borde de fondo y sin recorte: un borde en primer plano o un recorte sobre la vista nativa
+          // (WKWebView) le quitan los clics en macOS. La vista queda inscrita dentro del borde.
           child: DecoratedBox(
-            position: DecorationPosition.foreground,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(TfRadius.control),
               border: Border.all(color: TfColors.fieldLine, width: TfStroke.hairline),
             ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(TfRadius.control),
+            child: Padding(
+              padding: const EdgeInsets.all(TfStroke.hairline),
               child: TfWebView(controller: _web),
             ),
           ),
