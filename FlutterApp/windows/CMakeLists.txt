@@ -106,3 +106,33 @@ install(DIRECTORY "${PROJECT_BUILD_DIR}/${FLUTTER_ASSET_DIR_NAME}"
 install(FILES "${AOT_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_DATA_DIR}"
   CONFIGURATIONS Profile;Release
   COMPONENT Runtime)
+
+# --- Recursos de ToneForge junto al .exe (equivalente Windows de Tools/flutter/embed-resources.sh) ---
+# El nucleo (AppCore) los busca sin variables de entorno: helpers y tf-separate.exe en la carpeta del ejecutable,
+# modelos .zip y alphaTab/soundfont/sonivox.sf2 en la carpeta de recursos (aqui, tambien junto al .exe).
+# SIN PROBAR (escrito en el Mac). Los helpers salen de Vendor/helpers/win-x64 (Tools/helpers/fetch.sh).
+set(TF_REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../..")
+set(TF_HELPERS_DIR "${TF_REPO_ROOT}/Vendor/helpers/win-x64")
+foreach(_tf_helper yt-dlp.exe deno.exe ffmpeg.exe)
+  if(NOT EXISTS "${TF_HELPERS_DIR}/${_tf_helper}")
+    message(FATAL_ERROR "Falta ${TF_HELPERS_DIR}/${_tf_helper}; lanza Tools/helpers/fetch.sh (ffmpeg: Tools/helpers/build-ffmpeg.sh)")
+  endif()
+  install(PROGRAMS "${TF_HELPERS_DIR}/${_tf_helper}" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}" COMPONENT Runtime)
+endforeach()
+
+# tf-separate.exe (swift build -c release --product tf-separate en Packages/StemKit, ver Tools/win/build.sh).
+# Ruta por -DTF_SEPARATE_EXE=...; si no, busca bajo Packages/StemKit/.build.
+if(NOT TF_SEPARATE_EXE)
+  file(GLOB_RECURSE _tf_sep_candidates "${TF_REPO_ROOT}/Packages/StemKit/.build/*/release/tf-separate.exe")
+  list(GET _tf_sep_candidates 0 TF_SEPARATE_EXE)
+endif()
+if(TF_SEPARATE_EXE AND EXISTS "${TF_SEPARATE_EXE}")
+  install(PROGRAMS "${TF_SEPARATE_EXE}" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}" COMPONENT Runtime)
+else()
+  message(WARNING "tf-separate.exe no encontrado: sin separador en el paquete (pasa -DTF_SEPARATE_EXE=<ruta>)")
+endif()
+
+file(GLOB TF_MODEL_ZIPS "${TF_REPO_ROOT}/App/Resources/Models/*.zip")
+install(FILES ${TF_MODEL_ZIPS} DESTINATION "${INSTALL_BUNDLE_LIB_DIR}" COMPONENT Runtime)
+install(FILES "${TF_REPO_ROOT}/App/Resources/alphaTab/soundfont/sonivox.sf2"
+  DESTINATION "${INSTALL_BUNDLE_LIB_DIR}/alphaTab/soundfont" COMPONENT Runtime)
