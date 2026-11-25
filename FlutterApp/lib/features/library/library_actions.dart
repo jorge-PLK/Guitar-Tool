@@ -33,6 +33,16 @@ extension LibraryStoreActions on LibraryStore {
     return err;
   }
 
+  /// Primer arranque: `host.pickProjectsFolder` elige y guarda la carpeta (sin reinicio la primera vez);
+  /// si se eligió una, vuelve a pedir la lista. Cancelar no cambia nada.
+  Future<CoreError?> chooseFirstRunFolder() async {
+    final err = await _run(() async {
+      final r = await _core.call('host.pickProjectsFolder', const <String, Object?>{}, PickedFolderResult.fromJson);
+      if (r.path != null) await refresh();
+    });
+    return err;
+  }
+
   Future<CoreError?> separate(String id) => _run(
     () => _core.call('library.separate', ProjectIDParams(id: id).toJson(), QueuedResult.fromJson),
   );

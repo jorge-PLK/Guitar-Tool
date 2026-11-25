@@ -64,6 +64,17 @@ Future<bool> showTrashDialog(
   if (choice == null) return false;
   final err = choice == _Choice.bin ? await store.trash(projectId) : await store.delete(projectId);
   if (err == null) return true;
-  if (context.mounted) await showCoreErrorAlert(context, err);
+  if (!context.mounted) return false;
+  if (choice == _Choice.disk) {
+    await showCoreErrorAlert(context, err, title: l.library_errDelete);
+  } else {
+    // AM:978-979: el título depende de la plataforma y el cuerpo añade «te queda Eliminar del disco».
+    await showCoreErrorAlert(
+      context,
+      err,
+      title: windows ? l.library_errTrashTitleWindows : l.library_errTrashTitleMac,
+      message: l.library_errTrashBody(coreErrorText(l, err)),
+    );
+  }
   return false;
 }

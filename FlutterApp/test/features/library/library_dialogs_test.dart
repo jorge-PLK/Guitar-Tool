@@ -126,7 +126,7 @@ void main() {
     core.failWith('library.delete', const CoreError('unsafe-deletion', 'raw'));
     await tester.tap(find.text('Eliminar del disco'));
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('Aviso'), findsOneWidget);
+    expect(find.text(l.library_errDelete), findsOneWidget);
     expect(find.text(l.library_errUnsafeDeletion), findsOneWidget);
     await tester.tap(find.text('Aceptar'));
     await tester.pump(const Duration(milliseconds: 300));

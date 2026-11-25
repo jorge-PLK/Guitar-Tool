@@ -23,13 +23,14 @@ String coreErrorText(AppLocalizations l, CoreError e) {
   return e.message.trim().isEmpty ? l.error_unknown : e.message;
 }
 
-/// Aviso modal de un solo botón con el error traducido y título genérico.
-Future<void> showCoreErrorAlert(BuildContext context, CoreError error) {
+/// Aviso modal de un solo botón con el error traducido. [title] específico (p. ej. «No se pudo
+/// eliminar del disco»); sin él, el título genérico.
+Future<void> showCoreErrorAlert(BuildContext context, CoreError error, {String? title, String? message}) {
   final l = AppLocalizations.of(context);
   return showTfAlert(
     context: context,
-    title: l.library_noticeTitle,
-    message: coreErrorText(l, error),
+    title: title ?? l.library_noticeTitle,
+    message: message ?? coreErrorText(l, error),
     okLabel: l.library_noticeOk,
   );
 }

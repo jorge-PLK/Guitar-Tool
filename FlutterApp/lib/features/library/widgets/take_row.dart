@@ -1,8 +1,11 @@
+import 'dart:math' as math;
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:toneforge/contract/library_detail.dart';
 import 'package:toneforge/features/library/dialogs/delete_take_dialog.dart';
 import 'package:toneforge/features/library/library_format.dart';
+import 'package:toneforge/features/library/library_metrics.dart';
 import 'package:toneforge/features/library/project_detail_store.dart';
 import 'package:toneforge/features/library/take_viewer_link.dart';
 import 'package:toneforge/l10n/app_localizations.dart';
@@ -13,6 +16,28 @@ import 'package:toneforge/widgets/tf_buttons.dart';
 // PR:66 y PR:76: ancho de «Toma N» y alto de los botones, sin token en el kit.
 const double _numberWidth = 64;
 const double _buttonHeight = 32;
+
+/// Estrella de cinco puntas rellena en `ok` (marcador de mejor toma).
+class _StarPainter extends CustomPainter {
+  const _StarPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = size.center(Offset.zero);
+    final r = size.width / 2;
+    final path = Path();
+    for (var i = 0; i < 10; i++) {
+      final a = -math.pi / 2 + i * math.pi / 5;
+      final rr = i.isEven ? r : r * 0.4;
+      final p = Offset(c.dx + rr * math.cos(a), c.dy + rr * math.sin(a));
+      i == 0 ? path.moveTo(p.dx, p.dy) : path.lineTo(p.dx, p.dy);
+    }
+    canvas.drawPath(path..close(), Paint()..color = TfColors.ok);
+  }
+
+  @override
+  bool shouldRepaint(_StarPainter old) => false;
+}
 
 /// Fila de una toma (PR:62-79).
 class TakeRow extends ConsumerWidget {
@@ -48,9 +73,10 @@ class TakeRow extends ConsumerWidget {
         if (take.isBest) ...[
           Semantics(
             label: l.library_takeBest,
-            child: Text(
-              '★',
-              style: TfText.body().copyWith(color: TfColors.ok, decoration: TextDecoration.none),
+            // La fuente no trae «★» (salía una barra): estrella dibujada.
+            child: const CustomPaint(
+              size: Size.square(LibraryMetrics.bestStarSize),
+              painter: _StarPainter(),
             ),
           ),
           const SizedBox(width: TfSpace.s12),

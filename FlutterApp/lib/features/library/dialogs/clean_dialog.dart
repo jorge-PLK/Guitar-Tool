@@ -55,6 +55,6 @@ Future<void> showCleanDialog(
   try {
     await store.cleanup(id: projectId);
   } on CoreError catch (e) {
-    if (context.mounted) await showCoreErrorAlert(context, e);
+    if (context.mounted) await showCoreErrorAlert(context, e, title: l.library_errClean);
   }
 }
