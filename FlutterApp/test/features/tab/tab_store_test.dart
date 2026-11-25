@@ -71,6 +71,23 @@ void main() {
     expect(h.state.tab!.revision, 4);
   });
 
+  test('waitingAnalysis + study.analysis ready repite tab.open; en otra fase no', () async {
+    final (core, h) = await boot();
+    core.emit('study.analysis', fixture('../study/study.analysis.event.ready.json'));
+    await settle();
+    expect(methods(core), ['tab.open']);
+    core.emit('tab.state', {...fixture('tab.open.result.json'), 'phase': 'waitingAnalysis'});
+    await settle();
+    expect(h.state.tab!.phase, TabPhase.waitingAnalysis);
+    core.emit('study.analysis', fixture('../study/study.analysis.event.analyzing.json'));
+    await settle();
+    expect(methods(core), ['tab.open']);
+    core.emit('study.analysis', fixture('../study/study.analysis.event.ready.json'));
+    await settle();
+    expect(methods(core), ['tab.open', 'tab.open']);
+    expect(h.state.tab!.phase, TabPhase.ready);
+  });
+
   test('tab.progress: transcribing, failed con error y done/cancelled lo quitan', () async {
     final (core, h) = await boot();
     core.emitFixture('tab.progress');

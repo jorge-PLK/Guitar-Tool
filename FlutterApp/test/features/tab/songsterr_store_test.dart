@@ -30,6 +30,27 @@ void main() {
     expect(sheet(h).stage, TabSongsterrStage.choosing);
   });
 
+  test('al entrar en choosingSource la hoja se abre sola, una vez por entrada en la fase', () async {
+    final (core, h) = await boot();
+    expect(core.calls.where((c) => c.method == 'tab.songsterr.open'), isEmpty);
+    final choosing = {...fixture('tab.open.result.json'), 'phase': 'choosingSource'};
+    core.emit('tab.state', choosing);
+    await settle();
+    int opens() => core.calls.where((c) => c.method == 'tab.songsterr.open').length;
+    expect(opens(), 1);
+    expect(sheet(h).isOpen, isTrue);
+    // El usuario la cierra: otro tab.state en la misma fase no la reabre.
+    await store(h).close();
+    core.emit('tab.state', {...choosing, 'revision': 7});
+    await settle();
+    expect(opens(), 1);
+    // Sale de la fase y vuelve a entrar: se abre otra vez.
+    core.emit('tab.state', fixture('tab.open.result.json'));
+    core.emit('tab.state', choosing);
+    await settle();
+    expect(opens(), 2);
+  });
+
   test('open refleja la hoja y el evento tab.songsterr.state la actualiza', () async {
     final (core, h) = await boot();
     final s = await store(h).open();

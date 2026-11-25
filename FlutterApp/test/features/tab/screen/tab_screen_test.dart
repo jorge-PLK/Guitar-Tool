@@ -1,16 +1,23 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:toneforge/contract/library.dart';
 import 'package:toneforge/core/core_client.dart';
 import 'package:toneforge/core/core_providers.dart';
 import 'package:toneforge/core/mock_core.dart';
+import 'package:toneforge/features/backing/separated_projects.dart';
+import 'package:toneforge/features/tab/songsterr_sheet.dart';
+import 'package:toneforge/features/tab/tab_card.dart';
 import 'package:toneforge/features/tab/tab_header.dart';
 import 'package:toneforge/features/tab/tab_screen.dart';
 import 'package:toneforge/features/tab/tab_store.dart';
 import 'package:toneforge/features/tab/tab_theme_chooser.dart';
+import 'package:toneforge/features/tab/tab_transport.dart';
 import 'package:toneforge/l10n/app_localizations.dart';
 import 'package:toneforge/shell/selected_project.dart';
 import 'package:toneforge/theme/icons.dart';
+import 'package:toneforge/theme/tokens.dart';
+import 'package:toneforge/widgets/tf_buttons.dart';
 import 'package:toneforge/widgets/tf_notice.dart';
 import 'package:toneforge/widgets/tf_progress.dart';
 
@@ -43,7 +50,24 @@ Future<Rig> boot(
     coreClientProvider.overrideWithValue(core),
     tabStudyProjectProvider.overrideWith((ref) => ref.watch(studyProjectProbe)),
     launchProjectIdProvider.overrideWith((ref) async => null),
-    tabChooserThemesProvider.overrideWith((ref) async => themes),
+    separatedProjectsProvider.overrideWith((ref) async => [
+          for (final t in themes)
+            ProjectSummary.fromJson({
+              'id': t.id,
+              'title': t.title,
+              'folderName': t.title,
+              'duration': 1.0,
+              'sampleRate': 44100.0,
+              'createdAt': '2026-01-01T00:00:00Z',
+              'updatedAt': '2026-01-01T00:00:00Z',
+              'separationState': 'done',
+              'stemCount': 4,
+              'takeCount': 0,
+              'rigCount': 0,
+              'hasAnalysis': true,
+              'guitars': <Object?>[],
+            }),
+        ]),
     tabExportDataProvider.overrideWith((ref) => () async => 'AAAA'),
     tabSavePathProvider.overrideWith((ref) => (name) async => '/tmp/$name'),
   ]);
@@ -51,14 +75,24 @@ Future<Rig> boot(
   container.listen(tabStoreProvider, (_, _) {});
   if (study != null) container.read(studyProjectProbe.notifier).set(study);
   if (select) container.read(selectedProjectProvider.notifier).select(projectId);
+  // Las localizaciones van por encima del Navigator: la hoja de Songsterr se monta en una ruta.
   await tester.pumpWidget(UncontrolledProviderScope(
     container: container,
-    child: tfNavApp(
-      Localizations(
-        locale: const Locale('es'),
-        delegates: const [AppLocalizations.delegate, DefaultWidgetsLocalizations.delegate],
-        child: const DefaultTextStyle(style: TextStyle(), child: TabScreen()),
+    child: WidgetsApp(
+      color: TfColors.bg,
+      debugShowCheckedModeBanner: false,
+      locale: const Locale('es'),
+      supportedLocales: const [Locale('es')],
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        DefaultWidgetsLocalizations.delegate,
+      ],
+      pageRouteBuilder: <T>(RouteSettings settings, WidgetBuilder builder) =>
+          PageRouteBuilder<T>(
+        settings: settings,
+        pageBuilder: (BuildContext c, Animation<double> a, Animation<double> b) => builder(c),
       ),
+      home: const DefaultTextStyle(style: TextStyle(), child: TabScreen()),
     ),
   ));
   await tester.runAsync(settle);
@@ -75,6 +109,22 @@ Future<void> tapText(WidgetTester tester, String text) async {
   await tester.tap(find.text(text), warnIfMissed: false);
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 300));
+}
+
+/// Botón de cabecera por semántica (no por hit test): la hoja puede taparlo.
+Finder _semanticButton(String label, {required bool enabled}) => find.byWidgetPredicate(
+    (w) => w is Semantics && w.properties.label == label && w.properties.enabled == enabled);
+
+Finder _exportButton({required bool enabled}) => find.byWidgetPredicate((w) =>
+    w is TfSecondaryButton &&
+    w.label == 'Exportar a Guitar Pro' &&
+    (w.onPressed != null) == enabled);
+
+/// La hoja se abre en un frame posterior y su ruta tarda en montarse (transición de 150 ms).
+Future<void> _settleSheet(WidgetTester tester) async {
+  await tester.runAsync(settle);
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 200));
 }
 
 void main() {
@@ -103,10 +153,12 @@ void main() {
     });
   });
 
-  testWidgets('cargando: spinner sin cabecera', (tester) async {
+  testWidgets('controlador sin crear: cabecera y Spacer, sin spinner ni tarjeta', (tester) async {
     await boot(tester, study: null);
-    expect(find.byType(TfSpinner), findsOneWidget);
-    expect(find.text('Editar notas'), findsNothing);
+    expect(find.byType(TabHeader), findsOneWidget);
+    expect(find.byType(TfSpinner), findsNothing);
+    expect(find.byType(TabCard), findsNothing);
+    expect(find.byType(TabTransport), findsNothing);
   });
 
   testWidgets('sin tab y con error: mensaje del error', (tester) async {
@@ -119,6 +171,13 @@ void main() {
     for (final phase in ['waitingAnalysis', 'empty', 'choosingSource', 'working']) {
       testWidgets('Editar y Exportar deshabilitados en $phase', (tester) async {
         final r = await boot(tester, patch: {'phase': phase});
+        // En choosingSource la hoja se abre sola (TC:389-392) y puede tapar la cabecera.
+        if (phase == 'choosingSource') {
+          await _settleSheet(tester);
+          expect(find.byType(SongsterrSheet), findsOneWidget);
+        }
+        expect(_semanticButton('Editar notas', enabled: false), findsOneWidget);
+        expect(_exportButton(enabled: false), findsOneWidget);
         await tapText(tester, 'Editar notas');
         await tapText(tester, 'Exportar a Guitar Pro');
         expect(r.methods, isNot(contains('tab.edit')));
@@ -137,6 +196,13 @@ void main() {
     for (final phase in ['choosingSource', 'working', 'failed']) {
       testWidgets('Fuente habilitado en $phase', (tester) async {
         await boot(tester, patch: {'phase': phase, 'source': 'songsterr'});
+        if (phase == 'choosingSource') {
+          // La hoja abierta sola tapa la cabecera: se comprueba el botón por semántica.
+          await _settleSheet(tester);
+          expect(find.byType(SongsterrSheet), findsOneWidget);
+          expect(_semanticButton('Fuente: Songsterr', enabled: true), findsOneWidget);
+          return;
+        }
         await tapText(tester, 'Fuente: Songsterr');
         expect(find.text('Buscar en Songsterr…'), findsOneWidget);
       });

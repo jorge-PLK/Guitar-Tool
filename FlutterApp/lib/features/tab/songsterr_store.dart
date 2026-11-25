@@ -49,6 +49,11 @@ class SongsterrStore extends Notifier<SongsterrStoreState> {
       state = state.copyWith(sheet: s);
     }, onError: (Object _) {});
     ref.onDispose(sub.cancel);
+    // TC:389-392: al pasar a `choosingSource` la hoja se abre sola, una vez por entrada en la fase
+    // (cerrarla no la reabre mientras la fase no cambie).
+    ref.listen<TabPhase?>(tabStoreProvider.select((s) => s.tab?.phase), (prev, next) {
+      if (next == TabPhase.choosingSource && prev != TabPhase.choosingSource) open();
+    }, fireImmediately: true);
     return const SongsterrStoreState();
   }
 

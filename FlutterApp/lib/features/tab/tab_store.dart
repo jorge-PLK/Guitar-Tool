@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:toneforge/contract/study.dart';
 import 'package:toneforge/contract/tab.dart';
 import 'package:toneforge/core/core_client.dart';
 import 'package:toneforge/core/core_providers.dart';
@@ -107,6 +108,7 @@ class TabStore extends Notifier<TabStoreState> {
       core.on('tab.progress', TabProgressEvent.fromJson).listen(_onProgress, onError: _ignore),
       core.on('tab.selection', TabSelectionEvent.fromJson).listen(_onSelection, onError: _ignore),
       core.on('tab.range', TabRangeEvent.fromJson).listen(_onRange, onError: _ignore),
+      core.on('study.analysis', StudyAnalysisEvent.fromJson).listen(_onAnalysis, onError: _ignore),
     ];
     ref.onDispose(() {
       for (final s in subs) {
@@ -156,6 +158,13 @@ class TabStore extends Notifier<TabStoreState> {
   }
 
   // ---- Eventos ----
+
+  /// Con la fase `waitingAnalysis`, al llegar el análisis hay que repetir `tab.open`
+  /// (el núcleo no reabre solo: `TabService.open` solo carga la rejilla al abrir).
+  void _onAnalysis(StudyAnalysisEvent e) {
+    if (e.state != StudyAnalysisState.ready || state.opening) return;
+    if (state.tab?.phase == TabPhase.waitingAnalysis) unawaited(reopen());
+  }
 
   void _onState(TabState t) => _apply(t);
 

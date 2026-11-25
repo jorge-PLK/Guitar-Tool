@@ -36,6 +36,8 @@ Future<void> runTabExport(WidgetRef ref, AppLocalizations l) async {
   final b64 = await data();
   if (b64 == null) return;
   final r = await store.export(data: b64, path: path);
+  // Éxito: el aviso «Guardado …» lo manda el núcleo en `tab.state.flash` (no se duplica aquí).
+  // `saved:false` (sin ruta no llega a pasar) = nada que avisar; un fallo llega como error.
   if (r == null) {
     final e = ref.read(tabStoreProvider).error;
     store.showFlash(l.tab_flashExportFailed(e?.message ?? ''));

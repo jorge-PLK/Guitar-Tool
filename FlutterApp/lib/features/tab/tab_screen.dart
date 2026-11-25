@@ -16,7 +16,6 @@ import 'package:toneforge/features/tab/tab_transport.dart';
 import 'package:toneforge/shell/selected_project.dart';
 import 'package:toneforge/shell/shell_route.dart';
 import 'package:toneforge/theme/tokens.dart';
-import 'package:toneforge/widgets/tf_progress.dart';
 import 'package:toneforge/widgets/tf_state_message.dart';
 
 /// Pantalla de Tablatura: selector de tema, cargando o contenido (TabScreen.swift:13-19, 59-72).
@@ -33,26 +32,39 @@ class TabScreen extends ConsumerWidget {
       if (error != null) {
         return Center(child: TfStateMessage(icon: ShellRoute.tab.icon, text: error.message));
       }
-      return const Center(child: TfSpinner.small());
+      // Controlador sin crear: solo la cabecera y un Spacer (TabScreen.swift:62-69).
+      return const _Frame(children: [TabHeader(), Spacer()]);
     }
     final editing = tab.editMode && tab.phase == TabPhase.ready;
-    final body = Padding(
-      padding: const EdgeInsets.symmetric(horizontal: TfSpace.s36, vertical: TfSpace.s20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        spacing: TfSpace.s14,
-        children: [
-          const TabHeader(),
-          const TabNotice(),
-          const Expanded(child: TabCard(stage: _Stage())),
-          if (editing) const TabEditBar(),
-          const TabTransport(),
-        ],
-      ),
+    final body = _Frame(
+      children: [
+        const TabHeader(),
+        const TabNotice(),
+        const Expanded(child: TabCard(stage: _Stage())),
+        if (editing) const TabEditBar(),
+        const TabTransport(),
+      ],
     );
     // La hoja de Songsterr se abre y cierra sola según `songsterrStoreProvider` (TabScreen.swift:99-102).
     return TabShortcuts(child: Stack(children: [body, const SongsterrSheetHost()]));
   }
+}
+
+/// Marco de la pantalla: columna con el relleno de TabScreen.swift:68.
+class _Frame extends StatelessWidget {
+  const _Frame({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: TfSpace.s36, vertical: TfSpace.s20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          spacing: TfSpace.s14,
+          children: children,
+        ),
+      );
 }
 
 /// Lienzo alphaTab con el overlay de fases encima (TabScreen.swift:191-198).
