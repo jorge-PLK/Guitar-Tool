@@ -359,6 +359,8 @@ final class RecordService {
             try await setCamera(p)
         }
         router.register("record.rotate") { [self] (_: Empty) -> RecordSnapshot in try await with { $0.rotateCamera() } }
+        // Sondeo de cámara (SwiftUI lo hace cada 2 s mientras se busca); desvío GR10.
+        router.register("record.pollCamera") { [self] (_: Empty) -> RecordSnapshot in try await with { $0.pollCamera() } }
         router.register("record.adjustOffset") { [self] (p: RecordTakeParams) -> RecordSnapshot in
             try await with { c in
                 let id = try Self.takeID(p, c)

@@ -67,6 +67,7 @@ Vienen del apartado 9 de las fichas de `pantallas/`. La clase sigue [decisiones-
 | GR5 | Grabar, visor | Reproductor de vídeo de Flutter en Windows: HEVC y `playbackRate` fino; mensaje de HEVC en Dart | se mide (P9) | 3 | g:G5 |
 | GR6 | Grabar | Imán de ±1,5 dB del Master en la vista | interfaz en Dart | 3 | g:G6 |
 | GR7 | Visor | Sincronía vídeo-audio sin reloj común; el seguidor en Dart ya no es el plan (decisión 9 enmendada) | se mide (P9) | 3 | g:G7 |
+| GR10 | Grabar | `record.pollCamera` expuesto (SwiftUI pollCamera cada 2 s, RV:99,130); aprobado por Jorge 25/11 | núcleo (resuelto) | 3 | g:G10 |
 | GR8 | Visor | Audio del visor en el Mac: SwiftUI usa la salida del sistema, `AppCore` la del perfil. Resuelto por robustez: la del perfil en las dos plataformas (un solo camino de audio); Jorge lo comprueba de oído | interfaz en Dart (resuelto) | 3 | g:G8 |
 | MO1 | Montaje | Cancelar la exportación: `cancelled` se trata como reposo | interfaz en Dart | 4 | m:D1 |
 | MO2 | Montaje | `reveal` debe seleccionar el fichero exportado, no abrir la carpeta (depende de T3 en Windows) | hueco claro | 4 | m:D2 |

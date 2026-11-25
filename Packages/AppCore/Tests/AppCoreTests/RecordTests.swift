@@ -618,6 +618,19 @@ final class RecordTests: XCTestCase {
         _ = await call(r.router, "record.close")
     }
 
+    func testPollCameraMethodReevaluatesCamera() async throws {
+        let provider = SimulatedCameraProvider(cameras: [])
+        let r = try await makeRig(cameras: .simulated(provider: provider))
+        _ = try await openRecord(r, camera: "none")
+        provider.setCameras([.simulated])
+        _ = try await snap(r, "record.pollCamera")
+        let s = try await until(r) { $0.camera.state == "simulated" }
+        XCTAssertEqual(s.camera.cameras.map(\.id), ["sim-camera"])
+        _ = await call(r.router, "record.close")
+        let code = await errorCode(r, "record.pollCamera")
+        XCTAssertEqual(code, "not-open")
+    }
+
     func testChosenCameraMissingMessage() async throws {
         let r = try await makeRig()
         _ = try await call(r.bridge.router, "audio.state")

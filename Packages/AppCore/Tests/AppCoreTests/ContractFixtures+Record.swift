@@ -180,6 +180,7 @@ final class ContractFixturesRecordTests: XCTestCase {
         try await rig.dump("record.setMix", "{\"channel\":\"bass\",\"gainDB\":-3,\"mute\":false}")
         try await rig.dump("record.setMaster", "{\"gainDB\":-1.5}")
         try await rig.dump("record.setCamera", "{}", name: "record.setCamera")
+        try await rig.dump("record.pollCamera")
         try await rig.dump("record.prepareViewTake")
         try await rig.dump("record.adjustOffset", "{\"takeId\":\"\(t1)\"}")
         try await rig.dump("record.setOffset", "{\"valueMs\":40}")
