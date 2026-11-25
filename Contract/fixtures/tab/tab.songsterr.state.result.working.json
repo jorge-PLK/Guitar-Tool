@@ -1,0 +1,14 @@
+{
+  "busy" : false,
+  "canUse" : true,
+  "open" : true,
+  "query" : "Banda · Tema",
+  "results" : [
+
+  ],
+  "search" : {
+    "phase" : "results"
+  },
+  "stage" : "working",
+  "workingText" : "Descargando pistas de Songsterr…"
+}

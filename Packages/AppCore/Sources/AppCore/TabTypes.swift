@@ -117,7 +117,11 @@ struct TabClickParams: Decodable, Sendable {
     var string: Int?
 }
 struct TabSelectParams: Decodable, Sendable { var track: String; var beat: Int; var tick: Int; var string: Int? }
-struct TabSpanParams: Decodable, Sendable { var action: String }
+struct TabSpanParams: Decodable, Sendable {
+    var action: String
+    /// Solo con `clear`: conserva el ancla del tramo (como Esc / «Sin bucle» de SwiftUI); por defecto la borra.
+    var keepAnchor: Bool?
+}
 struct TabListeningParams: Decodable, Sendable { var track: String?; var on: Bool }
 struct TabExportParams: Decodable, Sendable { var data: String; var path: String? }
 struct TabEditParams: Decodable, Sendable {

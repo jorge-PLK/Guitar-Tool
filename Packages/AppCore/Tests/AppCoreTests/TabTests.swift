@@ -276,6 +276,37 @@ final class TabTests: XCTestCase {
         XCTAssertNil(t2["loop"] as? [String: Any])
     }
 
+    func testSpanClearKeepAnchorExtendsFromAnchor() async throws {
+        let f = try await makeFixture()
+        _ = try await openAndTranscribe(f)
+        _ = try await result(f, "tab.beatClick", "{\"track\":0,\"bar\":1,\"beat\":0}")
+        _ = try await result(f, "tab.beatClick", "{\"track\":0,\"bar\":1,\"beat\":4,\"shift\":true}")
+        var s = try await result(f, "tab.span", "{\"action\":\"clear\",\"keepAnchor\":true}")
+        XCTAssertNil(s["span"] as? [String: Any])
+        s = try await result(f, "tab.beatClick", "{\"track\":0,\"bar\":1,\"beat\":4,\"shift\":true}")
+        XCTAssertNotNil(s["span"] as? [String: Any], "con ancla conservada, ⇧clic amplía")
+        // Por defecto el ancla se borra: ⇧clic ya no amplía.
+        _ = try await result(f, "tab.span", "{\"action\":\"clear\"}")
+        s = try await result(f, "tab.beatClick", "{\"track\":0,\"bar\":1,\"beat\":4,\"shift\":true}")
+        XCTAssertNil(s["span"] as? [String: Any])
+    }
+
+    func testDismissNoticesClearsAndEmitsState() async throws {
+        let f = try await makeFixture()
+        _ = try await openAndTranscribe(f)
+        await f.bridge.tabService.setNotices(["Aviso de prueba."])
+        var s = try await result(f, "tab.state")
+        XCTAssertEqual(s["notices"] as? [String], ["Aviso de prueba."])
+        s = try await result(f, "tab.dismissNotices")
+        XCTAssertEqual(s["notices"] as? [String], [])
+        s = try await result(f, "tab.state")
+        XCTAssertEqual(s["notices"] as? [String], [])
+        let closed = await call(f, "tab.close")
+        XCTAssertNotNil(closed["result"])
+        let afterClose = await call(f, "tab.dismissNotices")
+        XCTAssertNotNil(afterClose["error"])
+    }
+
     func testPlainSetLoopIsNotSpan() async throws {
         let f = try await makeFixture()
         _ = try await openAndTranscribe(f)

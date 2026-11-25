@@ -34,7 +34,12 @@ extension TabService {
         router.register("tab.select") { [self] (p: TabSelectParams) -> TabState in
             try await selectPoint(track: p.track, beat: p.beat, tick: p.tick, string: p.string)
         }
-        router.register("tab.span") { [self] (p: TabSpanParams) -> TabState in try await spanAction(p.action) }
+        router.register("tab.span") { [self] (p: TabSpanParams) -> TabState in try await spanAction(p.action, keepAnchor: p.keepAnchor ?? false) }
+        router.register("tab.dismissNotices") { [self] (_: Empty) -> TabState in
+            try await requireOpen()
+            await dismissNotices()
+            return await state()
+        }
         router.register("tab.toggleMute") { [self] (p: TabTrackParams) -> TabState in
             guard let t = p.track else { throw RPCError(code: "bad-params", message: "Falta «track».") }
             try await toggleMute(trackID: t)

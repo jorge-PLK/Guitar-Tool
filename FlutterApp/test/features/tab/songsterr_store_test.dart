@@ -98,7 +98,7 @@ void main() {
   test('failed: retryImport y review llaman a su método', () async {
     final (core, h) = await boot();
     core.emit('tab.songsterr.state', {
-      ...fixture('tab.songsterr.state.result.failed.json'),
+      ...fixture('tab.songsterr.state.result.searchFailed.json'),
       'stage': 'failed',
       'failure': {'kind': 'other', 'message': 'No se pudo leer.', 'canRetry': true},
     });

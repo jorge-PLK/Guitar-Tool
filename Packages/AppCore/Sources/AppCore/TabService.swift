@@ -316,7 +316,11 @@ final class TabService {
         return vocalSource
     }
 
-    func dismissNotices() { notices = [] }
+    /// Cierra los avisos actuales (los de apertura: pistas rehechas, transcripción); solo vuelven a salir si hay otros nuevos.
+    func dismissNotices() {
+        notices = []
+        markChanged()
+    }
 
     // MARK: Fuente
 
@@ -621,10 +625,10 @@ final class TabService {
         ctl.seek(to: range.lowerBound)
     }
 
-    func spanAction(_ action: String) throws -> TabState {
+    func spanAction(_ action: String, keepAnchor: Bool = false) throws -> TabState {
         _ = try require()
         switch action {
-        case "clear": clearSpan(); spanAnchor = nil
+        case "clear": clearSpan(); if !keepAnchor { spanAnchor = nil }
         case "apply": applySpanLoop()
         case "extendForward": extendSpan(forward: true)
         case "extendBack": extendSpan(forward: false)

@@ -132,6 +132,10 @@ final class ContractFixturesTabTests: XCTestCase {
             try rig.goldenFile("tab.edit.params.\(name).json", params)
             try rig.variant("tab.edit", name, r)
         }
+        // «Sin bucle» conservando el ancla, y cierre de avisos (después de las ediciones: dejan de ver el tramo).
+        try rig.goldenFile("tab.span.params.clearKeepAnchor.json", "{\"action\":\"clear\",\"keepAnchor\":true}")
+        try rig.variant("tab.span", "clearKeepAnchor", try await rig.call("tab.span", "{\"action\":\"clear\",\"keepAnchor\":true}"))
+        try await rig.run("tab.dismissNotices")
         // Batería: golpe.
         _ = try await rig.call("tab.selectTrack", "{\"track\":\"drums\"}")
         try rig.variant("tab.select", "drums", try await rig.call("tab.select", "{\"track\":\"drums\",\"beat\":5,\"tick\":0}"))
@@ -263,7 +267,19 @@ final class ContractFixturesTabTests: XCTestCase {
             open: true, stage: "choosing", query: "Banda · Tema", search: SongsterrSearchInfo(phase: "failed", issue: SongsterrIssueInfo(.offline)),
             results: [], selected: nil, loadingSongId: nil, detailIssue: nil, linkIssue: nil, busy: false, canUse: false,
             workingText: nil, failure: nil, pairing: nil)
-        try rig.goldenFile("tab.songsterr.state.result.failed.json", try Self.encode(failed))
+        try rig.goldenFile("tab.songsterr.state.result.searchFailed.json", try Self.encode(failed))
+
+        // Paso working (descarga de pistas) y paso failed (fallo de importación reintentable).
+        let working = SongsterrSheetState(
+            open: true, stage: "working", query: "Banda · Tema", search: SongsterrSearchInfo(phase: "results", issue: nil),
+            results: [], selected: nil, loadingSongId: nil, detailIssue: nil, linkIssue: nil, busy: false, canUse: true,
+            workingText: SongsterrSheet.downloadingText, failure: nil, pairing: nil)
+        try rig.goldenFile("tab.songsterr.state.result.working.json", try Self.encode(working))
+        let importFailed = SongsterrSheetState(
+            open: true, stage: "failed", query: "Banda · Tema", search: SongsterrSearchInfo(phase: "results", issue: nil),
+            results: [], selected: nil, loadingSongId: nil, detailIssue: nil, linkIssue: nil, busy: false, canUse: true,
+            workingText: nil, failure: SongsterrIssueInfo(.offline), pairing: nil)
+        try rig.goldenFile("tab.songsterr.state.result.failed.json", try Self.encode(importFailed))
 
         let choices = [SongsterrChoiceInfo(track: 0, name: "Rítmica", similarity: 0.82, label: "Rítmica (82 %)"),
                        SongsterrChoiceInfo(track: 1, name: "Solista", similarity: nil, label: "Solista")]
