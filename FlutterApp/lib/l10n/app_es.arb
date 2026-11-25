@@ -641,6 +641,10 @@
   "@settings_tools_update": {"description":"Ajustes Fuentes externas: botón actualizar."},
   "settings_tools_updated": "actualizada",
   "@settings_tools_updated": {"description":"Ajustes Fuentes externas: estado actualizada."},
+  "settings_tools_updateDone": "yt-dlp actualizado a {version}.",
+  "@settings_tools_updateDone": {"description":"Ajustes Fuentes externas: resultado de actualizar (AppModel.swift:677).","placeholders":{"version":{"type":"String"}}},
+  "settings_tools_upToDate": "Ya tienes la última versión ({version}).",
+  "@settings_tools_upToDate": {"description":"Ajustes Fuentes externas: ya estaba al día (AppModel.swift:678).","placeholders":{"version":{"type":"String"}}},
   "errorAnchor": "",
   "@errorAnchor": {
     "description": "Ancla del bloque error: añade las claves del área debajo, en orden alfabético; no edites otros bloques."

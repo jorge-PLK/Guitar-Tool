@@ -1994,6 +1994,18 @@ abstract class AppLocalizations {
   /// **'actualizada'**
   String get settings_tools_updated;
 
+  /// Ajustes Fuentes externas: resultado de actualizar (AppModel.swift:677).
+  ///
+  /// In es, this message translates to:
+  /// **'yt-dlp actualizado a {version}.'**
+  String settings_tools_updateDone(String version);
+
+  /// Ajustes Fuentes externas: ya estaba al día (AppModel.swift:678).
+  ///
+  /// In es, this message translates to:
+  /// **'Ya tienes la última versión ({version}).'**
+  String settings_tools_upToDate(String version);
+
   /// Ancla del bloque error: añade las claves del área debajo, en orden alfabético; no edites otros bloques.
   ///
   /// In es, this message translates to:

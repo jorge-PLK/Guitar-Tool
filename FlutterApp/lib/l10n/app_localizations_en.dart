@@ -1139,6 +1139,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settings_tools_updated => 'up to date';
 
   @override
+  String settings_tools_updateDone(String version) {
+    return 'yt-dlp updated to $version.';
+  }
+
+  @override
+  String settings_tools_upToDate(String version) {
+    return 'You already have the latest version ($version).';
+  }
+
+  @override
   String get errorAnchor => '';
 
   @override
