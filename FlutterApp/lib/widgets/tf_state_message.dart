@@ -5,11 +5,13 @@ import 'package:toneforge/theme/typography.dart';
 
 /// Estado vacío o aviso (VideoSettingsView.swift:310-316): icono 18 `muted` y texto body 12 `text2`
 /// centrado, separación 6, padding 8.
+/// [iconFilled] rellena el icono (SF Symbol `.fill`); por defecto false.
 class TfStateMessage extends StatelessWidget {
-  const TfStateMessage({super.key, required this.icon, required this.text});
+  const TfStateMessage({super.key, required this.icon, required this.text, this.iconFilled = false});
 
   final TfIcon icon;
   final String text;
+  final bool iconFilled;
 
   @override
   Widget build(BuildContext context) {
@@ -19,7 +21,7 @@ class TfStateMessage extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         spacing: TfSpace.s6,
         children: <Widget>[
-          TfIconView(icon, size: TfSize.navIcon, color: TfColors.muted),
+          TfIconView(icon, size: TfSize.navIcon, color: TfColors.muted, filled: iconFilled),
           Text(
             text,
             textAlign: TextAlign.center,

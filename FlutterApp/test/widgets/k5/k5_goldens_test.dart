@@ -176,6 +176,15 @@ void main() {
       await _golden('k5_state_message');
     });
 
+    testWidgets('estado vacío: iconFilled pasa filled al TfIconView', (tester) async {
+      await pumpK5(
+        tester,
+        const TfStateMessage(icon: TfIcon.musicNoteList, text: 'Aún no hay canciones.', iconFilled: true),
+        size: const Size(320, 120),
+      );
+      expect(tester.widget<TfIconView>(find.byType(TfIconView)).filled, isTrue);
+    });
+
     testWidgets('avisos accent y danger', (tester) async {
       await pumpK5(tester, _notices(), size: const Size(520, 160));
       await _golden('k5_notices');
