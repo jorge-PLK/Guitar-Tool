@@ -83,11 +83,13 @@ class TfDeviceCard extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.connected,
+    this.titleMaxLines = 1,
   });
 
   final String title;
   final String subtitle;
   final bool connected;
+  final int titleMaxLines;
 
   @override
   Widget build(BuildContext context) {
@@ -118,7 +120,7 @@ class TfDeviceCard extends StatelessWidget {
                   Expanded(
                     child: Text(
                       title,
-                      maxLines: 1,
+                      maxLines: titleMaxLines,
                       overflow: TextOverflow.ellipsis,
                       style: TfText.body(14, TfWeight.semibold).copyWith(color: TfColors.text),
                     ),
