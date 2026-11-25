@@ -86,6 +86,21 @@ struct StudyShownKey: Codable, Sendable, Equatable {
     var mode: String
 }
 
+/// Acorde tal como lo ve la interfaz (ya transpuesto): raíz 0-11 (C = 0) y calidad = posición en `study.chordVocabulary`.
+struct StudyShownChord: Codable, Sendable, Equatable {
+    var root: Int
+    var quality: Int
+}
+
+struct StudyChordQuality: Codable, Sendable { var suffix: String }
+
+/// `study.chordVocabulary`: `suffix` vacío = mayor (el texto lo pone la interfaz).
+struct StudyChordVocabulary: Codable, Sendable {
+    var roots: [String]
+    var qualities: [StudyChordQuality]
+    var noChordIndex: Int
+}
+
 struct StudyChord: Codable, Sendable {
     var start: Double
     var end: Double
@@ -94,6 +109,8 @@ struct StudyChord: Codable, Sendable {
     var name: String
     /// K8: nombre transpuesto según `transport.transpose` en el momento de emitirse («D» con +2 -> «E»).
     var display: String
+    /// Acorde mostrado como raíz/calidad (mismo transpose que `display`); null en «?» y «N».
+    var shown: StudyShownChord?
     /// K7: forma del acorde mostrado (`display`) con el capo del momento; ausente en «?» y «N».
     /// Como `display`, se queda vieja si cambian `transpose`/`capo` (`study.state`): pídela de nuevo con `study.chordShape`.
     var shape: StudyChordShape?

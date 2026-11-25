@@ -51,7 +51,12 @@ struct StudyAnalysisEvent: Codable, Sendable {
 /// `key` = tonalidad guardada («C:maj»; null = quitar la corrección). K8: `shown` = la tonalidad tal como la ve la interfaz
 /// (ya transpuesta); el núcleo deshace la transposición. Si vienen las dos, manda `shown`.
 struct StudySetKeyParams: Decodable, Sendable { var key: String?; var shown: StudyShownKey? }
-struct StudySetChordParams: Decodable, Sendable { var start: Double; var end: Double; var index: Int?; var label: String? }
+/// `shown` = el acorde tal como lo ve la interfaz (raíz 0-11, calidad 0-13, ya transpuesto); el núcleo deshace la
+/// transposición. Alternativa a `index`/`label` (solo uno de los tres).
+struct StudySetChordParams: Decodable, Sendable {
+    var start: Double; var end: Double; var index: Int?; var label: String?; var shown: StudyShownChordParams?
+}
+struct StudyShownChordParams: Decodable, Sendable { var root: Int; var quality: Int }
 struct StudyChordRangeParams: Decodable, Sendable { var start: Double; var end: Double }
 struct StudySplitChordParams: Decodable, Sendable { var at: Double }
 struct StudyMarkSectionParams: Decodable, Sendable { var start: Double; var end: Double; var solo: Bool?; var snap: String? }
@@ -130,6 +135,7 @@ extension StudyService {
             try await chordShape(p)
         }
         router.register("study.analyze") { [self] (_: Empty) -> StudyEditState in try await analyze() }
+        router.register("study.chordVocabulary") { (_: Empty) -> StudyChordVocabulary in StudyKitBridge.chordVocabulary() }
         router.register("study.setKey") { [self] (p: StudySetKeyParams) -> StudyEditState in try await setKey(p) }
         router.register("study.setChord") { [self] (p: StudySetChordParams) -> StudyEditState in try await setChord(p) }
         router.register("study.removeChordOverrides") { [self] (p: StudyChordRangeParams) -> StudyEditState in
@@ -255,6 +261,7 @@ extension StudyService {
         let chords = s.effectiveChords.map {
             StudyChord(start: $0.start, end: $0.end, index: $0.index, name: StudyKitBridge.chordName($0.index),
                        display: StudyKitBridge.shownChordName($0.index, transpose: transpose),
+                       shown: StudyKitBridge.shownChord($0.index, transpose: transpose),
                        shape: StudyKitBridge.shape(index: $0.index, transpose: transpose, capo: capo),
                        overridden: !detected.contains("\($0.start)|\($0.end)|\($0.index)"))
         }
@@ -469,24 +476,29 @@ extension StudyService {
     }
 
     func setChord(_ p: StudySetChordParams) async throws -> StudyEditState {
-        try await edit { s, _ in
+        try await edit { s, c in
             guard p.start.isFinite, p.end.isFinite, p.start >= 0, p.end > p.start else {
                 throw RPCError(code: "bad-params", message: "«start» y «end» deben ser tiempos con 0 <= start < end.")
             }
             let index: Int
-            switch (p.index, p.label) {
-            case let (i?, nil):
+            switch (p.index, p.label, p.shown) {
+            case let (nil, nil, sh?):
+                guard let i = StudyKitBridge.storedChordIndex(root: sh.root, quality: sh.quality, transpose: c.settings.transpose) else {
+                    throw RPCError(code: "bad-params", message: "«shown» fuera de rango (root 0...11, quality 0...13).")
+                }
+                index = i
+            case let (i?, nil, nil):
                 guard StudyEditsBridge.isValidChordIndex(i) else {
                     throw RPCError(code: "bad-params", message: "«index» fuera de 0...169: \(i)")
                 }
                 index = i
-            case let (nil, l?):
+            case let (nil, l?, nil):
                 guard let i = StudyEditsBridge.chordIndex(label: l) else {
                     throw RPCError(code: "bad-params", message: "«label» no se reconoce como acorde («C:min», «F#:7», «N»): \(l)")
                 }
                 index = i
             default:
-                throw RPCError(code: "bad-params", message: "Indica «index» o «label» (solo uno).")
+                throw RPCError(code: "bad-params", message: "Indica «index», «label» o «shown» (solo uno).")
             }
             s.setChord(start: p.start, end: p.end, index: index)
         }

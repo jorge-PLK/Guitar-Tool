@@ -102,6 +102,35 @@ final class StudyCoreDeviationsTests: XCTestCase {
         XCTAssertEqual(events.payloads("study.analysis").count, 1)
     }
 
+    /// Vocabulario de la hoja «Acorde» (sin tema abierto), `shown` en el análisis y `setChord {shown}` que destranspone.
+    func testChordVocabularyAndShownChord() async throws {
+        let rig = try FixtureRig(area: "study-core", services: JobServices(importer: EditsImporter(), separator: EditsSeparator(),
+                                                                          levelMeter: nil, analyzer: nil, guitarSplitter: nil))
+        defer { rig.cleanup() }
+        let v = try await result(rig, "study.chordVocabulary")
+        let roots = try XCTUnwrap(v["roots"] as? [String])
+        let qualities = try XCTUnwrap(v["qualities"] as? [[String: String]])
+        XCTAssertEqual(roots.count, 12)
+        XCTAssertEqual(roots[1], "C#")
+        XCTAssertEqual(qualities.count, 14)
+        XCTAssertEqual(qualities[1]["suffix"], "")
+        XCTAssertEqual(qualities[0]["suffix"], "m")
+        XCTAssertEqual(v["noChordIndex"] as? Int, ChordLabel.noChordIndex)
+
+        let p = try FixtureSeed.project(in: rig.projects)
+        _ = try await rig.call("study.open", "{\"projectId\":\"\(p.id.uuidString)\"}")
+        _ = try await result(rig, "study.setTranspose", "{\"semitones\":2}")
+        // Mostrado D mayor (+2) = C mayor guardado.
+        let set = try await result(rig, "study.setChord", "{\"start\":0,\"end\":2,\"shown\":{\"root\":2,\"quality\":1}}")
+        let chords = try XCTUnwrap((set["analysis"] as? [String: Any])?["chords"] as? [[String: Any]])
+        let first = try XCTUnwrap(chords.first)
+        XCTAssertEqual(first["index"] as? Int, ChordLabel(root: 0, quality: .maj).index)
+        XCTAssertEqual(first["display"] as? String, "D")
+        XCTAssertEqual(first["shown"] as? [String: Int], ["root": 2, "quality": 1])
+        let bad = try await rig.call("study.setChord", "{\"start\":0,\"end\":2,\"shown\":{\"root\":12,\"quality\":1}}")
+        XCTAssertEqual((bad["error"] as? [String: Any])?["code"] as? String, "bad-params")
+    }
+
     /// K8: «D» con +2 sale «E»; `name` sigue sin transponer.
     func testTransposedChordNameAndKey() async throws {
         let rig = try await open()

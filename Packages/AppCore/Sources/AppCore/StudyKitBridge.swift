@@ -94,6 +94,27 @@ enum StudyKitBridge {
         (ChordLabel(index: index) ?? .unknown).transposed(by: transpose).index
     }
 
+    /// Acorde mostrado (transpuesto) como raíz 0-11 y calidad 0-13; nil para «?» y «N».
+    static func shownChord(_ index: Int, transpose: Int) -> StudyShownChord? {
+        let t = (ChordLabel(index: index) ?? .unknown).transposed(by: transpose)
+        guard let r = t.root, let q = t.quality else { return nil }
+        return StudyShownChord(root: r, quality: q.rawValue)
+    }
+
+    /// Camino inverso: el acorde que ve la interfaz (raíz, calidad) -> índice guardado; nil si está fuera de rango.
+    static func storedChordIndex(root: Int, quality: Int, transpose: Int) -> Int? {
+        guard (0..<12).contains(root), let q = ChordQuality(rawValue: quality) else { return nil }
+        return ChordLabel(root: root, quality: q).transposed(by: -transpose).index
+    }
+
+    /// Vocabulario que pinta la hoja «Acorde»: 12 raíces (nombres de `ChordLabel`) y 14 sufijos en orden de índice.
+    static func chordVocabulary() -> StudyChordVocabulary {
+        StudyChordVocabulary(
+            roots: (0..<12).map { ChordLabel(root: $0, quality: .maj).name },
+            qualities: ChordQuality.allCases.map { StudyChordQuality(suffix: $0.suffix) },
+            noChordIndex: ChordLabel.noChordIndex)
+    }
+
     /// K7: forma del acorde mostrado (transpuesto) con capo `capo`, igual que `ChordShapes.shape(for:capo:)` en el Mac.
     /// nil para «?» y «N».
     static func shape(index: Int, transpose: Int, capo: Int) -> StudyChordShape? {

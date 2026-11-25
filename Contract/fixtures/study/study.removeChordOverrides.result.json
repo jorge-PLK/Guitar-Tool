@@ -35,24 +35,32 @@
             3
           ]
         },
+        "shown" : {
+          "quality" : 0,
+          "root" : 10
+        },
         "start" : 0
       },
       {
-        "display" : "A#7",
+        "display" : "C",
         "end" : 4,
-        "index" : 9,
-        "name" : "C7",
+        "index" : 29,
+        "name" : "D",
         "overridden" : true,
         "shape" : {
           "baseFret" : 1,
           "frets" : [
-            3,
+            null,
+            0,
             2,
-            0,
-            0,
-            0,
-            1
+            2,
+            2,
+            0
           ]
+        },
+        "shown" : {
+          "quality" : 1,
+          "root" : 0
         },
         "start" : 2
       }
@@ -77,6 +85,11 @@
     {
       "end" : 4,
       "index" : 9,
+      "start" : 2
+    },
+    {
+      "end" : 4,
+      "index" : 29,
       "start" : 2
     },
     {

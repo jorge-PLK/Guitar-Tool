@@ -172,7 +172,14 @@ final class ContractFixturesStudyTests: XCTestCase {
             try rig.goldenFile("study.chordShape.params.capo0.json", params)
             try rig.variant("study.chordShape", "capo0", try await rig.call("study.chordShape", params))
         }
+        // Vocabulario de la hoja «Acorde» (no exige tema abierto) y `shown` (con transpose -2: «C mayor» visto = D mayor guardado).
+        try await rig.run("study.chordVocabulary")
         try await rig.run("study.setChord", params: "{\"start\":2,\"end\":4,\"index\":9}")
+        do {
+            let params = "{\"start\":2,\"end\":4,\"shown\":{\"root\":0,\"quality\":1}}"
+            try rig.goldenFile("study.setChord.params.shown.json", params)
+            try rig.variant("study.setChord", "shown", try await rig.call("study.setChord", params))
+        }
         try await rig.run("study.splitChord", params: "{\"at\":1}")
         try await rig.run("study.removeChordOverrides", params: "{\"start\":0,\"end\":1}")
         try await rig.run("study.clearChordOverrides")
