@@ -373,3 +373,8 @@ abstract final class TfSize {
   static const double font10 = 10;
   static const double font20 = 20;
 }
+
+/// Duración de Expandir/Plegar: `withAnimation(.easeInOut(duration: 0.15))` (BackingTimeline.swift:104).
+abstract final class TfMotion {
+  static const Duration expand = Duration(milliseconds: 150);
+}
