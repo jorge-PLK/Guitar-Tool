@@ -9,8 +9,8 @@ import 'package:toneforge/features/tab/tab_track_strip.dart';
 import 'package:toneforge/theme/tokens.dart';
 import 'package:toneforge/widgets/tf_card.dart';
 
-/// Alto mínimo de la zona del lienzo (`TabScreen.swift:191-198`); sin token en `theme/`.
-const double tabStageMinHeight = 320;
+/// Alto mínimo de la zona del lienzo (`TabScreen.swift:191-198`). Alias del token para los tests.
+const double tabStageMinHeight = TfSize.tabStageMinHeight;
 
 /// Tarjeta de tablatura (`TabScreen.swift:185-203`): selector Oír, pastillas, controles de
 /// pista, zona del lienzo (`stage`, la pone la pantalla) y pie.

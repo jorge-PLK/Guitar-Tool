@@ -7,8 +7,6 @@ import 'package:toneforge/widgets/tf_dropdown.dart';
 
 // TOKEN: alto de fila 44 (TSS:298)
 const double _rowHeight = 44;
-// TOKEN: ancho del nombre del slot 150 (TSS:298-319)
-const double _nameWidth = 150;
 // TOKEN: ancho del desplegable de slot 260 (TSS:298-319)
 const double _slotDropdown = 260;
 // TOKEN: ancho del desplegable de solo 200 (TSS:270-294)
@@ -67,7 +65,7 @@ class SongsterrPairingRow extends StatelessWidget {
         spacing: TfSpace.s10,
         children: <Widget>[
           SizedBox(
-            width: _nameWidth,
+            width: TfSize.tabNameWidth,
             child: name == null
                 ? null
                 : Text(name!,

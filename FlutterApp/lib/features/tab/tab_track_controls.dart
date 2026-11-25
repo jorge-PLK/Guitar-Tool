@@ -9,9 +9,6 @@ import 'package:toneforge/widgets/tf_checkbox.dart';
 import 'package:toneforge/widgets/tf_dropdown.dart';
 import 'package:toneforge/widgets/tf_progress.dart';
 
-/// Ancho del desplegable de afinación (`TabScreen.swift:306`); sin token en `theme/`.
-const double tabTuningWidth = 170;
-
 /// Controles de la pista seleccionada (`TabScreen.swift:294-319`).
 class TabTrackControls extends ConsumerWidget {
   const TabTrackControls({super.key, required this.track});
@@ -38,7 +35,7 @@ class TabTrackControls extends ConsumerWidget {
               children: <Widget>[
                 Text(l.tab_tuning, style: muted, maxLines: 1),
                 TfDropdown<TabTuningPreset>(
-                  width: tabTuningWidth,
+                  width: TfSize.tabTuningWidth,
                   value: tuning.preset,
                   items: <TfDropdownItem<TabTuningPreset>>[
                     TfDropdownItem(value: TabTuningPreset.standard, label: l.tab_tuningStandard),

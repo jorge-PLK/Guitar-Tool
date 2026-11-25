@@ -11,10 +11,6 @@ import 'package:toneforge/theme/typography.dart';
 import 'package:toneforge/widgets/tf_accent_bar.dart';
 import 'package:toneforge/widgets/tf_buttons.dart';
 
-// Medidas de la ficha (2.4) sin token propio: nombre de pista y barra de progreso.
-const double _nameWidth = 150;
-const double _barWidth = 220;
-
 /// Mensajes de fase sobre el lienzo (`TabScreen.swift:321-362`). Cubre el rectángulo del lienzo.
 class TabPhaseOverlay extends ConsumerWidget {
   const TabPhaseOverlay({super.key, this.webError});
@@ -61,12 +57,12 @@ class TabPhaseOverlay extends ConsumerWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
                   SizedBox(
-                    width: _nameWidth,
+                    width: TfSize.tabNameWidth,
                     child: Text(t.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: _body(TfColors.text)),
                   ),
                   const SizedBox(width: TfSpace.s12),
                   SizedBox(
-                    width: _barWidth,
+                    width: TfSize.tabPhaseBarWidth,
                     child: TfAccentBar(value: store.progress[t.id]?.fraction ?? t.progress),
                   ),
                 ],

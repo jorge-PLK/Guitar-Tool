@@ -6,9 +6,6 @@ import 'package:toneforge/l10n/app_localizations.dart';
 import 'package:toneforge/theme/tokens.dart';
 import 'package:toneforge/theme/typography.dart';
 
-/// Alto fijo del pie (`TabScreen.swift:374-384`); sin token en `theme/`.
-const double tabFooterHeight = 18;
-
 /// Pie de estado: `flash` (accent) > resumen de selección > texto fijo según la fuente (muted).
 class TabFooter extends ConsumerWidget {
   const TabFooter({super.key});
@@ -26,7 +23,7 @@ class TabFooter extends ConsumerWidget {
             ? summary
             : (tab?.source == TabSource.songsterr ? l.tab_footerSongsterr : l.tab_footerAutomatic);
     return SizedBox(
-      height: tabFooterHeight,
+      height: TfSize.tabFooterHeight,
       child: Text(
         text,
         maxLines: 1,

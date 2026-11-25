@@ -11,13 +11,6 @@ import 'package:toneforge/theme/typography.dart';
 import 'package:toneforge/widgets/tf_checkbox.dart';
 import 'package:toneforge/widgets/tf_slider.dart';
 
-// Medidas de TabScreen.swift (transporte) sin token propio.
-const double _playSize = 52;
-const double _playIcon = 20;
-const double _rewindIcon = 15;
-const double _tempoSliderWidth = 120;
-const double _tempoValueWidth = 54;
-
 const List<FontFeature> _tabular = <FontFeature>[FontFeature.tabularFigures()];
 
 /// Transporte de Tablatura: inicio, play/pausa, reloj, tempo, metrónomo y menú de bucle.
@@ -37,7 +30,7 @@ class TabTransport extends ConsumerWidget {
     return DefaultTextStyle(
       style: TfText.body(TfSize.font13).copyWith(color: TfColors.text2),
       child: Row(
-        spacing: TfSpace.s14,
+        spacing: TfSize.transportFlowSpacing,
         children: <Widget>[
           _Rewind(label: l.tab_a11yRewind, onTap: () => store.seek(0)),
           const _PlayButton(),
@@ -48,11 +41,11 @@ class TabTransport extends ConsumerWidget {
             min: 50,
             max: 200,
             step: 5,
-            width: _tempoSliderWidth,
+            width: TfSize.transportTempoSlider,
             onChanged: (double v) => store.setRate(v / 100),
           ),
           SizedBox(
-            width: _tempoValueWidth,
+            width: TfSize.transportTempoValue,
             child: Text(
               TfFmt.percent(rate),
               style: TfText.body(TfSize.font13, TfWeight.semibold)
@@ -98,7 +91,7 @@ class _Rewind extends StatelessWidget {
               shape: BoxShape.circle,
               border: Border.all(color: TfColors.fieldLine, width: TfStroke.hairline),
             ),
-            child: const TfIconView(TfIcon.backwardEndFill, size: _rewindIcon, color: TfColors.text),
+            child: const TfIconView(TfIcon.backwardEndFill, size: TfSize.transportRewindIcon, color: TfColors.text),
           ),
         ),
       ),
@@ -124,13 +117,13 @@ class _PlayButton extends ConsumerWidget {
           behavior: HitTestBehavior.opaque,
           onTap: playing ? store.pause : store.play,
           child: Container(
-            width: _playSize,
-            height: _playSize,
+            width: TfSize.transportPlay,
+            height: TfSize.transportPlay,
             alignment: Alignment.center,
             decoration: const BoxDecoration(color: TfColors.accent, shape: BoxShape.circle),
             child: TfIconView(
               playing ? TfIcon.pauseFill : TfIcon.playFill,
-              size: _playIcon,
+              size: TfSize.transportPlayIcon,
               color: TfColors.accentInk,
             ),
           ),

@@ -7,9 +7,6 @@ import 'package:toneforge/theme/tokens.dart';
 import 'package:toneforge/theme/typography.dart';
 import 'package:toneforge/widgets/tf_progress.dart';
 
-/// Alto de las cápsulas Stems/Transcripción (`TabScreen.swift:263`); sin token en `theme/`.
-const double tabListenOptionHeight = 30;
-
 /// Progreso de síntesis derivado de las pistas (el DTO no trae `synthProgress`):
 /// `null` si ninguna se está renderizando.
 ({int done, int total})? tabSynthProgress(TabState? tab) {
@@ -90,7 +87,7 @@ class _Option extends StatelessWidget {
               ),
             ),
             child: SizedBox(
-              height: tabListenOptionHeight,
+              height: TfSize.tabListenOptionHeight,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: TfSpace.s14),
                 child: Center(
