@@ -1,6 +1,6 @@
 # ToneForge · Mapa del código
 
-Última actualización: 2026-11-24 · Fase 7c cerrada (ADR-022): `VideoConversion` HEVC→H.264 y evento `takeview.video`, ONNX de BS y guitarras con GLU→Slice (T575 desactivado), ADTOF en CPU, `validCalibration`, `captureDiscontinuity` con `TakeRecorder.filledGaps` y `CoreLog`/`AudioKitLog`.
+Última actualización: 2026-11-25 · Fase 7f, ola 2 (ADR-021): Backing y Tablatura en Flutter (`FlutterApp/lib/features/backing`, `features/tab`) y desvíos de núcleo K2, K3, K7, K8, K12, TB10, `study.chordVocabulary`, `tab.dismissNotices`.
 
 Una sección por paquete (nombres de `docs/plan.md`, «Forma de trabajo»), más la app, las pruebas y las herramientas. Fila por fichero: `| Fichero | qué hace (ADR-NNN): APIs públicas |`. Cada paquete tiene su ficha en `docs/codemap/`; se lee solo la del paquete que se toca.
 

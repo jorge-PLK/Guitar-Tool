@@ -45,13 +45,13 @@ Vienen del apartado 9 de las fichas de `pantallas/`. La clase sigue [decisiones-
 | L7 | Biblioteca | Búsqueda, agrupación por artista y plegado; agrupación en preferencias locales; paridad de plegado y orden con `LibraryGrouping` | interfaz en Dart | 1 | b:7 |
 | L11 | Biblioteca | Carátulas y fotos: se leen por ruta de fichero (`Image.file`), no por `mediaBase` (antes «decisión de Jorge») | interfaz en Dart (resuelto) | 1 | b:11 |
 | L12 | Biblioteca | Importar: filtrar `wav`/`flac`/`mp3` antes de llamar a `import.file` | interfaz en Dart | 1 | b:12 |
-| K2 | Backing | Imán de bordes de sección a acorde y ⌥ a compás: `previewSectionEdge` y `updateSection` deben dar el resultado de `SectionEdgeDrag`; test que lo compare | hueco claro | 2 | k:D-2 |
-| K3 | Backing | Bucle por arrastre con ajuste a acorde o compás: falta `snap` en `study.setLoop`; test de paridad | hueco claro | 2 | k:D-3 |
+| K2 | Backing | Imán de bordes de sección a acorde y ⌥ a compás: hecho, ola 2. `study.previewSectionEdge {id,start,to,snap?: none\|chord\|bar}` calcula en el núcleo; `study.updateSection` con `snap` usa la regla `SectionEdgeDrag` | hueco claro (resuelto) | 2 | k:D-2 |
+| K3 | Backing | Bucle por arrastre con ajuste a acorde o compás: hecho, ola 2. `study.setLoop {start,end,name?,snap?}` ajusta en el núcleo; Flutter manda `name` desde ARB | hueco claro (resuelto) | 2 | k:D-3 |
 | K4 | Backing | Monitores de teclado (Espacio, Supr, Esc, ⌥) | interfaz en Dart | 2 | k:D-4 |
-| K7 | Backing | Formas de acorde con capo: falta método (`ChordShapes`) | hueco claro | 2 | k:D-7 |
-| K8 | Backing | Nombre de acorde transpuesto y tonalidad mostrada: el puente da el nombre sin transponer | hueco claro | 2 | k:D-8 |
+| K7 | Backing | Formas de acorde con capo: hecho, ola 2. `study.chordShape {index,capo?}` → `{index,display,capo,shape{frets,baseFret,barre?}}` | hueco claro (resuelto) | 2 | k:D-7 |
+| K8 | Backing | Nombre transpuesto y tonalidad mostrada: hecho, ola 2. `analysis.chords[].display/shape`, `analysis.key.display {tonic,mode}`; `study.setKey {shown:{tonic,mode}}` (el núcleo destranspone); `study.analysis` se reemite tras `setTranspose`, `setCapo` y `setKey` | hueco claro (resuelto) | 2 | k:D-8 |
 | K9 | Backing | «Sin guitarras» como N `study.setMix`; solo si `kind == "guitar"` | interfaz en Dart | 2 | k:D-9 |
-| K12 | Backing | `study.error` declarado y nunca emitido: emitirlo o quitarlo del DTO y del cliente | hueco claro | 2 | k:D-12 |
+| K12 | Backing | `study.error` eliminado, hecho en la ola 2: los errores van por respuesta | hueco claro (resuelto) | 2 | k:D-12 |
 | TB1 | Tablatura | Errores de alphaTab (`webError`): aviso de la pantalla con mensaje genérico y detalle | interfaz en Dart | 2 | t:D1 |
 | TB2 | Tablatura | Rehacer: Ctrl+Y además de Ctrl+⇧+Z en Windows; ⇧⌘Z en Mac | interfaz en Dart | 2 | t:D2 |
 | TB3 | Tablatura | Cursor: `study.position` (30 Hz) interpolado en un `Ticker`; sin temporizador propio | interfaz en Dart | 2 | t:D3 |
@@ -60,8 +60,13 @@ Vienen del apartado 9 de las fichas de `pantallas/`. La clase sigue [decisiones-
 | TB6 | Tablatura | Exportar `.gp`: Dart abre el diálogo (`file_selector`) y pasa `path` a `tab.export` (antes «decisión de Jorge») | interfaz en Dart (resuelto) | 2 | t:D6 |
 | TB7 | Tablatura | Songsterr oculto: sondeo, tope y serialización de cargas los ejecuta el anfitrión; comprobar que el de Flutter cumple los puntos 1-6 del contrato | se mide (requisito de anfitrión) | 2 | t:D7 |
 | TB9 | Tablatura | Eventos del lienzo reenviados a `tab.*` con coalescencia en cliente | interfaz en Dart | 2 | t:D9 |
-| TB10 | Tablatura | `tab.open`, `tab.songsterr.accept` y `tab.songsterr.automatic` deben arrancar la cola de transcripción | hueco claro | 2 | t:D10 |
+| TB10 | Tablatura | Hecho, ola 2: `tab.open`, `tab.songsterr.accept`, `tab.songsterr.automatic` y `tab.songsterr.setSource` arrancan o reabren la cola de transcripción en el núcleo | hueco claro (resuelto) | 2 | t:D10 |
 | TB11 | Tablatura | La hoja de Songsterr se cierra en el cliente tras `accept` y `automatic` | interfaz en Dart | 2 | t:D11 |
+| K-SL | Backing | Marca del bucle del tramo: `StudyLoop.span` (bool) en el snapshot; hecho, ola 2 | hueco claro (resuelto) | 2 | k |
+| K-TB | Tablatura | `hasNote` en la selección de tablatura y piezas de batería `kick`/`snare`/`hiHat`/`openHiHat`/`tom`/`crash`; hecho, ola 2 | hueco claro (resuelto) | 2 | t |
+| K-TAB | Tablatura | `tab.dismissNotices {}` (Dart ya no oculta avisos por texto) y `tab.span {action:clear, keepAnchor:true}`; fixtures Songsterr `working`, `failed` y `searchFailed`; hecho, ola 2 | hueco claro (resuelto) | 2 | t |
+| K-CH | Backing | `study.chordVocabulary` (raíces y calidades mostradas, transpuestas), `analysis.chords[].shown`; `study.setChord` acepta `shown:{root,quality}` y destranspone; hecho, ola 2 | hueco claro (resuelto) | 2 | k |
+| K-TS | Tablatura | Cabecera y resumen de selección por código: `header {code: meterBpm\|meter, bar, bpm}`, `selection.summary {code: note\|noNote\|drums\|drumsNoHits, bar, beat, string, fret, pieces[]}`; hecho, ola 2 | hueco claro (resuelto) | 2 | t |
 | GR1 | Grabar | `record.setPunch {enabled:true}` debe elegir la mejor toma si no hay toma elegida | hueco claro | 3 | g:G1 |
 | GR2 | Grabar | Nivel de guitarra: Dart lo lee de `audio.levels` y llama a `audio.setMeters` al entrar y salir | interfaz en Dart | 3 | g:G2 |
 | GR5 | Grabar, visor | Reproductor de vídeo de Flutter en Windows: HEVC y `playbackRate` fino; mensaje de HEVC en Dart | se mide (P9) | 3 | g:G5 |
@@ -85,6 +90,11 @@ Vienen del apartado 9 de las fichas de `pantallas/`. La clase sigue [decisiones-
 | AJ8 | Ajustes · Audio | Tarjeta de salida de la barra lateral deducida de `audio.settings` y `audio.devices` (la implementa la carcasa) | interfaz en Dart | 3 | a:8 |
 | FC1 | Grabar, Montaje | `FrameChannel` no da el tamaño del fotograma ni avisa del cambio de `textureId`; `TfVideoSurface` recibe `frameSize` por parámetro | hueco claro | 3, 4 | resolver en Grabar B (ola 3) y Montaje P2 (ola 4) |
 | AJ9 | Ajustes · Vídeo | Texto del botón de permisos de cámara en Windows: variante por plataforma en ARB (por analogía con «Finder»/«Explorador»; no lo cita `decisiones-interfaz.md`) | interfaz en Dart | 3 | a:9 |
+
+Pendiente (menor, sin hacer):
+
+- El user agent de Songsterr está duplicado en Dart (`songsterrPreviewUserAgent`); podría exponerlo el núcleo.
+- Avisos, flash y `tab.error` por código (ola 5).
 
 Descartados (sin trabajo, constan por si se vuelve a preguntar):
 
