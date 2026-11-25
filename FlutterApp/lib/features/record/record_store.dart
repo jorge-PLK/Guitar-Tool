@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui' show Size;
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:toneforge/contract/audio.dart';
 import 'package:toneforge/contract/core_message.dart';
@@ -134,13 +135,14 @@ class RecordStore extends Notifier<RecordState> {
   @override
   RecordState build() {
     final subs = <StreamSubscription<Object?>>[
-      _core.on('record.state', RecordSnapshot.fromJson).listen(applySnapshot),
+      // Un evento mal formado se registra y se ignora: no mata el stream ni queda sin capturar.
+      _core.on('record.state', RecordSnapshot.fromJson).listen(applySnapshot, onError: _badEvent('record.state')),
       _core.on('record.position', RecordPositionEvent.fromJson).listen((e) {
         if (state.opened) state = state.copyWith(position: e.seconds);
-      }),
+      }, onError: _badEvent('record.position')),
       _core.on('audio.state', AudioState.fromJson).listen((a) {
         if (state.opened) state = state.copyWith(calibrationValid: a.calibrationValid);
-      }),
+      }, onError: _badEvent('audio.state')),
     ];
     final poller = _poller = CameraPoller(_pollCamera);
     // Como SwiftUI (RecordController.swift:483): siempre en reposo y con sesión abierta; el núcleo decide qué hacer.
@@ -162,9 +164,21 @@ class RecordStore extends Notifier<RecordState> {
 
   CameraPoller? _poller;
 
+  void Function(Object, StackTrace) _badEvent(String name) =>
+      (Object e, StackTrace st) => debugPrint('Evento $name ignorado (mal formado): $e');
+
+  /// Error de decodificación (no `CoreError`) como error del núcleo `internal`.
+  CoreError _asCoreError(Object e) => e is CoreError ? e : CoreError('internal', '$e');
+
   Future<void> _pollCamera() async {
-    final s = await _core.call('record.pollCamera', const RecordEmptyParams().toJson(), RecordSnapshot.fromJson);
-    if (ref.mounted) applySnapshot(s);
+    try {
+      final s = await _core.call('record.pollCamera', const RecordEmptyParams().toJson(), RecordSnapshot.fromJson);
+      if (ref.mounted) applySnapshot(s);
+    } on CoreError {
+      rethrow;
+    } catch (e) {
+      debugPrint('record.pollCamera ignorado (respuesta mal formada): $e');
+    }
   }
 
   /// Aplica un snapshot (evento o respuesta). Lo usa también `MixerStore`. Ignorado si Grabar no está abierta.
@@ -186,8 +200,9 @@ class RecordStore extends Notifier<RecordState> {
       final s = await _core.call('record.open', RecordOpenParams(projectId: projectId).toJson(), RecordSnapshot.fromJson);
       if (!ref.mounted) return;
       state = RecordState(snapshot: s, opened: true, position: s.position, calibrationValid: state.calibrationValid, guitarIn: state.guitarIn);
-    } on CoreError catch (e) {
-      if (ref.mounted) state = state.copyWith(error: e);
+    } catch (e) {
+      // CoreError o fallo de decodificación: estado de error, nunca el spinner eterno.
+      if (ref.mounted) state = state.copyWith(error: _asCoreError(e));
       return;
     }
     Future<void> settings() async {
@@ -243,8 +258,9 @@ class RecordStore extends Notifier<RecordState> {
       if (!ref.mounted) return false;
       state = state.copyWith(snapshot: s, error: null);
       return true;
-    } on CoreError catch (e) {
-      if (ref.mounted) state = state.copyWith(error: e.code == 'not-open' ? null : e);
+    } catch (e) {
+      final err = _asCoreError(e);
+      if (ref.mounted) state = state.copyWith(error: err.code == 'not-open' ? null : err);
       return false;
     }
   }

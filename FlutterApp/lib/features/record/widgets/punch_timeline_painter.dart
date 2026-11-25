@@ -74,7 +74,7 @@ class PunchTimelinePainter extends CustomPainter {
       );
 
   void _section(Canvas canvas, RecordSection s, double w) {
-    final color = TfColors.sectionPalette[s.paletteIndex % TfColors.sectionPalette.length];
+    final color = TfColors.sectionPalette[(s.paletteIndex ?? 0) % TfColors.sectionPalette.length];
     final left = _x(s.start, w);
     final rect = Rect.fromLTWH(left, _sectionInset, math.max(_x(s.end, w) - left, 2), _sectionHeight);
     canvas.drawRRect(

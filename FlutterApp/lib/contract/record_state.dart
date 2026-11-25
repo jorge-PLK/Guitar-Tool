@@ -33,11 +33,11 @@ class RecordAudio {
 class RecordCamera {
   const RecordCamera({
     required this.cameras,
-    required this.chosenId,
-    required this.defaultOffsetMs,
-    required this.name,
     required this.rotation,
     required this.state,
+    this.chosenId,
+    this.defaultOffsetMs,
+    this.name,
     this.width,
     this.height,
     this.fps,
@@ -46,36 +46,36 @@ class RecordCamera {
   });
   factory RecordCamera.fromJson(Json j) => RecordCamera(
         cameras: [for (final c in j['cameras'] as List) RecordCameraOption.fromJson(c as Json)],
-        chosenId: j['chosenId'] as String,
-        defaultOffsetMs: j['defaultOffsetMs'] as int,
-        name: j['name'] as String,
+        chosenId: j['chosenId'] as String?,
+        defaultOffsetMs: j['defaultOffsetMs'] as num?,
+        name: j['name'] as String?,
         rotation: j['rotation'] as int,
         state: enumOf(CameraState.values, CameraState.unknown, j['state']),
         width: j['width'] as int?,
         height: j['height'] as int?,
-        fps: j['fps'] as int?,
+        fps: j['fps'] as num?,
         label: j['label'] as String?,
         message: j['message'] as String?,
       );
   final List<RecordCameraOption> cameras;
-  final String chosenId;
-  final int defaultOffsetMs;
-  final String name;
+  // Swift RecordCameraInfo: chosenId, defaultOffsetMs, name, width, height, fps, label, message son opcionales.
+  final String? chosenId;
+  final num? defaultOffsetMs;
+  final String? name;
   final int rotation;
   final CameraState state;
-  // Ausentes en denied, failed y none (fixtures).
   final int? width;
   final int? height;
-  final int? fps;
+  final num? fps;
   final String? label;
   final String? message;
   Json toJson() => {
         'cameras': [for (final c in cameras) c.toJson()],
-        'chosenId': chosenId,
-        'defaultOffsetMs': defaultOffsetMs,
-        'name': name,
         'rotation': rotation,
         'state': state.name,
+        if (chosenId != null) 'chosenId': chosenId,
+        if (defaultOffsetMs != null) 'defaultOffsetMs': defaultOffsetMs,
+        if (name != null) 'name': name,
         if (width != null) 'width': width,
         if (height != null) 'height': height,
         if (fps != null) 'fps': fps,
@@ -203,13 +203,13 @@ class RecordVideoFormat {
   factory RecordVideoFormat.fromJson(Json j) => RecordVideoFormat(
         cameraId: j['cameraId'] as String,
         cameraName: j['cameraName'] as String,
-        fps: j['fps'] as int,
+        fps: j['fps'] as num,
         height: j['height'] as int,
         width: j['width'] as int,
       );
   final String cameraId;
   final String cameraName;
-  final int fps;
+  final num fps;
   final int height;
   final int width;
   Json toJson() => {'cameraId': cameraId, 'cameraName': cameraName, 'fps': fps, 'height': height, 'width': width};
@@ -248,7 +248,7 @@ class RecordTake {
         durationSeconds: (j['durationSeconds'] as num?)?.toDouble(),
         songStart: (j['songStart'] as num?)?.toDouble(),
         videoFormat: j['videoFormat'] == null ? null : RecordVideoFormat.fromJson(j['videoFormat'] as Json),
-        videoOffsetMs: j['videoOffsetMs'] as int?,
+        videoOffsetMs: j['videoOffsetMs'] as num?,
         videoPath: j['videoPath'] as String?,
       );
   final bool best;
@@ -265,7 +265,7 @@ class RecordTake {
   final double? songStart;
   // Ausentes en tomas sin vídeo.
   final RecordVideoFormat? videoFormat;
-  final int? videoOffsetMs;
+  final num? videoOffsetMs;
   final String? videoPath;
   Json toJson() => {
         'best': best,
@@ -340,22 +340,30 @@ class RecordPart {
 
 @immutable
 class RecordSection {
-  const RecordSection({required this.id, required this.name, required this.paletteIndex, required this.solo, required this.start, required this.end});
+  const RecordSection({required this.id, required this.name, required this.solo, required this.start, required this.end, this.paletteIndex});
   factory RecordSection.fromJson(Json j) => RecordSection(
         id: j['id'] as String,
         name: j['name'] as String,
-        paletteIndex: j['paletteIndex'] as int,
+        paletteIndex: j['paletteIndex'] as int?,
         solo: j['solo'] as bool,
         start: j['start'] as num,
         end: j['end'] as num,
       );
   final String id;
   final String name;
-  final int paletteIndex;
+  /// Swift StudySectionInfo.paletteIndex es `Int?` (ausente en secciones solo): la vista usa `?? 0`.
+  final int? paletteIndex;
   final bool solo;
   final num start;
   final num end;
-  Json toJson() => {'end': end, 'id': id, 'name': name, 'paletteIndex': paletteIndex, 'solo': solo, 'start': start};
+  Json toJson() => {
+        'end': end,
+        'id': id,
+        'name': name,
+        if (paletteIndex != null) 'paletteIndex': paletteIndex,
+        'solo': solo,
+        'start': start,
+      };
 }
 
 @immutable
@@ -403,33 +411,34 @@ class RecordOffset {
         audioPath: j['audioPath'] as String,
         cameraId: j['cameraId'] as String,
         cameraName: j['cameraName'] as String,
-        fps: j['fps'] as int,
+        fps: j['fps'] as num,
         frameMs: j['frameMs'] as num,
-        initialMs: j['initialMs'] as int,
+        initialMs: j['initialMs'] as num,
         isNew: j['isNew'] as bool,
-        maxMs: j['maxMs'] as int,
-        minMs: j['minMs'] as int,
+        maxMs: j['maxMs'] as num,
+        minMs: j['minMs'] as num,
         punches: [for (final p in j['punches'] as List) RecordPunchTake.fromJson(p as Json)],
         rotation: j['rotation'] as int,
         songStart: j['songStart'] as num,
         takeId: j['takeId'] as String,
-        valueMs: j['valueMs'] as int,
+        valueMs: j['valueMs'] as num,
         videoPath: j['videoPath'] as String,
       );
+  // Swift RecordOffsetInfo: fps, initialMs, valueMs, minMs, maxMs, frameMs, songStart son Double.
   final String audioPath;
   final String cameraId;
   final String cameraName;
-  final int fps;
+  final num fps;
   final num frameMs;
-  final int initialMs;
+  final num initialMs;
   final bool isNew;
-  final int maxMs;
-  final int minMs;
+  final num maxMs;
+  final num minMs;
   final List<RecordPunchTake> punches;
   final int rotation;
   final num songStart;
   final String takeId;
-  final int valueMs;
+  final num valueMs;
   final String videoPath;
   Json toJson() => {
         'audioPath': audioPath,
@@ -454,7 +463,6 @@ class RecordOffset {
 @immutable
 class RecordSnapshot {
   const RecordSnapshot({
-    required this.activePartId,
     required this.audio,
     required this.barSeconds,
     required this.beatsPerBar,
@@ -478,6 +486,7 @@ class RecordSnapshot {
     required this.sections,
     required this.startTime,
     required this.title,
+    this.activePartId,
     this.block,
     this.blockReason,
     this.countBeat,
@@ -489,7 +498,7 @@ class RecordSnapshot {
     this.takeSaveError,
   });
   factory RecordSnapshot.fromJson(Json j) => RecordSnapshot(
-        activePartId: j['activePartId'] as String,
+        activePartId: j['activePartId'] as String?,
         audio: RecordAudio.fromJson(j['audio'] as Json),
         barSeconds: j['barSeconds'] as num,
         beatsPerBar: j['beatsPerBar'] as int,
@@ -523,7 +532,7 @@ class RecordSnapshot {
         startSectionId: j['startSectionId'] as String?,
         takeSaveError: j['takeSaveError'] as String?,
       );
-  final String activePartId;
+  final String? activePartId; // Swift RecordSnapshot.activePartId `String?`
   final RecordAudio audio;
   final num barSeconds;
   final int beatsPerBar;
@@ -557,7 +566,6 @@ class RecordSnapshot {
   final String? startSectionId;
   final String? takeSaveError;
   Json toJson() => {
-        'activePartId': activePartId,
         'audio': audio.toJson(),
         'barSeconds': barSeconds,
         'beatsPerBar': beatsPerBar,
@@ -581,6 +589,7 @@ class RecordSnapshot {
         'sections': [for (final s in sections) s.toJson()],
         'startTime': startTime,
         'title': title,
+        if (activePartId != null) 'activePartId': activePartId,
         if (block != null) 'block': block!.toJson(),
         if (blockReason != null) 'blockReason': blockReason,
         if (countBeat != null) 'countBeat': countBeat,

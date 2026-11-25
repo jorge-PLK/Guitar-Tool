@@ -46,10 +46,11 @@ class _RecordPreviewState extends ConsumerState<RecordPreview> {
           textureId: _channel?.create(),
           frameSize: s.cameraFrameSize,
           rotation: s.cameraRotation,
-          placeholder: PreviewPlaceholder(text: l.record_previewSimulated(cam.name)),
+          placeholder: PreviewPlaceholder(text: l.record_previewSimulated(cam.name ?? '')),
         );
       case CameraState.simulated:
-        return PreviewPlaceholder(text: l.record_previewSimulated(cam.name));
+        // TODO(ola3): falta clave ARB del nombre por defecto «simulada» (RV:398).
+        return PreviewPlaceholder(text: l.record_previewSimulated(cam.name ?? ''));
       case CameraState.none || CameraState.denied || CameraState.failed:
         return PreviewPlaceholder(text: l.record_previewNoVideo);
       case CameraState.unknown:

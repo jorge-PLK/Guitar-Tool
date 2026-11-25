@@ -49,8 +49,9 @@ class VideoOffsetRange {
   const VideoOffsetRange({required this.min, required this.max});
 
   factory VideoOffsetRange.fromJson(Json j) => VideoOffsetRange(
-        min: j['min'] as int,
-        max: j['max'] as int,
+        // Swift lo emite como `.num(Double)`: puede llegar como 500.0.
+        min: (j['min'] as num).toInt(),
+        max: (j['max'] as num).toInt(),
       );
 
   final int min;

@@ -53,7 +53,7 @@ class RecordBar extends ConsumerWidget {
                     autoStop: snap?.plannedStop != null,
                   ),
                   // Un solo Expanded: con Spacer + Flexible el hueco se repartía 50/50.
-                  Expanded(child: hasCamera ? OffsetLabel(ms: snap.camera.defaultOffsetMs) : const SizedBox.shrink()),
+                  Expanded(child: hasCamera && snap.camera.defaultOffsetMs != null ? OffsetLabel(ms: snap.camera.defaultOffsetMs!.round()) : const SizedBox.shrink()),
                 ],
               ),
               Wrap(

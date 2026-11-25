@@ -165,8 +165,9 @@ class TakeViewerStore extends Notifier<TakeViewerState> {
   @override
   TakeViewerState build() {
     final subs = <StreamSubscription<Object?>>[
-      _core.on('takeview.position', TakeViewPositionEvent.fromJson).listen(_onPosition),
-      _core.on('takeview.video', TakeViewVideoEvent.fromJson).listen(_onVideo),
+      // Un evento mal formado se registra y se ignora: no mata el stream.
+      _core.on('takeview.position', TakeViewPositionEvent.fromJson).listen(_onPosition, onError: _badEvent('takeview.position')),
+      _core.on('takeview.video', TakeViewVideoEvent.fromJson).listen(_onVideo, onError: _badEvent('takeview.video')),
     ];
     ref.onDispose(() {
       for (final s in subs) {
@@ -182,6 +183,12 @@ class TakeViewerStore extends Notifier<TakeViewerState> {
   }
 
   static const _empty = <String, Object?>{};
+
+  void Function(Object, StackTrace) _badEvent(String name) =>
+      (Object e, StackTrace st) => debugPrint('Evento $name ignorado (mal formado): $e');
+
+  /// Fallo de decodificación (no `CoreError`) como error del núcleo `internal`.
+  CoreError _asCoreError(Object e) => e is CoreError ? e : CoreError('internal', '$e');
 
   /// `takeview.open`: cierra lo anterior y abre la toma.
   Future<void> open(String projectId, String takeId) => _open(
@@ -209,10 +216,10 @@ class TakeViewerStore extends Notifier<TakeViewerState> {
       final hasVideo = s.videoWidth != null && s.videoHeight != null;
       state = state.copyWith(video: hasVideo ? TakeVideoState.ready : TakeVideoState.none);
       if (hasVideo) _attachChannel();
-    } on CoreError catch (e) {
+    } catch (e) {
       if (gen != _generation) return;
       _live = false;
-      state = TakeViewerState(isOffset: isOffset, error: e);
+      state = TakeViewerState(isOffset: isOffset, error: _asCoreError(e));
     }
   }
 
@@ -251,7 +258,8 @@ class TakeViewerStore extends Notifier<TakeViewerState> {
       if (gen != _generation || !state.isOpen) return;
       state = state.copyWith(clearError: true);
       _applySnapshot(s);
-    } on CoreError catch (e) {
+    } catch (err) {
+      final e = _asCoreError(err);
       if (gen != _generation) return;
       state = state.copyWith(error: e);
       if (e.code == 'not-open') state = state.copyWith(phase: TakeViewerPhase.closed, playing: false);
@@ -308,8 +316,8 @@ class TakeViewerStore extends Notifier<TakeViewerState> {
       state = state.copyWith(
           videoWidth: s.videoWidth, videoHeight: s.videoHeight, videoRotation: s.videoRotation ?? 0);
       _attachChannel();
-    } on CoreError catch (e) {
-      if (gen == _generation) state = state.copyWith(error: e);
+    } catch (e) {
+      if (gen == _generation) state = state.copyWith(error: _asCoreError(e));
     }
   }
 
