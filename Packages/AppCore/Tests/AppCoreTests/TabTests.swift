@@ -269,10 +269,19 @@ final class TabTests: XCTestCase {
         XCTAssertNotNil(s["span"] as? [String: Any])
         let t = try await result(f, "study.setRate", "{\"rate\":1}")
         XCTAssertEqual((t["loop"] as? [String: Any])?["name"] as? String, "Selección")
+        XCTAssertEqual((t["loop"] as? [String: Any])?["span"] as? Bool, true)
         let cleared = try await result(f, "tab.span", "{\"action\":\"clear\"}")
         XCTAssertNil(cleared["span"] as? [String: Any])
         let t2 = try await result(f, "study.setRate", "{\"rate\":1}")
         XCTAssertNil(t2["loop"] as? [String: Any])
+    }
+
+    func testPlainSetLoopIsNotSpan() async throws {
+        let f = try await makeFixture()
+        _ = try await openAndTranscribe(f)
+        let t = try await result(f, "study.setLoop", "{\"start\":1,\"end\":2,\"name\":\"Selección\"}")
+        let l = try XCTUnwrap(t["loop"] as? [String: Any])
+        XCTAssertEqual(l["span"] as? Bool, false)
     }
 
     func testSelectionCarriesBarRangeForBarLoop() async throws {

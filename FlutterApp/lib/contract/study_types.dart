@@ -28,14 +28,21 @@ final class StudyMetronome {
 
 /// Bucle activo del transporte (no se guarda en el proyecto).
 final class StudyLoop {
-  const StudyLoop({required this.start, required this.end, this.name});
+  const StudyLoop({required this.start, required this.end, this.name, this.span = false});
 
-  factory StudyLoop.fromJson(Json j) =>
-      StudyLoop(start: _d(j['start']), end: _d(j['end']), name: _sn(j['name']));
+  factory StudyLoop.fromJson(Json j) => StudyLoop(
+        start: _d(j['start']),
+        end: _d(j['end']),
+        name: _sn(j['name']),
+        span: j['span'] as bool? ?? false,
+      );
 
   final double start;
   final double end;
   final String? name;
+
+  /// `true` cuando el bucle lo crea el tramo de Tablatura.
+  final bool span;
 }
 
 /// Bucle guardado en el proyecto.

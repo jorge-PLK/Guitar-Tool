@@ -247,6 +247,18 @@ Future<void> main() async {
       expect(p.toJson(), equals(j));
     });
 
+    test('setLoop.result: loop.span false cuando no es del tramo', () async {
+      final t = StudyTransport.fromJson(await _load('study.setLoop.result.json'));
+      expect(t.loop, isNotNull);
+      expect(t.loop!.span, isFalse);
+    });
+
+    test('StudyLoop.fromJson: span true se lee', () {
+      final l = StudyLoop.fromJson({'start': 1, 'end': 2, 'name': 'Selección', 'span': true});
+      expect(l.span, isTrue);
+      expect(l.name, 'Selección');
+    });
+
     test('markSection.result: added', () async {
       final es = StudyEditState.fromJson(await _load('study.markSection.result.json'));
       expect(es.added, isNotNull);

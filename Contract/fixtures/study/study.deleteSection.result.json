@@ -162,6 +162,7 @@
     "loop" : {
       "end" : 2,
       "name" : "Riff",
+      "span" : false,
       "start" : 1
     },
     "masterGainDB" : -1.5,

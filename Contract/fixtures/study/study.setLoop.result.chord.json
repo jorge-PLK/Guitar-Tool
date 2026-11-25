@@ -42,6 +42,7 @@
   "loop" : {
     "end" : 2,
     "name" : "acordes",
+    "span" : false,
     "start" : 0.5
   },
   "masterGainDB" : 0,

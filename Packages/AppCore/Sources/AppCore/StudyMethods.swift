@@ -42,6 +42,8 @@ struct StudyLoop: Codable, Sendable {
     var start: Double
     var end: Double
     var name: String?
+    /// true solo en el bucle creado desde una selección de rango en Tablatura. Se codifica siempre (Bool no opcional).
+    var span: Bool = false
 }
 
 struct StudyTransport: Codable, Sendable {
@@ -461,7 +463,7 @@ final class StudyService {
             playing: c.isPlaying, position: c.player.currentTime, duration: c.duration, rate: p.rate,
             transpose: p.transpose, fineCents: p.fineCents, capo: p.capo,
             metronome: StudyMetronome(on: p.metronomeOn, gainDB: p.metronomeGainDB, available: s.hasBeatGrid),
-            loop: c.loop.map { StudyLoop(start: $0.lowerBound, end: $0.upperBound, name: c.loopName) },
+            loop: c.loop.map { StudyLoop(start: $0.lowerBound, end: $0.upperBound, name: c.loopName, span: c.loopIsSpan) },
             masterGainDB: c.masterGainDB, channels: channels(s), anySolo: c.anyStemSolo, audioError: c.audioError,
             outputName: c.audio.outputName)
     }

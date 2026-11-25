@@ -191,7 +191,7 @@ final class TabService {
             ctl.extraTracks = []
             for s in sources { ctl.setSubstituted(s.playerTrackID, false) }
             if let vocalSource { ctl.setSubstituted(vocalSource.playerTrackID, false) }
-            if ctl.loopName == Self.spanLoopName { ctl.setLoop(nil) }
+            if ctl.loopIsSpan { ctl.setLoop(nil) }
             if hadSynth { let t = ctl.player.currentTime; ctl.loadTracks(); ctl.seek(to: t) }
         }
         session = nil
@@ -582,7 +582,7 @@ final class TabService {
         guard upper > range.lowerBound else { return }
         let startChanged = first || lastSpanStart != range.lowerBound
         lastSpanStart = range.lowerBound
-        ctl.setLoop(range.lowerBound...upper, name: Self.spanLoopName)
+        ctl.setLoop(range.lowerBound...upper, name: Self.spanLoopName, span: true)
         if startChanged { ctl.seek(to: range.lowerBound) }
     }
 
@@ -609,7 +609,7 @@ final class TabService {
     func clearSpan() {
         spanHead = nil
         span = nil
-        if let ctl, ctl.loopName == Self.spanLoopName { ctl.setLoop(nil) }
+        if let ctl, ctl.loopIsSpan { ctl.setLoop(nil) }
     }
 
     /// «Selección» del menú de bucle: vuelve a poner el bucle del tramo y salta a su inicio.
@@ -617,7 +617,7 @@ final class TabService {
         guard let ctl, let span, let score, let range = score.timeRange(of: span) else { return }
         let upper = min(range.upperBound, ctl.duration)
         guard upper > range.lowerBound else { return }
-        ctl.setLoop(range.lowerBound...upper, name: Self.spanLoopName)
+        ctl.setLoop(range.lowerBound...upper, name: Self.spanLoopName, span: true)
         ctl.seek(to: range.lowerBound)
     }
 

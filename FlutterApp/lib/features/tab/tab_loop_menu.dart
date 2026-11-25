@@ -10,13 +10,8 @@ import 'package:toneforge/theme/tokens.dart';
 import 'package:toneforge/theme/typography.dart';
 import 'package:toneforge/widgets/tf_menu.dart';
 
-/// Marca con la que el núcleo etiqueta el bucle del tramo (`TabService.spanLoopName`).
-/// Único punto donde se reconoce: el texto visible sale siempre de ARB. Cuando `AppCore` exponga una
-/// marca propia (decisiones-interfaz.md, «Nombres por defecto…»), se cambia solo [isSpanLoop].
-const String _coreSpanLoopMark = 'Selección';
-
-/// `true` si [loop] es el bucle que el núcleo crea para el tramo seleccionado.
-bool isSpanLoop(StudyLoop loop) => loop.name == _coreSpanLoopMark;
+/// `true` si [loop] es el bucle que el núcleo crea para el tramo seleccionado (campo `span`).
+bool isSpanLoop(StudyLoop loop) => loop.span;
 
 /// Menú «Bucle» del transporte de Tablatura (TabScreen.swift:457-479).
 class TabLoopMenu extends ConsumerWidget {
