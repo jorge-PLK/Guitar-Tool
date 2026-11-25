@@ -8,6 +8,7 @@ import 'package:toneforge/core/core_client.dart';
 import 'package:toneforge/core/core_providers.dart';
 import 'package:toneforge/core/launch_options.dart';
 import 'package:toneforge/core/mock_core.dart';
+import 'package:toneforge/features/record/record_store.dart';
 import 'package:toneforge/features/settings/video_store.dart';
 import 'package:toneforge/shell/shell_providers.dart';
 import 'package:toneforge/shell/shell_route.dart';
@@ -58,6 +59,33 @@ void main() {
     t.c.read(shellRouteProvider.notifier).select(ShellRoute.record);
     await settle();
     expect(callsOf(t.core, 'video.preview.stop'), hasLength(2));
+  });
+
+  test('Ajustes vídeo -> Grabar -> Ajustes: la previa se rehace cuando Grabar libera la cámara', () async {
+    final t = await setup();
+    final live = jsonDecodeMap(await (await DirectoryFixtureSource.find())!
+        .read('video/video.preview.start.live.result.json'));
+    var recordOpen = false;
+    // Como el núcleo: con Grabar abierta, `start` no abre captura propia y devuelve `fromRecord`.
+    t.core.handle('video.preview.start', (_) => {...live, 'fromRecord': recordOpen});
+    t.c.read(shellRouteProvider.notifier).select(ShellRoute.record);
+    await settle();
+    final rec = t.c.read(recordStoreProvider.notifier);
+    await rec.open('p1');
+    recordOpen = true;
+    // Vuelve a Ajustes antes de que termine `record.close` (el dispose de Grabar lo encadena sin esperar).
+    t.c.read(shellRouteProvider.notifier).select(ShellRoute.settings);
+    await settle();
+    expect(callsOf(t.core, 'video.preview.start'), hasLength(2));
+    expect(t.c.read(videoStoreProvider).preview?.fromRecord, isTrue);
+    recordOpen = false;
+    await rec.close();
+    await settle();
+    expect(callsOf(t.core, 'video.preview.start'), hasLength(3));
+    expect(t.c.read(videoStoreProvider).preview?.fromRecord, isFalse);
+    // Sin Grabar de por medio no hay más arranques.
+    await settle();
+    expect(callsOf(t.core, 'video.preview.start'), hasLength(3));
   });
 
   test('fuera de la pestaña Vídeo no llama al núcleo', () async {

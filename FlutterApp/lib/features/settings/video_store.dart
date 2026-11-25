@@ -6,6 +6,7 @@ import 'package:toneforge/contract/patch.dart';
 import 'package:toneforge/contract/video.dart';
 import 'package:toneforge/core/core_client.dart';
 import 'package:toneforge/core/core_providers.dart';
+import 'package:toneforge/features/record/record_store.dart';
 import 'package:toneforge/shell/shell_providers.dart';
 import 'package:toneforge/shell/shell_route.dart';
 
@@ -62,6 +63,9 @@ class VideoStore extends Notifier<VideoStoreState> {
   bool _active = false; // pestaña Cámara y vídeo visible
   bool _previewOn = false;
 
+  /// `video.preview.start` devolvió `fromRecord`: Grabar tenía la cámara y no se abrió captura propia.
+  bool _waitingRecord = false;
+
   @override
   VideoStoreState build() {
     final core = _core = ref.read(coreClientProvider);
@@ -70,6 +74,11 @@ class VideoStore extends Notifier<VideoStoreState> {
         .listen((_) => _onCamerasChanged(), onError: _ignore);
     ref.listen(shellRouteProvider, (_, _) => _sync());
     ref.listen(settingsTabProvider, (_, _) => _sync());
+    // Grabar libera la cámara al terminar `record.close` (después de desmontarse la pantalla): si la
+    // previa arrancó antes, quedó atada a esa sesión y se congela; se rehace al cerrarse Grabar.
+    ref.listen(recordStoreProvider, (_, next) {
+      if (_waitingRecord && next.snapshot == null && !next.opened) _restartAfterRecord();
+    });
     ref.onDispose(() {
       sub.cancel();
       if (_previewOn) {
@@ -136,12 +145,18 @@ class VideoStore extends Notifier<VideoStoreState> {
     if (ref.mounted && _active) await _startPreview();
   }
 
+  Future<void> _restartAfterRecord() async {
+    _waitingRecord = false;
+    if (ref.mounted && _active) await _startPreview();
+  }
+
   // El núcleo para la captura anterior al arrancar de nuevo, así que rehacer la previa es otro `start`.
   Future<void> _startPreview() async {
     _previewOn = true;
     final p = await _guard(
         () => _core.call('video.preview.start', const {}, CameraPreviewResult.fromJson));
     if (p != null) _set(state.copyWith(preview: p));
+    _waitingRecord = p?.fromRecord ?? false;
     if (ref.mounted && !_active) await _stopPreview();
   }
 
