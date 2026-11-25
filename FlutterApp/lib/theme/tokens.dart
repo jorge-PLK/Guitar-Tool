@@ -221,6 +221,14 @@ abstract final class TfSize {
   static const double font12 = 12;
   static const double font13 = 13;
   static const double font14 = 14;
+  // Escala de letra completa (Jorge, 25/11/2026): ningún tamaño numérico fuera de theme/.
+  static const double font15 = 15;
+  static const double font16 = 16;
+  static const double font18 = 18;
+  static const double font22 = 22;
+  static const double font26 = 26;
+  static const double font30 = 30;
+  static const double font32 = 32;
   static const double iconButtonIcon = 14;
   static const double nudgeWidth = 30;
   static const double nudgeHeight = 24;
