@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
@@ -30,9 +32,15 @@ Future<void> main(List<String> args) async {
   );
 }
 
-void _configureWindow(LaunchOptions options) {
+/// En macOS la ventana aún no es «la actual» cuando arranca `main`: se reintenta unos instantes.
+void _configureWindow(LaunchOptions options, [int attempt = 0]) {
   final window = WindowManager.instance.getCurrent();
-  if (window == null) return;
+  if (window == null) {
+    if (attempt < 50) {
+      Timer(const Duration(milliseconds: 100), () => _configureWindow(options, attempt + 1));
+    }
+    return;
+  }
   final w = options.window;
   final size = w == null ? _initialWindowSize : Size(w.width.toDouble(), w.height.toDouble());
   window
@@ -40,4 +48,10 @@ void _configureWindow(LaunchOptions options) {
     ..minimumSize = _minWindowSize.toNative()
     ..setSize(size.toNative(), false)
     ..center();
+  // Al mostrarse la ventana (primer fotograma) macOS puede devolverla a su tamaño previo: se reaplica.
+  Timer(const Duration(seconds: 1), () {
+    window
+      ..setSize(size.toNative(), false)
+      ..center();
+  });
 }
