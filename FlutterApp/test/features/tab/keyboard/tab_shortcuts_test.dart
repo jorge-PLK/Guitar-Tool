@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:toneforge/contract/tab.dart';
 import 'package:toneforge/core/mock_core.dart';
+import 'package:toneforge/features/tab/tab_key_map.dart';
 import 'package:toneforge/features/tab/tab_shortcuts.dart';
 import 'package:toneforge/features/tab/tab_store.dart';
 import 'package:toneforge/shell/selected_project.dart';
@@ -22,13 +26,19 @@ Future<void> _boot(
   bool editMode = true,
   Map<String, Object?> extra = const {},
   TargetPlatform platform = TargetPlatform.macOS,
+  bool keyMap = true,
 }) async {
   debugDefaultTargetPlatformOverride = platform;
   addTearDown(() => debugDefaultTargetPlatformOverride = null);
   _platform = platform == TargetPlatform.macOS ? 'macos' : 'windows';
   setTestSurface(tester, const Size(600, 400));
   core = (await tester.runAsync(loadCore))!;
-  final c = makeContainer(core);
+  final c = makeContainer(
+    core,
+    overrides: [
+      if (!keyMap) tabKeyMapProvider.overrideWith((ref) => Completer<TabKeyMapResult>().future),
+    ],
+  );
   c.listen(tabStoreProvider, (_, _) {});
   c.read(selectedProjectProvider.notifier).select(projectId);
   await tester.pumpWidget(
@@ -230,5 +240,50 @@ void main() {
     }
     await _press(tester, LogicalKeyboardKey.keyA, ch: 'a', mods: [LogicalKeyboardKey.controlLeft]);
     expect(_methods, isNot(contains('tab.edit')));
+  });
+
+  testWidgets('sin mapa cargado no se reclama nada (ni Escape con tramo)', (tester) async {
+    await _boot(
+      tester,
+      keyMap: false,
+      extra: {
+        'span': {'startTick': 0, 'endTick': 960},
+      },
+    );
+    await _press(tester, LogicalKeyboardKey.arrowUp);
+    await _press(tester, LogicalKeyboardKey.escape);
+    expect(_methods, isNot(contains('tab.edit')));
+  });
+
+  testWidgets('el mapa se pide una sola vez al montar', (tester) async {
+    await _boot(tester);
+    await _press(tester, LogicalKeyboardKey.arrowUp);
+    await _press(tester, LogicalKeyboardKey.arrowDown);
+    expect(_methods.where((m) => m == 'tab.keyMap').length, 1);
+  });
+
+  testWidgets('tecla fuera del mapa se ignora aunque sea imprimible', (tester) async {
+    await _boot(tester);
+    await _press(tester, LogicalKeyboardKey.keyQ, ch: 'q');
+    await _press(tester, LogicalKeyboardKey.keyK, ch: '€');
+    expect(_methods, isNot(contains('tab.edit')));
+  });
+
+  testWidgets('b: según el mapa, depende del tipo de la pista seleccionada', (tester) async {
+    final map = TabKeyMapResult.fromJson(fixture('tab.keyMap.result.json'));
+    final raw = {...fixture('tab.open.result.json'), 'editMode': true};
+    bool claimed(String kind, {bool shift = false}) {
+      final tracks = [
+        for (final t in (raw['tracks']! as List).cast<Map<String, Object?>>())
+          t['id'] == raw['selectedTrack'] ? {...t, 'kind': kind} : t,
+      ];
+      final tab = TabState.fromJson({...raw, 'tracks': tracks});
+      return claims(map, key: shift ? 'B' : 'b', shift: shift, ctrl: false, alt: false, tab: tab, hasRange: false);
+    }
+
+    final rules = [for (final r in map.rules) if (r.key == 'b') r.when];
+    expect(claimed('drums'), rules.any((w) => w == TabKeyWhen.edit || w == TabKeyWhen.editDrums));
+    expect(claimed('guitar'), rules.any((w) => w == TabKeyWhen.edit || w == TabKeyWhen.editNotDrums));
+    expect(claimed('guitar', shift: true) || claimed('guitar'), isTrue);
   });
 }

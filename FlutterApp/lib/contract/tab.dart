@@ -7,6 +7,7 @@
 import 'package:toneforge/core/core_client.dart' show Json;
 
 part 'tab_enums.dart';
+part 'tab_keymap.dart';
 part 'tab_params.dart';
 part 'tab_songsterr.dart';
 part 'tab_songsterr_pairing.dart';

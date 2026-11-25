@@ -9,6 +9,7 @@ import 'package:toneforge/features/backing/backing_shortcuts.dart' show primaryF
 import 'package:toneforge/features/backing/study_position.dart';
 import 'package:toneforge/features/backing/study_store.dart';
 import 'package:toneforge/features/tab/songsterr_store.dart';
+import 'package:toneforge/features/tab/tab_key_map.dart';
 import 'package:toneforge/features/tab/tab_store.dart';
 
 /// Nombre `KeyboardEvent.key` de una tecla no imprimible que el núcleo conoce (D9), o `null`.
@@ -25,9 +26,9 @@ String? _namedKey(LogicalKeyboardKey k) {
 
 /// Atajos de teclado de Tablatura (ficha tablatura-interaccion §6.1, D1-D9).
 ///
-/// Un único `Focus` de pantalla: da igual quién tenga el foco salvo un campo de texto. Las teclas de
-/// edición se filtran como la web (una sola letra/cifra/signo, flechas, Retroceso, Supr, Esc) y se
-/// mandan al núcleo con `tab.edit {op:key}`; Espacio alterna el transporte de estudio.
+/// Un único `Focus` de pantalla: da igual quién tenga el foco salvo un campo de texto. Las teclas que
+/// reclama el mapa del núcleo (`tab.keyMap`, vía [claims]) se mandan al
+/// núcleo con `tab.edit {op:key}`; Espacio alterna el transporte de estudio.
 class TabShortcuts extends ConsumerStatefulWidget {
   const TabShortcuts({required this.child, super.key});
 
@@ -39,6 +40,12 @@ class TabShortcuts extends ConsumerStatefulWidget {
 
 class _TabShortcutsState extends ConsumerState<TabShortcuts> {
   final FocusNode _node = FocusNode(debugLabel: 'TabShortcuts');
+
+  @override
+  void initState() {
+    super.initState();
+    ref.read(tabKeyMapProvider); // precarga: el mapa es estático
+  }
 
   @override
   void dispose() {
@@ -72,46 +79,36 @@ class _TabShortcutsState extends ConsumerState<TabShortcuts> {
     if (stray) return KeyEventResult.ignored;
 
     final TabState? tab = ref.read(tabStoreProvider).tab;
-    if (tab == null) return KeyEventResult.ignored;
-    final bool editing = tab.phase == TabPhase.ready && tab.editMode;
+    final TabKeyMapResult? map = ref.read(tabKeyMapProvider).value;
+    if (tab == null || map == null) return KeyEventResult.ignored; // sin mapa, el núcleo no reclama
     final TabStore store = ref.read(tabStoreProvider.notifier);
 
-    final String? named = _namedKey(logical);
-    if (named == 'Escape') {
-      if (ctrl || alt) return KeyEventResult.ignored;
-      final bool hasSpan = tab.span != null || ref.read(tabStoreProvider).range != null;
-      if (!editing && !hasSpan) return KeyEventResult.ignored;
-      unawaited(store.key('Escape', shift: shift)); // por `key`: conserva el ancla (D3)
+    // D1: Ctrl+Y rehace en Windows (no está en el mapa del núcleo).
+    if (ctrl && !alt && !shift && !mac && logical == LogicalKeyboardKey.keyY) {
+      if (tab.phase != TabPhase.ready || !tab.editMode) return KeyEventResult.ignored;
+      unawaited(store.redo());
       return KeyEventResult.handled;
     }
-    if (!editing) return KeyEventResult.ignored;
 
-    if (ctrl || alt) {
-      // Solo ⌘Z, ⇧⌘Z, ⌥Y y (Windows) Ctrl+Y.
-      if (ctrl && !alt && logical == LogicalKeyboardKey.keyZ) {
-        unawaited(store.key('z', shift: shift, ctrl: true));
-        return KeyEventResult.handled;
-      }
-      if (ctrl && !alt && !shift && !mac && logical == LogicalKeyboardKey.keyY) {
-        unawaited(store.redo()); // D1
-        return KeyEventResult.handled;
-      }
-      if (alt && !ctrl && logical == LogicalKeyboardKey.keyY) {
-        unawaited(store.key('y', shift: shift, alt: true));
-        return KeyEventResult.handled;
-      }
-      return KeyEventResult.ignored;
-    }
-
-    String? key = named;
-    if (key == null) {
+    String? key = _namedKey(logical);
+    if (key == null && (ctrl || alt)) {
+      // Con ⌘/⌥ el carácter no sirve (¥, control): la letra física, en minúscula.
+      final String label = logical.keyLabel;
+      if (label.runes.length == 1) key = label.toLowerCase();
+    } else if (key == null) {
       final String? ch = event.character;
       if (ch == null || ch.runes.length != 1) return KeyEventResult.ignored;
       final int code = ch.runes.first;
       if (code <= 0x20 || code == 0x7f) return KeyEventResult.ignored; // Espacio, Tab, Intro, control
       key = ch;
     }
-    unawaited(store.key(key, shift: shift));
+    if (key == null) return KeyEventResult.ignored;
+    final bool hasRange = ref.read(tabStoreProvider).range != null;
+    if (!claims(map, key: key, shift: shift, ctrl: ctrl, alt: alt, tab: tab, hasRange: hasRange)) {
+      return KeyEventResult.ignored;
+    }
+    // Siempre por `key` (Escape incluido): conserva el ancla (D3).
+    unawaited(store.key(key, shift: shift, ctrl: ctrl, alt: alt));
     return KeyEventResult.handled;
   }
 

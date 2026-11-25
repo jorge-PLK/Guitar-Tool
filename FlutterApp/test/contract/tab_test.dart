@@ -64,6 +64,7 @@ final _results = <String, Object? Function(Json)>{
   'tab.setAllListening': TabState.fromJson,
   'tab.edit': TabState.fromJson,
   'tab.exportName': TabExportNameResult.fromJson,
+  'tab.keyMap': TabKeyMapResult.fromJson,
   'tab.export': TabExportResult.fromJson,
   'tab.songsterr.open': SongsterrSheetState.fromJson,
   'tab.songsterr.state': SongsterrSheetState.fromJson,
@@ -113,6 +114,7 @@ final _params = <String, Json Function(Json)>{
   'tab.setAllListening': (j) => TabListeningParams.fromJson(j).toJson(),
   'tab.edit': (j) => TabEditParams.fromJson(j).toJson(),
   'tab.exportName': _empty,
+  'tab.keyMap': _empty,
   'tab.export': (j) => TabExportParams.fromJson(j).toJson(),
   'tab.songsterr.open': _empty,
   'tab.songsterr.state': _empty,
@@ -174,8 +176,21 @@ void main() => group('contract · tab', () {
     _dir = Directory('${src.root.path}/tab');
   });
 
-  test('la carpeta de fixtures de tab tiene 128 ficheros', () {
-    expect(_files(), hasLength(128));
+  test('la carpeta de fixtures de tab tiene 130 ficheros', () {
+    expect(_files(), hasLength(130));
+  });
+
+  test('tab.keyMap: reglas con shift nulo, when conocido y desconocido', () {
+    final m = TabKeyMapResult.fromJson(_load('tab.keyMap.result'));
+    expect(m.rules, hasLength(54));
+    expect(m.rules.first.key, 'Escape');
+    expect(m.rules.first.when, TabKeyWhen.span);
+    expect(m.rules.first.shift, isFalse);
+    final z = m.rules[1];
+    expect([z.key, z.ctrl, z.alt, z.shift, z.when], ['z', true, false, null, TabKeyWhen.edit]);
+    expect(m.rules.every((r) => r.when != TabKeyWhen.unknown), isTrue);
+    final u = TabKeyRule.fromJson({'key': 'q', 'shift': null, 'ctrl': false, 'alt': false, 'when': 'x'});
+    expect(u.when, TabKeyWhen.unknown);
   });
 
   test('cada fixture de tab tiene decoder', () {
