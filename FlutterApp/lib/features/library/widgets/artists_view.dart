@@ -28,12 +28,11 @@ class ArtistsView extends ConsumerWidget {
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
         ArtistBar(name: open),
         const SizedBox(height: TfSpace.s24),
-        Expanded(
-          child: SingleChildScrollView(child: SongTable(tracks: s.openArtistTracks, showArtist: false)),
-        ),
+        SongTable(tracks: s.openArtistTracks, showArtist: false),
       ],
     );
   }

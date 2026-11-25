@@ -64,6 +64,8 @@ class ArtistGrid extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final store = ref.read(libraryStoreProvider.notifier);
     return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.only(bottom: TfSpace.s8),
       gridDelegate: const ArtistGridDelegate(),
       itemCount: groups.length,
