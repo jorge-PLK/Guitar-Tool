@@ -9,6 +9,7 @@ import 'package:toneforge/contract/tools.dart';
 import 'package:toneforge/core/core_client.dart';
 import 'package:toneforge/core/core_providers.dart';
 import 'package:toneforge/features/library/link_import_logic.dart';
+import 'package:toneforge/features/library/playlist_store.dart';
 
 export 'package:toneforge/features/library/link_import_logic.dart';
 
@@ -137,6 +138,7 @@ class LinkImportStore extends Notifier<LinkImportState> {
       final snap = r.playlistSnapshot;
       if (snap != null) {
         state = state.copyWith(screen: LinkImportScreen.playlist, passRunning: false, playlist: snap);
+        ref.read(playlistStoreProvider.notifier).adopt(snap);
         return false;
       }
       if (r.existing != null) {

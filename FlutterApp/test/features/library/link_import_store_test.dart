@@ -8,6 +8,7 @@ import 'package:toneforge/core/core_client.dart';
 import 'package:toneforge/core/core_providers.dart';
 import 'package:toneforge/core/mock_core.dart';
 import 'package:toneforge/features/library/link_import_store.dart';
+import 'package:toneforge/features/library/playlist_store.dart';
 
 Json cand(String id, {bool close = false, double? diff, String? lib}) => {
   'id': id,
@@ -342,6 +343,18 @@ void main() {
       await st(c).submit();
       expect(sv(c).screen, LinkImportScreen.playlist);
       expect(sv(c).playlist, isNotNull);
+    });
+
+    test('lista: el snapshot lo adopta playlistStore (abre la hoja de lista)', () async {
+      final (c, core) = await setup(classify: 'playlist');
+      final root = (await DirectoryFixtureSource.find())!.root.path;
+      final raw = jsonDecode(await File('$root/link/link.resolve.playlist.result.json').readAsString());
+      core.result('link.resolve', raw);
+      st(c).setText('https://open.spotify.com/playlist/x');
+      await st(c).submit();
+      final p = c.read(playlistStoreProvider);
+      expect(p.snapshot, isNotNull);
+      expect(p.sheetOpen, isTrue);
     });
   });
 }
