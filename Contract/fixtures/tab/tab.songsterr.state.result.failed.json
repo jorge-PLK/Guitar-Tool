@@ -1,0 +1,18 @@
+{
+  "busy" : false,
+  "canUse" : true,
+  "failure" : {
+    "canRetry" : true,
+    "kind" : "offline",
+    "message" : "No se pudo conectar con Songsterr. Comprueba la conexión."
+  },
+  "open" : true,
+  "query" : "Banda · Tema",
+  "results" : [
+
+  ],
+  "search" : {
+    "phase" : "results"
+  },
+  "stage" : "failed"
+}

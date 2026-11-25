@@ -1,0 +1,112 @@
+{
+  "busy" : false,
+  "canUse" : true,
+  "open" : true,
+  "pairing" : {
+    "extraNames" : [
+      "Rítmica"
+    ],
+    "extraText" : "Pistas extra, sin stem: Rítmica",
+    "intro" : "Qué pista de Songsterr va con cada stem. La confianza es el parecido medido con el audio.",
+    "slots" : [
+      {
+        "choices" : [
+          {
+            "label" : "Rítmica (82 %)",
+            "name" : "Rítmica",
+            "similarity" : 0.81999999999999995,
+            "track" : 0
+          },
+          {
+            "label" : "Solista",
+            "name" : "Solista",
+            "track" : 1
+          }
+        ],
+        "kind" : "guitar",
+        "name" : "Guitarra",
+        "role" : "lead",
+        "solos" : [
+          {
+            "choices" : [
+              {
+                "label" : "Rítmica (82 %)",
+                "name" : "Rítmica",
+                "similarity" : 0.81999999999999995,
+                "track" : 0
+              },
+              {
+                "label" : "Solista",
+                "name" : "Solista",
+                "track" : 1
+              }
+            ],
+            "clock" : "0:12",
+            "confidence" : 0.81999999999999995,
+            "confidenceText" : "82 %",
+            "end" : 20,
+            "index" : 0,
+            "start" : 12,
+            "track" : 1
+          },
+          {
+            "choices" : [
+              {
+                "label" : "Rítmica (82 %)",
+                "name" : "Rítmica",
+                "similarity" : 0.81999999999999995,
+                "track" : 0
+              },
+              {
+                "label" : "Solista",
+                "name" : "Solista",
+                "track" : 1
+              }
+            ],
+            "clock" : "1:01",
+            "end" : 70,
+            "index" : 1,
+            "start" : 61
+          }
+        ],
+        "stemId" : "guitar"
+      },
+      {
+        "choices" : [
+          {
+            "label" : "Rítmica (82 %)",
+            "name" : "Rítmica",
+            "similarity" : 0.81999999999999995,
+            "track" : 0
+          },
+          {
+            "label" : "Solista",
+            "name" : "Solista",
+            "track" : 1
+          }
+        ],
+        "confidence" : 0.80000000000000004,
+        "confidenceText" : "80 %",
+        "kind" : "bass",
+        "name" : "Bajo",
+        "role" : "bass",
+        "solos" : [
+
+        ],
+        "stemId" : "bass",
+        "track" : 1
+      }
+    ],
+    "warnings" : [
+      "La estructura del tema difiere de la del audio."
+    ]
+  },
+  "query" : "Banda · Tema",
+  "results" : [
+
+  ],
+  "search" : {
+    "phase" : "results"
+  },
+  "stage" : "pairing"
+}

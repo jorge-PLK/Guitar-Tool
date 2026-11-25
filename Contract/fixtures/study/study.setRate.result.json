@@ -1,0 +1,53 @@
+{
+  "anySolo" : false,
+  "capo" : 0,
+  "channels" : [
+    {
+      "gainDB" : 0,
+      "id" : "drums",
+      "kind" : "drums",
+      "muted" : false,
+      "name" : "Batería",
+      "solo" : false
+    },
+    {
+      "gainDB" : 0,
+      "id" : "bass",
+      "kind" : "bass",
+      "muted" : false,
+      "name" : "Bajo",
+      "solo" : false
+    },
+    {
+      "gainDB" : 0,
+      "guitarRole" : "left",
+      "id" : "guitar_L",
+      "kind" : "guitar",
+      "muted" : false,
+      "name" : "Guitarra izq.",
+      "solo" : false
+    },
+    {
+      "gainDB" : 0,
+      "guitarRole" : "right",
+      "id" : "guitar_R",
+      "kind" : "guitar",
+      "muted" : false,
+      "name" : "Guitarra der.",
+      "solo" : false
+    }
+  ],
+  "duration" : 8,
+  "fineCents" : 0,
+  "masterGainDB" : 0,
+  "metronome" : {
+    "available" : true,
+    "gainDB" : 0,
+    "on" : false
+  },
+  "outputName" : "Salida simulada",
+  "playing" : false,
+  "position" : 1.5,
+  "rate" : 0.75,
+  "transpose" : 0
+}

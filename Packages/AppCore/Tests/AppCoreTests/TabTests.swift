@@ -124,7 +124,7 @@ final class TabTests: XCTestCase {
     }
 
     func testOpenListsPendingTracksAndScoreNotReady() async throws {
-        let f = try await makeFixture()
+        let f = try makeFixture(slow: true)
         let s = try await openTab(f)
         XCTAssertEqual(s["phase"] as? String, "ready")
         XCTAssertEqual(tracks(s).compactMap { $0["id"] as? String }, ["bass", "drums"])
@@ -134,6 +134,25 @@ final class TabTests: XCTestCase {
         XCTAssertEqual((r["error"] as? [String: Any])?["code"] as? String, "not-ready")
         let noStudy = await call(f, "tab.close")
         XCTAssertNotNil(noStudy["result"])
+    }
+
+    /// TB10: `tab.open` arranca la cola sola, sin `tab.transcribe`.
+    func testOpenStartsQueue() async throws {
+        let f = try makeFixture()
+        _ = try await openTab(f)
+        let s = try await openAndTranscribeWait(f)
+        XCTAssertEqual(track(s, "bass")?["noteCount"] as? Int, 3)
+        XCTAssertTrue(f.events.all("tab.progress").contains { $0.payload["state"] as? String == "done" })
+    }
+
+    /// TB10: `tab.songsterr.automatic` (reabre en automático) también arranca la cola.
+    func testSongsterrAutomaticStartsQueue() async throws {
+        let f = try makeFixture(source: nil)
+        let s0 = try await openTab(f)
+        XCTAssertEqual(s0["phase"] as? String, "choosingSource")
+        _ = try await result(f, "tab.songsterr.automatic")
+        let s = try await openAndTranscribeWait(f)
+        XCTAssertEqual(track(s, "drums")?["noteCount"] as? Int, 3)
     }
 
     func testNotOpenErrors() async throws {
@@ -148,7 +167,7 @@ final class TabTests: XCTestCase {
         let f = try await makeFixture()
         _ = try await openTab(f)
         let q = try await result(f, "tab.transcribe")
-        XCTAssertEqual(q["queued"] as? [String], ["bass", "drums"])
+        XCTAssertNotNil(q["queued"])   // `open` ya arrancó la cola (TB10): lo que queda en ella depende del avance
         let s = try await openAndTranscribeWait(f)
         XCTAssertEqual(track(s, "bass")?["noteCount"] as? Int, 3)
         XCTAssertEqual(track(s, "drums")?["noteCount"] as? Int, 3)
@@ -250,10 +269,50 @@ final class TabTests: XCTestCase {
         XCTAssertNotNil(s["span"] as? [String: Any])
         let t = try await result(f, "study.setRate", "{\"rate\":1}")
         XCTAssertEqual((t["loop"] as? [String: Any])?["name"] as? String, "Selección")
+        XCTAssertEqual((t["loop"] as? [String: Any])?["span"] as? Bool, true)
         let cleared = try await result(f, "tab.span", "{\"action\":\"clear\"}")
         XCTAssertNil(cleared["span"] as? [String: Any])
         let t2 = try await result(f, "study.setRate", "{\"rate\":1}")
         XCTAssertNil(t2["loop"] as? [String: Any])
+    }
+
+    func testSpanClearKeepAnchorExtendsFromAnchor() async throws {
+        let f = try await makeFixture()
+        _ = try await openAndTranscribe(f)
+        _ = try await result(f, "tab.beatClick", "{\"track\":0,\"bar\":1,\"beat\":0}")
+        _ = try await result(f, "tab.beatClick", "{\"track\":0,\"bar\":1,\"beat\":4,\"shift\":true}")
+        var s = try await result(f, "tab.span", "{\"action\":\"clear\",\"keepAnchor\":true}")
+        XCTAssertNil(s["span"] as? [String: Any])
+        s = try await result(f, "tab.beatClick", "{\"track\":0,\"bar\":1,\"beat\":4,\"shift\":true}")
+        XCTAssertNotNil(s["span"] as? [String: Any], "con ancla conservada, ⇧clic amplía")
+        // Por defecto el ancla se borra: ⇧clic ya no amplía.
+        _ = try await result(f, "tab.span", "{\"action\":\"clear\"}")
+        s = try await result(f, "tab.beatClick", "{\"track\":0,\"bar\":1,\"beat\":4,\"shift\":true}")
+        XCTAssertNil(s["span"] as? [String: Any])
+    }
+
+    func testDismissNoticesClearsAndEmitsState() async throws {
+        let f = try await makeFixture()
+        _ = try await openAndTranscribe(f)
+        await f.bridge.tabService.setNotices(["Aviso de prueba."])
+        var s = try await result(f, "tab.state")
+        XCTAssertEqual(s["notices"] as? [String], ["Aviso de prueba."])
+        s = try await result(f, "tab.dismissNotices")
+        XCTAssertEqual(s["notices"] as? [String], [])
+        s = try await result(f, "tab.state")
+        XCTAssertEqual(s["notices"] as? [String], [])
+        let closed = await call(f, "tab.close")
+        XCTAssertNotNil(closed["result"])
+        let afterClose = await call(f, "tab.dismissNotices")
+        XCTAssertNotNil(afterClose["error"])
+    }
+
+    func testPlainSetLoopIsNotSpan() async throws {
+        let f = try await makeFixture()
+        _ = try await openAndTranscribe(f)
+        let t = try await result(f, "study.setLoop", "{\"start\":1,\"end\":2,\"name\":\"Selección\"}")
+        let l = try XCTUnwrap(t["loop"] as? [String: Any])
+        XCTAssertEqual(l["span"] as? Bool, false)
     }
 
     func testSelectionCarriesBarRangeForBarLoop() async throws {
@@ -264,6 +323,56 @@ final class TabTests: XCTestCase {
         XCTAssertEqual(r["bar"] as? Int, 1)
         let a = try XCTUnwrap(r["start"] as? Double), b = try XCTUnwrap(r["end"] as? Double)
         XCTAssertGreaterThan(b, a)
+    }
+
+    func testSelectionReportsHasNote() async throws {
+        let f = try await makeFixture()
+        _ = try await openAndTranscribe(f)
+        _ = try await result(f, "tab.edit", "{\"op\":\"editMode\",\"on\":true}")
+        var s = try await result(f, "tab.select", "{\"track\":\"bass\",\"beat\":5,\"tick\":0,\"string\":2}")
+        XCTAssertEqual((s["selection"] as? [String: Any])?["hasNote"] as? Bool, false)
+        s = try await result(f, "tab.edit", "{\"op\":\"digit\",\"value\":3}")
+        XCTAssertEqual((s["selection"] as? [String: Any])?["hasNote"] as? Bool, true)
+    }
+
+    func testSelectionSummaryCodesAndHeader() async throws {
+        let f = try await makeFixture()
+        _ = try await openAndTranscribe(f)
+        _ = try await result(f, "tab.edit", "{\"op\":\"editMode\",\"on\":true}")
+        var s = try await result(f, "tab.select", "{\"track\":\"bass\",\"beat\":5,\"tick\":0,\"string\":2}")
+        var sum = try XCTUnwrap((s["selection"] as? [String: Any])?["summary"] as? [String: Any])
+        XCTAssertEqual(sum["code"] as? String, "noNote")
+        XCTAssertEqual(sum["bar"] as? Int, 3)
+        XCTAssertEqual(sum["beat"] as? Int, 1)
+        XCTAssertEqual(sum["string"] as? Int, 2)
+        let h = try XCTUnwrap(s["header"] as? [String: Any])
+        XCTAssertEqual(h["code"] as? String, "meterBpm")
+        XCTAssertEqual(h["bar"] as? String, "4/4")
+        XCTAssertEqual(h["bpm"] as? Int, 120)
+        s = try await result(f, "tab.edit", "{\"op\":\"digit\",\"value\":3}")
+        sum = try XCTUnwrap((s["selection"] as? [String: Any])?["summary"] as? [String: Any])
+        XCTAssertEqual(sum["code"] as? String, "note")
+        XCTAssertEqual(sum["string"] as? Int, 2)
+        XCTAssertEqual(sum["fret"] as? Int, 3)
+        s = try await result(f, "tab.select", "{\"track\":\"drums\",\"beat\":5,\"tick\":0}")
+        sum = try XCTUnwrap((s["selection"] as? [String: Any])?["summary"] as? [String: Any])
+        XCTAssertEqual(sum["code"] as? String, "drumsNoHits")
+        XCTAssertNil(sum["pieces"])
+        s = try await result(f, "tab.select", "{\"track\":\"drums\",\"beat\":1,\"tick\":0}")
+        sum = try XCTUnwrap((s["selection"] as? [String: Any])?["summary"] as? [String: Any])
+        XCTAssertEqual(sum["code"] as? String, "drums")
+        XCTAssertEqual(sum["pieces"] as? [String], ["kick"])
+    }
+
+    func testPieceCodesMatchArbKeys() {
+        XCTAssertEqual(DrumPiece.allCases.map(TabService.pieceCode), ["kick", "snare", "hiHat", "openHiHat", "tom", "crash"])
+    }
+
+    func testHeaderMeterOnlyEncodesWithoutBpm() throws {
+        let data = try JSONEncoder().encode(TabHeaderSummary(code: "meter", bar: "3/4"))
+        let o = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(o["code"] as? String, "meter")
+        XCTAssertNil(o["bpm"])
     }
 
     // MARK: Edición

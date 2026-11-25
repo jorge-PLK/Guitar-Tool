@@ -1,0 +1,70 @@
+{
+  "busy" : true,
+  "canUse" : true,
+  "loadingSongId" : -1,
+  "open" : true,
+  "query" : "Banda · Tema",
+  "results" : [
+    {
+      "artist" : "Banda",
+      "loading" : false,
+      "previewUrl" : "https://www.songsterr.com/a/wsa/song-tab-s7",
+      "selected" : true,
+      "songId" : 7,
+      "title" : "Tema"
+    },
+    {
+      "artist" : "Banda",
+      "loading" : false,
+      "previewUrl" : "https://www.songsterr.com/a/wsa/song-tab-s8",
+      "selected" : false,
+      "songId" : 8,
+      "title" : "Tema (live)"
+    }
+  ],
+  "search" : {
+    "phase" : "results"
+  },
+  "selected" : {
+    "artist" : "Banda",
+    "previewUrl" : "https://www.songsterr.com/a/wsa/song-tab-s7",
+    "revisionId" : 700,
+    "songId" : 7,
+    "title" : "Tema 7",
+    "tracks" : [
+      {
+        "instrument" : "Overdriven Guitar",
+        "name" : "Rítmica",
+        "partId" : 0,
+        "tuning" : [
+          64,
+          59,
+          55,
+          50,
+          45,
+          40
+        ],
+        "tuningText" : "E A D G B E"
+      },
+      {
+        "instrument" : "Bass",
+        "name" : "Bajo",
+        "partId" : 1,
+        "tuning" : [
+          43,
+          38,
+          33,
+          28
+        ],
+        "tuningText" : "E A D G"
+      },
+      {
+        "instrument" : "Drums",
+        "name" : "Batería",
+        "partId" : 2,
+        "tuningText" : "-"
+      }
+    ]
+  },
+  "stage" : "choosing"
+}

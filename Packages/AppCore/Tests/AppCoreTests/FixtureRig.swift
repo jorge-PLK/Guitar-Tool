@@ -148,6 +148,20 @@ struct FixtureRig {
         return o
     }
 
+    /// Como `run`, pero antes de volcar el result pone a 0 las claves `zero` de su objeto (valores que dependen del reloj simulado).
+    @discardableResult
+    func runNormalized(_ method: String, params: String = "{}", zero keys: [String],
+                       file: StaticString = #filePath, line: UInt = #line) async throws -> [String: Any] {
+        try golden(method, .params, params, file: file, line: line)
+        let r = await bridge.router.handle("{\"id\":1,\"method\":\"\(method)\",\"params\":\(params)}")
+        var o = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(r.utf8)) as? [String: Any])
+        var result = try XCTUnwrap(o["result"] as? [String: Any], "\(method): \(o)", file: file, line: line)
+        for k in keys { result[k] = 0 }
+        o["result"] = result
+        try golden(method, .result, try Self.text(result), file: file, line: line)
+        return o
+    }
+
     /// Variante que espera un error y vuelca solo `<método>.error.json` (los params ya se volcaron o no importan).
     func runExpectingError(_ method: String, params: String, file: StaticString = #filePath, line: UInt = #line) async throws {
         let r = await bridge.router.handle("{\"id\":1,\"method\":\"\(method)\",\"params\":\(params)}")
@@ -164,7 +178,7 @@ struct FixtureRig {
     }
 
     static func text(_ any: Any) throws -> String {
-        let data = try JSONSerialization.data(withJSONObject: any, options: [.fragmentsAllowed, .withoutEscapingSlashes])
+        let data = try JSONSerialization.data(withJSONObject: any, options: [.fragmentsAllowed, .withoutEscapingSlashes, .sortedKeys])
         return String(decoding: data, as: UTF8.self)
     }
 

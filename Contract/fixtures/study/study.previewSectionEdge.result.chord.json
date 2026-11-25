@@ -1,0 +1,28 @@
+{
+  "sections" : [
+    {
+      "color" : 2,
+      "end" : 2,
+      "id" : "00000000-0000-0000-0000-000000000001",
+      "name" : "Estrofa",
+      "paletteIndex" : 2,
+      "solo" : false,
+      "start" : 0
+    },
+    {
+      "end" : 4,
+      "id" : "00000000-0000-0000-0000-000000000002",
+      "name" : "Solo",
+      "solo" : true,
+      "start" : 2
+    },
+    {
+      "end" : 7,
+      "id" : "00000000-0000-0000-0000-000000000003",
+      "name" : "Sección 1",
+      "paletteIndex" : 0,
+      "solo" : false,
+      "start" : 4.5
+    }
+  ]
+}

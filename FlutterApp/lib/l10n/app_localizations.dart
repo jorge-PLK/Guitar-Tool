@@ -1748,11 +1748,1654 @@ abstract class AppLocalizations {
   /// **''**
   String get backingAnchor;
 
+  /// No description provided for @backing_analysisFailed.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo analizar: {message}'**
+  String backing_analysisFailed(String message);
+
+  /// No description provided for @backing_analysisMissing.
+  ///
+  /// In es, this message translates to:
+  /// **'Sin análisis de acordes ni pulso todavía.'**
+  String get backing_analysisMissing;
+
+  /// No description provided for @backing_analyze.
+  ///
+  /// In es, this message translates to:
+  /// **'Analizar'**
+  String get backing_analyze;
+
+  /// No description provided for @backing_analyzing.
+  ///
+  /// In es, this message translates to:
+  /// **'Analizando acordes y pulso… Puedes reproducir mientras tanto.'**
+  String get backing_analyzing;
+
+  /// No description provided for @backing_apply.
+  ///
+  /// In es, this message translates to:
+  /// **'Aplicar'**
+  String get backing_apply;
+
+  /// No description provided for @backing_applyTooltip.
+  ///
+  /// In es, this message translates to:
+  /// **'Guarda las secciones. Las pistas de guitarra se rehacen, en segundo plano, solo si cambian los solos'**
+  String get backing_applyTooltip;
+
+  /// No description provided for @backing_barLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'c. {number}'**
+  String backing_barLabel(int number);
+
+  /// No description provided for @backing_bpm.
+  ///
+  /// In es, this message translates to:
+  /// **'{bpm} BPM'**
+  String backing_bpm(int bpm);
+
+  /// No description provided for @backing_capo.
+  ///
+  /// In es, this message translates to:
+  /// **'Capo virtual'**
+  String get backing_capo;
+
+  /// No description provided for @backing_capoFret.
+  ///
+  /// In es, this message translates to:
+  /// **'Traste {n}'**
+  String backing_capoFret(int n);
+
+  /// No description provided for @backing_capoNone.
+  ///
+  /// In es, this message translates to:
+  /// **'Sin capo'**
+  String get backing_capoNone;
+
+  /// No description provided for @backing_capoShown.
+  ///
+  /// In es, this message translates to:
+  /// **'Capo {fret}'**
+  String backing_capoShown(int fret);
+
+  /// No description provided for @backing_cents.
+  ///
+  /// In es, this message translates to:
+  /// **'{n} cents'**
+  String backing_cents(int n);
+
+  /// No description provided for @backing_channelNameField.
+  ///
+  /// In es, this message translates to:
+  /// **'Nombre'**
+  String get backing_channelNameField;
+
+  /// No description provided for @backing_channelRenameMenu.
+  ///
+  /// In es, this message translates to:
+  /// **'Cambiar nombre…'**
+  String get backing_channelRenameMenu;
+
+  /// No description provided for @backing_channelRenameTooltip.
+  ///
+  /// In es, this message translates to:
+  /// **'Doble clic para cambiar el nombre'**
+  String get backing_channelRenameTooltip;
+
+  /// No description provided for @backing_chooserEmpty.
+  ///
+  /// In es, this message translates to:
+  /// **'Aún no hay temas separados. Importa uno y sepáralo en la biblioteca.'**
+  String get backing_chooserEmpty;
+
+  /// No description provided for @backing_chooserPick.
+  ///
+  /// In es, this message translates to:
+  /// **'Elige un tema'**
+  String get backing_chooserPick;
+
+  /// Etiqueta de accesibilidad de un diagrama de acorde (ChordDiagram.swift:65).
+  ///
+  /// In es, this message translates to:
+  /// **'Diagrama del acorde'**
+  String get backing_chordDiagramA11y;
+
+  /// No description provided for @backing_chordMajor.
+  ///
+  /// In es, this message translates to:
+  /// **'mayor'**
+  String get backing_chordMajor;
+
+  /// No description provided for @backing_chordNone.
+  ///
+  /// In es, this message translates to:
+  /// **'N (sin acorde)'**
+  String get backing_chordNone;
+
+  /// No description provided for @backing_chordRemoveOverride.
+  ///
+  /// In es, this message translates to:
+  /// **'Quitar corrección'**
+  String get backing_chordRemoveOverride;
+
+  /// No description provided for @backing_chords.
+  ///
+  /// In es, this message translates to:
+  /// **'Acordes'**
+  String get backing_chords;
+
+  /// No description provided for @backing_chordsAfterAnalysis.
+  ///
+  /// In es, this message translates to:
+  /// **'Los acordes aparecerán al terminar el análisis.'**
+  String get backing_chordsAfterAnalysis;
+
+  /// No description provided for @backing_chordSheetTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Acorde'**
+  String get backing_chordSheetTitle;
+
+  /// No description provided for @backing_chordSplit.
+  ///
+  /// In es, this message translates to:
+  /// **'Partir aquí'**
+  String get backing_chordSplit;
+
+  /// No description provided for @backing_chordSplitTooltip.
+  ///
+  /// In es, this message translates to:
+  /// **'Parte el tramo en el pulso más cercano al cursor de reproducción'**
+  String get backing_chordSplitTooltip;
+
+  /// No description provided for @backing_clearOverrides.
+  ///
+  /// In es, this message translates to:
+  /// **'Quitar todas ({count})'**
+  String backing_clearOverrides(int count);
+
+  /// No description provided for @backing_clearOverridesTooltip.
+  ///
+  /// In es, this message translates to:
+  /// **'Quita todas las correcciones de acordes de este tema'**
+  String get backing_clearOverridesTooltip;
+
+  /// No description provided for @backing_collapse.
+  ///
+  /// In es, this message translates to:
+  /// **'Plegar'**
+  String get backing_collapse;
+
+  /// No description provided for @backing_collapseA11y.
+  ///
+  /// In es, this message translates to:
+  /// **'Plegar acordes'**
+  String get backing_collapseA11y;
+
+  /// No description provided for @backing_dbValue.
+  ///
+  /// In es, this message translates to:
+  /// **'{value} dB'**
+  String backing_dbValue(double value);
+
+  /// No description provided for @backing_discard.
+  ///
+  /// In es, this message translates to:
+  /// **'Descartar'**
+  String get backing_discard;
+
+  /// No description provided for @backing_discardTooltip.
+  ///
+  /// In es, this message translates to:
+  /// **'Vuelve a las secciones guardadas'**
+  String get backing_discardTooltip;
+
+  /// No description provided for @backing_dragHintMac.
+  ///
+  /// In es, this message translates to:
+  /// **'Clic: saltar · arrastrar: bucle (⌥ = compases)'**
+  String get backing_dragHintMac;
+
+  /// No description provided for @backing_dragHintWin.
+  ///
+  /// In es, this message translates to:
+  /// **'Clic: saltar · arrastrar: bucle (Alt = compases)'**
+  String get backing_dragHintWin;
+
+  /// No description provided for @backing_editChords.
+  ///
+  /// In es, this message translates to:
+  /// **'Editar acordes'**
+  String get backing_editChords;
+
+  /// No description provided for @backing_editModeHint.
+  ///
+  /// In es, this message translates to:
+  /// **'Modo edición: clic en un acorde para cambiarlo o partirlo. No se marcan bucles.'**
+  String get backing_editModeHint;
+
+  /// No description provided for @backing_errorLoadStems.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudieron cargar los stems ({error}).'**
+  String backing_errorLoadStems(String error);
+
+  /// No description provided for @backing_errorPlay.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo reproducir ({error}).'**
+  String backing_errorPlay(String error);
+
+  /// No description provided for @backing_errorSaveGuitarNames.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudieron guardar los nombres: {error}'**
+  String backing_errorSaveGuitarNames(String error);
+
+  /// No description provided for @backing_errorSaveGuitarOptions.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudieron guardar las opciones: {error}'**
+  String backing_errorSaveGuitarOptions(String error);
+
+  /// No description provided for @backing_errorSaveSections.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudieron guardar las secciones: {error}'**
+  String backing_errorSaveSections(String error);
+
+  /// No description provided for @backing_errorSaveStudy.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo guardar el estudio: {error}'**
+  String backing_errorSaveStudy(String error);
+
+  /// No description provided for @backing_expand.
+  ///
+  /// In es, this message translates to:
+  /// **'Expandir'**
+  String get backing_expand;
+
+  /// No description provided for @backing_expandA11y.
+  ///
+  /// In es, this message translates to:
+  /// **'Expandir acordes'**
+  String get backing_expandA11y;
+
+  /// No description provided for @backing_faderA11y.
+  ///
+  /// In es, this message translates to:
+  /// **'Volumen'**
+  String get backing_faderA11y;
+
+  /// No description provided for @backing_fineTune.
+  ///
+  /// In es, this message translates to:
+  /// **'Afinación fina'**
+  String get backing_fineTune;
+
+  /// Traste base de un diagrama de acorde, p. ej. 3fr (ChordDiagram.swift:38).
+  ///
+  /// In es, this message translates to:
+  /// **'{base}fr'**
+  String backing_fretLabel(int base);
+
+  /// No description provided for @backing_goToLibrary.
+  ///
+  /// In es, this message translates to:
+  /// **'Ir a la biblioteca'**
+  String get backing_goToLibrary;
+
+  /// No description provided for @backing_guitarsProcessing.
+  ///
+  /// In es, this message translates to:
+  /// **'Procesando guitarras…'**
+  String get backing_guitarsProcessing;
+
+  /// No description provided for @backing_handleEndA11y.
+  ///
+  /// In es, this message translates to:
+  /// **'Borde de fin'**
+  String get backing_handleEndA11y;
+
+  /// No description provided for @backing_handleStartA11y.
+  ///
+  /// In es, this message translates to:
+  /// **'Borde de inicio'**
+  String get backing_handleStartA11y;
+
+  /// No description provided for @backing_key.
+  ///
+  /// In es, this message translates to:
+  /// **'Tonalidad:'**
+  String get backing_key;
+
+  /// No description provided for @backing_keyBackToDetected.
+  ///
+  /// In es, this message translates to:
+  /// **'Volver a la detectada'**
+  String get backing_keyBackToDetected;
+
+  /// No description provided for @backing_keyCorrected.
+  ///
+  /// In es, this message translates to:
+  /// **'(corregida)'**
+  String get backing_keyCorrected;
+
+  /// No description provided for @backing_keyMajor.
+  ///
+  /// In es, this message translates to:
+  /// **'{note} mayor'**
+  String backing_keyMajor(String note);
+
+  /// No description provided for @backing_keyMinor.
+  ///
+  /// In es, this message translates to:
+  /// **'{note} menor'**
+  String backing_keyMinor(String note);
+
+  /// Nombre de la nota de la tonalidad. Clave `tonic` sin «#»: sostenido = s (Cs = C#), bemol = b (Db). Sostenidos como en SpanishNotes.names (BackingView.swift:9). Los bemoles no tienen literal en SwiftUI y caen a `other` (muestran el valor crudo).
+  ///
+  /// In es, this message translates to:
+  /// **'{tonic, select, C{Do} Cs{Do#} D{Re} Ds{Re#} E{Mi} F{Fa} Fs{Fa#} G{Sol} Gs{Sol#} A{La} As{La#} B{Si} other{{tonic}}}'**
+  String backing_keyNote(String tonic);
+
+  /// No description provided for @backing_loopClearA11y.
+  ///
+  /// In es, this message translates to:
+  /// **'Quitar bucle'**
+  String get backing_loopClearA11y;
+
+  /// No description provided for @backing_loopEnd.
+  ///
+  /// In es, this message translates to:
+  /// **'Fin'**
+  String get backing_loopEnd;
+
+  /// No description provided for @backing_loopEndTooltip.
+  ///
+  /// In es, this message translates to:
+  /// **'Marca el final del bucle en la posición actual'**
+  String get backing_loopEndTooltip;
+
+  /// No description provided for @backing_loopFree.
+  ///
+  /// In es, this message translates to:
+  /// **'libre'**
+  String get backing_loopFree;
+
+  /// No description provided for @backing_loopLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Bucle: {name} · {from}–{to}'**
+  String backing_loopLabel(String name, String from, String to);
+
+  /// No description provided for @backing_loopNameBars.
+  ///
+  /// In es, this message translates to:
+  /// **'compases'**
+  String get backing_loopNameBars;
+
+  /// No description provided for @backing_loopNameChords.
+  ///
+  /// In es, this message translates to:
+  /// **'acordes'**
+  String get backing_loopNameChords;
+
+  /// No description provided for @backing_loopStartButton.
+  ///
+  /// In es, this message translates to:
+  /// **'Inicio {time}'**
+  String backing_loopStartButton(String time);
+
+  /// No description provided for @backing_loopStartTooltip.
+  ///
+  /// In es, this message translates to:
+  /// **'Marca el inicio del bucle en la posición actual'**
+  String get backing_loopStartTooltip;
+
+  /// No description provided for @backing_markSection.
+  ///
+  /// In es, this message translates to:
+  /// **'Marcar sección'**
+  String get backing_markSection;
+
+  /// No description provided for @backing_markSectionTooltip.
+  ///
+  /// In es, this message translates to:
+  /// **'Marca el bucle como una sección'**
+  String get backing_markSectionTooltip;
+
+  /// No description provided for @backing_markSolo.
+  ///
+  /// In es, this message translates to:
+  /// **'Marcar como solo'**
+  String get backing_markSolo;
+
+  /// No description provided for @backing_markSoloTooltip.
+  ///
+  /// In es, this message translates to:
+  /// **'Marca el bucle como un solo: sus guitarras se separan al aplicar'**
+  String get backing_markSoloTooltip;
+
+  /// No description provided for @backing_master.
+  ///
+  /// In es, this message translates to:
+  /// **'Master'**
+  String get backing_master;
+
+  /// No description provided for @backing_menuDeleteSection.
+  ///
+  /// In es, this message translates to:
+  /// **'Eliminar sección'**
+  String get backing_menuDeleteSection;
+
+  /// No description provided for @backing_menuMarkSolo.
+  ///
+  /// In es, this message translates to:
+  /// **'Marcar como solo'**
+  String get backing_menuMarkSolo;
+
+  /// No description provided for @backing_menuRenameAdjust.
+  ///
+  /// In es, this message translates to:
+  /// **'Renombrar y ajustar…'**
+  String get backing_menuRenameAdjust;
+
+  /// No description provided for @backing_menuUnmarkSolo.
+  ///
+  /// In es, this message translates to:
+  /// **'Quitar marca de solo'**
+  String get backing_menuUnmarkSolo;
+
+  /// No description provided for @backing_metronome.
+  ///
+  /// In es, this message translates to:
+  /// **'Metrónomo'**
+  String get backing_metronome;
+
+  /// No description provided for @backing_mixer.
+  ///
+  /// In es, this message translates to:
+  /// **'Mezclador'**
+  String get backing_mixer;
+
+  /// No description provided for @backing_mixerOutput.
+  ///
+  /// In es, this message translates to:
+  /// **'Salida: {device}'**
+  String backing_mixerOutput(String device);
+
+  /// No description provided for @backing_muteA11y.
+  ///
+  /// In es, this message translates to:
+  /// **'Silenciar {name}'**
+  String backing_muteA11y(String name);
+
+  /// No description provided for @backing_muted.
+  ///
+  /// In es, this message translates to:
+  /// **'Silenciado'**
+  String get backing_muted;
+
+  /// No description provided for @backing_muteLetter.
+  ///
+  /// In es, this message translates to:
+  /// **'M'**
+  String get backing_muteLetter;
+
+  /// No description provided for @backing_nextChord.
+  ///
+  /// In es, this message translates to:
+  /// **'Siguiente: {name}'**
+  String backing_nextChord(String name);
+
+  /// Etiqueta de accesibilidad cuando el acorde no tiene diagrama (ChordDiagram.swift:65).
+  ///
+  /// In es, this message translates to:
+  /// **'Sin diagrama'**
+  String get backing_noChordDiagramA11y;
+
+  /// No description provided for @backing_noChords.
+  ///
+  /// In es, this message translates to:
+  /// **'Sin acordes detectados.'**
+  String get backing_noChords;
+
+  /// No description provided for @backing_noGrid.
+  ///
+  /// In es, this message translates to:
+  /// **'Sin rejilla de compases todavía.'**
+  String get backing_noGrid;
+
+  /// No description provided for @backing_notSeparatedBody.
+  ///
+  /// In es, this message translates to:
+  /// **'Backing track necesita los stems. Sepáralo desde la biblioteca y vuelve.'**
+  String get backing_notSeparatedBody;
+
+  /// No description provided for @backing_notSeparatedTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Este tema aún no está separado'**
+  String get backing_notSeparatedTitle;
+
+  /// No description provided for @backing_pause.
+  ///
+  /// In es, this message translates to:
+  /// **'Pausar'**
+  String get backing_pause;
+
+  /// No description provided for @backing_play.
+  ///
+  /// In es, this message translates to:
+  /// **'Reproducir'**
+  String get backing_play;
+
+  /// No description provided for @backing_positionA11y.
+  ///
+  /// In es, this message translates to:
+  /// **'Posición'**
+  String get backing_positionA11y;
+
+  /// No description provided for @backing_positionValueA11y.
+  ///
+  /// In es, this message translates to:
+  /// **'{time} de {duration}'**
+  String backing_positionValueA11y(String time, String duration);
+
+  /// No description provided for @backing_retry.
+  ///
+  /// In es, this message translates to:
+  /// **'Reintentar'**
+  String get backing_retry;
+
+  /// kind: 'solo' o 'section'.
+  ///
+  /// In es, this message translates to:
+  /// **'{kind, select, solo{Solo} other{Sección}} {name}, {from} a {to}'**
+  String backing_sectionA11y(String kind, String name, String from, String to);
+
+  /// No description provided for @backing_sectionA11yHint.
+  ///
+  /// In es, this message translates to:
+  /// **'Clic para editarla; mantener pulsado para repetirla en bucle'**
+  String get backing_sectionA11yHint;
+
+  /// solo: 'yes' o 'no'.
+  ///
+  /// In es, this message translates to:
+  /// **'{name}{solo, select, yes{ (solo)} other{}} · {from}–{to} · clic: editar, mantener: bucle'**
+  String backing_sectionBoxTooltip(
+    String name,
+    String solo,
+    String from,
+    String to,
+  );
+
+  /// No description provided for @backing_sectionColor.
+  ///
+  /// In es, this message translates to:
+  /// **'Color'**
+  String get backing_sectionColor;
+
+  /// No description provided for @backing_sectionColorN.
+  ///
+  /// In es, this message translates to:
+  /// **'Color {n}'**
+  String backing_sectionColorN(int n);
+
+  /// No description provided for @backing_sectionDelete.
+  ///
+  /// In es, this message translates to:
+  /// **'Eliminar'**
+  String get backing_sectionDelete;
+
+  /// No description provided for @backing_sectionDone.
+  ///
+  /// In es, this message translates to:
+  /// **'Hecho'**
+  String get backing_sectionDone;
+
+  /// No description provided for @backing_sectionEnd.
+  ///
+  /// In es, this message translates to:
+  /// **'Fin'**
+  String get backing_sectionEnd;
+
+  /// No description provided for @backing_sectionListen.
+  ///
+  /// In es, this message translates to:
+  /// **'Escuchar en bucle'**
+  String get backing_sectionListen;
+
+  /// No description provided for @backing_sectionName.
+  ///
+  /// In es, this message translates to:
+  /// **'Nombre'**
+  String get backing_sectionName;
+
+  /// edge: 'start' o 'end'. direction: 'after' o 'before'.
+  ///
+  /// In es, this message translates to:
+  /// **'{edge, select, start{Inicio} other{Fin}} {direction, select, after{después} other{antes}}'**
+  String backing_sectionNudgeA11y(String edge, String direction);
+
+  /// No description provided for @backing_sectionNudgeHintMac.
+  ///
+  /// In es, this message translates to:
+  /// **'◀ ▶ mueven por acorde · ⌥ por compás'**
+  String get backing_sectionNudgeHintMac;
+
+  /// No description provided for @backing_sectionNudgeHintWin.
+  ///
+  /// In es, this message translates to:
+  /// **'◀ ▶ mueven por acorde · Alt por compás'**
+  String get backing_sectionNudgeHintWin;
+
+  /// No description provided for @backing_sectionSheetSection.
+  ///
+  /// In es, this message translates to:
+  /// **'Sección'**
+  String get backing_sectionSheetSection;
+
+  /// No description provided for @backing_sectionSheetSolo.
+  ///
+  /// In es, this message translates to:
+  /// **'Solo'**
+  String get backing_sectionSheetSolo;
+
+  /// No description provided for @backing_sectionSolo.
+  ///
+  /// In es, this message translates to:
+  /// **'Solo'**
+  String get backing_sectionSolo;
+
+  /// No description provided for @backing_sectionSoloOrange.
+  ///
+  /// In es, this message translates to:
+  /// **'Los solos van en naranja'**
+  String get backing_sectionSoloOrange;
+
+  /// No description provided for @backing_sectionStart.
+  ///
+  /// In es, this message translates to:
+  /// **'Inicio'**
+  String get backing_sectionStart;
+
+  /// No description provided for @backing_sectionSuggestBridge.
+  ///
+  /// In es, this message translates to:
+  /// **'Puente'**
+  String get backing_sectionSuggestBridge;
+
+  /// No description provided for @backing_sectionSuggestChorus.
+  ///
+  /// In es, this message translates to:
+  /// **'Estribillo'**
+  String get backing_sectionSuggestChorus;
+
+  /// No description provided for @backing_sectionSuggestEnd.
+  ///
+  /// In es, this message translates to:
+  /// **'Final'**
+  String get backing_sectionSuggestEnd;
+
+  /// No description provided for @backing_sectionSuggestIntro.
+  ///
+  /// In es, this message translates to:
+  /// **'Intro'**
+  String get backing_sectionSuggestIntro;
+
+  /// No description provided for @backing_sectionSuggestVerse.
+  ///
+  /// In es, this message translates to:
+  /// **'Estrofa'**
+  String get backing_sectionSuggestVerse;
+
+  /// No description provided for @backing_soloA11y.
+  ///
+  /// In es, this message translates to:
+  /// **'Solo {name}'**
+  String backing_soloA11y(String name);
+
+  /// No description provided for @backing_soloLetter.
+  ///
+  /// In es, this message translates to:
+  /// **'S'**
+  String get backing_soloLetter;
+
+  /// No description provided for @backing_stemBass.
+  ///
+  /// In es, this message translates to:
+  /// **'Bajo'**
+  String get backing_stemBass;
+
+  /// No description provided for @backing_stemDrums.
+  ///
+  /// In es, this message translates to:
+  /// **'Batería'**
+  String get backing_stemDrums;
+
+  /// No description provided for @backing_stemGuitar.
+  ///
+  /// In es, this message translates to:
+  /// **'Guitarra'**
+  String get backing_stemGuitar;
+
+  /// No description provided for @backing_stemOther.
+  ///
+  /// In es, this message translates to:
+  /// **'Resto'**
+  String get backing_stemOther;
+
+  /// No description provided for @backing_stemPiano.
+  ///
+  /// In es, this message translates to:
+  /// **'Piano'**
+  String get backing_stemPiano;
+
+  /// No description provided for @backing_stemVocals.
+  ///
+  /// In es, this message translates to:
+  /// **'Voz'**
+  String get backing_stemVocals;
+
+  /// No description provided for @backing_stereoSplit.
+  ///
+  /// In es, this message translates to:
+  /// **'Guitarras en L y R'**
+  String get backing_stereoSplit;
+
+  /// No description provided for @backing_stereoSplitTooltip.
+  ///
+  /// In es, this message translates to:
+  /// **'L = canal izquierdo, R = canal derecho de la pista de guitarras'**
+  String get backing_stereoSplitTooltip;
+
+  /// No description provided for @backing_tabButton.
+  ///
+  /// In es, this message translates to:
+  /// **'Tablatura'**
+  String get backing_tabButton;
+
+  /// No description provided for @backing_tabButtonTooltip.
+  ///
+  /// In es, this message translates to:
+  /// **'Abrir la tablatura de este tema'**
+  String get backing_tabButtonTooltip;
+
+  /// No description provided for @backing_tempo.
+  ///
+  /// In es, this message translates to:
+  /// **'Tempo'**
+  String get backing_tempo;
+
+  /// No description provided for @backing_tempoDetected.
+  ///
+  /// In es, this message translates to:
+  /// **'Tempo detectado:'**
+  String get backing_tempoDetected;
+
+  /// No description provided for @backing_title.
+  ///
+  /// In es, this message translates to:
+  /// **'Backing track'**
+  String get backing_title;
+
+  /// No description provided for @backing_transpose.
+  ///
+  /// In es, this message translates to:
+  /// **'Transponer'**
+  String get backing_transpose;
+
+  /// No description provided for @backing_transposeZero.
+  ///
+  /// In es, this message translates to:
+  /// **'0 semitonos'**
+  String get backing_transposeZero;
+
+  /// No description provided for @backing_unmuteA11y.
+  ///
+  /// In es, this message translates to:
+  /// **'Activar {name}'**
+  String backing_unmuteA11y(String name);
+
+  /// No description provided for @backing_withoutGuitars.
+  ///
+  /// In es, this message translates to:
+  /// **'Sin guitarras'**
+  String get backing_withoutGuitars;
+
   /// Ancla del bloque tab: añade las claves del área debajo, en orden alfabético; no edites otros bloques.
   ///
   /// In es, this message translates to:
   /// **''**
   String get tabAnchor;
+
+  /// No description provided for @tab_a11yCloseNotice.
+  ///
+  /// In es, this message translates to:
+  /// **'Cerrar aviso'**
+  String get tab_a11yCloseNotice;
+
+  /// No description provided for @tab_a11yLengthenNote.
+  ///
+  /// In es, this message translates to:
+  /// **'Alargar nota'**
+  String get tab_a11yLengthenNote;
+
+  /// No description provided for @tab_a11yMute.
+  ///
+  /// In es, this message translates to:
+  /// **'Silenciar {track}'**
+  String tab_a11yMute(String track);
+
+  /// No description provided for @tab_a11yPause.
+  ///
+  /// In es, this message translates to:
+  /// **'Pausar'**
+  String get tab_a11yPause;
+
+  /// No description provided for @tab_a11yPlay.
+  ///
+  /// In es, this message translates to:
+  /// **'Reproducir'**
+  String get tab_a11yPlay;
+
+  /// No description provided for @tab_a11yRewind.
+  ///
+  /// In es, this message translates to:
+  /// **'Volver al inicio'**
+  String get tab_a11yRewind;
+
+  /// No description provided for @tab_a11yShortenNote.
+  ///
+  /// In es, this message translates to:
+  /// **'Acortar nota'**
+  String get tab_a11yShortenNote;
+
+  /// No description provided for @tab_a11ySolo.
+  ///
+  /// In es, this message translates to:
+  /// **'Solo {track}'**
+  String tab_a11ySolo(String track);
+
+  /// No description provided for @tab_a11yUnmute.
+  ///
+  /// In es, this message translates to:
+  /// **'Activar {track}'**
+  String tab_a11yUnmute(String track);
+
+  /// No description provided for @tab_addNote.
+  ///
+  /// In es, this message translates to:
+  /// **'Añadir nota'**
+  String get tab_addNote;
+
+  /// No description provided for @tab_chooserEmpty.
+  ///
+  /// In es, this message translates to:
+  /// **'Aún no hay temas separados. Importa uno y sepáralo en la biblioteca.'**
+  String get tab_chooserEmpty;
+
+  /// No description provided for @tab_chooserPick.
+  ///
+  /// In es, this message translates to:
+  /// **'Elige un tema'**
+  String get tab_chooserPick;
+
+  /// No description provided for @tab_choosingAutomatic.
+  ///
+  /// In es, this message translates to:
+  /// **'Transcribir automáticamente'**
+  String get tab_choosingAutomatic;
+
+  /// No description provided for @tab_choosingBody.
+  ///
+  /// In es, this message translates to:
+  /// **'Songsterr trae la tablatura hecha por la comunidad; la transcripción automática sale del audio.'**
+  String get tab_choosingBody;
+
+  /// No description provided for @tab_choosingSongsterr.
+  ///
+  /// In es, this message translates to:
+  /// **'Buscar en Songsterr'**
+  String get tab_choosingSongsterr;
+
+  /// No description provided for @tab_choosingTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Elige la fuente de la tablatura'**
+  String get tab_choosingTitle;
+
+  /// No description provided for @tab_confirmAutoAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Pasar a automática'**
+  String get tab_confirmAutoAction;
+
+  /// No description provided for @tab_confirmAutoBody.
+  ///
+  /// In es, this message translates to:
+  /// **'Se quitan las pistas de Songsterr y sus ediciones; las demás se transcriben del audio.'**
+  String get tab_confirmAutoBody;
+
+  /// No description provided for @tab_confirmAutoCancel.
+  ///
+  /// In es, this message translates to:
+  /// **'Cancelar'**
+  String get tab_confirmAutoCancel;
+
+  /// No description provided for @tab_confirmAutoTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'¿Pasar a transcripción automática?'**
+  String get tab_confirmAutoTitle;
+
+  /// No description provided for @tab_delete.
+  ///
+  /// In es, this message translates to:
+  /// **'Borrar'**
+  String get tab_delete;
+
+  /// No description provided for @tab_drumKeysHint.
+  ///
+  /// In es, this message translates to:
+  /// **'B bombo · C caja · H charles · T tom · P platos'**
+  String get tab_drumKeysHint;
+
+  /// No description provided for @tab_editFretRange.
+  ///
+  /// In es, this message translates to:
+  /// **'El traste saldría de 0–24.'**
+  String get tab_editFretRange;
+
+  /// No description provided for @tab_editInvalidDuration.
+  ///
+  /// In es, this message translates to:
+  /// **'Esa duración no cabe.'**
+  String get tab_editInvalidDuration;
+
+  /// No description provided for @tab_editInvalidPosition.
+  ///
+  /// In es, this message translates to:
+  /// **'Esa posición no está en la rejilla de la pista.'**
+  String get tab_editInvalidPosition;
+
+  /// No description provided for @tab_editNoOtherString.
+  ///
+  /// In es, this message translates to:
+  /// **'No hay otra cuerda en esa dirección.'**
+  String get tab_editNoOtherString;
+
+  /// No description provided for @tab_editNotes.
+  ///
+  /// In es, this message translates to:
+  /// **'Editar notas'**
+  String get tab_editNotes;
+
+  /// No description provided for @tab_editNothingSelected.
+  ///
+  /// In es, this message translates to:
+  /// **'No hay nada seleccionado.'**
+  String get tab_editNothingSelected;
+
+  /// No description provided for @tab_editNoTieOrigin.
+  ///
+  /// In es, this message translates to:
+  /// **'No hay una nota anterior igual en esa cuerda a la que ligarla.'**
+  String get tab_editNoTieOrigin;
+
+  /// No description provided for @tab_editStringOccupied.
+  ///
+  /// In es, this message translates to:
+  /// **'Ya hay una nota en esa cuerda en ese punto.'**
+  String get tab_editStringOccupied;
+
+  /// No description provided for @tab_editWrongKind.
+  ///
+  /// In es, this message translates to:
+  /// **'Esa edición no vale para esta pista.'**
+  String get tab_editWrongKind;
+
+  /// No description provided for @tab_emptyBody.
+  ///
+  /// In es, this message translates to:
+  /// **'Este tema no tiene stems de guitarra, bajo o batería con audio.'**
+  String get tab_emptyBody;
+
+  /// No description provided for @tab_emptyTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'No hay pistas que transcribir'**
+  String get tab_emptyTitle;
+
+  /// No description provided for @tab_exportGuitarPro.
+  ///
+  /// In es, this message translates to:
+  /// **'Exportar a Guitar Pro'**
+  String get tab_exportGuitarPro;
+
+  /// No description provided for @tab_failedTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo transcribir'**
+  String get tab_failedTitle;
+
+  /// No description provided for @tab_flashExportFailed.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo exportar: {error}'**
+  String tab_flashExportFailed(String error);
+
+  /// No description provided for @tab_flashNoHits.
+  ///
+  /// In es, this message translates to:
+  /// **'No hay golpes seleccionados.'**
+  String get tab_flashNoHits;
+
+  /// No description provided for @tab_flashNoNote.
+  ///
+  /// In es, this message translates to:
+  /// **'No hay ninguna nota seleccionada.'**
+  String get tab_flashNoNote;
+
+  /// No description provided for @tab_flashNoSoundfont.
+  ///
+  /// In es, this message translates to:
+  /// **'Falta el soundfont de alphaTab en la app.'**
+  String get tab_flashNoSoundfont;
+
+  /// No description provided for @tab_flashRetuned.
+  ///
+  /// In es, this message translates to:
+  /// **'{n, plural, =1{1 nota se movió una octava} other{{n} notas se movieron una octava}} y {dropped} se quitaron por no caber en la afinación.'**
+  String tab_flashRetuned(int n, String dropped);
+
+  /// No description provided for @tab_flashSaveFailed.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo guardar la tablatura: {error}'**
+  String tab_flashSaveFailed(String error);
+
+  /// No description provided for @tab_flashSaved.
+  ///
+  /// In es, this message translates to:
+  /// **'Guardado {file}.'**
+  String tab_flashSaved(String file);
+
+  /// No description provided for @tab_flashSynthFailed.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo sintetizar la pista: {error}'**
+  String tab_flashSynthFailed(String error);
+
+  /// No description provided for @tab_footerAutomatic.
+  ///
+  /// In es, this message translates to:
+  /// **'Transcripción automática · revisa y corrige si hace falta'**
+  String get tab_footerAutomatic;
+
+  /// No description provided for @tab_footerSongsterr.
+  ///
+  /// In es, this message translates to:
+  /// **'Tablatura de Songsterr · revisa y corrige si hace falta'**
+  String get tab_footerSongsterr;
+
+  /// No description provided for @tab_headerSummary.
+  ///
+  /// In es, this message translates to:
+  /// **'{bar} · {bpm} BPM'**
+  String tab_headerSummary(String bar, int bpm);
+
+  /// No description provided for @tab_issueFormatChanged.
+  ///
+  /// In es, this message translates to:
+  /// **'Songsterr ha cambiado su formato.'**
+  String get tab_issueFormatChanged;
+
+  /// No description provided for @tab_issueHttp.
+  ///
+  /// In es, this message translates to:
+  /// **'Songsterr respondió con el error {code}.'**
+  String tab_issueHttp(int code);
+
+  /// No description provided for @tab_issueInvalidLink.
+  ///
+  /// In es, this message translates to:
+  /// **'Ese enlace no es de Songsterr.'**
+  String get tab_issueInvalidLink;
+
+  /// No description provided for @tab_issueNoResults.
+  ///
+  /// In es, this message translates to:
+  /// **'No está en Songsterr.'**
+  String get tab_issueNoResults;
+
+  /// No description provided for @tab_issueOffline.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo conectar con Songsterr. Comprueba la conexión.'**
+  String get tab_issueOffline;
+
+  /// No description provided for @tab_issueRateLimited.
+  ///
+  /// In es, this message translates to:
+  /// **'Songsterr está limitando las peticiones. Espera un poco y vuelve a intentarlo.'**
+  String get tab_issueRateLimited;
+
+  /// No description provided for @tab_keysHintMac.
+  ///
+  /// In es, this message translates to:
+  /// **'Dígitos: traste · ↑ ↓: cuerda · ← →: mover · +/−: duración · ⌘Z deshacer'**
+  String get tab_keysHintMac;
+
+  /// No description provided for @tab_keysHintWin.
+  ///
+  /// In es, this message translates to:
+  /// **'Dígitos: traste · ↑ ↓: cuerda · ← →: mover · +/−: duración · Ctrl+Z deshacer'**
+  String get tab_keysHintWin;
+
+  /// No description provided for @tab_listenLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Oír'**
+  String get tab_listenLabel;
+
+  /// No description provided for @tab_listenMixed.
+  ///
+  /// In es, this message translates to:
+  /// **'Mixto'**
+  String get tab_listenMixed;
+
+  /// No description provided for @tab_listenStems.
+  ///
+  /// In es, this message translates to:
+  /// **'Stems'**
+  String get tab_listenStems;
+
+  /// No description provided for @tab_listenTrack.
+  ///
+  /// In es, this message translates to:
+  /// **'Oír transcripción'**
+  String get tab_listenTrack;
+
+  /// No description provided for @tab_listenTranscription.
+  ///
+  /// In es, this message translates to:
+  /// **'Transcripción'**
+  String get tab_listenTranscription;
+
+  /// No description provided for @tab_loop.
+  ///
+  /// In es, this message translates to:
+  /// **'Bucle'**
+  String get tab_loop;
+
+  /// No description provided for @tab_loopActive.
+  ///
+  /// In es, this message translates to:
+  /// **'Bucle: {name} · {from}–{to}'**
+  String tab_loopActive(String name, String from, String to);
+
+  /// No description provided for @tab_loopBar.
+  ///
+  /// In es, this message translates to:
+  /// **'Compás {n}'**
+  String tab_loopBar(int n);
+
+  /// Nombre del bucle creado por arrastre; va en minúscula.
+  ///
+  /// In es, this message translates to:
+  /// **'compás {n}'**
+  String tab_loopBarName(int n);
+
+  /// No description provided for @tab_loopFree.
+  ///
+  /// In es, this message translates to:
+  /// **'libre'**
+  String get tab_loopFree;
+
+  /// No description provided for @tab_loopNone.
+  ///
+  /// In es, this message translates to:
+  /// **'Sin bucle'**
+  String get tab_loopNone;
+
+  /// No description provided for @tab_loopSelection.
+  ///
+  /// In es, this message translates to:
+  /// **'Selección'**
+  String get tab_loopSelection;
+
+  /// No description provided for @tab_metronome.
+  ///
+  /// In es, this message translates to:
+  /// **'Metrónomo'**
+  String get tab_metronome;
+
+  /// No description provided for @tab_noticeAnd.
+  ///
+  /// In es, this message translates to:
+  /// **'{a} y {b}'**
+  String tab_noticeAnd(String a, String b);
+
+  /// El texto de dropped incluye la cantidad y el sustantivo.
+  ///
+  /// In es, this message translates to:
+  /// **'{dropped} se quitaron por no caber en las cuerdas'**
+  String tab_noticeDropped(String dropped);
+
+  /// No description provided for @tab_noticeRedone.
+  ///
+  /// In es, this message translates to:
+  /// **'Se han rehecho: {tracks}. Su audio cambió, así que se perdieron las ediciones de esas pistas.'**
+  String tab_noticeRedone(String tracks);
+
+  /// No description provided for @tab_noticeShifted.
+  ///
+  /// In es, this message translates to:
+  /// **'{n, plural, =1{1 nota fuera del registro de la afinación se subió o bajó una octava} other{{n} notas fuera del registro de la afinación se subieron o bajaron una octava}}'**
+  String tab_noticeShifted(int n);
+
+  /// No description provided for @tab_noticeTranscription.
+  ///
+  /// In es, this message translates to:
+  /// **'Transcripción: {parts}.'**
+  String tab_noticeTranscription(String parts);
+
+  /// No description provided for @tab_pieceCrash.
+  ///
+  /// In es, this message translates to:
+  /// **'platos'**
+  String get tab_pieceCrash;
+
+  /// No description provided for @tab_pieceHiHat.
+  ///
+  /// In es, this message translates to:
+  /// **'charles'**
+  String get tab_pieceHiHat;
+
+  /// No description provided for @tab_pieceKick.
+  ///
+  /// In es, this message translates to:
+  /// **'bombo'**
+  String get tab_pieceKick;
+
+  /// No description provided for @tab_pieceOpenHiHat.
+  ///
+  /// In es, this message translates to:
+  /// **'charles abierto'**
+  String get tab_pieceOpenHiHat;
+
+  /// No description provided for @tab_pieceSnare.
+  ///
+  /// In es, this message translates to:
+  /// **'caja'**
+  String get tab_pieceSnare;
+
+  /// No description provided for @tab_pieceTom.
+  ///
+  /// In es, this message translates to:
+  /// **'tom'**
+  String get tab_pieceTom;
+
+  /// No description provided for @tab_redo.
+  ///
+  /// In es, this message translates to:
+  /// **'Rehacer'**
+  String get tab_redo;
+
+  /// No description provided for @tab_selectionDrums.
+  ///
+  /// In es, this message translates to:
+  /// **'{place} · {pieces}'**
+  String tab_selectionDrums(String place, String pieces);
+
+  /// No description provided for @tab_selectionNoHits.
+  ///
+  /// In es, this message translates to:
+  /// **'sin golpes'**
+  String get tab_selectionNoHits;
+
+  /// No description provided for @tab_selectionNote.
+  ///
+  /// In es, this message translates to:
+  /// **'{place} · cuerda {string}, traste {fret}'**
+  String tab_selectionNote(String place, int string, int fret);
+
+  /// No description provided for @tab_selectionNoNote.
+  ///
+  /// In es, this message translates to:
+  /// **'{place} · cuerda {string}, sin nota'**
+  String tab_selectionNoNote(String place, int string);
+
+  /// No description provided for @tab_selectionPlace.
+  ///
+  /// In es, this message translates to:
+  /// **'Compás {bar}, pulso {beat}'**
+  String tab_selectionPlace(int bar, int beat);
+
+  /// No description provided for @tab_sheetAccept.
+  ///
+  /// In es, this message translates to:
+  /// **'Aceptar'**
+  String get tab_sheetAccept;
+
+  /// No description provided for @tab_sheetAllAutomatic.
+  ///
+  /// In es, this message translates to:
+  /// **'Todo automático'**
+  String get tab_sheetAllAutomatic;
+
+  /// No description provided for @tab_sheetAutomatic.
+  ///
+  /// In es, this message translates to:
+  /// **'Transcribir automáticamente'**
+  String get tab_sheetAutomatic;
+
+  /// No description provided for @tab_sheetBack.
+  ///
+  /// In es, this message translates to:
+  /// **'Volver'**
+  String get tab_sheetBack;
+
+  /// No description provided for @tab_sheetBackShort.
+  ///
+  /// In es, this message translates to:
+  /// **'Atrás'**
+  String get tab_sheetBackShort;
+
+  /// No description provided for @tab_sheetCancel.
+  ///
+  /// In es, this message translates to:
+  /// **'Cancelar'**
+  String get tab_sheetCancel;
+
+  /// No description provided for @tab_sheetClose.
+  ///
+  /// In es, this message translates to:
+  /// **'Cerrar'**
+  String get tab_sheetClose;
+
+  /// No description provided for @tab_sheetConfidenceUnmeasured.
+  ///
+  /// In es, this message translates to:
+  /// **'sin medir'**
+  String get tab_sheetConfidenceUnmeasured;
+
+  /// No description provided for @tab_sheetExtraTracks.
+  ///
+  /// In es, this message translates to:
+  /// **'Pistas extra, sin stem: {names}. Entran en la tablatura y en el .gp y solo suenan con «Oír transcripción».'**
+  String tab_sheetExtraTracks(String names);
+
+  /// No description provided for @tab_sheetLinkHint.
+  ///
+  /// In es, this message translates to:
+  /// **'O pega un enlace de Songsterr'**
+  String get tab_sheetLinkHint;
+
+  /// No description provided for @tab_sheetNoSolos.
+  ///
+  /// In es, this message translates to:
+  /// **'Transcripción automática (el tema no tiene secciones de solo)'**
+  String get tab_sheetNoSolos;
+
+  /// No description provided for @tab_sheetOtherResults.
+  ///
+  /// In es, this message translates to:
+  /// **'Otros resultados'**
+  String get tab_sheetOtherResults;
+
+  /// No description provided for @tab_sheetPairingHelp.
+  ///
+  /// In es, this message translates to:
+  /// **'Qué pista de Songsterr va con cada stem. La confianza es el parecido medido con el audio.'**
+  String get tab_sheetPairingHelp;
+
+  /// No description provided for @tab_sheetPickAutomatic.
+  ///
+  /// In es, this message translates to:
+  /// **'Transcripción automática'**
+  String get tab_sheetPickAutomatic;
+
+  /// No description provided for @tab_sheetPreview.
+  ///
+  /// In es, this message translates to:
+  /// **'Vista previa'**
+  String get tab_sheetPreview;
+
+  /// No description provided for @tab_sheetReadingTracks.
+  ///
+  /// In es, this message translates to:
+  /// **'Leyendo las pistas…'**
+  String get tab_sheetReadingTracks;
+
+  /// No description provided for @tab_sheetRetry.
+  ///
+  /// In es, this message translates to:
+  /// **'Reintentar'**
+  String get tab_sheetRetry;
+
+  /// No description provided for @tab_sheetSearch.
+  ///
+  /// In es, this message translates to:
+  /// **'Búsqueda: {query}'**
+  String tab_sheetSearch(String query);
+
+  /// No description provided for @tab_sheetSearching.
+  ///
+  /// In es, this message translates to:
+  /// **'Buscando en Songsterr…'**
+  String get tab_sheetSearching;
+
+  /// No description provided for @tab_sheetSoloNone.
+  ///
+  /// In es, this message translates to:
+  /// **'Ninguna'**
+  String get tab_sheetSoloNone;
+
+  /// No description provided for @tab_sheetSoloRow.
+  ///
+  /// In es, this message translates to:
+  /// **'Solo {n} ({time})'**
+  String tab_sheetSoloRow(int n, String time);
+
+  /// No description provided for @tab_sheetSuggestAuto.
+  ///
+  /// In es, this message translates to:
+  /// **'Puedes transcribir el tema automáticamente.'**
+  String get tab_sheetSuggestAuto;
+
+  /// No description provided for @tab_sheetTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Tablatura de Songsterr'**
+  String get tab_sheetTitle;
+
+  /// No description provided for @tab_sheetUseLink.
+  ///
+  /// In es, this message translates to:
+  /// **'Usar enlace'**
+  String get tab_sheetUseLink;
+
+  /// No description provided for @tab_sheetUseThis.
+  ///
+  /// In es, this message translates to:
+  /// **'Usar esta'**
+  String get tab_sheetUseThis;
+
+  /// No description provided for @tab_sheetWorkingDownload.
+  ///
+  /// In es, this message translates to:
+  /// **'Descargando pistas de Songsterr…'**
+  String get tab_sheetWorkingDownload;
+
+  /// No description provided for @tab_sheetWorkingRead.
+  ///
+  /// In es, this message translates to:
+  /// **'Leyendo Songsterr…'**
+  String get tab_sheetWorkingRead;
+
+  /// No description provided for @tab_sourceAutomatic.
+  ///
+  /// In es, this message translates to:
+  /// **'Transcripción automática'**
+  String get tab_sourceAutomatic;
+
+  /// No description provided for @tab_sourceChangePairing.
+  ///
+  /// In es, this message translates to:
+  /// **'Cambiar emparejamiento…'**
+  String get tab_sourceChangePairing;
+
+  /// No description provided for @tab_sourceMenu.
+  ///
+  /// In es, this message translates to:
+  /// **'Fuente: {source}'**
+  String tab_sourceMenu(String source);
+
+  /// No description provided for @tab_sourceNone.
+  ///
+  /// In es, this message translates to:
+  /// **'Sin elegir'**
+  String get tab_sourceNone;
+
+  /// No description provided for @tab_sourceSongsterr.
+  ///
+  /// In es, this message translates to:
+  /// **'Songsterr'**
+  String get tab_sourceSongsterr;
+
+  /// No description provided for @tab_sourceSongsterrSearch.
+  ///
+  /// In es, this message translates to:
+  /// **'Buscar en Songsterr…'**
+  String get tab_sourceSongsterrSearch;
+
+  /// No description provided for @tab_synthFailedSoundfont.
+  ///
+  /// In es, this message translates to:
+  /// **'Falta el soundfont en la app'**
+  String get tab_synthFailedSoundfont;
+
+  /// No description provided for @tab_synthProgress.
+  ///
+  /// In es, this message translates to:
+  /// **'Sintetizando {done}/{total}…'**
+  String tab_synthProgress(int done, int total);
+
+  /// No description provided for @tab_synthRendering.
+  ///
+  /// In es, this message translates to:
+  /// **'Sintetizando…'**
+  String get tab_synthRendering;
+
+  /// No description provided for @tab_tempo.
+  ///
+  /// In es, this message translates to:
+  /// **'Tempo'**
+  String get tab_tempo;
+
+  /// No description provided for @tab_title.
+  ///
+  /// In es, this message translates to:
+  /// **'Tablatura'**
+  String get tab_title;
+
+  /// No description provided for @tab_trackMuteLetter.
+  ///
+  /// In es, this message translates to:
+  /// **'M'**
+  String get tab_trackMuteLetter;
+
+  /// No description provided for @tab_trackSoloLetter.
+  ///
+  /// In es, this message translates to:
+  /// **'S'**
+  String get tab_trackSoloLetter;
+
+  /// No description provided for @tab_tuning.
+  ///
+  /// In es, this message translates to:
+  /// **'Afinación'**
+  String get tab_tuning;
+
+  /// No description provided for @tab_tuningCustom.
+  ///
+  /// In es, this message translates to:
+  /// **'Personalizada'**
+  String get tab_tuningCustom;
+
+  /// No description provided for @tab_tuningDropD.
+  ///
+  /// In es, this message translates to:
+  /// **'Drop D'**
+  String get tab_tuningDropD;
+
+  /// No description provided for @tab_tuningHalfDown.
+  ///
+  /// In es, this message translates to:
+  /// **'Medio tono abajo'**
+  String get tab_tuningHalfDown;
+
+  /// No description provided for @tab_tuningStandard.
+  ///
+  /// In es, this message translates to:
+  /// **'Estándar'**
+  String get tab_tuningStandard;
+
+  /// No description provided for @tab_tuningWholeDown.
+  ///
+  /// In es, this message translates to:
+  /// **'Un tono abajo'**
+  String get tab_tuningWholeDown;
+
+  /// No description provided for @tab_undo.
+  ///
+  /// In es, this message translates to:
+  /// **'Deshacer'**
+  String get tab_undo;
+
+  /// No description provided for @tab_waitingAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Analizar'**
+  String get tab_waitingAction;
+
+  /// No description provided for @tab_waitingBody.
+  ///
+  /// In es, this message translates to:
+  /// **'La tablatura necesita los compases y pulsos del análisis. Puedes lanzarlo desde Backing track.'**
+  String get tab_waitingBody;
+
+  /// No description provided for @tab_waitingTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Esperando el análisis del tema'**
+  String get tab_waitingTitle;
+
+  /// No description provided for @tab_webError.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo mostrar la tablatura.'**
+  String get tab_webError;
+
+  /// No description provided for @tab_workingBody.
+  ///
+  /// In es, this message translates to:
+  /// **'La primera vez tarda un poco. Lo hecho se guarda pista a pista.'**
+  String get tab_workingBody;
+
+  /// No description provided for @tab_workingTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Transcribiendo…'**
+  String get tab_workingTitle;
 
   /// Ancla del bloque record: añade las claves del área debajo, en orden alfabético; no edites otros bloques.
   ///

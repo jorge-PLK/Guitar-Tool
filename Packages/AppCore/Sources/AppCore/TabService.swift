@@ -164,7 +164,15 @@ final class TabService {
         ctl = o.controller
         o.controller.onMixChanged = { [weak self] in self?.syncSynthMix(); self?.markChanged() }
         load()
+        startQueueIfNeeded()
         return state()
+    }
+
+    /// TB10: como `TabController.start()` del Mac, abrir (también tras `tab.songsterr.accept` y `tab.songsterr.automatic`,
+    /// que reabren) transcribe solo las pistas pendientes; el cliente ya no llama a `tab.transcribe` para eso.
+    private func startQueueIfNeeded() {
+        guard phase == .ready, work == nil, !queued.isEmpty else { return }
+        work = Task { [weak self] in await self?.runQueue() }
     }
 
     /// Guarda lo editado, cancela lo pendiente y suelta la síntesis del reproductor (el estudio sigue abierto).
@@ -183,7 +191,7 @@ final class TabService {
             ctl.extraTracks = []
             for s in sources { ctl.setSubstituted(s.playerTrackID, false) }
             if let vocalSource { ctl.setSubstituted(vocalSource.playerTrackID, false) }
-            if ctl.loopName == Self.spanLoopName { ctl.setLoop(nil) }
+            if ctl.loopIsSpan { ctl.setLoop(nil) }
             if hadSynth { let t = ctl.player.currentTime; ctl.loadTracks(); ctl.seek(to: t) }
         }
         session = nil
@@ -308,7 +316,11 @@ final class TabService {
         return vocalSource
     }
 
-    func dismissNotices() { notices = [] }
+    /// Cierra los avisos actuales (los de apertura: pistas rehechas, transcripción); solo vuelven a salir si hay otros nuevos.
+    func dismissNotices() {
+        notices = []
+        markChanged()
+    }
 
     // MARK: Fuente
 
@@ -373,7 +385,7 @@ final class TabService {
     }
 
     /// Compás más frecuente y tempo para la cabecera (Mac: `headerSummary`).
-    private var header: String? {
+    private var header: TabHeaderSummary? {
         guard let score, !score.bars.isEmpty else { return nil }
         var counts: [String: Int] = [:]
         for b in score.bars { counts["\(b.beatCount)/\(b.beatUnit)", default: 0] += 1 }
@@ -381,10 +393,10 @@ final class TabService {
         if usesSongsterr {
             var beats: [Double: Int] = [:]
             for b in score.bars { beats[b.tempo, default: 0] += b.beatCount }
-            if let written = beats.max(by: { ($0.value, $1.key) < ($1.value, $0.key) })?.key { return "\(meter) · \(Int(written)) BPM" }
+            if let written = beats.max(by: { ($0.value, $1.key) < ($1.value, $0.key) })?.key { return TabHeaderSummary(code: "meterBpm", bar: meter, bpm: Int(written)) }
         }
-        guard let bpm = session?.analysis?.bpm else { return meter }
-        return "\(meter) · \(Int(bpm.rounded())) BPM"
+        guard let bpm = session?.analysis?.bpm else { return TabHeaderSummary(code: "meter", bar: meter) }
+        return TabHeaderSummary(code: "meterBpm", bar: meter, bpm: Int(bpm.rounded()))
     }
 
     private var usesSongsterr: Bool {
@@ -574,7 +586,7 @@ final class TabService {
         guard upper > range.lowerBound else { return }
         let startChanged = first || lastSpanStart != range.lowerBound
         lastSpanStart = range.lowerBound
-        ctl.setLoop(range.lowerBound...upper, name: Self.spanLoopName)
+        ctl.setLoop(range.lowerBound...upper, name: Self.spanLoopName, span: true)
         if startChanged { ctl.seek(to: range.lowerBound) }
     }
 
@@ -601,7 +613,7 @@ final class TabService {
     func clearSpan() {
         spanHead = nil
         span = nil
-        if let ctl, ctl.loopName == Self.spanLoopName { ctl.setLoop(nil) }
+        if let ctl, ctl.loopIsSpan { ctl.setLoop(nil) }
     }
 
     /// «Selección» del menú de bucle: vuelve a poner el bucle del tramo y salta a su inicio.
@@ -609,14 +621,14 @@ final class TabService {
         guard let ctl, let span, let score, let range = score.timeRange(of: span) else { return }
         let upper = min(range.upperBound, ctl.duration)
         guard upper > range.lowerBound else { return }
-        ctl.setLoop(range.lowerBound...upper, name: Self.spanLoopName)
+        ctl.setLoop(range.lowerBound...upper, name: Self.spanLoopName, span: true)
         ctl.seek(to: range.lowerBound)
     }
 
-    func spanAction(_ action: String) throws -> TabState {
+    func spanAction(_ action: String, keepAnchor: Bool = false) throws -> TabState {
         _ = try require()
         switch action {
-        case "clear": clearSpan(); spanAnchor = nil
+        case "clear": clearSpan(); if !keepAnchor { spanAnchor = nil }
         case "apply": applySpanLoop()
         case "extendForward": extendSpan(forward: true)
         case "extendBack": extendSpan(forward: false)
@@ -679,27 +691,28 @@ final class TabService {
         return TabBarRange(bar: bar, start: start, end: min(end, max(ctl.duration, start + 0.001)))
     }
 
-    var selectionSummary: String? {
+    var selectionSummary: TabSelectionSummary? {
         guard let sel = selection, let score, let track = selectedTrack, score.beats.indices.contains(sel.point.beat) else { return nil }
         let bar = score.beats[sel.point.beat].bar + 1
         let beat = score.beats[sel.point.beat].indexInBar + 1
-        let place = "Compás \(bar), pulso \(beat)"
         if track.kind == .drums {
-            let pieces = track.hits.filter { $0.at == sel.point }.map { Self.pieceName($0.piece) }
-            return "\(place) · " + (pieces.isEmpty ? "sin golpes" : pieces.joined(separator: ", "))
+            let pieces = track.hits.filter { $0.at == sel.point }.map { Self.pieceCode($0.piece) }
+            return pieces.isEmpty ? TabSelectionSummary(code: "drumsNoHits", bar: bar, beat: beat)
+                : TabSelectionSummary(code: "drums", bar: bar, beat: beat, pieces: pieces)
         }
-        if let n = selectedNote, let f = track.fret(of: n) { return "\(place) · cuerda \(n.string), traste \(f)" }
-        return "\(place) · cuerda \(sel.string ?? 1), sin nota"
+        if let n = selectedNote, let f = track.fret(of: n) { return TabSelectionSummary(code: "note", bar: bar, beat: beat, string: n.string, fret: f) }
+        return TabSelectionSummary(code: "noNote", bar: bar, beat: beat, string: sel.string ?? 1)
     }
 
-    nonisolated static func pieceName(_ p: DrumPiece) -> String {
+    /// Código de pieza (ARB `tab_piece*`).
+    nonisolated static func pieceCode(_ p: DrumPiece) -> String {
         switch p {
-        case .kick: "bombo"
-        case .snare: "caja"
-        case .hiHat: "charles"
-        case .openHiHat: "charles abierto"
+        case .kick: "kick"
+        case .snare: "snare"
+        case .hiHat: "hiHat"
+        case .openHiHat: "openHiHat"
         case .tom: "tom"
-        case .crash: "platos"
+        case .crash: "crash"
         }
     }
 
@@ -1282,7 +1295,7 @@ final class TabService {
         if case let .failed(m) = phase { err = m }
         let selInfo = selection.map {
             TabSelectionInfo(track: $0.trackID, beat: $0.point.beat, tick: $0.point.tick, string: $0.string, summary: selectionSummary,
-                             barRange: selectedBarRange)
+                             barRange: selectedBarRange, hasNote: selectedNote != nil)
         }
         let sourceName: String? = switch session?.project.tabSource {
         case .songsterr?: "songsterr"

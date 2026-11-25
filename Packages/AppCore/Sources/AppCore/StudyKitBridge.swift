@@ -84,6 +84,60 @@ enum StudyKitBridge {
         return label.name
     }
 
+    /// K8: nombre del acorde ya transpuesto `transpose` semitonos (como `BackingTimeline.shown`); «?» y «N» no cambian.
+    static func shownChordName(_ index: Int, transpose: Int) -> String {
+        chordName(shownIndex(index, transpose: transpose))
+    }
+
+    /// Índice del acorde transpuesto `transpose` semitonos (X y N no cambian).
+    static func shownIndex(_ index: Int, transpose: Int) -> Int {
+        (ChordLabel(index: index) ?? .unknown).transposed(by: transpose).index
+    }
+
+    /// Acorde mostrado (transpuesto) como raíz 0-11 y calidad 0-13; nil para «?» y «N».
+    static func shownChord(_ index: Int, transpose: Int) -> StudyShownChord? {
+        let t = (ChordLabel(index: index) ?? .unknown).transposed(by: transpose)
+        guard let r = t.root, let q = t.quality else { return nil }
+        return StudyShownChord(root: r, quality: q.rawValue)
+    }
+
+    /// Camino inverso: el acorde que ve la interfaz (raíz, calidad) -> índice guardado; nil si está fuera de rango.
+    static func storedChordIndex(root: Int, quality: Int, transpose: Int) -> Int? {
+        guard (0..<12).contains(root), let q = ChordQuality(rawValue: quality) else { return nil }
+        return ChordLabel(root: root, quality: q).transposed(by: -transpose).index
+    }
+
+    /// Vocabulario que pinta la hoja «Acorde»: 12 raíces (nombres de `ChordLabel`) y 14 sufijos en orden de índice.
+    static func chordVocabulary() -> StudyChordVocabulary {
+        StudyChordVocabulary(
+            roots: (0..<12).map { ChordLabel(root: $0, quality: .maj).name },
+            qualities: ChordQuality.allCases.map { StudyChordQuality(suffix: $0.suffix) },
+            noChordIndex: ChordLabel.noChordIndex)
+    }
+
+    /// K7: forma del acorde mostrado (transpuesto) con capo `capo`, igual que `ChordShapes.shape(for:capo:)` en el Mac.
+    /// nil para «?» y «N».
+    static func shape(index: Int, transpose: Int, capo: Int) -> StudyChordShape? {
+        guard let label = ChordLabel(index: index) else { return nil }
+        guard let s = ChordShapes.shape(for: label.transposed(by: transpose), capo: capo) else { return nil }
+        return StudyChordShape(frets: s.frets, baseFret: s.baseFret,
+                               barre: s.barre.map { StudyBarre(fret: $0.fret, fromString: $0.fromString, toString: $0.toString) })
+    }
+
+    /// K8: tonalidad guardada («C:maj») vista con la transposición; nil si no es mayor ni menor.
+    static func shownKey(_ stored: String?, transpose: Int) -> StudyShownKey? {
+        guard let stored, let c = ChordLabel(labName: stored), let q = c.quality, q == .maj || q == .min else { return nil }
+        let t = c.transposed(by: transpose)
+        guard let tonic = t.labName.split(separator: ":").first else { return nil }
+        return StudyShownKey(tonic: String(tonic), mode: q == .min ? "min" : "maj")
+    }
+
+    /// K8, camino inverso (`storedKeyLabel` de `chords.js`): la tonalidad que ve la interfaz -> la que se guarda.
+    static func storedKey(tonic: String, mode: String, transpose: Int) -> String? {
+        guard mode == "maj" || mode == "min", let c = ChordLabel(labName: "\(tonic):\(mode)") else { return nil }
+        return c.transposed(by: -transpose).labName
+    }
+
     /// Clics de la rejilla como pares, para que el controlador los convierta a `AudioKit.Click`.
     static func clicks(beats: [Double], downbeats: [Double], in range: ClosedRange<Double>) -> [(time: Double, accent: Bool)] {
         guard beats.count >= 2 else { return [] }

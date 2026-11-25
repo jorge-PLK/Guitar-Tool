@@ -1,0 +1,61 @@
+{
+  "noChordIndex" : 169,
+  "qualities" : [
+    {
+      "suffix" : "m"
+    },
+    {
+      "suffix" : ""
+    },
+    {
+      "suffix" : "°"
+    },
+    {
+      "suffix" : "+"
+    },
+    {
+      "suffix" : "m6"
+    },
+    {
+      "suffix" : "6"
+    },
+    {
+      "suffix" : "m7"
+    },
+    {
+      "suffix" : "m(maj7)"
+    },
+    {
+      "suffix" : "maj7"
+    },
+    {
+      "suffix" : "7"
+    },
+    {
+      "suffix" : "°7"
+    },
+    {
+      "suffix" : "ø7"
+    },
+    {
+      "suffix" : "sus2"
+    },
+    {
+      "suffix" : "sus4"
+    }
+  ],
+  "roots" : [
+    "C",
+    "C#",
+    "D",
+    "D#",
+    "E",
+    "F",
+    "F#",
+    "G",
+    "G#",
+    "A",
+    "A#",
+    "B"
+  ]
+}
