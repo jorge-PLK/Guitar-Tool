@@ -28,5 +28,10 @@
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<!-- Impeller desactivado en macOS: cae en impeller::Canvas::SetupRenderPass al componer platform views
+	     (flutter/flutter#185394, arreglado en master cf75578, sin estable que lo traiga en 3.44.5).
+	     Quitar cuando la versión estable lo incluya. -->
+	<key>FLTEnableImpeller</key>
+	<false/>
 </dict>
 </plist>
