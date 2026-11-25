@@ -136,6 +136,7 @@ class TfPrimaryButton extends StatelessWidget {
 /// Botón secundario: `SecondaryButton` (Theme.swift:72). Alturas usadas: 44, 36, 28.
 /// Opcionales: [weight] (por defecto medium), [color] (color del texto activo, por defecto `text`),
 /// [hPadding] (por defecto 16) e [icon] (a la izquierda del texto, `Label` de SwiftUI; [iconSize] 14).
+/// [iconFilled] rellena el icono (SF Symbol `.fill`, p. ej. `play.fill`).
 class TfSecondaryButton extends StatelessWidget {
   const TfSecondaryButton({
     super.key,
@@ -147,6 +148,7 @@ class TfSecondaryButton extends StatelessWidget {
     this.hPadding = TfSpace.s16,
     this.icon,
     this.iconSize = TfSize.font14,
+    this.iconFilled = false,
   });
 
   final String label;
@@ -157,6 +159,7 @@ class TfSecondaryButton extends StatelessWidget {
   final double hPadding;
   final TfIcon? icon;
   final double iconSize;
+  final bool iconFilled;
 
   @override
   Widget build(BuildContext context) {
@@ -178,7 +181,7 @@ class TfSecondaryButton extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 spacing: TfSpace.s6,
                 children: <Widget>[
-                  TfIconView(icon!, size: iconSize, color: fg),
+                  TfIconView(icon!, size: iconSize, color: fg, filled: iconFilled),
                   Flexible(child: Text(label, style: style, maxLines: 1, softWrap: false, overflow: TextOverflow.clip)),
                 ],
               ),
