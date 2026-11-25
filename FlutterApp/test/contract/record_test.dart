@@ -26,6 +26,7 @@ const _snapshotResults = [
   'record.finishOffset',
   'record.markBest',
   'record.open',
+  'record.pollCamera',
   'record.rotate',
   'record.selectPart',
   'record.selectTake',
@@ -54,6 +55,7 @@ final Map<String, _Codec> _codecs = {
   'record.finishOffset.params': (j) => RecordFinishOffsetParams.fromJson(j).toJson(),
   'record.markBest.params': _takeParams,
   'record.open.params': (j) => RecordOpenParams.fromJson(j).toJson(),
+  'record.pollCamera.params': _empty,
   'record.selectPart.params': (j) => RecordPartParams.fromJson(j).toJson(),
   'record.selectTake.params': _takeParams,
   'record.setCamera.params': (j) => RecordCameraParams.fromJson(j).toJson(),
@@ -128,5 +130,12 @@ void main() {
     if (source == null) fail('No se encuentra Contract/fixtures');
     final json = jsonDecode(await source.read('record/record.state.punch-armed-no-marks.event.json')) as Json;
     expect(RecordSnapshot.fromJson(json).block?.code, 'record-block-punch-no-marks');
+  });
+
+  test('record.state.adjusting expone offset no nulo', () async {
+    final source = await DirectoryFixtureSource.find();
+    if (source == null) fail('No se encuentra Contract/fixtures');
+    final json = jsonDecode(await source.read('record/record.state.adjusting.event.json')) as Json;
+    expect(RecordSnapshot.fromJson(json).offset, isNotNull);
   });
 }
