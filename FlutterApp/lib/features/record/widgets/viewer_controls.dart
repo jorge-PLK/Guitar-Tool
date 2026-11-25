@@ -151,7 +151,7 @@ class _RoundButton extends StatelessWidget {
       child: DecoratedBox(
         decoration: const BoxDecoration(color: TfColors.accent, shape: BoxShape.circle),
         child: Center(
-          child: TfIconView(playing ? TfIcon.pauseFill : TfIcon.playFill, size: TfSize.viewerPlayIcon, color: TfColors.accentInk),
+          child: TfIconView(playing ? TfIcon.pauseFill : TfIcon.playFill, size: TfSize.viewerPlayIcon, color: TfColors.accentInk, filled: true),
         ),
       ),
     );
@@ -199,7 +199,7 @@ class _BackingButton extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             spacing: TfSpace.s6,
             children: <Widget>[
-              TfIconView(muted ? TfIcon.speakerSlashFill : TfIcon.speakerWave2Fill, size: TfSize.font12, color: fg),
+              TfIconView(muted ? TfIcon.speakerSlashFill : TfIcon.speakerWave2Fill, size: TfSize.font12, color: fg, filled: true),
               Text(label, style: TfText.body(TfSize.font12, TfWeight.semibold).copyWith(color: fg)),
             ],
           ),

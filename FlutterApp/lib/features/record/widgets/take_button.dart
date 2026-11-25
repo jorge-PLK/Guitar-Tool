@@ -118,7 +118,7 @@ class TakeButton extends StatelessWidget {
               child: _Tap(
                 onTap: _canView ? onView : null,
                 semanticLabel: l.record_viewTakeA11y(take.number),
-                child: const Center(child: TfIconView(TfIcon.playFill, size: TfSize.font11, color: TfColors.text2)),
+                child: const Center(child: TfIconView(TfIcon.playFill, size: TfSize.font11, color: TfColors.text2, filled: true)),
               ),
             ),
           ),

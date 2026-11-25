@@ -164,7 +164,7 @@ class _Denied extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         spacing: TfSpace.s6,
         children: <Widget>[
-          const TfIconView(TfIcon.lockFill, size: TfSize.navIcon, color: TfColors.muted),
+          const TfIconView(TfIcon.lockFill, size: TfSize.navIcon, color: TfColors.muted, filled: true),
           Text(
             l.settings_video_denied,
             textAlign: TextAlign.center,
