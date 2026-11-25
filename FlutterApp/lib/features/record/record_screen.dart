@@ -4,8 +4,11 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:toneforge/contract/library.dart';
 import 'package:toneforge/core/core_client.dart' show CoreError;
+import 'package:toneforge/features/record/record_offset_actions.dart';
 import 'package:toneforge/features/record/record_store.dart';
 import 'package:toneforge/features/record/record_topics_provider.dart';
+import 'package:toneforge/features/record/sheets/add_part_sheet.dart';
+import 'package:toneforge/features/record/sheets/offset_sheet.dart';
 import 'package:toneforge/features/record/widgets/record_body.dart';
 import 'package:toneforge/features/record/widgets/record_topic_chooser.dart';
 import 'package:toneforge/l10n/app_localizations.dart';
@@ -66,6 +69,18 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
     }).catchError((Object _) {});
   }
 
+  bool _offsetOpen = false;
+
+  Future<void> _openOffsetSheet() async {
+    if (_offsetOpen || !mounted) return;
+    _offsetOpen = true;
+    try {
+      await showOffsetSheet(context);
+    } finally {
+      _offsetOpen = false;
+    }
+  }
+
   Future<void> _goMontage() async {
     _openId = null;
     await _chain;
@@ -96,6 +111,10 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
       return RecordTopicChooser(topics: list, onPick: ref.read(selectedProjectProvider.notifier).select);
     }
     if (project.separationState != SeparationState.done) return const _NotSeparated();
+    // La hoja de desfase se abre al pasar `snapshot.offset` a no nulo (toma nueva o menú de toma), solo una vez.
+    ref.listen<bool>(recordStoreProvider.select((s) => s.offset != null), (bool? _, bool on) {
+      if (on) unawaited(_openOffsetSheet());
+    });
     final RecordState s = ref.watch(recordStoreProvider);
     final CoreError? error = s.error;
     if (!s.opened && error != null) {
@@ -108,8 +127,8 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
       title: project.title,
       artist: project.artist,
       onGoMontage: _goMontage,
-      // TODO(ola3 3.K): showAddPartSheet(context) y showOffsetSheet(context) los cablea el orquestador.
-      onAddPart: () {},
+      onAddPart: () => unawaited(showAddPartSheet(context)),
+      onAdjustOffset: (String takeId) => unawaited(_store.adjustOffset(takeId)),
     );
   }
 }

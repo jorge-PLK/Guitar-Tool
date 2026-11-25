@@ -28,8 +28,8 @@ Json snapshot({bool isNew = false}) {
   return j;
 }
 
-Future<MockCore> openSheet(WidgetTester tester, {bool isNew = false, bool openFails = false}) async {
-  setTestSurface(tester, const Size(900, 1000));
+Future<MockCore> openSheet(WidgetTester tester, {bool isNew = false, bool openFails = false, Size size = const Size(900, 1000)}) async {
+  setTestSurface(tester, size);
   final core = MockCore()
     ..result('study.open', <String, Object?>{})
     ..result('record.open', snapshot(isNew: isNew))
@@ -103,6 +103,16 @@ void main() {
     expect(t.widget<TfCheckbox>(find.byKey(const ValueKey('offset-default'))).value, isTrue);
     expect(t.widget<TfSecondaryButton>(find.byKey(const ValueKey('offset-play'))).onPressed, isNotNull);
   });
+
+  for (final size in const [Size(1100, 680), Size(1440, 900)]) {
+    testWidgets('cabe sin desbordar a ${size.width.toInt()}×${size.height.toInt()}', (t) async {
+      await openSheet(t, size: size);
+      expect(t.takeException(), isNull);
+      expect(find.byType(TfVideoSurface), findsOneWidget);
+      final sheet = t.getRect(find.byKey(const ValueKey('offset-save')));
+      expect(sheet.bottom, lessThanOrEqualTo(size.height));
+    });
+  }
 
   testWidgets('toma nueva: rótulos «Descartar toma» / «Guardar toma»', (t) async {
     await openSheet(t, isNew: true);

@@ -11,6 +11,7 @@ import 'package:toneforge/widgets/tf_tab_bar.dart';
 import 'settings_audio_tab.dart';
 import 'settings_library_tab.dart';
 import 'settings_video_tab.dart';
+import 'sheets/calibration_sheet.dart';
 
 /// Ajustes (SettingsView.swift:8-43): título, subtítulo, barra de pestañas y el contenido de la pestaña,
 /// con scroll y padding 36 × 28.
@@ -45,7 +46,7 @@ class SettingsScreen extends ConsumerWidget {
                 onSelect: (i) => ref.read(settingsTabProvider.notifier).select(SettingsTab.values[i]),
               ),
               switch (tab) {
-                SettingsTab.audio => const SettingsAudioTab(),
+                SettingsTab.audio => SettingsAudioTab(onCalibrate: () => showCalibrationSheet(context)),
                 SettingsTab.video => const SettingsVideoTab(),
                 SettingsTab.library => const SettingsLibraryTab(),
               },

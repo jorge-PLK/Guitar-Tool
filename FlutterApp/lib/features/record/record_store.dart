@@ -12,7 +12,17 @@ const Object _keep = Object();
 
 /// Estado de Grabar: refleja `record.state` y `audio.state`. Inmutable; no compone textos.
 class RecordState {
-  const RecordState({this.snapshot, this.opened = false, this.position = 0, this.calibrationValid, this.error});
+  const RecordState({
+    this.snapshot,
+    this.opened = false,
+    this.position = 0,
+    this.calibrationValid,
+    this.guitarIn = const <int>[],
+    this.error,
+  });
+
+  /// Canales de entrada de la guitarra (1-based) de `audio.settings`; vacío hasta conocerlos.
+  final List<int> guitarIn;
 
   /// Último `RecordSnapshot` (respuesta de un método o evento `record.state`).
   final RecordSnapshot? snapshot;
@@ -102,12 +112,14 @@ class RecordState {
     bool? opened,
     num? position,
     Object? calibrationValid = _keep,
+    List<int>? guitarIn,
     Object? error = _keep,
   }) =>
       RecordState(
         snapshot: identical(snapshot, _keep) ? this.snapshot : snapshot as RecordSnapshot?,
         opened: opened ?? this.opened,
         position: position ?? this.position,
+        guitarIn: guitarIn ?? this.guitarIn,
         calibrationValid: identical(calibrationValid, _keep) ? this.calibrationValid : calibrationValid as bool?,
         error: identical(error, _keep) ? this.error : error as CoreError?,
       );
@@ -155,16 +167,17 @@ class RecordStore extends Notifier<RecordState> {
     try {
       final s = await _core.call('record.open', RecordOpenParams(projectId: projectId).toJson(), RecordSnapshot.fromJson);
       if (!ref.mounted) return;
-      state = RecordState(snapshot: s, opened: true, position: s.position, calibrationValid: state.calibrationValid);
+      state = RecordState(snapshot: s, opened: true, position: s.position, calibrationValid: state.calibrationValid, guitarIn: state.guitarIn);
     } on CoreError catch (e) {
       if (ref.mounted) state = state.copyWith(error: e);
       return;
     }
     Future<void> settings() async {
       try {
-        await _core.call('audio.settings', const <String, Object?>{}, AudioSettings.fromJson);
+        final a = await _core.call('audio.settings', const <String, Object?>{}, AudioSettings.fromJson);
+        if (ref.mounted && state.opened) state = state.copyWith(guitarIn: a.guitarIn);
       } on CoreError {
-        // `guitarIn` lo lee la vista de `audio.*`; aquí solo se pide.
+        // Sin `guitarIn` el nivel de «Tu guitarra» queda a cero.
       }
     }
 
@@ -213,6 +226,15 @@ class RecordStore extends Notifier<RecordState> {
       return true;
     } on CoreError catch (e) {
       if (ref.mounted) state = state.copyWith(error: e.code == 'not-open' ? null : e);
+      return false;
+    }
+  }
+
+  /// `record.prepareViewTake` -> `{allowed}` (RV:253): `false` (o error) = no abrir la hoja «Ver toma».
+  Future<bool> prepareViewTake() async {
+    try {
+      return (await _core.call('record.prepareViewTake', const RecordEmptyParams().toJson(), RecordAllowedResult.fromJson)).allowed;
+    } on CoreError {
       return false;
     }
   }

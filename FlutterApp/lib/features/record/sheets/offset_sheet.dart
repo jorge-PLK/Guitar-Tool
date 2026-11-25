@@ -81,11 +81,13 @@ class _OffsetSheetState extends ConsumerState<OffsetSheet> {
       width: _width,
       title: l.record_offsetTitle,
       body: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         spacing: TfSpace.s16,
         children: <Widget>[
           Text(l.record_offsetHelp, style: TfText.body(TfSize.font13).copyWith(color: TfColors.muted)),
-          _VideoBox(state: v, error: _error(l, v)),
+          // El recuadro 16:9 se encoge antes que el resto cuando la ventana es baja (1100×680).
+          Flexible(child: Center(heightFactor: 1, child: _VideoBox(state: v, error: _error(l, v)))),
           Row(
             spacing: TfSpace.s8,
             children: <Widget>[

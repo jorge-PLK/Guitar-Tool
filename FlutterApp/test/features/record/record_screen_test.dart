@@ -6,8 +6,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:toneforge/core/core_client.dart' show CoreError, Json;
 import 'package:toneforge/core/core_providers.dart';
+import 'package:toneforge/core/frame_channel.dart';
+import 'package:toneforge/core/frame_providers.dart';
 import 'package:toneforge/core/mock_core.dart';
 import 'package:toneforge/features/record/record_screen.dart';
+import 'package:toneforge/features/record/record_store.dart';
 import 'package:toneforge/features/record/widgets/parts_panel.dart';
 import 'package:toneforge/features/record/widgets/punch_timeline.dart';
 import 'package:toneforge/features/record/widgets/record_bar.dart';
@@ -15,10 +18,12 @@ import 'package:toneforge/features/record/widgets/record_header.dart';
 import 'package:toneforge/features/record/widgets/record_mixer.dart';
 import 'package:toneforge/features/record/widgets/record_preview.dart';
 import 'package:toneforge/features/record/widgets/status_lines.dart';
+import 'package:toneforge/features/record/widgets/take_button.dart';
 import 'package:toneforge/l10n/app_localizations.dart';
 import 'package:toneforge/shell/selected_project.dart';
 import 'package:toneforge/shell/shell_providers.dart';
 import 'package:toneforge/shell/shell_route.dart';
+import 'package:toneforge/theme/icons.dart';
 import 'package:toneforge/theme/tokens.dart';
 import 'package:toneforge/theme/typography.dart';
 import 'package:toneforge/widgets/tf_progress.dart';
@@ -47,17 +52,23 @@ MockCore _core({Object? list, String open = 'record/record.open.result'}) {
 final ValueNotifier<bool> _shown = ValueNotifier<bool>(true);
 
 Widget _app(MockCore core) => ProviderScope(
-      overrides: [coreClientProvider.overrideWithValue(core)],
-      child: tfNavApp(
-        Localizations(
-          locale: const Locale('es'),
-          delegates: const <LocalizationsDelegate<dynamic>>[AppLocalizations.delegate, DefaultWidgetsLocalizations.delegate],
-          child: DefaultTextStyle(
-            style: TfText.body().copyWith(color: TfColors.text),
-            child: ValueListenableBuilder<bool>(
-              valueListenable: _shown,
-              builder: (BuildContext _, bool on, Widget? _) => on ? const RecordScreen() : const SizedBox(),
-            ),
+      overrides: [
+        coreClientProvider.overrideWithValue(core),
+        frameChannelProvider(FrameChannelId.take).overrideWithValue(null),
+      ],
+      child: WidgetsApp(
+        color: TfColors.bg,
+        debugShowCheckedModeBanner: false,
+        locale: const Locale('es'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        pageRouteBuilder: <T>(RouteSettings s, WidgetBuilder b) =>
+            PageRouteBuilder<T>(settings: s, pageBuilder: (c, a, b2) => b(c)),
+        home: DefaultTextStyle(
+          style: TfText.body().copyWith(color: TfColors.text),
+          child: ValueListenableBuilder<bool>(
+            valueListenable: _shown,
+            builder: (BuildContext _, bool on, Widget? _) => on ? const RecordScreen() : const SizedBox(),
           ),
         ),
       ),
@@ -202,5 +213,54 @@ void main() {
     core.emit('audio.levels', <String, Object?>{'levels': levels, 'rmsDB': <double>[], 'peakDB': <double>[]});
     await _settle(t);
     expect(mixer.inputLevel!.value, 0.6);
+    // `guitarIn` viene de `record_store`: Grabar no recarga Ajustes.
+    expect(_c(t).read(recordStoreProvider).guitarIn, guitarIn);
+  });
+
+  testWidgets('Añadir parte abre la hoja', (t) async {
+    await _pump(t, _core(), project: _done);
+    await t.tap(find.text('Añadir parte'));
+    await _settle(t);
+    expect(find.text('Nombre de la parte'), findsOneWidget);
+  });
+
+  testWidgets('snapshot con offset abre la hoja de desfase una sola vez', (t) async {
+    final MockCore core = _core()
+      ..result('takeview.openOffset', _fx('takeview/takeview.openOffset.result'))
+      ..result('takeview.close', <String, Object?>{});
+    await _pump(t, core, project: _done);
+    expect(find.text('Ajustar desfase'), findsNothing);
+    core.emit('record.state', _fx('record/record.adjustOffset.result'));
+    await _settle(t);
+    expect(find.text('Ajustar desfase'), findsOneWidget);
+    core.emit('record.state', _fx('record/record.adjustOffset.result'));
+    await _settle(t);
+    expect(find.text('Ajustar desfase'), findsOneWidget);
+    expect(_methods(core).where((String m) => m == 'takeview.openOffset').length, 1);
+  });
+
+  testWidgets('menú de toma «Ajustar desfase» envía record.adjustOffset', (t) async {
+    final MockCore core = _core()
+      ..result('record.adjustOffset', _fx('record/record.adjustOffset.result'))
+      ..result('takeview.openOffset', _fx('takeview/takeview.openOffset.result'))
+      ..result('takeview.close', <String, Object?>{});
+    await _pump(t, core, project: _done);
+    final Finder chevron = find.descendant(of: find.byType(TakeButton).first, matching: find.byType(TfIconView)).first;
+    await t.tap(chevron);
+    await t.pump();
+    await t.tap(find.text('Ajustar desfase…'));
+    await _settle(t);
+    expect(_methods(core), contains('record.adjustOffset'));
+    expect(find.text('Ajustar desfase'), findsOneWidget);
+  });
+
+  testWidgets('Ver toma: sin permiso de record.prepareViewTake no se abre la hoja', (t) async {
+    final MockCore core = _core()..result('record.prepareViewTake', <String, Object?>{'allowed': false});
+    await _pump(t, core, project: _done);
+    final Finder play = find.descendant(of: find.byType(TakeButton).first, matching: find.byType(TfIconView)).last;
+    await t.tap(play);
+    await _settle(t);
+    expect(_methods(core), contains('record.prepareViewTake'));
+    expect(_methods(core), isNot(contains('takeview.open')));
   });
 }

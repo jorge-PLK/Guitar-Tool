@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:toneforge/features/record/record_audio_actions.dart';
 import 'package:toneforge/features/record/record_store.dart';
 import 'package:toneforge/features/record/sheets/take_viewer_sheet.dart';
 import 'package:toneforge/features/record/widgets/parts_panel.dart';
@@ -45,18 +46,21 @@ class _RecordBodyState extends ConsumerState<RecordBody> {
   @override
   void initState() {
     super.initState();
-    ref.listenManual<AudioStoreState>(audioStoreProvider, (AudioStoreState? _, AudioStoreState s) => _updateLevel(s), fireImmediately: true);
-    // `audio.settings` (canales `guitarIn`) solo lo carga Ajustes; aquí se pide una vez si falta.
-    if (ref.read(audioStoreProvider).settings == null) Future<void>.microtask(ref.read(audioStoreProvider.notifier).reload);
+    // Niveles de `audio.levels` y canales `guitarIn` que `record_store` guarda al entrar.
+    ref.listenManual<List<double>?>(audioStoreProvider.select((s) => s.levels?.levels), (_, _) => _updateLevel());
+    ref.listenManual<List<int>>(recordStoreProvider.select((s) => s.guitarIn), (_, _) => _updateLevel(), fireImmediately: true);
   }
 
-  void _updateLevel(AudioStoreState s) {
-    final List<double> levels = s.levels?.levels ?? const <double>[];
-    double max = 0;
-    for (final int ch in s.settings?.guitarIn ?? const <int>[]) {
-      if (ch >= 1 && ch - 1 < levels.length && levels[ch - 1] > max) max = levels[ch - 1];
-    }
-    _inputLevel.value = max;
+  void _updateLevel() {
+    _inputLevel.value = guitarInputLevel(
+      ref.read(recordStoreProvider).guitarIn,
+      ref.read(audioStoreProvider).levels?.levels ?? const <double>[],
+    );
+  }
+
+  Future<void> _viewTake(String takeId) async {
+    if (!await ref.read(recordStoreProvider.notifier).prepareViewTake() || !mounted) return;
+    await showTakeViewer(context, projectId: widget.projectId, takeId: takeId);
   }
 
   @override
@@ -102,7 +106,7 @@ class _RecordBodyState extends ConsumerState<RecordBody> {
                   width: _partsWidth,
                   child: SingleChildScrollView(
                     child: PartsPanel(
-                      onViewTake: (String takeId) => showTakeViewer(context, projectId: widget.projectId, takeId: takeId),
+                      onViewTake: _viewTake,
                       onAddPart: widget.onAddPart,
                       onAdjustOffset: widget.onAdjustOffset,
                     ),
