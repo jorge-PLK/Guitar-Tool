@@ -1,9 +1,12 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:toneforge/contract/tab.dart';
+import 'package:toneforge/features/tab/tab_canvas.dart';
+import 'package:toneforge/features/tab/tab_canvas_controller.dart';
 import 'package:toneforge/features/tab/tab_card.dart';
 import 'package:toneforge/features/tab/tab_header.dart';
 import 'package:toneforge/features/tab/tab_notice.dart';
+import 'package:toneforge/features/tab/tab_stage.dart';
 import 'package:toneforge/features/tab/tab_store.dart';
 import 'package:toneforge/features/tab/tab_theme_chooser.dart';
 import 'package:toneforge/shell/selected_project.dart';
@@ -37,7 +40,7 @@ class TabScreen extends ConsumerWidget {
         children: [
           const TabHeader(),
           const TabNotice(),
-          const Expanded(child: TabCard(stage: _StagePlaceholder())),
+          const Expanded(child: TabCard(stage: _Stage())),
           if (editing) const _SlotEditBar(),
           const _SlotTransport(),
         ],
@@ -46,12 +49,15 @@ class TabScreen extends ConsumerWidget {
   }
 }
 
-// SLOT: TabStage
-class _StagePlaceholder extends StatelessWidget {
-  const _StagePlaceholder();
+/// Lienzo alphaTab con el overlay de fases encima (TabScreen.swift:191-198).
+class _Stage extends ConsumerWidget {
+  const _Stage();
 
   @override
-  Widget build(BuildContext context) => const SizedBox.expand();
+  Widget build(BuildContext context, WidgetRef ref) {
+    final webError = ref.watch(tabCanvasProvider.select((s) => s.webError));
+    return TabStage(canvas: const TabCanvas(), webError: webError);
+  }
 }
 
 // SLOT: TabEditBar
