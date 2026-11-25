@@ -63,7 +63,7 @@ class _CameraPreviewBoxState extends ConsumerState<CameraPreviewBox> {
           ],
         );
       case PreviewState.noCamera:
-        return TfStateMessage(icon: TfIcon.cameraFill, text: l.settings_video_none);
+        return TfStateMessage(icon: TfIcon.cameraFill, iconFilled: true, text: l.settings_video_none);
       case PreviewState.denied:
         return _Denied(onOpen: () => ref.read(videoStoreProvider.notifier).openCameraPrivacy());
       case PreviewState.failed:
