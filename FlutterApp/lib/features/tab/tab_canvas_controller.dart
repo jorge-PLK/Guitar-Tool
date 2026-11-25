@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:toneforge/contract/study.dart';
 import 'package:toneforge/contract/tab.dart';
 import 'package:toneforge/features/backing/study_position.dart';
+import 'package:toneforge/features/tab/tab_shortcuts.dart' show WebKey, tabWebKeysProvider;
 import 'package:toneforge/features/tab/tab_store.dart';
 import 'package:toneforge/widgets/tf_web_view.dart';
 
@@ -129,6 +130,16 @@ class TabCanvasController extends Notifier<TabCanvasState> {
         if (json['shift'] == true) return;
         unawaited(_store.noteClick(TabClickParams(
             track: i('track'), bar: i('bar'), beat: i('beat'), string: i('string'), shift: false)));
+      case 'key':
+        // Teclado con el foco dentro del WebView: mismo manejador que cuando lo tiene Flutter.
+        ref.read(tabWebKeysProvider).add(WebKey(
+              key: '${json['key'] ?? ''}',
+              code: '${json['code'] ?? ''}',
+              shift: json['shift'] == true,
+              ctrl: json['ctrl'] == true,
+              meta: json['meta'] == true,
+              alt: json['alt'] == true,
+            ));
       case 'error':
         _fail('${json['message'] ?? ''}');
       default: // `cursor` y desconocidos: se ignoran

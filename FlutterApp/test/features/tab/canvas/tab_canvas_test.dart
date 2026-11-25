@@ -6,6 +6,7 @@ import 'package:toneforge/core/mock_core.dart';
 import 'package:toneforge/features/backing/study_position.dart';
 import 'package:toneforge/features/tab/tab_canvas_controller.dart';
 import 'package:toneforge/features/tab/tab_header.dart';
+import 'package:toneforge/features/tab/tab_shortcuts.dart' show WebKey, tabWebKeysProvider;
 import 'package:toneforge/features/tab/tab_store.dart';
 
 import '../../../support/fake_web_view.dart';
@@ -73,6 +74,26 @@ Future<Rig> boot({bool ready = true}) async {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(findFixtures);
+
+  test('el mensaje key de la página llega al canal de atajos', () async {
+    final r = await boot();
+    final got = <WebKey>[];
+    final sub = r.container.read(tabWebKeysProvider).stream.listen(got.add);
+    addTearDown(sub.cancel);
+    r.msg({'event': 'key', 'key': ' ', 'code': 'Space', 'shift': false, 'meta': true});
+    await settle();
+    expect(got.single.key, ' ');
+    expect(got.single.code, 'Space');
+    expect(got.single.meta, isTrue);
+    expect(got.single.shift, isFalse);
+  });
+
+  test('ready + tab.state cargan la partitura una sola vez (TF.load)', () async {
+    final r = await boot();
+    await r.state();
+    await settle();
+    expect(r.js.where((j) => j.startsWith('TF.load(')).length, 1);
+  });
 
   test('carga tab.html del paquete', () async {
     final r = await boot(ready: false);
