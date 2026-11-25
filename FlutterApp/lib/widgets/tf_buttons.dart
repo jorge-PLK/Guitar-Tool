@@ -140,15 +140,25 @@ class TfSecondaryButton extends StatelessWidget {
     required this.label,
     required this.onPressed,
     this.height = TfSize.controlLg,
+    this.icon,
+    this.labelColor,
   });
 
   final String label;
   final VoidCallback? onPressed;
   final double height;
 
+  /// Icono antes del texto (`Label(_, systemImage:)`), del tamaño de la fuente y del color de la etiqueta.
+  final TfIcon? icon;
+
+  /// Color de etiqueta e icono cuando está habilitado; por defecto `text`. Deshabilitado siempre `muted`.
+  final Color? labelColor;
+
   @override
   Widget build(BuildContext context) {
     final bool enabled = onPressed != null;
+    final Color color = enabled ? (labelColor ?? TfColors.text) : TfColors.muted;
+    final TextStyle style = _label(TfSize.font14, TfWeight.medium, color);
     return _TfPress(
       onPressed: onPressed,
       semanticLabel: label,
@@ -156,7 +166,17 @@ class TfSecondaryButton extends StatelessWidget {
         enabled: enabled,
         pressed: pressed,
         height: height,
-        child: _labelRow(label, _label(TfSize.font14, TfWeight.medium, enabled ? TfColors.text : TfColors.muted)),
+        child: icon == null
+            ? _labelRow(label, style)
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: <Widget>[
+                  TfIconView(icon!, size: TfSize.font14, color: color),
+                  const SizedBox(width: TfSpace.s6),
+                  Flexible(child: Text(label, style: style, maxLines: 1, softWrap: false, overflow: TextOverflow.clip)),
+                ],
+              ),
       ),
     );
   }

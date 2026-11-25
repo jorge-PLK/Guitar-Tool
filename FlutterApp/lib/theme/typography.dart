@@ -13,6 +13,12 @@ abstract final class TfFamily {
 }
 
 abstract final class TfText {
+  /// Cifras tabulares (`.monospacedDigit()`): relojes, tempo, cents.
+  static const List<FontFeature> tabularFigures = <FontFeature>[FontFeature.tabularFigures()];
+
+  /// [base] con cifras tabulares.
+  static TextStyle tabular(TextStyle base) => base.copyWith(fontFeatures: tabularFigures);
+
   /// Display (Space Grotesk). Por defecto bold, como `TF.display(s)`.
   /// regular/medium -> 500 (SpaceGroteskLight-Medium); semibold/bold -> 700 (SpaceGroteskLight-Bold).
   static TextStyle display(double size, [TfWeight weight = TfWeight.bold]) {

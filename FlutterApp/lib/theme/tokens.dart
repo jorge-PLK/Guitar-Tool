@@ -139,6 +139,9 @@ abstract final class TfStroke {
 
   /// Trazo discontinuo `dash: [3]` (TabScreen.swift:238): 3 pt de trazo y 3 de hueco.
   static const double dash = 3;
+
+  /// Marco de edición de acordes (BackingTrackView.swift:172).
+  static const double editFrame = 1.5;
 }
 
 /// Opacidades literales de SwiftUI (§2.4). Sin fundir valores casi iguales.
@@ -163,6 +166,9 @@ abstract final class TfOpacity {
   static const double tint16 = 0.16;
   static const double tint12 = 0.12;
   static const double tint07 = 0.07;
+
+  /// `muted@0.7` (BackingTrackView.swift:268). Mismo valor que [pressedSecondary], otro uso.
+  static const double mutedChip = 0.7;
 }
 
 /// Sombras (§2.5), todas negras. SwiftUI `radius` se transcribe como `blurRadius`.
@@ -279,4 +285,22 @@ abstract final class TfSize {
   static const double mixerChannelMinHeight = 166;
   static const double mixerTitleHeight = 22;
   static const double mixerTogglesHeight = 40;
+
+  // Backing y Tab: transporte, información y escenario (BackingView/TabScreen).
+  static const double transportPlay = 52; // botón de play redondo, Backing y Tab
+  static const double transportPlayIcon = 20;
+  static const double transportRewindIcon = 15;
+  static const double transportMarkHeight = 30; // «Inicio»/«Fin» de bucle
+  static const double transportTempoSlider = 120;
+  static const double transportTempoValue = 54;
+  static const double transportFlowSpacing = 14;
+  static const double infoPickerWidth = 112;
+  static const double infoFineSliderWidth = 70;
+  static const double infoCentsWidth = 56;
+  static const double tabStageMinHeight = 320; // alto mínimo del escenario
+  static const double tabFooterHeight = 18;
+  static const double tabListenOptionHeight = 30;
+  static const double tabTuningWidth = 170;
+  static const double tabNameWidth = 150; // nombre de pista (pairing y fases)
+  static const double tabPhaseBarWidth = 220;
 }
