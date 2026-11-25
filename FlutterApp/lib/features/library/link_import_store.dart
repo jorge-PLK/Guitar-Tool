@@ -13,6 +13,8 @@ import 'package:toneforge/features/library/playlist_store.dart';
 
 export 'package:toneforge/features/library/link_import_logic.dart';
 
+part 'link_import_actions.dart';
+
 /// Hoja «Importar tema / desde enlace». Sin autoDispose: `link.finished` (duplicado,
 /// cancelación) puede llegar con la hoja ya cerrada; la hoja llama a `reset()` al abrirse.
 final linkImportStoreProvider = NotifierProvider<LinkImportStore, LinkImportState>(
@@ -31,6 +33,7 @@ class LinkImportStore extends Notifier<LinkImportState> {
   /// Trabajos `link-N` propios sin `link.finished` todavía (incluye los de hojas ya reiniciadas).
   final _jobs = <String>{};
   bool _importing = false;
+  int _importPass = 0;
   final _early = <LinkFinished>[];
 
   @override
@@ -48,6 +51,10 @@ class LinkImportStore extends Notifier<LinkImportState> {
   }
 
   bool _live(int pass) => ref.mounted && pass == _pass;
+
+  /// Estado para `link_import_actions.dart` (`state` es protegido fuera de la clase).
+  LinkImportState get _s => state;
+  set _s(LinkImportState v) => state = v;
 
   // ---- Campo y Spotify ----
 
@@ -216,22 +223,33 @@ class LinkImportStore extends Notifier<LinkImportState> {
       jobId: null,
     );
     _importing = true;
+    _importPass = pass;
     _early.clear();
     try {
       final r = await _core.call('link.import', params.toJson(), LinkJobResult.fromJson);
       _jobs.add(r.jobId);
       if (!_live(pass)) {
-        // Cancelado mientras se encolaba: se cancela el trabajo recién creado.
+        // Cancelado mientras se encolaba: se cancela el trabajo recién creado y se
+        // atiende lo acumulado (duplicado, `cancelled`) de los trabajos conocidos.
         unawaited(cancelJob(r.jobId));
+        _drainEarly(pass);
         return;
       }
       state = state.copyWith(jobId: r.jobId, passRunning: false);
     } on CoreError catch (e) {
-      _importing = false;
-      _early.clear();
+      if (_importPass == pass) {
+        _importing = false;
+        _early.clear();
+      }
       if (_live(pass)) _showError(e);
       return;
     }
+    _drainEarly(pass);
+  }
+
+  /// Fin de la ventana de `link.import`: atiende los `link.finished` llegados antes de conocer el id.
+  void _drainEarly(int pass) {
+    if (!ref.mounted || _importPass != pass) return;
     _importing = false;
     final early = [..._early];
     _early.clear();
@@ -282,135 +300,9 @@ class LinkImportStore extends Notifier<LinkImportState> {
     }
   }
 
-  // ---- Cancelar y reintentar ----
-
-  /// «Cancelar»: resolviendo → `link.cancel`; trabajando → `link.cancel {jobId}`;
-  /// error o banner → vuelve a candidatos o al campo vacío.
-  Future<void> cancel() async {
-    final s = state;
-    switch (s.screen) {
-      case LinkImportScreen.resolving || LinkImportScreen.preparing:
-        _pass++;
-        unawaited(_cancelResolution());
-        state = s.copyWith(passRunning: false, screen: LinkImportScreen.empty);
-      case LinkImportScreen.working:
-        if (!s.canCancel) return;
-        final id = s.jobId;
-        if (id == null) {
-          _pass++;
-          _back(passRunning: false);
-          return;
-        }
-        // La vuelta a candidatos llega con `link.finished` (`cancelled`).
-        await cancelJob(id);
-      case LinkImportScreen.error || LinkImportScreen.candidates:
-        if (s.passRunning) _pass++;
-        _back(passRunning: false);
-      default:
-        break;
-    }
-  }
-
-  Future<void> _cancelResolution() async {
-    try {
-      await _core.call('link.cancel', const LinkCancelParams().toJson(), CancelledResult.fromJson);
-    } on CoreError {
-      // ya había terminado
-    }
-  }
-
-  /// `link.cancel {jobId}`: para la X de la fila `link-…` de la Biblioteca (nunca `jobs.cancel`).
-  Future<CoreError?> cancelJob(String jobId) async {
-    try {
-      await _core.call('link.cancel', LinkCancelParams(jobId: jobId).toJson(), CancelledResult.fromJson);
-      return null;
-    } on CoreError catch (e) {
-      return e;
-    }
-  }
-
-  Future<void> retry() async {
-    if (state.passRunning) return;
-    if (_lastDownload) return importSelected();
-    await _resolve(state.text.trim(), ++_pass);
-  }
-
-  /// `tools.updateYtDlp` y repite lo último (resolver, o resolver y volver a importar).
-  Future<void> updateAndRetry() async {
-    if (state.passRunning) return;
-    final broken = state.error;
-    final saved = (state.title, state.artist, state.selectedId);
-    final pass = ++_pass;
-    state = state.copyWith(
-      screen: LinkImportScreen.working,
-      passRunning: true,
-      error: null,
-      alreadyLatest: false,
-      workPhase: LinkWorkPhase.updating,
-      progress: null,
-      jobId: null,
-    );
-    try {
-      final r = await _core.call('tools.updateYtDlp', const <String, Object?>{}, UpdateYtDlpResult.fromJson);
-      if (!_live(pass)) return;
-      if (broken != null && broken.suggestsUpdate && r.alreadyLatest) {
-        state = state.copyWith(screen: LinkImportScreen.error, passRunning: false, error: broken, alreadyLatest: true);
-        return;
-      }
-    } on CoreError catch (e) {
-      if (_live(pass)) _showError(e);
-      return;
-    }
-    final ok = await _resolve(state.text.trim(), pass, quiet: true);
-    if (!ok || !_live(pass)) return;
-    for (final link in [..._manualLinks]) {
-      try {
-        await _core.call('link.addManual', LinkAddManualParams(url: link).toJson(), LinkAddManualResult.fromJson);
-      } on CoreError {
-        // un enlace manual que ya no sirve no impide el reintento
-      }
-      if (!_live(pass)) return;
-    }
-    final still = state.resolved?.candidates.any((c) => c.id == saved.$3) ?? false;
-    state = state.copyWith(title: saved.$1, artist: saved.$2, selectedId: still ? saved.$3 : state.selectedId);
-    if (_lastDownload) await importSelected();
-  }
-
-  /// «Probar con otro enlace» / apertura de la hoja: campo vacío. Un trabajo en curso sigue
-  /// (su `link.finished` solo se atiende para la alerta de duplicado).
-  void reset() {
-    if (state.passRunning && state.screen == LinkImportScreen.resolving) unawaited(_cancelResolution());
-    _pass++;
-    _searchSeq++;
-    _early.clear();
-    _manualLinks.clear();
-    _lastDownload = false;
-    _source = null;
-    state = LinkImportState(duplicateOf: state.duplicateOf);
-  }
-
-  // ---- Interno ----
-
-  void _back({bool passRunning = false}) => state = state.copyWith(
-    screen: state.resolved != null ? LinkImportScreen.candidates : LinkImportScreen.empty,
-    passRunning: passRunning,
-    error: null,
-    jobId: null,
-    progress: null,
-  );
-
-  /// Error del núcleo → pantalla de error; los de «vuelve a candidatos» dejan un banner.
-  void _showError(CoreError e) {
-    if (e.code == 'cancelled') {
-      _back();
-      return;
-    }
-    final err = LinkImportError.fromCore(e);
-    final toCandidates = err.returnsToCandidates && state.resolved != null;
-    state = state.copyWith(
-      screen: toCandidates ? LinkImportScreen.candidates : LinkImportScreen.error,
-      passRunning: false,
-      error: err,
-    );
-  }
+  // Sobrescribibles (los tests de widgets los falsean); el cuerpo vive en `link_import_actions.dart`.
+  Future<void> cancel() => _cancel();
+  Future<void> retry() => _retry();
+  Future<void> updateAndRetry() => _updateAndRetry();
+  void reset() => _reset();
 }

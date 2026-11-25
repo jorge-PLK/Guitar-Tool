@@ -60,6 +60,16 @@ Future<(ProviderContainer, MockCore, MemoryPrefs)> setup({
 }
 
 void main() {
+  test('library.changed vuelve a leer projectsFolder (tras library.relocate)', () async {
+    final (c, core, _) = await setup();
+    final info = await core.call<Json>('app.info', const <String, Object?>{}, (j) => j);
+    expect(c.read(libraryStoreProvider).projectsFolder, info['projectsFolder']);
+    core.result('app.info', {...info, 'projectsFolder': '/nueva/carpeta'});
+    core.emitFixture('library.changed');
+    await pumpEventQueue();
+    expect(c.read(libraryStoreProvider).projectsFolder, '/nueva/carpeta');
+  });
+
   test('app.info.proposedProjectsFolder llega al estado; sin el campo queda null', () async {
     final (c, _, _) = await setup(keepProposal: true);
     expect(c.read(libraryStoreProvider).proposedFolder, '/<dir>/Music/ToneForge');

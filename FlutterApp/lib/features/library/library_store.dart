@@ -118,7 +118,10 @@ class LibraryStore extends Notifier<LibraryState> {
   @override
   LibraryState build() {
     final subs = [
-      _core.on<Json>('library.changed', (j) => j).listen((_) => refresh()),
+      _core.on<Json>('library.changed', (j) => j).listen((_) {
+        unawaited(_loadInfo(onlyFolder: true));
+        unawaited(refresh());
+      }),
     ];
     ref.onDispose(() {
       for (final s in subs) {
@@ -143,14 +146,17 @@ class LibraryStore extends Notifier<LibraryState> {
     }
   }
 
-  Future<void> _loadInfo() async {
+  /// [onlyFolder]: tras `library.changed` solo se refresca la carpeta (puede haber cambiado por `library.relocate`).
+  Future<void> _loadInfo({bool onlyFolder = false}) async {
     try {
       final info = await _core.call<Json>('app.info', const <String, Object?>{}, (j) => j);
       if (!ref.mounted) return;
-      state = state.copyWith(
-        projectsFolder: info['projectsFolder'] as String?,
-        proposedFolder: indicatorText(info['proposedProjectsFolder']),
-      );
+      state = onlyFolder
+          ? state.copyWith(projectsFolder: info['projectsFolder'] as String?)
+          : state.copyWith(
+              projectsFolder: info['projectsFolder'] as String?,
+              proposedFolder: indicatorText(info['proposedProjectsFolder']),
+            );
     } on CoreError {
       // la carpeta la decide library.list
     }
