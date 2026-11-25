@@ -26,13 +26,15 @@ class FakeTabStore extends TabStore {
 
   final TabStoreState initial;
   final List<TabSpanAction> spans = <TabSpanAction>[];
+  final List<bool?> keepAnchors = <bool?>[];
 
   @override
   TabStoreState build() => initial;
 
   @override
-  Future<TabState?> span(TabSpanAction action) async {
+  Future<TabState?> span(TabSpanAction action, {bool? keepAnchor}) async {
     spans.add(action);
+    keepAnchors.add(keepAnchor);
     return null;
   }
 }

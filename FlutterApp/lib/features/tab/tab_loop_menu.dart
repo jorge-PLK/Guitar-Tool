@@ -42,7 +42,7 @@ class TabLoopMenu extends ConsumerWidget {
       TfMenuItem(
         label: l.tab_loopNone,
         onSelected: () async {
-          await tab.span(TabSpanAction.clear);
+          await tab.span(TabSpanAction.clear, keepAnchor: true);
           await study.clearLoop();
         },
       ),

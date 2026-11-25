@@ -112,15 +112,19 @@ final class TabSelectParams {
 }
 
 final class TabSpanParams {
-  const TabSpanParams({required this.action});
+  const TabSpanParams({required this.action, this.keepAnchor});
 
   factory TabSpanParams.fromJson(Json j) => TabSpanParams(
         action: _enumOr(TabSpanAction.values, j['action'], TabSpanAction.unknown),
+        keepAnchor: _bn(j['keepAnchor']),
       );
 
-  Json toJson() => {'action': _wire(action)};
+  Json toJson() => _compact({'action': _wire(action), 'keepAnchor': keepAnchor});
 
   final TabSpanAction action;
+
+  /// Solo con `clear`: limpia el tramo y conserva el ancla del ⇧clic.
+  final bool? keepAnchor;
 }
 
 final class TabListeningParams {

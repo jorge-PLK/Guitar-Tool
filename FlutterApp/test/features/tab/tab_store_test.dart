@@ -113,7 +113,7 @@ void main() {
     expect(h.state.flash, isNull);
   });
 
-  test('showFlash local y avisos cerrados', () async {
+  test('dismissNotices llama al núcleo y aplica el TabState devuelto', () async {
     final (core, h) = await boot();
     core.emit('tab.state', {
       ...fixture('tab.open.result.json'),
@@ -121,14 +121,32 @@ void main() {
     });
     await settle();
     expect(h.state.notices, ['uno']);
-    h.notifier.dismissNotices();
+    final t = await h.notifier.dismissNotices();
+    expect(core.calls.last.method, 'tab.dismissNotices');
+    expect(core.calls.last.params, isEmpty);
+    expect(t!.notices, isEmpty);
     expect(h.state.notices, isEmpty);
     core.emit('tab.state', {
       ...fixture('tab.open.result.json'),
-      'notices': ['uno', 'dos'],
+      'notices': ['uno'],
     });
     await settle();
-    expect(h.state.notices, ['dos']);
+    expect(h.state.notices, ['uno']);
+  });
+
+  test('dismissNotices sin tablatura abierta deja el error not-open', () async {
+    final (core, h) = await boot();
+    core.failWith('tab.dismissNotices', const CoreError('not-open', 'sin tab'));
+    expect(await h.notifier.dismissNotices(), isNull);
+    expect(h.state.error!.code, 'not-open');
+  });
+
+  test('span clear con keepAnchor envía el parámetro', () async {
+    final (core, h) = await boot();
+    await h.notifier.span(TabSpanAction.clear, keepAnchor: true);
+    expect(core.calls.last.params, {'action': 'clear', 'keepAnchor': true});
+    await h.notifier.span(TabSpanAction.clear);
+    expect(core.calls.last.params, {'action': 'clear'});
   });
 
   test('cada intención llama a su método con sus parámetros', () async {

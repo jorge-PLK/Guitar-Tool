@@ -52,6 +52,7 @@ void main() {
     await tester.tap(find.text(es.tab_loopNone));
     await tester.pump();
     expect(r.tab.spans, [TabSpanAction.clear]);
+    expect(r.tab.keepAnchors, [true]);
     expect(r.calls('study.setLoop'), hasLength(1));
     expect(_params(r, 'study.setLoop').containsKey('start'), isFalse);
   });

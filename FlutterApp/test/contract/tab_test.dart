@@ -57,6 +57,7 @@ final _results = <String, Object? Function(Json)>{
   'tab.noteClick': TabState.fromJson,
   'tab.select': TabState.fromJson,
   'tab.span': TabState.fromJson,
+  'tab.dismissNotices': TabState.fromJson,
   'tab.toggleMute': TabState.fromJson,
   'tab.toggleSolo': TabState.fromJson,
   'tab.setListening': TabState.fromJson,
@@ -105,6 +106,7 @@ final _params = <String, Json Function(Json)>{
   'tab.noteClick': (j) => TabClickParams.fromJson(j).toJson(),
   'tab.select': (j) => TabSelectParams.fromJson(j).toJson(),
   'tab.span': (j) => TabSpanParams.fromJson(j).toJson(),
+  'tab.dismissNotices': _empty,
   'tab.toggleMute': (j) => TabTrackParams.fromJson(j).toJson(),
   'tab.toggleSolo': (j) => TabTrackParams.fromJson(j).toJson(),
   'tab.setListening': (j) => TabListeningParams.fromJson(j).toJson(),
@@ -172,8 +174,8 @@ void main() => group('contract · tab', () {
     _dir = Directory('${src.root.path}/tab');
   });
 
-  test('la carpeta de fixtures de tab tiene 122 ficheros', () {
-    expect(_files(), hasLength(122));
+  test('la carpeta de fixtures de tab tiene 128 ficheros', () {
+    expect(_files(), hasLength(128));
   });
 
   test('cada fixture de tab tiene decoder', () {

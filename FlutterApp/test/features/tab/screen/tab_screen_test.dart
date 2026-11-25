@@ -161,12 +161,14 @@ void main() {
   });
 
   group('aviso', () {
-    testWidgets('visible con notices y la X lo oculta', (tester) async {
-      await boot(tester, patch: {'notices': ['Aviso uno']});
+    testWidgets('visible con notices y la X llama a tab.dismissNotices', (tester) async {
+      final r = await boot(tester, patch: {'notices': ['Aviso uno']});
       expect(find.text('Aviso uno'), findsOneWidget);
       await tester.tap(find.descendant(
           of: find.byType(TfNotice), matching: find.byType(TfIconView)).last);
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
       await tester.pump();
+      expect(r.methods, contains('tab.dismissNotices'));
       expect(find.text('Aviso uno'), findsNothing);
       expect(find.byType(TfNotice), findsNothing);
     });
@@ -183,7 +185,6 @@ void main() {
       await tapText(tester, 'Fuente: Songsterr');
       expect(find.text('Cambiar emparejamiento…'), findsOneWidget);
       await tapText(tester, 'Transcripción automática');
-      tester.takeException(); // TfAlert: 0.7 px de desborde en la fila de botones (lib/widgets, congelado)
       expect(find.text('¿Pasar a transcripción automática?'), findsOneWidget);
       expect(r.methods, isNot(contains('tab.setSource')));
       await tapText(tester, 'Pasar a automática');
@@ -194,7 +195,6 @@ void main() {
       final r = await boot(tester, patch: {'source': 'songsterr'});
       await tapText(tester, 'Fuente: Songsterr');
       await tapText(tester, 'Transcripción automática');
-      tester.takeException(); // ver arriba
       await tapText(tester, 'Cancelar');
       expect(r.methods, isNot(contains('tab.setSource')));
     });

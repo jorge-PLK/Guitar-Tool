@@ -30,7 +30,6 @@ final class TabStoreState {
     this.error,
     this.exportName,
     this.exporting = false,
-    this.dismissedNotices = const [],
   });
 
   /// Proyecto con tablatura abierta (o abriéndose).
@@ -58,14 +57,8 @@ final class TabStoreState {
   final String? exportName;
   final bool exporting;
 
-  /// Avisos que el usuario cerró con la X (el núcleo no tiene método para ello).
-  final List<String> dismissedNotices;
-
-  /// Avisos del núcleo aún no cerrados.
-  List<String> get notices => [
-        for (final n in tab?.notices ?? const <String>[])
-          if (!dismissedNotices.contains(n)) n,
-      ];
+  /// Avisos vigentes del núcleo (`tab.state.notices`).
+  List<String> get notices => tab?.notices ?? const <String>[];
 
   TabStoreState copyWith({
     Object? projectId = _keep,
@@ -79,7 +72,6 @@ final class TabStoreState {
     Object? error = _keep,
     Object? exportName = _keep,
     bool? exporting,
-    List<String>? dismissedNotices,
   }) =>
       TabStoreState(
         projectId: identical(projectId, _keep) ? this.projectId : projectId as String?,
@@ -93,7 +85,6 @@ final class TabStoreState {
         error: identical(error, _keep) ? this.error : error as CoreError?,
         exportName: identical(exportName, _keep) ? this.exportName : exportName as String?,
         exporting: exporting ?? this.exporting,
-        dismissedNotices: dismissedNotices ?? this.dismissedNotices,
       );
 }
 
@@ -205,11 +196,8 @@ class TabStore extends Notifier<TabStoreState> {
     });
   }
 
-  /// Cierra el cuadro de avisos (la X). Solo oculta; el núcleo no ofrece método.
-  void dismissNotices() {
-    final n = state.tab?.notices ?? const <String>[];
-    state = state.copyWith(dismissedNotices: [...state.dismissedNotices, ...n]);
-  }
+  /// Cierra el cuadro de avisos (la X): `tab.dismissNotices` y aplica el `TabState` devuelto.
+  Future<TabState?> dismissNotices() => _call('tab.dismissNotices');
 
   void clearError() => state = state.copyWith(error: null);
 
@@ -268,8 +256,8 @@ class TabStore extends Notifier<TabStoreState> {
   Future<TabState?> noteClick(TabClickParams p) => _call('tab.noteClick', p.toJson());
   Future<TabState?> select(TabSelectParams p) => _call('tab.select', p.toJson());
 
-  Future<TabState?> span(TabSpanAction action) =>
-      _call('tab.span', TabSpanParams(action: action).toJson());
+  Future<TabState?> span(TabSpanAction action, {bool? keepAnchor}) =>
+      _call('tab.span', TabSpanParams(action: action, keepAnchor: keepAnchor).toJson());
 
   Future<TabState?> toggleMute(String track) =>
       _call('tab.toggleMute', TabTrackParams(track: track).toJson());
