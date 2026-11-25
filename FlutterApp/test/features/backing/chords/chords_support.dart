@@ -32,7 +32,7 @@ class MemPrefs implements ChordsExpandedPrefStore {
 /// Cuatro acordes de 2 s: Cm, Cm(maj7), G, Am; compases en 0 y 4.
 void fourChords(Json open, {double position = 0}) {
   final a = (open['analysis']! as Map).cast<String, Object?>();
-  final base = (a['chords']! as List).cast<Map>().map((m) => m.cast<String, Object?>()).toList();
+  final base = (a['chords']! as List).cast<Map<String, Object?>>().map((m) => m.cast<String, Object?>()).toList();
   Json mk(Json src, String name, int index, double s) =>
       <String, Object?>{...src, 'name': name, 'display': name, 'index': index, 'start': s, 'end': s + 2};
   a['chords'] = <Object?>[

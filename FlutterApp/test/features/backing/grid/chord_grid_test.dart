@@ -70,7 +70,7 @@ Future<(MockCore, ProviderContainer)> pumpGrid(
 
 ChordGridPainter painterOf(WidgetTester t) => (t.widget<CustomPaint>(find.byKey(paintKey))).painter! as ChordGridPainter;
 Offset at(WidgetTester t, double x, double y) => t.getTopLeft(find.byKey(contentKey)) + Offset(x, y);
-Map call(MockCore c, String m) => c.calls.lastWhere((x) => x.method == m).params! as Map;
+Map<String, dynamic> call(MockCore c, String m) => c.calls.lastWhere((x) => x.method == m).params! as Map<String, dynamic>;
 
 // Con 1100 de ancho caben 8 compases por fila: barWidth 127, drawn 123, celda 30,75.
 // Pulso k del compás c: x = 84 + 127·c + 30,75·k + 10; fila 0: y = 18 + 23.

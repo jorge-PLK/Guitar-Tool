@@ -12,7 +12,7 @@ void tweak(Json open, {double position = 3, bool override = true, Json? shown}) 
   fourChords(open, position: position);
   final a = (open['analysis']! as Map).cast<String, Object?>();
   a['beats'] = <Object?>[for (int i = 0; i < 8; i++) i.toDouble()];
-  final chords = (a['chords']! as List).cast<Map>();
+  final chords = (a['chords']! as List).cast<Map<String, dynamic>>();
   chords[1]['shown'] = shown ?? <String, Object?>{'root': 0, 'quality': 7};
   open['chordOverrides'] = override
       ? <Object?>[
@@ -22,7 +22,7 @@ void tweak(Json open, {double position = 3, bool override = true, Json? shown}) 
 }
 
 Finder inEditor(Finder f) => find.descendant(of: find.byType(ChordEditor), matching: f);
-Map last(ChordsRig r, String m) => r.core.calls.lastWhere((x) => x.method == m).params! as Map;
+Map<String, dynamic> last(ChordsRig r, String m) => r.core.calls.lastWhere((x) => x.method == m).params! as Map<String, dynamic>;
 int count(ChordsRig r, String m) => r.core.calls.where((x) => x.method == m).length;
 
 Future<ChordsRig> pumpEditing(WidgetTester t, {double position = 3, bool override = true, Json? shown}) async {
@@ -63,7 +63,7 @@ void main() {
     expect(last(rig, 'study.setChord')['shown'], equals({'root': 2, 'quality': 7}));
     await t.tap(inEditor(find.text('maj7')));
     await settleFrames(t);
-    final Map p = last(rig, 'study.setChord');
+    final Map<String, dynamic> p = last(rig, 'study.setChord');
     expect(p['shown'], equals({'root': 2, 'quality': 8}));
     expect(p.containsKey('index'), isFalse);
     expect(p, containsPair('start', 2.0));
@@ -122,7 +122,7 @@ void main() {
     final ChordsRig rig = await pumpEditing(t);
     await t.tap(inEditor(find.text(es.backing_chordRemoveOverride)));
     await settleFrames(t);
-    final Map p = last(rig, 'study.removeChordOverrides');
+    final Map<String, dynamic> p = last(rig, 'study.removeChordOverrides');
     expect(p, containsPair('start', 2.0));
     expect(p, containsPair('end', 4.0));
   });

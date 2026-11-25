@@ -78,7 +78,7 @@ void main() {
       await pumpBacking(tester, tweak: (o) {
         final t = (o['transport']! as Map).cast<String, Object?>();
         t['channels'] = [
-          for (final c in (t['channels']! as List).cast<Map>())
+          for (final c in (t['channels']! as List).cast<Map<String, dynamic>>())
             if (c['kind'] != 'guitar') c,
         ];
       });

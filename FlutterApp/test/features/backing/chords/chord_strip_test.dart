@@ -1,7 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:toneforge/core/mock_core.dart';
-import 'package:toneforge/features/backing/widgets/chord_chip.dart';
 import 'package:toneforge/features/backing/widgets/chord_strip.dart';
 import 'package:toneforge/theme/tokens.dart';
 

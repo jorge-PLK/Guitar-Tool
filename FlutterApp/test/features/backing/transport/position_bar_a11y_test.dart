@@ -26,10 +26,8 @@ void main() {
     final SemanticsNode n = tester.getSemantics(find.bySemanticsLabel('Posición'));
     expect(n.label, 'Posición');
     expect(n.value, '1:02 de 3:20');
-    SemanticsBinding.instance.performSemanticsAction(
-        SemanticsActionEvent(type: SemanticsAction.increase, viewId: tester.view.viewId, nodeId: n.id));
-    SemanticsBinding.instance.performSemanticsAction(
-        SemanticsActionEvent(type: SemanticsAction.decrease, viewId: tester.view.viewId, nodeId: n.id));
+    tester.semantics.performAction(find.semantics.byLabel('Posición'), SemanticsAction.increase);
+    tester.semantics.performAction(find.semantics.byLabel('Posición'), SemanticsAction.decrease);
     expect(seeks, <double>[67, 57]);
     h.dispose();
   });

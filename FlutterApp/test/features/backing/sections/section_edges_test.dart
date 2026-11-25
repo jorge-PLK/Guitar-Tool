@@ -155,7 +155,7 @@ void main() {
     await g.moveBy(const Offset(12, 0));
     await g.moveBy(const Offset(-12, 0));
     await settleFrames(tester);
-    final Map last = r.calls('study.previewSectionEdge').last.params! as Map;
+    final Map<String, dynamic> last = r.calls('study.previewSectionEdge').last.params! as Map<String, dynamic>;
     expect((last['to']! as num).toDouble(), closeTo(s.start, 0.001));
     await g.up();
     await settleFrames(tester);
@@ -182,7 +182,7 @@ void main() {
     await settleFrames(tester);
     final List<MockCall> u = r.calls('study.updateSection');
     expect(u, hasLength(1));
-    final Map p = u.single.params! as Map;
+    final Map<String, dynamic> p = u.single.params! as Map<String, dynamic>;
     expect(p['id'], solo);
     expect(p['snap'], 'chord');
     expect(p.containsKey('start'), isTrue);
