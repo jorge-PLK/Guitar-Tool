@@ -698,7 +698,7 @@
   "backing_tabButton": "Tabs",
   "backing_tabButtonTooltip": "Open the tab for this theme",
   "backing_tempo": "Tempo",
-  "backing_tempoDetected": "Detected tempo",
+  "backing_tempoDetected": "Detected tempo:",
   "backing_title": "Backing track",
   "backing_transpose": "Transpose",
   "backing_transposeZero": "0 semitones",

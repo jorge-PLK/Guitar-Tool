@@ -2494,7 +2494,7 @@ abstract class AppLocalizations {
   /// No description provided for @backing_tempoDetected.
   ///
   /// In es, this message translates to:
-  /// **'Tempo detectado'**
+  /// **'Tempo detectado:'**
   String get backing_tempoDetected;
 
   /// No description provided for @backing_title.

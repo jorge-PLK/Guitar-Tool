@@ -14,6 +14,7 @@ import 'package:toneforge/widgets/tf_menu.dart';
 import 'package:toneforge/widgets/tf_mixer_channel.dart';
 import 'package:toneforge/widgets/tf_text_field.dart';
 import 'package:toneforge/widgets/tf_toggle_button.dart';
+import 'package:toneforge/widgets/tf_tooltip.dart';
 
 const List<StudyStemKind> _order = <StudyStemKind>[
   StudyStemKind.vocals,
@@ -218,11 +219,14 @@ class _RenamableTitleState extends ConsumerState<_RenamableTitle> {
     }
     return TfMenu(
       entries: <TfMenuEntry>[TfMenuItem(label: l.backing_channelRenameMenu, onSelected: _start)],
-      builder: (BuildContext context, VoidCallback toggle) => GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onDoubleTap: _start,
-        onSecondaryTap: toggle,
-        child: _titleText(widget.title),
+      builder: (BuildContext context, VoidCallback toggle) => TfTooltip(
+        message: l.backing_channelRenameTooltip,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onDoubleTap: _start,
+          onSecondaryTap: toggle,
+          child: _titleText(widget.title),
+        ),
       ),
     );
   }

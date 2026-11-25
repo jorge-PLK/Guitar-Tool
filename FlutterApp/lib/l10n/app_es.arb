@@ -698,7 +698,7 @@
   "backing_tabButton": "Tablatura",
   "backing_tabButtonTooltip": "Abrir la tablatura de este tema",
   "backing_tempo": "Tempo",
-  "backing_tempoDetected": "Tempo detectado",
+  "backing_tempoDetected": "Tempo detectado:",
   "backing_title": "Backing track",
   "backing_transpose": "Transponer",
   "backing_transposeZero": "0 semitonos",

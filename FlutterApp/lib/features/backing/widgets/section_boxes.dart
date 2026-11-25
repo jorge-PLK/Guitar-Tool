@@ -14,11 +14,13 @@ import 'package:toneforge/features/backing/widgets/section_popover.dart';
 import 'package:toneforge/features/backing/widgets/section_popover_state.dart';
 import 'package:toneforge/features/backing/widgets/section_selection.dart';
 import 'package:toneforge/l10n/app_localizations.dart';
+import 'package:toneforge/theme/fmt.dart';
 import 'package:toneforge/theme/icons.dart';
 import 'package:toneforge/theme/tokens.dart';
 import 'package:toneforge/theme/typography.dart';
 import 'package:toneforge/widgets/tf_menu.dart';
 import 'package:toneforge/widgets/tf_popover.dart';
+import 'package:toneforge/widgets/tf_tooltip.dart';
 
 // TOKEN: sectionIconSize 10 (SB:76)
 const double _iconSize = 10;
@@ -254,42 +256,65 @@ class _SectionBoxState extends ConsumerState<_SectionBox> {
     Widget name,
   ) {
     final SectionPlacement placement = widget.placement;
-    final Widget box = MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
+    final AppLocalizations l = AppLocalizations.of(context);
+    final String from = TfFmt.clock(s.start);
+    final String to = TfFmt.clock(s.end);
+    final Widget box = TfTooltip(
+      message: l.backing_sectionBoxTooltip(
+        s.name,
+        s.solo ? 'yes' : 'no',
+        from,
+        to,
+      ),
+      child: Semantics(
+        label: l.backing_sectionA11y(
+          s.solo ? 'solo' : 'section',
+          s.name,
+          from,
+          to,
+        ),
+        hint: l.backing_sectionA11yHint,
+        button: true,
+        excludeSemantics: true,
         onTap: _open,
-        onLongPress: () => toggleSectionLoop(ref, s, sameTime: _sameTime),
-        child: !placement.labeled
-            ? const SizedBox.expand()
-            : Padding(
-                padding: const EdgeInsets.symmetric(horizontal: TfSpace.s8),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  // Como `ViewThatFits`: nombre con icono, solo el icono (si es solo) o nada.
-                  child: LayoutBuilder(
-                    builder: (BuildContext context, BoxConstraints c) {
-                      final double text = (TextPainter(
-                        text: TextSpan(text: s.name, style: nameStyle),
-                        maxLines: 1,
-                        textDirection: TextDirection.ltr,
-                      )..layout()).width;
-                      final double full =
-                          text + (s.solo ? _iconSize + TfSpace.s4 : 0);
-                      if (full <= c.maxWidth) {
-                        return Row(
-                          mainAxisSize: MainAxisSize.min,
-                          spacing: TfSpace.s4,
-                          children: <Widget>[if (s.solo) icon, name],
-                        );
-                      }
-                      return s.solo && _iconSize <= c.maxWidth
-                          ? icon
-                          : const SizedBox.shrink();
-                    },
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: _open,
+            onLongPress: () => toggleSectionLoop(ref, s, sameTime: _sameTime),
+            child: !placement.labeled
+                ? const SizedBox.expand()
+                : Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: TfSpace.s8),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      // Como `ViewThatFits`: nombre con icono, solo el icono (si es solo) o nada.
+                      child: LayoutBuilder(
+                        builder: (BuildContext context, BoxConstraints c) {
+                          final double text = (TextPainter(
+                            text: TextSpan(text: s.name, style: nameStyle),
+                            maxLines: 1,
+                            textDirection: TextDirection.ltr,
+                          )..layout()).width;
+                          final double full =
+                              text + (s.solo ? _iconSize + TfSpace.s4 : 0);
+                          if (full <= c.maxWidth) {
+                            return Row(
+                              mainAxisSize: MainAxisSize.min,
+                              spacing: TfSpace.s4,
+                              children: <Widget>[if (s.solo) icon, name],
+                            );
+                          }
+                          return s.solo && _iconSize <= c.maxWidth
+                              ? icon
+                              : const SizedBox.shrink();
+                        },
+                      ),
+                    ),
                   ),
-                ),
-              ),
+          ),
+        ),
       ),
     );
     final Widget anchored = placement.labeled

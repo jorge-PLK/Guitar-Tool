@@ -7,6 +7,7 @@ import 'package:toneforge/features/backing/study_store.dart';
 import 'package:toneforge/features/backing/widgets/section_boxes_geometry.dart';
 import 'package:toneforge/features/backing/widgets/section_boxes_painter.dart';
 import 'package:toneforge/features/backing/widgets/section_edge_drag.dart';
+import 'package:toneforge/l10n/app_localizations.dart';
 import 'package:toneforge/theme/tokens.dart';
 
 // TOKEN: sectionEdgeStartDistance 1 (DragGesture(minimumDistance: 1), SB:150)
@@ -15,7 +16,10 @@ const double _startDistance = 1;
 /// Las dos asas de la sección seleccionada, para el `Stack` de [SectionBoxesLayer]: fuera del bucle de trozos
 /// y con clave fija para que el arrastre sobreviva al cambio de fila (ficha §6.5).
 /// [pieces] son los trozos de esa sección, en orden; tira: uno; rejilla: uno por fila.
-List<Widget> sectionEdgeHandles({required List<SectionPlacement> pieces, required EdgeTimeMapper mapper}) {
+List<Widget> sectionEdgeHandles({
+  required List<SectionPlacement> pieces,
+  required EdgeTimeMapper mapper,
+}) {
   if (pieces.isEmpty) return const <Widget>[];
   return <Widget>[
     _handle(pieces.first, true, mapper),
@@ -37,7 +41,12 @@ Widget _handle(SectionPlacement p, bool isStart, EdgeTimeMapper mapper) {
 }
 
 class SectionEdgeHandle extends ConsumerStatefulWidget {
-  const SectionEdgeHandle({required this.piece, required this.isStart, required this.mapper, super.key});
+  const SectionEdgeHandle({
+    required this.piece,
+    required this.isStart,
+    required this.mapper,
+    super.key,
+  });
 
   final SectionPlacement piece;
   final bool isStart;
@@ -62,8 +71,10 @@ class _EdgeRecognizer extends PanGestureRecognizer {
   }
 
   @override
-  bool hasSufficientGlobalDistanceToAccept(PointerDeviceKind pointerDeviceKind, double? deviceTouchSlop) =>
-      globalDistanceMoved.abs() > _startDistance;
+  bool hasSufficientGlobalDistanceToAccept(
+    PointerDeviceKind pointerDeviceKind,
+    double? deviceTouchSlop,
+  ) => globalDistanceMoved.abs() > _startDistance;
 }
 
 class _SectionEdgeHandleState extends ConsumerState<SectionEdgeHandle> {
@@ -71,21 +82,26 @@ class _SectionEdgeHandleState extends ConsumerState<SectionEdgeHandle> {
   Offset _last = Offset.zero;
 
   Offset _local(Offset global) {
-    final RenderStack? box = context.findAncestorRenderObjectOfType<RenderStack>();
+    final RenderStack? box = context
+        .findAncestorRenderObjectOfType<RenderStack>();
     return box == null ? global : box.globalToLocal(global);
   }
 
   void _start(DragStartDetails d) {
     final SectionPlacement p = widget.piece;
     final StudyStore store = ref.read(studyStoreProvider.notifier);
-    final SectionEdgePreview preview = ref.read(sectionEdgePreviewProvider.notifier);
+    final SectionEdgePreview preview = ref.read(
+      sectionEdgePreviewProvider.notifier,
+    );
     _last = _local(d.globalPosition);
     _drag = SectionEdgeDragController(
       id: p.section.id,
       isStart: widget.isStart,
       mapper: widget.mapper,
       anchor: Offset(
-        widget.isStart ? p.rect.left + SectionBoxesGeometry.inset : p.rect.right - SectionBoxesGeometry.inset,
+        widget.isStart
+            ? p.rect.left + SectionBoxesGeometry.inset
+            : p.rect.right - SectionBoxesGeometry.inset,
         p.rect.center.dy,
       ),
       grab: _last,
@@ -124,33 +140,53 @@ class _SectionEdgeHandleState extends ConsumerState<SectionEdgeHandle> {
   @override
   Widget build(BuildContext context) {
     final SectionPlacement p = widget.piece;
-    final Color color = sectionColor(solo: p.section.solo, paletteIndex: p.section.paletteIndex ?? p.index);
-    final double barHeight = (p.rect.height - p.headerHeight - TfSize.sectionEdgeBarInset)
-        .clamp(TfSize.sectionEdgeBarMin, TfSize.sectionEdgeBarMax);
-    return MouseRegion(
-      cursor: SystemMouseCursors.resizeColumn,
-      child: RawGestureDetector(
-        behavior: HitTestBehavior.opaque,
-        gestures: <Type, GestureRecognizerFactory>{
-          _EdgeRecognizer: GestureRecognizerFactoryWithHandlers<_EdgeRecognizer>(
-            () => _EdgeRecognizer(debugOwner: this),
-            (_EdgeRecognizer r) => r
-              ..onStart = ((DragStartDetails d) {
-                r.canceled = false;
-                _start(d);
-              })
-              ..onUpdate = _update
-              ..onEnd = ((DragEndDetails d) => r.canceled ? _cancel() : _end(d))
-              ..onCancel = _cancel,
-          ),
-        },
-        child: Center(
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: const BorderRadius.all(Radius.circular(TfRadius.r3)),
+    final Color color = sectionColor(
+      solo: p.section.solo,
+      paletteIndex: p.section.paletteIndex ?? p.index,
+    );
+    final double barHeight =
+        (p.rect.height - p.headerHeight - TfSize.sectionEdgeBarInset).clamp(
+          TfSize.sectionEdgeBarMin,
+          TfSize.sectionEdgeBarMax,
+        );
+    final AppLocalizations l = AppLocalizations.of(context);
+    return Semantics(
+      label: widget.isStart
+          ? l.backing_handleStartA11y
+          : l.backing_handleEndA11y,
+      container: true,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.resizeColumn,
+        child: RawGestureDetector(
+          behavior: HitTestBehavior.opaque,
+          gestures: <Type, GestureRecognizerFactory>{
+            _EdgeRecognizer:
+                GestureRecognizerFactoryWithHandlers<_EdgeRecognizer>(
+                  () => _EdgeRecognizer(debugOwner: this),
+                  (_EdgeRecognizer r) => r
+                    ..onStart = ((DragStartDetails d) {
+                      r.canceled = false;
+                      _start(d);
+                    })
+                    ..onUpdate = _update
+                    ..onEnd = ((DragEndDetails d) =>
+                        r.canceled ? _cancel() : _end(d))
+                    ..onCancel = _cancel,
+                ),
+          },
+          child: Center(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: const BorderRadius.all(
+                  Radius.circular(TfRadius.r3),
+                ),
+              ),
+              child: SizedBox(
+                width: TfSize.sectionEdgeBarWidth,
+                height: barHeight,
+              ),
             ),
-            child: SizedBox(width: TfSize.sectionEdgeBarWidth, height: barHeight),
           ),
         ),
       ),

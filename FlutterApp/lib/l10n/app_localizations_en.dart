@@ -1480,7 +1480,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backing_tempo => 'Tempo';
 
   @override
-  String get backing_tempoDetected => 'Detected tempo';
+  String get backing_tempoDetected => 'Detected tempo:';
 
   @override
   String get backing_title => 'Backing track';

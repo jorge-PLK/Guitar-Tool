@@ -35,7 +35,7 @@ class InfoRow extends ConsumerWidget {
           crossAxisAlignment: WrapCrossAlignment.center,
           children: <Widget>[
             Row(mainAxisSize: MainAxisSize.min, children: <Widget>[
-              Text('${l.backing_tempoDetected}:'),
+              Text(l.backing_tempoDetected),
               const SizedBox(width: TfSpace.s4),
               Text(bpm == null ? '—' : l.backing_bpm(bpm.round()), style: strong),
             ]),

@@ -1494,7 +1494,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get backing_tempo => 'Tempo';
 
   @override
-  String get backing_tempoDetected => 'Tempo detectado';
+  String get backing_tempoDetected => 'Tempo detectado:';
 
   @override
   String get backing_title => 'Backing track';
