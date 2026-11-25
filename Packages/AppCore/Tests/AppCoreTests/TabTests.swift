@@ -335,6 +335,46 @@ final class TabTests: XCTestCase {
         XCTAssertEqual((s["selection"] as? [String: Any])?["hasNote"] as? Bool, true)
     }
 
+    func testSelectionSummaryCodesAndHeader() async throws {
+        let f = try await makeFixture()
+        _ = try await openAndTranscribe(f)
+        _ = try await result(f, "tab.edit", "{\"op\":\"editMode\",\"on\":true}")
+        var s = try await result(f, "tab.select", "{\"track\":\"bass\",\"beat\":5,\"tick\":0,\"string\":2}")
+        var sum = try XCTUnwrap((s["selection"] as? [String: Any])?["summary"] as? [String: Any])
+        XCTAssertEqual(sum["code"] as? String, "noNote")
+        XCTAssertEqual(sum["bar"] as? Int, 3)
+        XCTAssertEqual(sum["beat"] as? Int, 1)
+        XCTAssertEqual(sum["string"] as? Int, 2)
+        let h = try XCTUnwrap(s["header"] as? [String: Any])
+        XCTAssertEqual(h["code"] as? String, "meterBpm")
+        XCTAssertEqual(h["bar"] as? String, "4/4")
+        XCTAssertEqual(h["bpm"] as? Int, 120)
+        s = try await result(f, "tab.edit", "{\"op\":\"digit\",\"value\":3}")
+        sum = try XCTUnwrap((s["selection"] as? [String: Any])?["summary"] as? [String: Any])
+        XCTAssertEqual(sum["code"] as? String, "note")
+        XCTAssertEqual(sum["string"] as? Int, 2)
+        XCTAssertEqual(sum["fret"] as? Int, 3)
+        s = try await result(f, "tab.select", "{\"track\":\"drums\",\"beat\":5,\"tick\":0}")
+        sum = try XCTUnwrap((s["selection"] as? [String: Any])?["summary"] as? [String: Any])
+        XCTAssertEqual(sum["code"] as? String, "drumsNoHits")
+        XCTAssertNil(sum["pieces"])
+        s = try await result(f, "tab.select", "{\"track\":\"drums\",\"beat\":1,\"tick\":0}")
+        sum = try XCTUnwrap((s["selection"] as? [String: Any])?["summary"] as? [String: Any])
+        XCTAssertEqual(sum["code"] as? String, "drums")
+        XCTAssertEqual(sum["pieces"] as? [String], ["kick"])
+    }
+
+    func testPieceCodesMatchArbKeys() {
+        XCTAssertEqual(DrumPiece.allCases.map(TabService.pieceCode), ["kick", "snare", "hiHat", "openHiHat", "tom", "crash"])
+    }
+
+    func testHeaderMeterOnlyEncodesWithoutBpm() throws {
+        let data = try JSONEncoder().encode(TabHeaderSummary(code: "meter", bar: "3/4"))
+        let o = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(o["code"] as? String, "meter")
+        XCTAssertNil(o["bpm"])
+    }
+
     // MARK: Edición
 
     func testEditWithUndoRedoAndTuning() async throws {

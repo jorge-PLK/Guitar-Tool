@@ -4,7 +4,11 @@
   "canUndo" : true,
   "editMode" : true,
   "graceMode" : false,
-  "header" : "4/4 · 120 BPM",
+  "header" : {
+    "bar" : "4/4",
+    "bpm" : 120,
+    "code" : "meterBpm"
+  },
   "listenMode" : "stems",
   "notices" : [
 
@@ -22,7 +26,13 @@
     "beat" : 5,
     "hasNote" : true,
     "string" : 2,
-    "summary" : "Compás 3, pulso 1 · cuerda 2, traste 0",
+    "summary" : {
+      "bar" : 3,
+      "beat" : 1,
+      "code" : "note",
+      "fret" : 0,
+      "string" : 2
+    },
     "tick" : 3,
     "track" : "bass"
   },

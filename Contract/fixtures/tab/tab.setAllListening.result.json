@@ -4,7 +4,11 @@
   "canUndo" : false,
   "editMode" : false,
   "graceMode" : false,
-  "header" : "4/4 · 120 BPM",
+  "header" : {
+    "bar" : "4/4",
+    "bpm" : 120,
+    "code" : "meterBpm"
+  },
   "listenMode" : "stems",
   "notices" : [
 
