@@ -1,5 +1,14 @@
 part of 'study_store.dart';
 
+const String _masterKey = '\u0000master';
+
+/// Faders en arrastre: valor local mostrado, última posición pendiente y canales con llamada en vuelo.
+final class _GainQueue {
+  final Map<String, double> local = <String, double>{};
+  final Map<String, double> pending = <String, double>{};
+  final Set<String> inFlight = <String>{};
+}
+
 /// Intenciones de transporte, análisis, secciones y guitarras (misma API que el resto del store).
 extension StudyStoreSections on StudyStore {
   // Transporte
@@ -24,10 +33,82 @@ extension StudyStoreSections on StudyStore {
   /// Sin `gainDB`: la interfaz no lo expone.
   Future<void> setMetronome(bool on) =>
       _transportCall('study.setMetronome', StudyMetronomeParams(on: on).toJson());
-  Future<void> setMix(String channel, {double? gainDB, bool? mute, bool? solo}) => _transportCall(
-      'study.setMix', StudyMixParams(channel: channel, gainDB: gainDB, mute: mute, solo: solo).toJson());
-  Future<void> setMaster(double gainDB) =>
-      _transportCall('study.setMaster', StudyMasterParams(gainDB: gainDB).toJson());
+
+  /// Solo `gainDB` (arrastre del fader): una llamada en vuelo por canal, la última posición gana y
+  /// lo mostrado sigue al puntero (valor local) hasta reconciliar con la respuesta del núcleo.
+  Future<void> setMix(String channel, {double? gainDB, bool? mute, bool? solo}) {
+    if (gainDB != null && mute == null && solo == null) {
+      return _dragGain(channel, gainDB, 'study.setMix',
+          (v) => StudyMixParams(channel: channel, gainDB: v).toJson());
+    }
+    return _transportCall(
+        'study.setMix', StudyMixParams(channel: channel, gainDB: gainDB, mute: mute, solo: solo).toJson());
+  }
+
+  Future<void> setMaster(double gainDB) => _dragGain(
+      _masterKey, gainDB, 'study.setMaster', (v) => StudyMasterParams(gainDB: v).toJson());
+
+  Future<void> _dragGain(String key, double v, String method, Object? Function(double) params) async {
+    final g = _gain;
+    g.local[key] = v;
+    g.pending[key] = v;
+    _showLocalGain();
+    if (!g.inFlight.add(key)) return;
+    StudyTransport? last;
+    while (g.pending.containsKey(key)) {
+      final x = g.pending.remove(key)!;
+      last = await _call(method, params(x), StudyTransport.fromJson) ?? last;
+    }
+    g.inFlight.remove(key);
+    g.local.remove(key);
+    if (!_isOpen) return;
+    if (last == null) {
+      _showLocalGain();
+      await refresh();
+    } else {
+      state = state.copyWith(study: _withTransport(state.study!, _overlayGain(last)), clearError: true);
+    }
+  }
+
+  void _showLocalGain() {
+    final t = state.transport;
+    if (!_isOpen || t == null) return;
+    state = state.copyWith(study: _withTransport(state.study!, _overlayGain(t)));
+  }
+
+  StudyTransport _overlayGain(StudyTransport t) {
+    final l = _gain.local;
+    if (l.isEmpty) return t;
+    return StudyTransport(
+      playing: t.playing,
+      position: t.position,
+      duration: t.duration,
+      rate: t.rate,
+      transpose: t.transpose,
+      fineCents: t.fineCents,
+      capo: t.capo,
+      metronome: t.metronome,
+      loop: t.loop,
+      masterGainDB: l[_masterKey] ?? t.masterGainDB,
+      channels: [
+        for (final c in t.channels)
+          if (l.containsKey(c.id))
+            StudyChannel(
+                id: c.id,
+                kind: c.kind,
+                guitarRole: c.guitarRole,
+                name: c.name,
+                gainDB: l[c.id]!,
+                muted: c.muted,
+                solo: c.solo)
+          else
+            c,
+      ],
+      anySolo: t.anySolo,
+      audioError: t.audioError,
+      outputName: t.outputName,
+    );
+  }
 
   /// «Sin guitarras» (D-9): un `setMix` por canal de guitarra. Activo = todas silenciadas; entonces restaura.
   Future<void> toggleNoGuitars() async {

@@ -112,6 +112,7 @@ class StudyStore extends Notifier<StudyStoreState> {
   bool _disposed = false;
   bool _refreshing = false;
   bool _refreshAgain = false;
+  final _gain = _GainQueue();
 
   @override
   StudyStoreState build() {
@@ -197,7 +198,7 @@ class StudyStore extends Notifier<StudyStoreState> {
 
   void _onTransport(StudyTransport t) {
     if (!_isOpen) return;
-    state = state.copyWith(study: _withTransport(state.study!, t));
+    state = state.copyWith(study: _withTransport(state.study!, _overlayGain(t)));
     if (state.study!.guitars.process == StudyGuitarProcess.processing) refresh();
   }
 
@@ -261,7 +262,7 @@ class StudyStore extends Notifier<StudyStoreState> {
 
   Future<void> _transportCall(String method, Object? params) async {
     final t = await _call(method, params, StudyTransport.fromJson);
-    if (t != null) state = state.copyWith(study: _withTransport(state.study!, t), clearError: true);
+    if (t != null) state = state.copyWith(study: _withTransport(state.study!, _overlayGain(t)), clearError: true);
   }
 
   Future<StudyEditState?> _edit(String method, Object? params) async {

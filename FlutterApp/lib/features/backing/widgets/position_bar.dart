@@ -1,4 +1,6 @@
 import 'package:flutter/widgets.dart';
+import 'package:toneforge/l10n/app_localizations.dart';
+import 'package:toneforge/theme/fmt.dart';
 import 'package:toneforge/theme/tokens.dart';
 
 /// Barra de posición (BT:562-613): pista, progreso, bucle y cabezal. Solo traduce posición → tiempo.
@@ -13,6 +15,9 @@ class PositionBar extends StatelessWidget {
   });
 
   static const double height = 22;
+
+  /// Salto de VoiceOver (`accessibilityAdjustableAction`, BackingTimeline.swift).
+  static const double a11yStep = 5;
 
   final double position;
   final double duration;
@@ -29,7 +34,14 @@ class PositionBar extends StatelessWidget {
         onSeek!((dx / w).clamp(0.0, 1.0) * duration);
       }
 
-      return GestureDetector(
+      void nudge(double delta) {
+        if (onSeek == null || duration <= 0) return;
+        onSeek!((position + delta).clamp(0.0, duration));
+      }
+
+      final AppLocalizations? l = Localizations.of<AppLocalizations>(context, AppLocalizations);
+      String at(double t) => l!.backing_positionValueA11y(TfFmt.clock(t), TfFmt.clock(duration));
+      final Widget bar = GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTapDown: (TapDownDetails d) => seek(d.localPosition.dx),
         onHorizontalDragStart: (DragStartDetails d) => seek(d.localPosition.dx),
@@ -43,6 +55,17 @@ class PositionBar extends StatelessWidget {
             loopEnd: loopEnd,
           ),
         ),
+      );
+      if (l == null) return bar;
+      return Semantics(
+        slider: true,
+        label: l.backing_positionA11y,
+        value: at(position),
+        increasedValue: at((position + a11yStep).clamp(0.0, duration)),
+        decreasedValue: at((position - a11yStep).clamp(0.0, duration)),
+        onIncrease: () => nudge(a11yStep),
+        onDecrease: () => nudge(-a11yStep),
+        child: bar,
       );
     });
   }
