@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/core_providers.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../theme/tokens.dart';
 import '../../../theme/typography.dart';
@@ -26,6 +27,18 @@ class RecordMixer extends ConsumerStatefulWidget {
 
 class _RecordMixerState extends ConsumerState<RecordMixer> {
   bool _expanded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Captura de validación: `--mock --screen record --state mixer-expanded` arranca desplegado.
+    if (ref.read(launchOptionsProvider).state == 'mixer-expanded') {
+      _expanded = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) widget.onExpandedChanged?.call(true);
+      });
+    }
+  }
 
   void _toggle() {
     setState(() => _expanded = !_expanded);

@@ -12,7 +12,24 @@ import 'package:toneforge/theme/tokens.dart';
 import '../../support/harness.dart';
 
 void main() {
+  testWidgets('--screen calibration-sheet abre la hoja sola tras el primer frame', (tester) async {
+    await pumpSettings(tester, 'calibration-sheet');
+    expect(find.byType(CalibrationSheet), findsOneWidget);
+  });
+
   testWidgets('«Calibrar latencia» abre la hoja de calibración', (tester) async {
+    await pumpSettings(tester, 'settings-audio');
+    expect(find.byType(CalibrationSheet), findsNothing);
+    await tester.tap(find.text('Calibrar latencia'));
+    for (var i = 0; i < 4; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(find.byType(CalibrationSheet), findsOneWidget);
+  });
+}
+
+Future<void> pumpSettings(WidgetTester tester, String screen) async {
+  {
     final MockCore core = (await tester.runAsync(() async {
       final src = await DirectoryFixtureSource.find();
       return MockCore.load(src!);
@@ -21,7 +38,7 @@ void main() {
     await tester.pumpWidget(ProviderScope(
       overrides: [
         coreClientProvider.overrideWithValue(core),
-        launchOptionsProvider.overrideWithValue(const LaunchOptions(screen: 'settings-audio')),
+        launchOptionsProvider.overrideWithValue(LaunchOptions(screen: screen)),
       ],
       child: WidgetsApp(
         color: TfColors.bg,
@@ -37,11 +54,5 @@ void main() {
     for (var i = 0; i < 6; i++) {
       await tester.pump(const Duration(milliseconds: 50));
     }
-    expect(find.byType(CalibrationSheet), findsNothing);
-    await tester.tap(find.text('Calibrar latencia'));
-    for (var i = 0; i < 4; i++) {
-      await tester.pump(const Duration(milliseconds: 100));
-    }
-    expect(find.byType(CalibrationSheet), findsOneWidget);
-  });
+  }
 }

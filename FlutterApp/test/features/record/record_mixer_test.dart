@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:toneforge/core/core_client.dart';
 import 'package:toneforge/core/core_providers.dart';
+import 'package:toneforge/core/launch_options.dart';
 import 'package:toneforge/core/mock_core.dart';
 import 'package:toneforge/features/record/mixer_store.dart';
 import 'package:toneforge/features/record/record_store.dart';
@@ -32,7 +33,7 @@ Map<String, Object?> chan(String id, String name, {bool forced = false}) => {
     };
 
 /// Abre Grabar con un mix de dos canales: «Bajo» normal y «Guitarra» forzada a silencio.
-Future<(MockCore, ProviderContainer)> open() async {
+Future<(MockCore, ProviderContainer)> open({String? launchState}) async {
   final core = MockCore()
     ..result('study.open', <String, Object?>{})
     ..result('audio.settings', fx('audio/audio.settings.result'))
@@ -40,7 +41,10 @@ Future<(MockCore, ProviderContainer)> open() async {
     ..result('audio.setMeters', fx('audio/audio.setMeters.result'))
     ..result('record.setMaster', fx('record/record.state.base.result'))
     ..result('record.setMix', fx('record/record.setMix.result'));
-  final c = ProviderContainer(overrides: [coreClientProvider.overrideWithValue(core)]);
+  final c = ProviderContainer(overrides: [
+    coreClientProvider.overrideWithValue(core),
+    if (launchState != null) launchOptionsProvider.overrideWithValue(LaunchOptions(state: launchState)),
+  ]);
   addTearDown(c.dispose);
   c.listen(recordStoreProvider, (_, _) {});
   c.listen(mixerStoreProvider, (_, _) {});
@@ -89,6 +93,16 @@ void main() {
     expect(find.text('Tu guitarra'), findsOneWidget);
     expect(find.text('Bajo'), findsOneWidget);
     expect(find.byType(TfFader), findsNothing);
+  });
+
+  testWidgets('--state mixer-expanded arranca desplegado y avisa al padre', (tester) async {
+    final (_, c) = (await tester.runAsync(() => open(launchState: 'mixer-expanded')))!;
+    final calls = <bool>[];
+    await pumpMixer(tester, c, onExpanded: calls.add);
+    await tester.pump();
+    expect(find.text('Plegar'), findsOneWidget);
+    expect(find.byType(TfFader), findsNWidgets(3));
+    expect(calls, [true]);
   });
 
   testWidgets('expandir muestra faders y avisa al padre; plegar vuelve', (tester) async {

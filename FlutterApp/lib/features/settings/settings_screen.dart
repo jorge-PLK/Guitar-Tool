@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:toneforge/core/core_providers.dart';
 import 'package:toneforge/l10n/app_localizations.dart';
 import 'package:toneforge/shell/shell_providers.dart';
 import 'package:toneforge/shell/shell_route.dart';
@@ -15,11 +18,28 @@ import 'sheets/calibration_sheet.dart';
 
 /// Ajustes (SettingsView.swift:8-43): título, subtítulo, barra de pestañas y el contenido de la pestaña,
 /// con scroll y padding 36 × 28.
-class SettingsScreen extends ConsumerWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Captura de validación: `--screen calibration-sheet` abre la hoja una vez tras el primer frame
+    // (el paso lo fija `--state`, p. ej. `success`).
+    if (ref.read(launchOptionsProvider).screen == 'calibration-sheet') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(showCalibrationSheet(context));
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final tab = ref.watch(settingsTabProvider);
     return TfScroll(
