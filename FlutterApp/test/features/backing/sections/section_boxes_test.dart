@@ -31,7 +31,7 @@ Future<ProviderContainer> _pump(WidgetTester tester, {required bool grid, void F
   a['bpm'] = 60.0;
   tweak?.call(open);
   core.result('study.open', open);
-  setTestSurface(tester, const Size(1100, 400));
+  setTestSurface(tester, const Size(1100, 700));
   final container = ProviderContainer(overrides: [
     coreClientProvider.overrideWithValue(core),
     launchOptionsProvider.overrideWithValue(const LaunchOptions()),
