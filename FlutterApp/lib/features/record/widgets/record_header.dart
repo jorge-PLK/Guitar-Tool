@@ -31,9 +31,9 @@ class RecordHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Text(line, maxLines: 1, overflow: TextOverflow.ellipsis, style: TfText.body(13).copyWith(color: TfColors.muted)),
+              Text(line, maxLines: 1, overflow: TextOverflow.ellipsis, style: TfText.body(TfSize.font13).copyWith(color: TfColors.muted)),
               const SizedBox(height: TfSpace.s2),
-              Text(l.record_title, style: TfText.display(26).copyWith(color: TfColors.text)),
+              Text(l.record_title, style: TfText.display(TfSize.font26).copyWith(color: TfColors.text)),
             ],
           ),
         ),

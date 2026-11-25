@@ -82,7 +82,7 @@ class PunchTimelinePainter extends CustomPainter {
       Paint()..color = color.withValues(alpha: 0.30),
     );
     final tp = TextPainter(
-      text: TextSpan(text: s.name, style: TfText.body(10, TfWeight.medium).copyWith(color: color)),
+      text: TextSpan(text: s.name, style: TfText.body(TfSize.font10, TfWeight.medium).copyWith(color: color)),
       textDirection: ui.TextDirection.ltr,
       maxLines: 1,
       ellipsis: '…',

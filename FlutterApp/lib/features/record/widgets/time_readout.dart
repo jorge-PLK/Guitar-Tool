@@ -26,11 +26,11 @@ class TimeReadout extends StatelessWidget {
           children: <InlineSpan>[
             TextSpan(
               text: TfFmt.duration(position < 0 ? 0 : position),
-              style: TfText.display(20, TfWeight.bold, true).copyWith(color: TfColors.text),
+              style: TfText.display(TfSize.font20,TfWeight.bold, true).copyWith(color: TfColors.text),
             ),
             TextSpan(
               text: ' / ${TfFmt.duration(total)}',
-              style: TfText.body(16, TfWeight.medium, true).copyWith(color: TfColors.muted),
+              style: TfText.body(TfSize.font16,TfWeight.medium, true).copyWith(color: TfColors.muted),
             ),
           ],
         ),

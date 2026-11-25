@@ -18,7 +18,7 @@ class LatencyStatus extends StatelessWidget {
     final bool ok = calibration.calibrated;
     return Text(
       ok ? calibratedText(l, calibration) : l.settings_audio_uncalibrated,
-      style: TfText.body(14, TfWeight.semibold).copyWith(color: ok ? TfColors.ok : TfColors.accent),
+      style: TfText.body(TfSize.font14, TfWeight.semibold).copyWith(color: ok ? TfColors.ok : TfColors.accent),
     );
   }
 }

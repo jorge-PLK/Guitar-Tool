@@ -42,7 +42,7 @@ double? _cappedWidth(List<String> labels, double cap) {
   double widest = 0;
   for (final String t in labels) {
     final TextPainter p = TextPainter(
-      text: TextSpan(text: t, style: TfText.body(13)),
+      text: TextSpan(text: t, style: TfText.body(TfSize.font13)),
       textDirection: TextDirection.ltr,
       maxLines: 1,
     )..layout();
@@ -152,7 +152,7 @@ class _CameraGroup extends ConsumerWidget {
                       // TODO(ola3): traducir por `code` cuando exista el helper común de errores.
                       child: Text(
                         state.error!.message,
-                        style: TfText.body(12).copyWith(color: TfColors.danger),
+                        style: TfText.body(TfSize.font12).copyWith(color: TfColors.danger),
                       ),
                     ),
                 ],

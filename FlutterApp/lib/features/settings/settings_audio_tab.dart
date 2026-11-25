@@ -144,7 +144,7 @@ class SettingsAudioTab extends ConsumerWidget {
               onPressed: canCalibrate ? (onCalibrate ?? () => store.calibrate()) : null,
             ),
             if (block != null)
-              Text(block, style: TfText.body(12).copyWith(color: TfColors.muted)),
+              Text(block, style: TfText.body(TfSize.font12).copyWith(color: TfColors.muted)),
           ],
         ),
       ],

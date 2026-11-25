@@ -34,9 +34,9 @@ class RateMismatchNotice extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       spacing: TfSpace.s8,
       children: <Widget>[
-        Text(message, style: TfText.body(13).copyWith(color: TfColors.accent)),
+        Text(message, style: TfText.body(TfSize.font13).copyWith(color: TfColors.accent)),
         Text(l.settings_audio_rateMismatchHint,
-            style: TfText.body(12).copyWith(color: TfColors.muted)),
+            style: TfText.body(TfSize.font12).copyWith(color: TfColors.muted)),
         if (mismatch.canUseDeviceRate) TfSecondaryButton(label: use, onPressed: onUseDeviceRate),
       ],
     );

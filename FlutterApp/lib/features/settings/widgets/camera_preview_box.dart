@@ -168,7 +168,7 @@ class _Denied extends StatelessWidget {
           Text(
             l.settings_video_denied,
             textAlign: TextAlign.center,
-            style: TfText.body(12).copyWith(color: TfColors.text2),
+            style: TfText.body(TfSize.font12).copyWith(color: TfColors.text2),
           ),
           TfSecondaryButton(label: label, height: TfSize.controlSm, onPressed: onOpen),
         ],

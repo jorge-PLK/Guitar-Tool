@@ -253,7 +253,7 @@ class _Problem extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       spacing: TfSpace.s8,
       children: <Widget>[
-        Text(title, style: TfText.display(16).copyWith(color: TfColors.danger, decoration: TextDecoration.none)),
+        Text(title, style: TfText.display(TfSize.font16).copyWith(color: TfColors.danger, decoration: TextDecoration.none)),
         if (hint != null) Text(hint!, style: _body(TfSize.font14, TfColors.text2)),
       ],
     );

@@ -110,7 +110,7 @@ class _PunchTimelineState extends ConsumerState<PunchTimeline> {
     final exit = _dragging ? _out : punch?.outSeconds;
     final locale = Localizations.localeOf(context).toLanguageTag();
     final cursor = (st.phase != RecordPhase.idle || st.position > 0) ? st.position : null;
-    final muted = TfText.body(12).copyWith(color: TfColors.muted);
+    final muted = TfText.body(TfSize.font12).copyWith(color: TfColors.muted);
     final help = Platform.isMacOS ? l.record_punchHelp_mac : l.record_punchHelp_win;
     return IgnorePointer(
       ignoring: st.isBusy,
@@ -122,7 +122,7 @@ class _PunchTimelineState extends ConsumerState<PunchTimeline> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Row(children: [
-                Text(l.record_punchTitle, style: TfText.display(16).copyWith(color: TfColors.text)),
+                Text(l.record_punchTitle, style: TfText.display(TfSize.font16).copyWith(color: TfColors.text)),
                 const Spacer(),
                 Text(
                   l.record_punchSummary(_fmt(entry, locale), _fmt(exit, locale)),

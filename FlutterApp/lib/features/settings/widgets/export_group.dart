@@ -66,7 +66,7 @@ class ExportGroup extends ConsumerWidget {
           label: l.settings_video_volume,
           trailing: Text(
             l.settings_video_volumeValue,
-            style: TfText.body(14, TfWeight.semibold).copyWith(color: TfColors.text2),
+            style: TfText.body(TfSize.font14, TfWeight.semibold).copyWith(color: TfColors.text2),
           ),
         ),
         TfInfoRow(

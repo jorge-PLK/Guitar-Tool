@@ -155,7 +155,7 @@ class RecordButton extends StatelessWidget {
           ),
           Text(
             stop ? l.record_stop : l.record_start,
-            style: TfText.body(15, TfWeight.semibold).copyWith(color: TfColors.white),
+            style: TfText.body(TfSize.font15, TfWeight.semibold).copyWith(color: TfColors.white),
           ),
         ],
       ),

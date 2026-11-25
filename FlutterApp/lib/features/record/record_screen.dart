@@ -160,7 +160,7 @@ class _NotSeparated extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
-                  Text(l.record_notSeparatedTitle, style: TfText.display(18).copyWith(color: TfColors.text)),
+                  Text(l.record_notSeparatedTitle, style: TfText.display(TfSize.font18).copyWith(color: TfColors.text)),
                   const SizedBox(height: TfSpace.s12),
                   Text(l.record_notSeparatedBody, style: TfText.body().copyWith(color: TfColors.muted)),
                   const SizedBox(height: TfSpace.s12),

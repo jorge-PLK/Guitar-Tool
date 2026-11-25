@@ -39,7 +39,7 @@ class PartsPanel extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Text(l.record_parts, style: TfText.display(18).copyWith(color: TfColors.text, decoration: TextDecoration.none)),
+            Text(l.record_parts, style: TfText.display(TfSize.font18).copyWith(color: TfColors.text, decoration: TextDecoration.none)),
             const SizedBox(height: TfSpace.s12),
             Text(
               l.record_partsHelp,

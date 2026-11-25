@@ -59,7 +59,7 @@ class _RecordMixerState extends ConsumerState<RecordMixer> {
             Row(
               spacing: TfSpace.s12,
               children: <Widget>[
-                Text(l.record_mixerTitle, style: TfText.display(18).copyWith(color: TfColors.text)),
+                Text(l.record_mixerTitle, style: TfText.display(TfSize.font18).copyWith(color: TfColors.text)),
                 // Un solo Expanded: con Spacer + Flexible el hueco se repartía 50/50.
                 Expanded(
                   child: Align(
@@ -117,7 +117,7 @@ class _FoldButton extends StatelessWidget {
             ),
             child: Text(
               label,
-              style: TfText.body(13, TfWeight.medium).copyWith(color: TfColors.text2),
+              style: TfText.body(TfSize.font13, TfWeight.medium).copyWith(color: TfColors.text2),
             ),
           ),
         ),

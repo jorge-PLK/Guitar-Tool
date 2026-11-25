@@ -24,7 +24,7 @@ class RecordTopicChooser extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text(l.record_title, style: TfText.display(30).copyWith(color: TfColors.text)),
+          Text(l.record_title, style: TfText.display(TfSize.font30).copyWith(color: TfColors.text)),
           const SizedBox(height: TfSpace.s16),
           if (ready.isEmpty)
             Text(l.record_chooserEmpty, style: muted)
