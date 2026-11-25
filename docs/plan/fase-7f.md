@@ -16,6 +16,13 @@ Cerrada 24/11/2026 con visto bueno de Jorge (suite 20:51, Flutter 328 tests); la
 
 Cada ola: contrato del área (fixtures → DTO) antes que la pantalla; partes en paralelo si no se pisan; validación con la lista de `orquestador.md`; `tf-qa` una vez; todo se valida primero en el Mac (el PC x64 solo cuando todo esté validado: pasada única al final, con lo pendiente de Windows acumulado en una lista); visto bueno de Jorge sobre las parejas referencia/Flutter.
 
+Pendiente de Windows para la pasada del PC (se acumula aquí):
+
+- *Ola 1:* `models.list.archiveBytes` del fixture es el de macOS.
+- *Ola 1 (L2):* comprobar que borrar un tema abierto en Backing no falla por bloqueo NTFS.
+- *Ola 1:* `URL.path` devuelve `/` en `proposedProjectsFolder` (Known Folder Music\ToneForge); comprobar la ruta que ve Dart.
+- *Ola 1:* `displayPath` no abrevia HOME en Windows.
+
 Orden acordado (24/11/2026): Ola 0 sola → olas 1, 2 y 3 en paralelo (una sesión y un worktree por ola) → ola 4 → ola 5 → pasada del PC. Commits pequeños y frecuentes con push a `fase-7f`, sin preguntar, uno por parte integrada.
 
 Condición de paso (Jorge, 22/11/2026): en el Mac y en el PC x64, con la app Flutter: importar un tema por enlace, separarlo, Backing en bucle al 70 %, tablatura con edición y exportación a `.gp`, grabar una toma con cámara y verla, montar y exportar un vídeo, y Ajustes completos; todas las pantallas y hojas comparadas con su captura de referencia y aceptadas por Jorge; puerta de tests verde; sin SwiftUI ni WebView2 en el repo.

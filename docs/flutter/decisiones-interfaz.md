@@ -158,6 +158,20 @@ Dudas que devolvieron las auditorías de fichas y contratos (`Temp/flutter/audit
 | Colores casi iguales (`C8433A`/`E5534B`, `0B0C0E`/`0F1113`, `4CC38A`/`6FD99E`) | No se funden: cada hex es un token con nombre. |
 | Separador decimal de `Fmt.db` y `Fmt.rate` | Según el idioma (coma en español, punto en inglés) con `intl`, coherente con los mensajes del núcleo (`decimalPattern`). |
 
+## Cerradas durante la ola 1 (25/11/2026)
+
+| Pregunta | Resolución |
+| --- | --- |
+| Carpeta propuesta del primer arranque | La da el núcleo por plataforma, `app.info.proposedProjectsFolder` (Jorge, 25/11/2026). |
+| `TfSettingsGroup.note` | Opcional, y las rutas se truncan al medio en el kit (Jorge, 25/11/2026). |
+| «Abrir» del diálogo de duplicado | Cambia a la sección Biblioteca (Jorge, 25/11/2026). |
+| Alertas de biblioteca | Cola FIFO con una sola visible (`library_alerts_host.dart`) (Jorge, 25/11/2026). |
+| Tamaños de letra | Ninguno numérico fuera de `theme/`: tokens `TfSize.fontNN`, en todas las olas (Jorge, 25/11/2026). |
+| Medidas propias de pantalla | Constantes con nombre en `features/<f>/<f>_metrics.dart` (orquestador, 25/11/2026); el test de literales solo vigila color, fuente, radio y padding. |
+| Meses de `library_format.dart` | Literales es/en: `intl` en español exige `initializeDateFormatting` en `main` (orquestador, 25/11/2026). |
+| Iconos `.fill` de SF Symbols | `TfSecondaryButton.iconFilled` (orquestador, 25/11/2026). |
+| Segmentado Temas/Artistas e Idioma | Segmento activo naranja, ya decidido en [tokens-componentes.md](tokens-componentes.md) (`TfSegmented`) (Jorge, 24/11/2026). |
+
 ## Dudas reales, para Jorge
 
 Ninguna abierta. La rama `fase-7f` existe y la documentación está subida.

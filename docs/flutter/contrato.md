@@ -62,8 +62,9 @@ Sin `bridge.host` todos dan `unsupported` (`ImportMethods.swift:311`). Las tabla
 | library.separate | ProjectIDParams | QueuedResult | ImportMethods.swift:180 | encola separación y análisis |
 | library.rename | RenameParams | RenameResult | ImportMethods.swift:184 | cambia título y artista |
 | library.deleteTake | DeleteTakeParams | RemovedResult | ImportMethods.swift:189 | borra una toma |
-| library.trash | ProjectIDParams | RemovedResult | ImportMethods.swift:195 | tema a la papelera |
-| library.delete | ProjectIDParams | RemovedResult | ImportMethods.swift:199 | borra del disco |
+| library.trash | ProjectIDParams | RemovedResult | ImportMethods.swift:195 | tema a la papelera; antes cierra la sesión del tema abierto (`Bridge.closeProjectFilesIfOpen`, 71a46fa) |
+| library.delete | ProjectIDParams | RemovedResult | ImportMethods.swift:199 | borra del disco; también cierra antes la sesión del tema abierto (71a46fa) |
+| library.markBest | MarkBestParams `{id, takeId}` (Swift: `DeleteTakeParams`) | `{marked: true}` | ImportMethods.swift:204 (71a46fa) | fija la mejor toma de su parte sin sesión de Grabar; avisa al estudio si el tema está abierto |
 | library.relocate | RelocateParams | RelocateResult | ImportMethods.swift:251 | mueve o reapunta la carpeta de proyectos |
 | library.usage | Empty | SJ (objeto) | SettingsMethods.swift:289 | uso de disco |
 | library.cleanupInfo | OptionalIDParams | CleanupInfoResult | SettingsMethods.swift:290 | bytes que liberaría limpiar |
@@ -160,10 +161,10 @@ Métodos (`StudyMethods.swift`): open :233, close :234, play :235, pause :238, s
 ## Apéndice Tipos
 
 ### app
-`AppInfo` (`Bridge.swift:5`): `version: String`, `platform: String` ("macos"/"windows"), `mediaBase: String`, `projectsFolder: String?`, `launch: {screen: String?, project: String?, snapshot: Bool}`, `playlist: PlaylistSnapshot?`. Opcionales nil = clave ausente.
+`AppInfo` (`Bridge.swift:5`): `version: String`, `platform: String` ("macos"/"windows"), `mediaBase: String`, `projectsFolder: String?`, `proposedProjectsFolder: String` (carpeta que el núcleo propone en el primer arranque, por plataforma: `~/Music/ToneForge` en Mac, Known Folder Music\ToneForge en Windows; la misma que usa `host.pickProjectsFolder`, 83f61a5), `launch: {screen: String?, project: String?, snapshot: Bool}`, `playlist: PlaylistSnapshot?`. Opcionales nil = clave ausente.
 
 ### library
-- `ProjectSummary` (`LibraryMethods.swift:6`): `id: UUID`, `title`, `artist: String?`, `folderName`, `duration: Double`, `sampleRate: Double`, `cover: String?`, `createdAt: Date`, `updatedAt: Date` (ISO-8601 sin fracción), `separationState: String` (`none|queued|running|done|failed`, rawValue de Store), `stemCount`, `takeCount`, `rigCount: Int`, `hasAnalysis: Bool`, `origin: String?` (`youtube|spotify`), `guitars: [String]`. Sin CodingKeys.
+- `ProjectSummary` (`LibraryMethods.swift:6`): `id: UUID`, `title`, `artist: String?`, `folderName`, `duration: Double`, `sampleRate: Double`, `cover: String?`, `createdAt: Date`, `updatedAt: Date` (ISO-8601 sin fracción), `separationState: String` (`none|queued|running|done|failed`, rawValue de Store), `separationError: String?` (texto del fallo guardado; `null` en cola o corriendo; si el fallo es vivo, la interfaz usa `jobs.progress.error`; 71a46fa), `stemCount`, `takeCount`, `rigCount: Int`, `hasAnalysis: Bool`, `origin: String?` (`youtube|spotify`), `guitars: [String]`. Sin CodingKeys.
 - `SkippedInfo` :27 `{folderName, reason}`. `LibraryListResult` :32 `{projects, skipped}`.
 - `StemInfo` :37 `{kind: String (bass|drums|other|vocals|guitar|piano), bytes: Int64, isEmpty}`.
 - `TakeInfo` :43 `{id: UUID, number: Int, createdAt: Date, discarded, isBest, hasVideo: Bool, punchCount: Int, duration: Double?, audio: String?, video: String?, songStart: Double?, videoOffsetMs: Double?, videoRotation: Int, punches: [TakePunchInfo]}`.
