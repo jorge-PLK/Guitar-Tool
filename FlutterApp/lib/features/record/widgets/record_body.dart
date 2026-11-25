@@ -9,6 +9,7 @@ import 'package:toneforge/features/record/widgets/record_header.dart';
 import 'package:toneforge/features/record/widgets/record_mixer.dart';
 import 'package:toneforge/features/record/widgets/record_preview.dart';
 import 'package:toneforge/features/record/widgets/status_lines.dart';
+import 'package:toneforge/features/settings/audio_store.dart';
 import 'package:toneforge/theme/tokens.dart';
 
 /// Ancho fijo del panel «Partes» (RV:114).
@@ -38,6 +39,32 @@ class RecordBody extends ConsumerStatefulWidget {
 }
 
 class _RecordBodyState extends ConsumerState<RecordBody> {
+  /// Nivel de «Tu guitarra» (RV:127-128): máximo de `audio.levels` sobre los canales `guitarIn` (1-based).
+  final ValueNotifier<double> _inputLevel = ValueNotifier<double>(0);
+
+  @override
+  void initState() {
+    super.initState();
+    ref.listenManual<AudioStoreState>(audioStoreProvider, (AudioStoreState? _, AudioStoreState s) => _updateLevel(s), fireImmediately: true);
+    // `audio.settings` (canales `guitarIn`) solo lo carga Ajustes; aquí se pide una vez si falta.
+    if (ref.read(audioStoreProvider).settings == null) Future<void>.microtask(ref.read(audioStoreProvider.notifier).reload);
+  }
+
+  void _updateLevel(AudioStoreState s) {
+    final List<double> levels = s.levels?.levels ?? const <double>[];
+    double max = 0;
+    for (final int ch in s.settings?.guitarIn ?? const <int>[]) {
+      if (ch >= 1 && ch - 1 < levels.length && levels[ch - 1] > max) max = levels[ch - 1];
+    }
+    _inputLevel.value = max;
+  }
+
+  @override
+  void dispose() {
+    _inputLevel.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final bool busy = ref.watch(recordStoreProvider.select((s) => s.isBusy));
@@ -65,9 +92,8 @@ class _RecordBodyState extends ConsumerState<RecordBody> {
                       const RecordStatusLines(),
                       if (punch) ...<Widget>[const SizedBox(height: TfSpace.s14), const PunchTimeline()],
                       const SizedBox(height: TfSpace.s14),
-                      // TODO(ola3): `inputLevel` (máximo de `audio.levels` sobre `guitarIn`) sin store de audio aún.
                       // `mixerExpanded` (RV:95) es estado local de `RecordMixer`: al crecer, el `Expanded` de arriba encoge la vista previa.
-                      const RecordMixer(),
+                      RecordMixer(inputLevel: _inputLevel),
                     ],
                   ),
                 ),

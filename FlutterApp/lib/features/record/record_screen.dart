@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:toneforge/contract/library.dart';
+import 'package:toneforge/core/core_client.dart' show CoreError;
 import 'package:toneforge/features/record/record_store.dart';
 import 'package:toneforge/features/record/record_topics_provider.dart';
 import 'package:toneforge/features/record/widgets/record_body.dart';
@@ -11,11 +12,13 @@ import 'package:toneforge/l10n/app_localizations.dart';
 import 'package:toneforge/shell/selected_project.dart';
 import 'package:toneforge/shell/shell_providers.dart';
 import 'package:toneforge/shell/shell_route.dart';
+import 'package:toneforge/theme/icons.dart';
 import 'package:toneforge/theme/tokens.dart';
 import 'package:toneforge/theme/typography.dart';
 import 'package:toneforge/widgets/tf_buttons.dart';
 import 'package:toneforge/widgets/tf_card.dart';
 import 'package:toneforge/widgets/tf_progress.dart';
+import 'package:toneforge/widgets/tf_state_message.dart';
 
 /// Proyecto con el que hay que tener abierta Grabar: el elegido, ya conocido en la biblioteca y separado.
 final _recordTargetProvider = Provider.autoDispose<String?>((ref) {
@@ -94,6 +97,11 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
     }
     if (project.separationState != SeparationState.done) return const _NotSeparated();
     final RecordState s = ref.watch(recordStoreProvider);
+    final CoreError? error = s.error;
+    if (!s.opened && error != null) {
+      // TODO(ola3): traducir por `error.code` cuando haya claves ARB genéricas de Grabar; hoy `message` del núcleo.
+      return TfStateMessage(icon: TfIcon.exclamationmarkTriangle, text: error.message);
+    }
     if (!s.opened || s.snapshot == null) return const _Loading();
     return RecordBody(
       projectId: project.id,

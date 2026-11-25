@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:toneforge/core/core_client.dart' show Json;
+import 'package:toneforge/core/core_client.dart' show CoreError, Json;
 import 'package:toneforge/core/core_providers.dart';
 import 'package:toneforge/core/mock_core.dart';
 import 'package:toneforge/features/record/record_screen.dart';
@@ -22,6 +22,7 @@ import 'package:toneforge/shell/shell_route.dart';
 import 'package:toneforge/theme/tokens.dart';
 import 'package:toneforge/theme/typography.dart';
 import 'package:toneforge/widgets/tf_progress.dart';
+import 'package:toneforge/widgets/tf_state_message.dart';
 
 import '../../support/harness.dart';
 
@@ -177,5 +178,29 @@ void main() {
     expect(_methods(core), contains('record.close'));
     expect(_methods(core), isNot(contains('study.close')));
     expect(_c(t).read(shellRouteProvider), ShellRoute.montage);
+  });
+
+  testWidgets('record.open falla: TfStateMessage con el error y sin spinner', (t) async {
+    final MockCore core = _core()..failWith('record.open', const CoreError('internal', 'No se pudo abrir Grabar'));
+    await _pump(t, core, project: _done);
+    expect(find.byType(TfStateMessage), findsOneWidget);
+    expect(find.text('No se pudo abrir Grabar'), findsOneWidget);
+    expect(find.byType(TfSpinner), findsNothing);
+    expect(find.byType(RecordHeader), findsNothing);
+  });
+
+  testWidgets('nivel de Tu guitarra: máximo de audio.levels sobre guitarIn', (t) async {
+    final MockCore core = _core();
+    await _pump(t, core, project: _done);
+    final Json settings = _fx('audio/audio.settings.result');
+    final List<int> guitarIn = (settings['guitarIn']! as List).cast<int>();
+    final RecordMixer mixer = t.widget(find.byType(RecordMixer));
+    expect(mixer.inputLevel, isNotNull);
+    expect(mixer.inputLevel!.value, 0);
+    final List<double> levels = List<double>.filled(guitarIn.reduce((int a, int b) => a > b ? a : b), 0)
+      ..[guitarIn.first - 1] = 0.6;
+    core.emit('audio.levels', <String, Object?>{'levels': levels, 'rmsDB': <double>[], 'peakDB': <double>[]});
+    await _settle(t);
+    expect(mixer.inputLevel!.value, 0.6);
   });
 }
