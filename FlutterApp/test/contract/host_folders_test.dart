@@ -1,8 +1,12 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:toneforge/contract/host_folders.dart';
+import 'package:toneforge/core/core_client.dart' show Json;
+import 'package:toneforge/core/mock_core.dart';
 
-// Sin fixture de resultado en Contract/fixtures/host/: JSON en línea según
-// ImportMethods.swift:91-107 (la clave `path` siempre sale, `null` si se cancela).
+// `host.chooseFolder` lee su fixture de Contract/fixtures/host/; el resto, JSON en línea según
+// ImportMethods.swift (la clave `path` siempre sale, `null` si se cancela).
 void main() {
   group('contract host folders', () {
     test('host.pickProjectsFolder: con carpeta, codifica sin perder campos', () {
@@ -24,6 +28,19 @@ void main() {
       const json = {'path': '/Volumes/Discos/Biblioteca'};
       final result = ChosenFolderResult.fromJson(json);
       expect(result.path, '/Volumes/Discos/Biblioteca');
+      expect(result.toJson(), equals(json));
+    });
+
+    test('host.chooseFolder: fixture result.json', () async {
+      final source = await DirectoryFixtureSource.find();
+      if (source == null) {
+        fail('No encuentro Contract/fixtures subiendo desde el cwd');
+      }
+      final json =
+          jsonDecode(await source.read('host/host.chooseFolder.result.json'))
+              as Json;
+      final result = ChosenFolderResult.fromJson(json);
+      expect(result.path, '/Users/example/Music/ToneForge');
       expect(result.toJson(), equals(json));
     });
 

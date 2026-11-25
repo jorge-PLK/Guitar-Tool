@@ -16,8 +16,11 @@ final class ContractFixturesHostTests: XCTestCase {
         try await rig.run("host.preview.show",
                           params: "{\"url\":\"https://www.songsterr.com/a/wsa/x-tab-s1\",\"x\":10,\"y\":20.5,\"width\":640,\"height\":360}")
         try await rig.run("host.preview.hide")
-        // Abren un selector de carpeta nativo: solo params.
-        try await rig.run("host.chooseFolder", paramsOnly: true)
+        // `host.chooseFolder`: el selector se simula con la variable de pruebas (sin abrir diálogo); ruta neutra y estable.
+        rig.bridge.environment = { [Bridge.testPickFolderVariable: "/Users/example/Music/ToneForge"] }
+        try await rig.run("host.chooseFolder")
+        rig.bridge.environment = { [:] }
+        // `host.pickProjectsFolder` abre un selector nativo y guarda el perfil: solo params.
         try await rig.run("host.pickProjectsFolder", paramsOnly: true)
         // Sin anfitrión, todos dan `unsupported`.
         rig.bridge.host = nil
