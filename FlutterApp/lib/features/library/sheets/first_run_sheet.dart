@@ -10,7 +10,7 @@ import '../library_errors.dart';
 import '../library_metrics.dart';
 import '../library_store.dart';
 
-/// Carpeta que propone el selector (RootView.swift:130).
+/// Respaldo si el núcleo no manda `app.info.proposedProjectsFolder` (RootView.swift:130).
 const String proposedProjectsFolder = '~/Music/ToneForge';
 
 /// Hoja de primer arranque (FirstRunSheet, RV:122-137): sin botón de cerrar y sin Esc.
@@ -27,6 +27,7 @@ class _FirstRunSheet extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l = AppLocalizations.of(context);
+    final proposed = ref.watch(libraryStoreProvider.select((s) => s.proposedFolder)) ?? proposedProjectsFolder;
     ref.listen(libraryStoreProvider.select((s) => s.needsFolder), (_, needs) {
       final route = ModalRoute.of(context);
       if (!needs && route != null) route.navigator?.removeRoute(route);
@@ -50,7 +51,7 @@ class _FirstRunSheet extends ConsumerWidget {
           children: <Widget>[
             Text(l.library_firstRunBody),
             Text(
-              l.library_firstRunProposal(proposedProjectsFolder),
+              l.library_firstRunProposal(proposed),
               style: TfText.body(TfSize.font13).copyWith(color: TfColors.text2),
             ),
             Align(

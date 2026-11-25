@@ -12,6 +12,8 @@ struct AppInfo: Codable, Sendable {
     var platform: String
     var mediaBase: String
     var projectsFolder: String?
+    /// Carpeta que propone el primer arranque (la misma que abre `host.pickProjectsFolder`), ruta absoluta por plataforma.
+    var proposedProjectsFolder: String?
     var launch: Launch
     /// Lista o álbum importándose (cola en marcha o parada) que sobrevive a una recarga de la página; nil si no hay.
     var playlist: PlaylistSnapshot?
@@ -143,6 +145,7 @@ public final class Bridge: @unchecked Sendable {
         router.register("app.info") { [weak self] (_: Empty) -> AppInfo in
             var i = info
             i.projectsFolder = self?.projects.url?.path
+            i.proposedProjectsFolder = self?.proposedFolder.path
             if let live = self?.liveList { i.playlist = await live() }
             return i
         }

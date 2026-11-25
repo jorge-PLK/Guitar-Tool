@@ -26,6 +26,7 @@ class LibraryState {
     this.grouping = LibraryGrouping.songs,
     this.openArtist,
     this.projectsFolder,
+    this.proposedFolder,
     this.error,
   });
 
@@ -45,6 +46,9 @@ class LibraryState {
   /// Nombre del artista abierto en la vista Artistas (vacío = «Sin artista»); no se persiste.
   final String? openArtist;
   final String? projectsFolder;
+
+  /// Carpeta que propone el núcleo en el primer arranque (`app.info.proposedProjectsFolder`); null si no llega.
+  final String? proposedFolder;
 
   /// Último error de `library.list` distinto de `no-projects-folder`.
   final CoreError? error;
@@ -78,6 +82,7 @@ class LibraryState {
     LibraryGrouping? grouping,
     Object? openArtist = _keep,
     Object? projectsFolder = _keep,
+    Object? proposedFolder = _keep,
     Object? error = _keep,
   }) => LibraryState(
     entries: entries ?? this.entries,
@@ -88,6 +93,7 @@ class LibraryState {
     grouping: grouping ?? this.grouping,
     openArtist: identical(openArtist, _keep) ? this.openArtist : openArtist as String?,
     projectsFolder: identical(projectsFolder, _keep) ? this.projectsFolder : projectsFolder as String?,
+    proposedFolder: identical(proposedFolder, _keep) ? this.proposedFolder : proposedFolder as String?,
     error: identical(error, _keep) ? this.error : error as CoreError?,
   );
 }
@@ -141,7 +147,10 @@ class LibraryStore extends Notifier<LibraryState> {
     try {
       final info = await _core.call<Json>('app.info', const <String, Object?>{}, (j) => j);
       if (!ref.mounted) return;
-      state = state.copyWith(projectsFolder: info['projectsFolder'] as String?);
+      state = state.copyWith(
+        projectsFolder: info['projectsFolder'] as String?,
+        proposedFolder: indicatorText(info['proposedProjectsFolder']),
+      );
     } on CoreError {
       // la carpeta la decide library.list
     }

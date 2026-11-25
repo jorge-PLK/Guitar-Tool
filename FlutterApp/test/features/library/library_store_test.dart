@@ -40,8 +40,14 @@ Json project(String id, String title, {String? artist}) => {
 Future<(ProviderContainer, MockCore, MemoryPrefs)> setup({
   List<Json>? projects,
   Map<String, String>? prefs,
+  bool keepProposal = false,
 }) async {
   final core = await MockCore.load((await DirectoryFixtureSource.find())!);
+  if (!keepProposal) {
+    // Sin la propuesta del núcleo, la hoja de primer arranque muestra el respaldo (y el golden no cambia).
+    final info = await core.call<Json>('app.info', const <String, Object?>{}, (j) => j);
+    core.result('app.info', {...info}..remove('proposedProjectsFolder'));
+  }
   if (projects != null) core.result('library.list', {'projects': projects, 'skipped': <Object>[]});
   final mem = MemoryPrefs(prefs);
   final c = ProviderContainer(
@@ -54,6 +60,13 @@ Future<(ProviderContainer, MockCore, MemoryPrefs)> setup({
 }
 
 void main() {
+  test('app.info.proposedProjectsFolder llega al estado; sin el campo queda null', () async {
+    final (c, _, _) = await setup(keepProposal: true);
+    expect(c.read(libraryStoreProvider).proposedFolder, '/<dir>/Music/ToneForge');
+    final (c2, _, _) = await setup();
+    expect(c2.read(libraryStoreProvider).proposedFolder, isNull);
+  });
+
   test('la lista se ordena por título plegado y la carga marca loaded', () async {
     final (c, _, _) = await setup(
       projects: [

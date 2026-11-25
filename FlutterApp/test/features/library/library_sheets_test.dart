@@ -112,6 +112,37 @@ void main() {
     expect(find.text(_l.library_firstRunTitle), findsNothing);
   });
 
+  testWidgets('primer arranque: muestra la carpeta propuesta por el núcleo', (tester) async {
+    late ProviderContainer c;
+    late MockCore core;
+    await tester.runAsync(() async {
+      await loadTfFonts();
+      final r = await setup(projects: [project(_id, 'Delta')], keepProposal: true);
+      c = r.$1;
+      core = r.$2;
+    });
+    setTestSurface(tester, const Size(800, 600));
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: c,
+        child: WidgetsApp(
+          color: TfColors.bg,
+          locale: const Locale('es'),
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          pageRouteBuilder: <T>(RouteSettings s, WidgetBuilder b) =>
+              PageRouteBuilder<T>(settings: s, pageBuilder: (ctx, a, b2) => b(ctx)),
+          home: const LibraryAlertsHost(child: SizedBox.expand()),
+        ),
+      ),
+    );
+    await tester.pump();
+    core.failWith('library.list', const CoreError('no-projects-folder', 'x'));
+    await tester.runAsync(() => c.read(libraryStoreProvider.notifier).refresh());
+    await tester.pump(_ms);
+    expect(find.text(_l.library_firstRunProposal('/<dir>/Music/ToneForge')), findsOneWidget);
+  });
+
   testWidgets('hoja de corrección: Guardar deshabilitado con título vacío', (tester) async {
     final (_, core) = await _pump(tester, _opener);
     await tester.tap(find.byType(GestureDetector).first);
