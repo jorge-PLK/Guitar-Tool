@@ -64,6 +64,25 @@
   "notices" : [
 
   ],
+  "offset" : {
+    "audioPath" : "Banda - Tema/takes/00000000-0000-0000-0000-000000000002/processed.wav",
+    "cameraId" : "sim-camera",
+    "cameraName" : "Cámara simulada",
+    "fps" : 30,
+    "frameMs" : 33.333333333333336,
+    "initialMs" : 40,
+    "isNew" : false,
+    "maxMs" : 500,
+    "minMs" : -500,
+    "punches" : [
+
+    ],
+    "rotation" : 90,
+    "songStart" : 2,
+    "takeId" : "00000000-0000-0000-0000-000000000002",
+    "valueMs" : 40,
+    "videoPath" : "Banda - Tema/takes/00000000-0000-0000-0000-000000000002/video.mov"
+  },
   "parts" : [
     {
       "bestTakeId" : "00000000-0000-0000-0000-000000000002",

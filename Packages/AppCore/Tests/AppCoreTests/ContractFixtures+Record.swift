@@ -182,7 +182,7 @@ final class ContractFixturesRecordTests: XCTestCase {
         try await rig.dump("record.setCamera", "{}", name: "record.setCamera")
         try await rig.dump("record.pollCamera")
         try await rig.dump("record.prepareViewTake")
-        try await rig.dump("record.adjustOffset", "{\"takeId\":\"\(t1)\"}")
+        let adjustSnap = try decodeSnapshot(try await rig.dump("record.adjustOffset", "{\"takeId\":\"\(t1)\"}"))
         try await rig.dump("record.setOffset", "{\"valueMs\":40}")
         try await rig.dump("record.finishOffset", "{\"save\":true,\"makeDefault\":false}")
         try await rig.dump("record.adjustOffset", "{\"takeId\":\"\(t2)\"}", name: "record.adjustOffset.no-video")
@@ -204,7 +204,9 @@ final class ContractFixturesRecordTests: XCTestCase {
         try rig.variantEvent("record.state", variant: "recording", recording)
         var finishing = base; finishing.phase = "finishing"; finishing.busy = true
         try rig.variantEvent("record.state", variant: "finishing", finishing)
-        var adjusting = base; adjusting.phase = "adjusting"; adjusting.busy = true
+        // El snapshot real de `record.adjustOffset` lleva `offset` en fase adjusting: la variante lo copia.
+        var adjusting = base; adjusting.phase = "adjusting"; adjusting.busy = true; adjusting.offset = adjustSnap.offset
+        XCTAssertNotNil(adjusting.offset)
         try rig.variantEvent("record.state", variant: "adjusting", adjusting)
         for (state, message): (String, String?) in [("none", "No hay ninguna cámara conectada. Se grabará solo el audio."),
                                                    ("denied", "ToneForge no tiene permiso para usar la cámara."),
