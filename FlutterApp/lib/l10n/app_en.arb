@@ -275,7 +275,7 @@
   "@library_plDoneTitle": {"description":"Lista: título del resumen final."},
   "library_plDownload": "Download and process ({n})",
   "@library_plDownload": {"description":"Lista: botón descargar.","placeholders":{"n":{"type":"int"}}},
-  "library_plDownloading": "Downloading",
+  "library_plDownloading": "Downloading…",
   "@library_plDownloading": {"description":"Lista: estado de fila descargando."},
   "library_plDownloadingPercent": "Downloading {percent}",
   "@library_plDownloadingPercent": {"description":"Lista: estado de fila descargando con porcentaje.","placeholders":{"percent":{"type":"String"}}},

@@ -929,7 +929,7 @@ abstract class AppLocalizations {
   /// Lista: estado de fila descargando.
   ///
   /// In es, this message translates to:
-  /// **'Descargando'**
+  /// **'Descargando…'**
   String get library_plDownloading;
 
   /// Lista: estado de fila descargando con porcentaje.

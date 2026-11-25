@@ -488,7 +488,7 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String get library_plDownloading => 'Descargando';
+  String get library_plDownloading => 'Descargando…';
 
   @override
   String library_plDownloadingPercent(String percent) {
