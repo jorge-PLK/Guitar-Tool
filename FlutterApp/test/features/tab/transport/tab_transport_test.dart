@@ -42,7 +42,7 @@ void main() {
     expect(studyPositionProvider, isNotNull);
   });
 
-  testWidgets('tempo en pasos de 5 llama a setRate', (tester) async {
+  testWidgets('tempo en pasos de 5: muestra al arrastrar y llama a setRate al soltar', (tester) async {
     final r = await pumpTransport(tester, const TabTransport());
     final slider = tester.widget<TfSlider>(find.byType(TfSlider));
     expect(slider.step, 5);
@@ -50,8 +50,11 @@ void main() {
     expect(slider.max, 200);
     slider.onChanged!(115);
     await tester.pump();
+    expect(r.calls('study.setRate'), isEmpty);
+    expect(find.text('115 %'), findsOneWidget);
+    slider.onChangeEnd!(115);
+    await tester.pump();
     expect(_params(r, 'study.setRate')['rate'], 1.15);
-    expect(find.text('100 %'), findsOneWidget);
   });
 
   testWidgets('metrónomo habilitado con pulsos y llama a setMetronome', (tester) async {
