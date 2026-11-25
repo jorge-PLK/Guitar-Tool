@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:toneforge/contract/study.dart';
+import 'package:toneforge/features/backing/chord_vocabulary_provider.dart';
 import 'package:toneforge/features/backing/study_position.dart';
 import 'package:toneforge/features/backing/study_store.dart';
 import 'package:toneforge/features/backing/widgets/chord_editor_grid.dart';
@@ -10,6 +11,10 @@ import 'package:toneforge/theme/typography.dart';
 import 'package:toneforge/widgets/tf_buttons.dart';
 import 'package:toneforge/widgets/tf_divider.dart';
 import 'package:toneforge/widgets/tf_tooltip.dart';
+
+/// Mientras carga el vocabulario: rejillas vacías y «N» inerte.
+const StudyChordVocabulary _emptyVocab =
+    StudyChordVocabulary(roots: <String>[], qualities: <String>[], noChordIndex: -1);
 
 /// Hoja «Acorde» (`ChordEditor`, BackingTimeline.swift:480-557) del tramo [start]...[end]. [time] = punto de
 /// partida (celda de la rejilla); sin él, la posición de reproducción. No se cierra al elegir.
@@ -39,18 +44,18 @@ class _ChordEditorState extends ConsumerState<ChordEditor> {
     final Iterable<StudyChord> hit =
         (study?.analysis.chords ?? const <StudyChord>[]).where((StudyChord c) => c.start == widget.start);
     _initialIndex = hit.isEmpty ? -1 : hit.first.index;
-    if (_initialIndex >= 0 && _initialIndex < chordRootNames.length * chordQualityCount) {
-      _root = _initialIndex ~/ chordQualityCount;
-      _quality = _initialIndex % chordQualityCount;
-    }
+    final StudyShownChord? shown = hit.isEmpty ? null : hit.first.shown;
+    _root = shown?.root;
+    _quality = shown?.quality;
   }
 
   StudyStore get _store => ref.read(studyStoreProvider.notifier);
 
+  /// Acorde tal como se ve; el núcleo lo destranspone.
   void _commit() {
     final int? r = _root, q = _quality;
     if (r == null || q == null) return;
-    _store.setChord(widget.start, widget.end, index: r * chordQualityCount + q);
+    _store.setChord(widget.start, widget.end, shown: StudyShownChord(root: r, quality: q));
   }
 
   /// Pulso más cercano al punto, si queda a más de 0,05 s de ambos extremos (BT:506-510).
@@ -67,6 +72,7 @@ class _ChordEditorState extends ConsumerState<ChordEditor> {
   Widget build(BuildContext context) {
     final AppLocalizations l = AppLocalizations.of(context);
     final StudyOpenResult? study = ref.watch(studyStoreProvider.select((s) => s.study));
+    final StudyChordVocabulary vocab = ref.watch(chordVocabularyProvider).asData?.value ?? _emptyVocab;
     final double seconds = widget.time ?? ref.watch(studyPositionProvider.select((p) => p.seconds));
     final double? beat = _splitBeat(study?.analysis.beats ?? const <double>[], seconds);
     final bool hasOverride = (study?.chordOverrides ?? const <StudyOverrideInfo>[])
@@ -83,9 +89,9 @@ class _ChordEditorState extends ConsumerState<ChordEditor> {
             cell: TfSize.controlLg,
             columns: 6,
             children: <Widget>[
-              for (int r = 0; r < chordRootNames.length; r++)
+              for (int r = 0; r < vocab.roots.length; r++)
                 ChordEditorChip(
-                  text: chordRootNames[r],
+                  text: vocab.roots[r],
                   on: _root == r,
                   onTap: () {
                     setState(() => _root = r);
@@ -96,12 +102,12 @@ class _ChordEditorState extends ConsumerState<ChordEditor> {
           ),
           const SizedBox(height: TfSpace.s12),
           ChordEditorGrid(
-            cell: TfSize.controlLg + TfSpace.s16,
+            cell: TfSize.chordQualityCellWidth,
             columns: 4,
             children: <Widget>[
-              for (int q = 0; q < chordQualitySuffixes.length; q++)
+              for (int q = 0; q < vocab.qualities.length; q++)
                 ChordEditorChip(
-                  text: chordQualitySuffixes[q].isEmpty ? l.backing_chordMajor : chordQualitySuffixes[q],
+                  text: vocab.qualities[q].isEmpty ? l.backing_chordMajor : vocab.qualities[q],
                   on: _quality == q,
                   onTap: () {
                     setState(() => _quality = q);
@@ -113,8 +119,10 @@ class _ChordEditorState extends ConsumerState<ChordEditor> {
           const SizedBox(height: TfSpace.s12),
           ChordEditorChip(
             text: l.backing_chordNone,
-            on: _initialIndex == chordNoChordIndex,
-            onTap: () => _store.setChord(widget.start, widget.end, index: chordNoChordIndex),
+            on: vocab.noChordIndex >= 0 && _initialIndex == vocab.noChordIndex,
+            onTap: vocab.noChordIndex < 0
+                ? () {}
+                : () => _store.setChord(widget.start, widget.end, index: vocab.noChordIndex),
           ),
           const SizedBox(height: TfSpace.s12),
           const SizedBox(width: TfSize.controlLg * 6 + TfSpace.s6 * 5, child: TfDivider()),

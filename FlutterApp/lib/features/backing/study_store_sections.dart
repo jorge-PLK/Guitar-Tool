@@ -58,8 +58,17 @@ extension StudyStoreSections on StudyStore {
       'study.chordShape',
       StudyChordShapeParams(index: index, capo: capo).toJson(),
       StudyChordShapeResult.fromJson);
-  Future<void> setChord(double start, double end, {int? index, String? label}) => _edit(
-      'study.setChord', StudySetChordParams(start: start, end: end, index: index, label: label).toJson());
+
+  /// Vocabulario de acordes (no exige tema abierto); no cambia el estado.
+  Future<StudyChordVocabulary?> chordVocabulary() =>
+      _call('study.chordVocabulary', _empty, StudyChordVocabulary.fromJson);
+
+  /// Solo uno de [index], [label] y [shown] (acorde tal como se ve; el núcleo destranspone).
+  Future<void> setChord(double start, double end, {int? index, String? label, StudyShownChord? shown}) =>
+      _edit(
+          'study.setChord',
+          StudySetChordParams(start: start, end: end, index: index, label: label, shown: shown)
+              .toJson());
   Future<void> removeChordOverrides(double start, double end) =>
       _edit('study.removeChordOverrides', StudyChordRangeParams(start: start, end: end).toJson());
   Future<void> clearChordOverrides() => _edit('study.clearChordOverrides', _empty);

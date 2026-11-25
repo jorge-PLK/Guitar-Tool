@@ -13,6 +13,36 @@ final class StudyShownKey {
   Json toJson() => {'tonic': tonic, 'mode': mode};
 }
 
+/// Acorde tal como se muestra (transpuesto): raíz 0-11 y calidad 0-13 (índices del vocabulario).
+final class StudyShownChord {
+  const StudyShownChord({required this.root, required this.quality});
+
+  factory StudyShownChord.fromJson(Json j) =>
+      StudyShownChord(root: _i(j['root']), quality: _i(j['quality']));
+
+  final int root;
+  final int quality;
+
+  Json toJson() => {'root': root, 'quality': quality};
+}
+
+/// Respuesta de `study.chordVocabulary`: nombres de raíz, calidades por índice y el índice de «N».
+final class StudyChordVocabulary {
+  const StudyChordVocabulary({required this.roots, required this.qualities, required this.noChordIndex});
+
+  factory StudyChordVocabulary.fromJson(Json j) => StudyChordVocabulary(
+        roots: [for (final e in j['roots']! as List<Object?>) _s(e)],
+        qualities: [for (final e in j['qualities']! as List<Object?>) _s((e! as Map)['suffix'])],
+        noChordIndex: _i(j['noChordIndex']),
+      );
+
+  final List<String> roots;
+
+  /// Sufijos en orden de índice; el vacío es «mayor».
+  final List<String> qualities;
+  final int noChordIndex;
+}
+
 final class StudyKey {
   const StudyKey({this.detected, this.override, this.effective, this.confidence, this.display});
 
@@ -72,9 +102,11 @@ final class StudyChord {
     required this.overridden,
     this.display,
     this.shape,
+    this.shown,
   });
 
   factory StudyChord.fromJson(Json j) => StudyChord(
+        shown: _opt(j['shown'], StudyShownChord.fromJson),
         start: _d(j['start']),
         end: _d(j['end']),
         index: _i(j['index']),
@@ -95,6 +127,9 @@ final class StudyChord {
 
   /// Ausente para «?» y «N».
   final StudyChordShape? shape;
+
+  /// Raíz y calidad mostradas (con transpose); ausente para «?» y «N».
+  final StudyShownChord? shown;
 }
 
 /// Params de `study.chordShape`; `capo` ausente = el del transporte.

@@ -139,25 +139,30 @@ final class StudySetKeyParams {
 }
 
 final class StudySetChordParams {
-  const StudySetChordParams({required this.start, required this.end, this.index, this.label});
+  const StudySetChordParams({required this.start, required this.end, this.index, this.label, this.shown});
 
   factory StudySetChordParams.fromJson(Json j) => StudySetChordParams(
         start: _d(j['start']),
         end: _d(j['end']),
         index: _in(j['index']),
         label: _sn(j['label']),
+        shown: _opt(j['shown'], StudyShownChord.fromJson),
       );
 
   final double start;
   final double end;
+
+  /// Solo uno de [index], [label] y [shown]; [shown] = acorde tal como se ve (el núcleo destranspone).
   final int? index;
   final String? label;
+  final StudyShownChord? shown;
 
   Json toJson() => _compact({
         'start': start,
         'end': end,
         'index': index,
         'label': label,
+        'shown': shown?.toJson(),
       });
 }
 

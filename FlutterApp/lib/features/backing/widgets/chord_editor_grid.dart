@@ -2,24 +2,11 @@ import 'package:flutter/widgets.dart';
 import 'package:toneforge/theme/tokens.dart';
 import 'package:toneforge/theme/typography.dart';
 
-/// Calidades por índice de `StudyChord.index = raíz*14 + calidad` (backing-contrato.md:92).
-const int chordQualityCount = 14;
-
-/// Sin acorde (`ChordLabel.noChordIndex`).
-const int chordNoChordIndex = 169;
-
-/// Nombres de raíz (sostenidos) y sufijos de calidad en el orden del índice (`ChordLabel.swift`).
-/// El puente no ofrece estos nombres: ver desvío en el informe.
-const List<String> chordRootNames = <String>['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-const List<String> chordQualitySuffixes = <String>[
-  'm', '', '°', '+', 'm6', '6', 'm7', 'm(maj7)', 'maj7', '7', '°7', 'ø7', 'sus2', 'sus4', //
-];
-
 /// Chip de la hoja: alto 30, minWidth 36, padding 4, radio 6; activo acento, inactivo field.
 class ChordEditorChip extends StatelessWidget {
   const ChordEditorChip({super.key, required this.text, required this.on, required this.onTap});
 
-  static const double height = TfSize.controlSm + TfSpace.s2;
+  static const double height = TfSize.chordChipHeight;
 
   final String text;
   final bool on;

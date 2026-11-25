@@ -3,14 +3,17 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:toneforge/features/backing/study_store.dart';
 import 'package:toneforge/features/backing/widgets/chord_chip.dart';
 import 'package:toneforge/features/backing/widgets/chord_editor.dart';
+import 'package:toneforge/features/backing/widgets/chord_editor_grid.dart';
 
 import 'chords_support.dart';
 
 /// Cuatro acordes de 2 s con pulsos cada 1 s; el segundo (2...4, índice 7 = Cm(maj7)) tiene corrección.
-void tweak(Json open, {double position = 3, bool override = true}) {
+void tweak(Json open, {double position = 3, bool override = true, Json? shown}) {
   fourChords(open, position: position);
   final a = (open['analysis']! as Map).cast<String, Object?>();
   a['beats'] = <Object?>[for (int i = 0; i < 8; i++) i.toDouble()];
+  final chords = (a['chords']! as List).cast<Map>();
+  chords[1]['shown'] = shown ?? <String, Object?>{'root': 0, 'quality': 7};
   open['chordOverrides'] = override
       ? <Object?>[
           <String, Object?>{'start': 2.0, 'end': 4.0, 'index': 7},
@@ -22,11 +25,11 @@ Finder inEditor(Finder f) => find.descendant(of: find.byType(ChordEditor), match
 Map last(ChordsRig r, String m) => r.core.calls.lastWhere((x) => x.method == m).params! as Map;
 int count(ChordsRig r, String m) => r.core.calls.where((x) => x.method == m).length;
 
-Future<ChordsRig> pumpEditing(WidgetTester t, {double position = 3, bool override = true}) async {
+Future<ChordsRig> pumpEditing(WidgetTester t, {double position = 3, bool override = true, Json? shown}) async {
   final ChordsRig rig = await pumpChords(
     t,
     size: const Size(1100, 900),
-    tweak: (o) => tweak(o, position: position, override: override),
+    tweak: (o) => tweak(o, position: position, override: override, shown: shown),
   );
   rig.container.read(studyStoreProvider.notifier).setEditMode(true);
   await settleFrames(t);
@@ -53,18 +56,37 @@ void main() {
     expect(find.byType(ChordEditor), findsNothing);
   });
 
-  testWidgets('raíz y calidad escriben el índice y la hoja sigue abierta', (t) async {
+  testWidgets('raíz y calidad escriben shown y la hoja sigue abierta', (t) async {
     final ChordsRig rig = await pumpEditing(t);
     await t.tap(inEditor(find.text('D')));
     await settleFrames(t);
-    expect(last(rig, 'study.setChord'), containsPair('index', 2 * 14 + 7));
+    expect(last(rig, 'study.setChord')['shown'], equals({'root': 2, 'quality': 7}));
     await t.tap(inEditor(find.text('maj7')));
     await settleFrames(t);
     final Map p = last(rig, 'study.setChord');
-    expect(p, containsPair('index', 2 * 14 + 8));
+    expect(p['shown'], equals({'root': 2, 'quality': 8}));
+    expect(p.containsKey('index'), isFalse);
     expect(p, containsPair('start', 2.0));
     expect(p, containsPair('end', 4.0));
     expect(find.byType(ChordEditor), findsOneWidget);
+  });
+
+  testWidgets('pinta 12 raíces y 14 calidades del vocabulario', (t) async {
+    await pumpEditing(t);
+    expect(inEditor(find.byType(ChordEditorChip)), findsNWidgets(12 + 14 + 1));
+  });
+
+  testWidgets('con transpose +2 marca el acorde mostrado (D) y Em envía shown', (t) async {
+    final ChordsRig rig = await pumpEditing(t, shown: <String, Object?>{'root': 2, 'quality': 1});
+    bool on(String text) => t.widget<ChordEditorChip>(inEditor(find.widgetWithText(ChordEditorChip, text))).on;
+    expect(on('D'), isTrue);
+    expect(on(es.backing_chordMajor), isTrue);
+    expect(on('E'), isFalse);
+    await t.tap(inEditor(find.text('E')));
+    await settleFrames(t);
+    await t.tap(inEditor(find.text('m')));
+    await settleFrames(t);
+    expect(last(rig, 'study.setChord')['shown'], equals({'root': 4, 'quality': 0}));
   });
 
   testWidgets('N escribe sin acorde', (t) async {

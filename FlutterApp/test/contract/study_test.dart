@@ -12,6 +12,7 @@ late List<String> _files;
 const _emptyParams = {
   'analyze',
   'applySections',
+  'chordVocabulary',
   'clearChordOverrides',
   'close',
   'discardSections',
@@ -86,6 +87,7 @@ final Map<String, Object Function(Json)> _decoders = {
   'analysis.event': StudyAnalysisEvent.fromJson,
   'guitars.event': StudyGuitarsEvent.fromJson,
   'chordShape.result': StudyChordShapeResult.fromJson,
+  'chordVocabulary.result': StudyChordVocabulary.fromJson,
   'play.error': _expectCallError,
   'setMix.error': _expectCallError,
 };
@@ -245,6 +247,33 @@ Future<void> main() async {
       expect(p.shown!.tonic, 'G');
       expect(p.shown!.mode, 'min');
       expect(p.toJson(), equals(j));
+    });
+
+    test('setChord shown: params ida y vuelta', () async {
+      final j = await _load('study.setChord.params.shown.json');
+      final p = StudySetChordParams.fromJson(j);
+      expect(p.shown!.root, 0);
+      expect(p.shown!.quality, 1);
+      expect(p.index, isNull);
+      expect(p.toJson(), equals(j));
+    });
+
+    test('chordVocabulary.result: 12 raíces, 14 calidades y N', () async {
+      final v = StudyChordVocabulary.fromJson(await _load('study.chordVocabulary.result.json'));
+      expect(v.roots, hasLength(12));
+      expect(v.roots.first, 'C');
+      expect(v.qualities, hasLength(14));
+      expect(v.qualities[0], 'm');
+      expect(v.qualities[1], '');
+      expect(v.noChordIndex, 169);
+    });
+
+    test('analysis withChords: shown en los acordes', () async {
+      final e = StudyAnalysisEvent.fromJson(await _load('study.analysis.event.withChords.json'));
+      final c = e.analysis!.chords;
+      expect(c.first.shown!.root, 10);
+      expect(c.first.shown!.quality, 0);
+      expect(c[1].shown!.quality, 7);
     });
 
     test('setLoop.result: loop.span false cuando no es del tramo', () async {
