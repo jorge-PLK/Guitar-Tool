@@ -573,8 +573,6 @@
   "@settings_lang_es": {"description":"Ajustes Idioma: nombre del idioma, no se traduce."},
   "settings_lang_label": "Idioma",
   "@settings_lang_label": {"description":"Ajustes Idioma: etiqueta del selector."},
-  "settings_lang_system": "Sistema",
-  "@settings_lang_system": {"description":"Ajustes Idioma: opción del selector."},
   "settings_lang_title": "Idioma",
   "@settings_lang_title": {"description":"Ajustes Idioma: título del grupo."},
   "settings_lib_cancel": "Cancelar",

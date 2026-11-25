@@ -1025,9 +1025,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settings_lang_label => 'Language';
 
   @override
-  String get settings_lang_system => 'System';
-
-  @override
   String get settings_lang_title => 'Language';
 
   @override

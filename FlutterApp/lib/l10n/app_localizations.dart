@@ -1790,12 +1790,6 @@ abstract class AppLocalizations {
   /// **'Idioma'**
   String get settings_lang_label;
 
-  /// Ajustes Idioma: opción del selector.
-  ///
-  /// In es, this message translates to:
-  /// **'Sistema'**
-  String get settings_lang_system;
-
   /// Ajustes Idioma: título del grupo.
   ///
   /// In es, this message translates to:

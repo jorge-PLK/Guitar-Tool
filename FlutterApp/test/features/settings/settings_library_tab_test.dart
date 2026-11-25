@@ -13,6 +13,7 @@ import 'package:toneforge/l10n/app_localizations.dart';
 import 'package:toneforge/shell/locale_pref.dart';
 import 'package:toneforge/theme/tokens.dart';
 import 'package:toneforge/theme/typography.dart';
+import 'package:toneforge/widgets/tf_dropdown.dart';
 
 import '../../support/harness.dart';
 
@@ -99,8 +100,9 @@ SettingsModelsState _models(List<ModelEntry> m) => SettingsModelsState(models: m
 final _both = _models([_installed, _pending]);
 
 class _Ctx {
-  _Ctx(this.container, this.library, this.models);
+  _Ctx(this.container, this.library, this.models, this.prefs);
 
+  final _MemoryLocalePrefs prefs;
   final ProviderContainer container;
   final _FakeLibrary library;
   final _FakeModels models;
@@ -112,8 +114,10 @@ Future<_Ctx> _pump(
   SettingsModelsState? models,
   String? chosen,
   CoreError? failure,
+  String systemLocale = 'es',
 }) async {
   await tester.runAsync(loadTfFonts);
+  final prefs = _MemoryLocalePrefs();
   setTestSurface(tester, const Size(1200, 1500));
   final lib = _FakeLibrary(library, chosen: chosen, failure: failure);
   final mod = _FakeModels(models ?? _both);
@@ -122,7 +126,7 @@ Future<_Ctx> _pump(
       settingsLibraryStoreProvider.overrideWith(() => lib),
       settingsModelsStoreProvider.overrideWith(() => mod),
       settingsToolsStoreProvider.overrideWith(_FakeTools.new),
-      localePrefStoreProvider.overrideWithValue(_MemoryLocalePrefs()),
+      localePrefStoreProvider.overrideWithValue(prefs),
     ],
   );
   addTearDown(c.dispose);
@@ -135,7 +139,11 @@ Future<_Ctx> _pump(
           return WidgetsApp(
             color: TfColors.bg,
             debugShowCheckedModeBanner: false,
-            locale: Locale(choice == LocaleChoice.en ? 'en' : 'es'),
+            locale: switch (choice) {
+              LocaleChoice.system => Locale(systemLocale),
+              LocaleChoice.es => const Locale('es'),
+              LocaleChoice.en => const Locale('en'),
+            },
             supportedLocales: AppLocalizations.supportedLocales,
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             pageRouteBuilder: <T>(RouteSettings s, WidgetBuilder b) => PageRouteBuilder<T>(
@@ -165,10 +173,13 @@ Future<_Ctx> _pump(
   );
   await tester.pump();
   await tester.pump();
-  return _Ctx(c, lib, mod);
+  return _Ctx(c, lib, mod, prefs);
 }
 
 AppLocalizations _l(WidgetTester tester) => AppLocalizations.of(tester.element(find.byType(SettingsLibraryTab)));
+
+final _dropdown = find.byType(TfDropdown<LocaleChoice>);
+final _shownLabel = find.descendant(of: _dropdown, matching: find.byType(Text)).last;
 
 Future<void> _settle(WidgetTester tester) async {
   await tester.pump();
@@ -317,11 +328,28 @@ void main() {
   testWidgets('English cambia el idioma al momento', (tester) async {
     final c = await _pump(tester);
     expect(c.container.read(localeChoiceProvider), LocaleChoice.system);
-    await tester.tap(find.text('English'));
-    await tester.pump();
-    await tester.pump();
+    await tester.tap(_dropdown);
+    await _settle(tester);
+    await tester.tap(find.text('English').last);
+    await _settle(tester);
     expect(c.container.read(localeChoiceProvider), LocaleChoice.en);
     expect(_l(tester).localeName, 'en');
     await expectLater(find.byKey(k5Boundary), matchesGoldenFile('goldens/settings_library_language_en.png'));
+  });
+
+  testWidgets('idioma: sin override y sistema en inglés, el desplegable muestra English', (tester) async {
+    final c = await _pump(tester, systemLocale: 'en');
+    expect(c.container.read(localeChoiceProvider), LocaleChoice.system);
+    expect(tester.widget<Text>(_shownLabel).data, 'English');
+  });
+
+  testWidgets('idioma: elegir Español guarda LocaleChoice.es aunque coincida con el sistema', (tester) async {
+    final c = await _pump(tester);
+    await tester.tap(_dropdown);
+    await _settle(tester);
+    await tester.tap(find.text('Español').last);
+    await _settle(tester);
+    expect(c.container.read(localeChoiceProvider), LocaleChoice.es);
+    expect(c.prefs.saved, LocaleChoice.es);
   });
 }

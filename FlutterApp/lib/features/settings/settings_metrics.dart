@@ -1,8 +1,5 @@
 /// Medidas propias de la pestaña Biblioteca de Ajustes (sin equivalente en los tokens del tema).
 abstract final class SettingsMetrics {
-  /// Ancho del selector segmentado de Idioma («Sistema», «Español», «English»): la ficha pide 260-300.
-  static const double languageSegmentWidth = 280;
-
   /// Alto mínimo del campo de la carpeta de proyectos (SettingsView.swift:114).
   static const double folderFieldMinHeight = 44;
 
