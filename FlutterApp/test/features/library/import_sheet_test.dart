@@ -170,14 +170,16 @@ void main() {
     expect(find.text('Black Album'), findsOneWidget);
     await tester.tap(find.text(_l.library_importChoose).first);
     expect(_store.chosen, 'a');
-    await expectLater(find.byType(WidgetsApp), matchesGoldenFile('goldens/import_sheet_spotify.png'));
+    await tester.pump(const Duration(milliseconds: 400));
+    await expectLater(find.byType(ImportSheetBody), matchesGoldenFile('goldens/import_sheet_spotify.png'));
   });
 
   testWidgets('vacía: ayuda y golden', (tester) async {
     await _open(tester, const LinkImportState());
     expect(find.text(_l.library_importSupported), findsOneWidget);
     expect(find.byType(ImportBanner), findsNothing);
-    await expectLater(find.byType(WidgetsApp), matchesGoldenFile('goldens/import_sheet_empty.png'));
+    await tester.pump(const Duration(milliseconds: 400));
+    await expectLater(find.byType(ImportSheetBody), matchesGoldenFile('goldens/import_sheet_empty.png'));
   });
 
   testWidgets('error de Spotify: banner y ayuda', (tester) async {

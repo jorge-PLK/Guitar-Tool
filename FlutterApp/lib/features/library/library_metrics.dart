@@ -19,4 +19,32 @@ abstract final class LibraryMetrics {
 
   /// Campo de enlace de la hoja (LinkImportSheet.swift:479-499).
   static const double linkFieldHeight = 40;
+
+  // --- E2: hoja de importación, candidatos y trabajando (LinkImportSheet.swift:597-757) ---
+
+  /// Portada de la cabecera de candidatos (LinkImportSheet.swift:643).
+  static const double importCoverSize = 104;
+
+  /// Alto máximo de la lista de candidatos con scroll (LinkImportSheet.swift:682).
+  static const double candidateListMaxHeight = 280;
+
+  /// Alto del botón «Abrir» de la banda de posible repetido y de la fila en biblioteca (LinkImportSheet.swift:620,712).
+  static const double importOpenHeight = 28;
+
+  /// Radio de la portada y de la tarjeta de confirmación (LinkImportSheet.swift:644,660).
+  static const double importCoverRadius = 10;
+
+  // --- G: hojas pequeñas (ArtistGrid.swift:164, RootView.swift:133) ---
+
+  /// Ancho de la hoja «Corregir título y artista» (ArtistGrid.swift:164).
+  static const double songInfoSheetWidth = 520;
+
+  /// Alto del botón «Cancelar» de esa hoja (ArtistGrid.swift:159).
+  static const double songInfoButtonHeight = 36;
+
+  /// Ancho de la hoja de primer arranque (RootView.swift:133).
+  static const double firstRunSheetWidth = 480;
+
+  /// Lado de la estrella de «mejor toma» (Text("★") en ProjectRecordingsView.swift:67, sin glifo en la fuente).
+  static const double bestStarSize = 14;
 }

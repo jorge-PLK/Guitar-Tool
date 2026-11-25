@@ -103,7 +103,7 @@ class _ImportSheetBodyState extends ConsumerState<ImportSheetBody> {
       LinkImportScreen.empty => ImportEmptyView(onClose: widget.onClose),
       LinkImportScreen.resolving => const ImportResolvingView(),
       LinkImportScreen.preparing => const ImportPreparingView(),
-      LinkImportScreen.candidates => const ImportCandidatesView(),
+      LinkImportScreen.candidates => ImportCandidatesView(onClose: widget.onClose),
       LinkImportScreen.working => const ImportWorkingView(),
       LinkImportScreen.error => ImportErrorView(onClose: widget.onClose),
       LinkImportScreen.done => ImportDoneView(onClose: widget.onClose),
