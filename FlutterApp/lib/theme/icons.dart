@@ -121,53 +121,78 @@ const Map<TfIcon, List<_Cmd>> _tfIconData = {
 int tfIconCommandCount(TfIcon icon) => _tfIconData[icon]?.length ?? 0;
 
 /// Icono de trazo. El tamaño escala el dibujo 24x24; el color pinta el trazo.
+/// Con [filled] (SwiftUI `.fill`) se rellenan los contornos cerrados y solo se traza lo abierto.
 class TfIconView extends StatelessWidget {
-  const TfIconView(this.icon, {super.key, this.size = 24, required this.color});
+  const TfIconView(this.icon, {super.key, this.size = 24, required this.color, this.filled = false});
 
   final TfIcon icon;
   final double size;
   final Color color;
+  final bool filled;
 
   @override
   Widget build(BuildContext context) {
     return CustomPaint(
       size: Size.square(size),
-      painter: _TfIconPainter(icon, color),
+      painter: _TfIconPainter(icon, color, filled),
     );
   }
 }
 
 class _TfIconPainter extends CustomPainter {
-  _TfIconPainter(this.icon, this.color);
+  _TfIconPainter(this.icon, this.color, this.filled);
 
   final TfIcon icon;
   final Color color;
+  final bool filled;
+
+  static void _apply(Path path, _Cmd c) {
+    switch (c) {
+      case _M(:final x, :final y):
+        path.moveTo(x, y);
+      case _L(:final x, :final y):
+        path.lineTo(x, y);
+      case _C(:final x1, :final y1, :final x2, :final y2, :final x, :final y):
+        path.cubicTo(x1, y1, x2, y2, x, y);
+      case _A(:final rx, :final ry, :final rotation, :final largeArc, :final sweep, :final x, :final y):
+        path.arcToPoint(
+          Offset(x, y),
+          radius: Radius.elliptical(rx, ry),
+          rotation: rotation,
+          largeArc: largeArc,
+          clockwise: sweep,
+        );
+      case _Z():
+        path.close();
+    }
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
     final cmds = _tfIconData[icon] ?? const <_Cmd>[];
-    final path = Path();
-    for (final c in cmds) {
-      switch (c) {
-        case _M(:final x, :final y):
-          path.moveTo(x, y);
-        case _L(:final x, :final y):
-          path.lineTo(x, y);
-        case _C(:final x1, :final y1, :final x2, :final y2, :final x, :final y):
-          path.cubicTo(x1, y1, x2, y2, x, y);
-        case _A(:final rx, :final ry, :final rotation, :final largeArc, :final sweep, :final x, :final y):
-          path.arcToPoint(
-            Offset(x, y),
-            radius: Radius.elliptical(rx, ry),
-            rotation: rotation,
-            largeArc: largeArc,
-            clockwise: sweep,
-          );
-        case _Z():
-          path.close();
+    final Path path = Path(); // todo (trazo) o solo los cerrados (relleno)
+    final Path open = Path(); // subtrazados abiertos, solo en modo relleno
+    if (filled) {
+      final List<_Cmd> sub = <_Cmd>[];
+      void flush() {
+        final Path target = sub.isNotEmpty && sub.last is _Z ? path : open;
+        for (final _Cmd c in sub) {
+          _apply(target, c);
+        }
+        sub.clear();
+      }
+
+      for (final _Cmd c in cmds) {
+        if (c is _M) flush();
+        sub.add(c);
+      }
+      flush();
+    } else {
+      for (final _Cmd c in cmds) {
+        _apply(path, c);
       }
     }
-    final paint = Paint()
+    final Paint stroke = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2
@@ -175,10 +200,15 @@ class _TfIconPainter extends CustomPainter {
       ..strokeJoin = StrokeJoin.round;
     canvas.save();
     canvas.scale(size.width / 24, size.height / 24);
-    canvas.drawPath(path, paint);
+    if (filled) {
+      canvas.drawPath(path, Paint()..color = color..style = PaintingStyle.fill);
+      canvas.drawPath(open, stroke);
+    } else {
+      canvas.drawPath(path, stroke);
+    }
     canvas.restore();
   }
 
   @override
-  bool shouldRepaint(_TfIconPainter old) => old.icon != icon || old.color != color;
+  bool shouldRepaint(_TfIconPainter old) => old.icon != icon || old.color != color || old.filled != filled;
 }
