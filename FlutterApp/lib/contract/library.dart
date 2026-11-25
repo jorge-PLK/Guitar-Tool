@@ -1,4 +1,5 @@
 import '../core/core_client.dart' show Json;
+import 'json_read.dart';
 
 export 'library_detail.dart';
 export 'library_storage.dart';
@@ -22,13 +23,6 @@ enum SeparationState {
     orElse: () => SeparationState.unknown,
   );
 }
-
-/// Decodificadores compartidos por los ficheros `library*.dart`.
-double jsonDouble(Object? v) => (v as num).toDouble();
-double? jsonOptDouble(Object? v) => (v as num?)?.toDouble();
-List<T> jsonList<T>(Object? raw, T Function(Json) decode) => List.unmodifiable([
-  for (final e in raw as List<Object?>) decode(e as Json),
-]);
 
 /// Resumen de tema (`library.list`, `library.project` aplanado).
 class ProjectSummary {

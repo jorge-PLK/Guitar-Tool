@@ -1,0 +1,44 @@
+{
+  "error" : {
+    "code" : "offline",
+    "detail" : "No se ha podido conectar. Comprueba la red y reintenta.",
+    "suggestsUpdate" : false,
+    "title" : "Sin conexión"
+  },
+  "isLive" : false,
+  "items" : [
+
+  ],
+  "kind" : "playlist",
+  "mayBeTruncated" : false,
+  "name" : "Mi lista",
+  "progress" : 0,
+  "source" : "spotify",
+  "step" : "error",
+  "summary" : {
+    "cancelled" : false,
+    "failed" : 0,
+    "imported" : 0,
+    "inLibrary" : 0,
+    "remaining" : 0,
+    "skipped" : 0
+  },
+  "totals" : {
+    "duplicates" : 0,
+    "failed" : 0,
+    "imported" : 0,
+    "inLibrary" : 0,
+    "queued" : 0,
+    "remaining" : 0,
+    "selected" : 0,
+    "skipped" : 0,
+    "total" : 0
+  },
+  "update" : {
+    "alreadyLatest" : false,
+    "updating" : false
+  },
+  "warnings" : [
+
+  ]
+}

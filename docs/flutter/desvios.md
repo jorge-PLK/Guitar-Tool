@@ -20,7 +20,7 @@ Estado a comprobar al empezar la ola 0 contra `docs/plan/fase-7c.md` («Condici�
 | --- | --- | --- | --- | --- |
 | B1 | Separador de guitarras en Windows (`guitarSplitter`) | 2 | núcleo | a comprobar |
 | B2 | Cambio de carpeta de proyectos en caliente (`Library.relocate`) | 1 | núcleo | a comprobar |
-| B3 | Primer arranque: proponer y crear `~/Music/ToneForge` | 1 | núcleo | a comprobar |
+| B3 | Primer arranque: proponer y crear `~/Music/ToneForge` | 1 | núcleo | resuelto (83f61a5): `app.info.proposedProjectsFolder` por plataforma; falta comprobar `URL.path` en Windows |
 | B4 | Fotos de artista por `AppCore` | 1 | núcleo | a comprobar |
 | B6 | Cierre ordenado (`terminateAll`, `flush`) | 0 | núcleo | a comprobar |
 | A1 | Cámaras en Ajustes del Mac por `AppCore` (`resolvedCameras`) | 3 | núcleo | abierto |
@@ -38,9 +38,9 @@ Vienen del apartado 9 de las fichas de `pantallas/`. La clase sigue [decisiones-
 | --- | --- | --- | --- | --- | --- |
 | N1 | Todas | Textos de error y avisos del núcleo en español: pasar a `{code, message, args}` (`mensajes-nucleo.md`) | hueco claro (decidido, ADR-021, 16) | 1 | ADR-021 |
 | N2 | Grabar, Ajustes, Montaje | Canal de píxeles BGRA por FFI en lugar de `frames.*` en JPEG | hueco claro (decidido, ADR-021, 8) | 3 | ADR-021 |
-| L1 | Biblioteca | Marcar la mejor toma desde la lista: `record.markBest` exige sesión de Grabar; falta `library.markBest` que avise a Grabar/estudio si el tema está abierto | hueco claro | 1 | b:1 |
-| L2 | Biblioteca | Borrar un tema abierto en estudio: `library.trash`/`delete` deben cerrar la sesión y soltar ficheros (en Windows, bloqueo NTFS sin confirmar; lo prueba Jorge) | hueco claro | 1 | b:2 |
-| L3 | Biblioteca | `ProjectSummary` sin `separationError`; falta el campo para el texto del fallo en la lista | hueco claro | 1 | b:3 |
+| L1 | Biblioteca | Marcar la mejor toma desde la lista: `record.markBest` exige sesión de Grabar; falta `library.markBest` que avise a Grabar/estudio si el tema está abierto | hueco claro, resuelto (71a46fa) | 1 | b:1 |
+| L2 | Biblioteca | Borrar un tema abierto en estudio: `library.trash`/`delete` deben cerrar la sesión y soltar ficheros (en Windows, bloqueo NTFS sin confirmar; lo prueba Jorge) | hueco claro, resuelto (71a46fa); falta comprobar en Windows | 1 | b:2 |
+| L3 | Biblioteca | `ProjectSummary` sin `separationError`; falta el campo para el texto del fallo en la lista | hueco claro, resuelto (71a46fa) | 1 | b:3 |
 | L6 | Biblioteca | Selección de tema (`backingTarget`): se limpia al borrar y si el id desaparece de `library.list` | interfaz en Dart | 1 | b:6 |
 | L7 | Biblioteca | Búsqueda, agrupación por artista y plegado; agrupación en preferencias locales; paridad de plegado y orden con `LibraryGrouping` | interfaz en Dart | 1 | b:7 |
 | L11 | Biblioteca | Carátulas y fotos: se leen por ruta de fichero (`Image.file`), no por `mediaBase` (antes «decisión de Jorge») | interfaz en Dart (resuelto) | 1 | b:11 |
@@ -90,6 +90,14 @@ Vienen del apartado 9 de las fichas de `pantallas/`. La clase sigue [decisiones-
 | AJ8 | Ajustes · Audio | Tarjeta de salida de la barra lateral deducida de `audio.settings` y `audio.devices` (la implementa la carcasa) | interfaz en Dart | 3 | a:8 |
 | FC1 | Grabar, Montaje | `FrameChannel` no da el tamaño del fotograma ni avisa del cambio de `textureId`; `TfVideoSurface` recibe `frameSize` por parámetro | hueco claro | 3, 4 | resolver en Grabar B (ola 3) y Montaje P2 (ola 4) |
 | AJ9 | Ajustes · Vídeo | Texto del botón de permisos de cámara en Windows: variante por plataforma en ARB (por analogía con «Finder»/«Explorador»; no lo cita `decisiones-interfaz.md`) | interfaz en Dart | 3 | a:9 |
+
+Abiertos al cerrar la ola 1, para la ola 5 (mensajes del núcleo por código):
+
+| Id | Pantalla | Qué | Clase | Ola | Ficha |
+| --- | --- | --- | --- | --- | --- |
+| L14 | Biblioteca, importación | `AppCore` no emite `args` en ningún `RPCError`. Dart lee `version`, `name`, `status` y `retryAfter` de `args` (nombres supuestos de `SourceError` y `SpotifySearchError`) y, si faltan, cae a una expresión regular sobre `message`. `LinkFailure` (contrato) no lee `args` | hueco claro (N1) | 5 | N1 |
+| L15 | Biblioteca, importación | El aviso genérico de importación sale sin título (`ImportNotice` sin `title`) y las filas fallidas de una lista muestran `error.title` y `error.detail` del núcleo sin traducir por `code` | hueco claro (N1) | 5 | N1 |
+| L16 | Biblioteca | Portada de fila: Flutter usa `ProjectSummary.cover`; SwiftUI mira siempre `<carpeta>/source/cover.jpg` (`LibraryView.swift:412-415`). Puede diferir si `cover` falta y el fichero existe | se mide (ola 5) | 5 | b:40 |
 
 Pendiente (menor, sin hacer):
 

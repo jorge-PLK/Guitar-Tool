@@ -236,6 +236,12 @@ abstract class AppLocalizations {
   /// **'Se borrarán tomas descartadas y stems por {bytes}. Los stems se pueden volver a generar.'**
   String library_cleanMessage(String bytes);
 
+  /// Cabecera: título del diálogo de limpieza de toda la biblioteca (SettingsView:131).
+  ///
+  /// In es, this message translates to:
+  /// **'Limpiar toda la biblioteca'**
+  String get library_cleanTitleAll;
+
   /// Cabecera: título del diálogo de limpieza de un tema.
   ///
   /// In es, this message translates to:
@@ -806,6 +812,12 @@ abstract class AppLocalizations {
   /// **'Ningún tema coincide con «{query}»'**
   String library_noMatch(String query);
 
+  /// Diálogos y avisos: título genérico de un aviso de error del núcleo.
+  ///
+  /// In es, this message translates to:
+  /// **'Aviso'**
+  String get library_noticeTitle;
+
   /// Diálogos y avisos: botón del aviso.
   ///
   /// In es, this message translates to:
@@ -917,7 +929,7 @@ abstract class AppLocalizations {
   /// Lista: estado de fila descargando.
   ///
   /// In es, this message translates to:
-  /// **'Descargando'**
+  /// **'Descargando…'**
   String get library_plDownloading;
 
   /// Lista: estado de fila descargando con porcentaje.
@@ -1393,6 +1405,36 @@ abstract class AppLocalizations {
   /// In es, this message translates to:
   /// **'Vídeo no disponible'**
   String get library_srcRemovedTitle;
+
+  /// Búsqueda en Spotify: respuesta inesperada (spotify-bad-response).
+  ///
+  /// In es, this message translates to:
+  /// **'Spotify ha devuelto una respuesta inesperada'**
+  String get library_spotifyBadResponse;
+
+  /// Búsqueda en Spotify: sin credenciales (spotify-missing-credentials).
+  ///
+  /// In es, this message translates to:
+  /// **'Búsqueda en Spotify no disponible: falta la clave (.env)'**
+  String get library_spotifyMissingCredentials;
+
+  /// Búsqueda en Spotify: sin red (spotify-offline).
+  ///
+  /// In es, this message translates to:
+  /// **'Sin conexión con Spotify'**
+  String get library_spotifyOffline;
+
+  /// Búsqueda en Spotify: límite de peticiones (spotify-rate-limited).
+  ///
+  /// In es, this message translates to:
+  /// **'Spotify pide esperar {seconds} s'**
+  String library_spotifyRateLimited(int seconds);
+
+  /// Búsqueda en Spotify: clave rechazada (spotify-rejected).
+  ///
+  /// In es, this message translates to:
+  /// **'Spotify ha rechazado la clave'**
+  String get library_spotifyRejected;
 
   /// Errores de fuente: detalle.
   ///
@@ -3391,12 +3433,6 @@ abstract class AppLocalizations {
   /// **'Idioma'**
   String get settings_lang_label;
 
-  /// Ajustes Idioma: opción del selector.
-  ///
-  /// In es, this message translates to:
-  /// **'Sistema'**
-  String get settings_lang_system;
-
   /// Ajustes Idioma: título del grupo.
   ///
   /// In es, this message translates to:
@@ -3624,6 +3660,18 @@ abstract class AppLocalizations {
   /// In es, this message translates to:
   /// **'actualizada'**
   String get settings_tools_updated;
+
+  /// Ajustes Fuentes externas: resultado de actualizar (AppModel.swift:677).
+  ///
+  /// In es, this message translates to:
+  /// **'yt-dlp actualizado a {version}.'**
+  String settings_tools_updateDone(String version);
+
+  /// Ajustes Fuentes externas: ya estaba al día (AppModel.swift:678).
+  ///
+  /// In es, this message translates to:
+  /// **'Ya tienes la última versión ({version}).'**
+  String settings_tools_upToDate(String version);
 
   /// Ancla del bloque error: añade las claves del área debajo, en orden alfabético; no edites otros bloques.
   ///

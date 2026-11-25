@@ -101,6 +101,9 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
+  String get library_cleanTitleAll => 'Limpiar toda la biblioteca';
+
+  @override
   String library_cleanTitle(String title) {
     return 'Limpiar «$title»';
   }
@@ -421,6 +424,9 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
+  String get library_noticeTitle => 'Aviso';
+
+  @override
   String get library_noticeOk => 'Aceptar';
 
   @override
@@ -482,7 +488,7 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String get library_plDownloading => 'Descargando';
+  String get library_plDownloading => 'Descargando…';
 
   @override
   String library_plDownloadingPercent(String percent) {
@@ -772,6 +778,25 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get library_srcRemovedTitle => 'Vídeo no disponible';
+
+  @override
+  String get library_spotifyBadResponse =>
+      'Spotify ha devuelto una respuesta inesperada';
+
+  @override
+  String get library_spotifyMissingCredentials =>
+      'Búsqueda en Spotify no disponible: falta la clave (.env)';
+
+  @override
+  String get library_spotifyOffline => 'Sin conexión con Spotify';
+
+  @override
+  String library_spotifyRateLimited(int seconds) {
+    return 'Spotify pide esperar $seconds s';
+  }
+
+  @override
+  String get library_spotifyRejected => 'Spotify ha rechazado la clave';
 
   @override
   String get library_srcSpotifyUnreadableDetail =>
@@ -2033,9 +2058,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settings_lang_label => 'Idioma';
 
   @override
-  String get settings_lang_system => 'Sistema';
-
-  @override
   String get settings_lang_title => 'Idioma';
 
   @override
@@ -2163,6 +2185,16 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get settings_tools_updated => 'actualizada';
+
+  @override
+  String settings_tools_updateDone(String version) {
+    return 'yt-dlp actualizado a $version.';
+  }
+
+  @override
+  String settings_tools_upToDate(String version) {
+    return 'Ya tienes la última versión ($version).';
+  }
 
   @override
   String get errorAnchor => '';

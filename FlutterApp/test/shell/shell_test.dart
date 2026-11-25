@@ -2,12 +2,18 @@ import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:toneforge/app.dart';
+import 'package:toneforge/contract/library.dart';
+import 'package:toneforge/core/core_providers.dart';
 import 'package:toneforge/core/launch_options.dart';
+import 'package:toneforge/core/mock_core.dart';
 import 'package:toneforge/features/backing/backing_screen.dart';
 import 'package:toneforge/features/library/library_screen.dart';
+import 'package:toneforge/features/library/library_store.dart';
 import 'package:toneforge/features/montage/montage_screen.dart';
 import 'package:toneforge/features/record/record_screen.dart';
 import 'package:toneforge/features/settings/settings_audio_tab.dart';
@@ -15,9 +21,12 @@ import 'package:toneforge/features/settings/settings_library_tab.dart';
 import 'package:toneforge/features/settings/settings_screen.dart';
 import 'package:toneforge/features/settings/settings_video_tab.dart';
 import 'package:toneforge/features/tab/tab_screen.dart';
+import 'package:toneforge/shell/library_detail.dart';
+import 'package:toneforge/shell/selected_project.dart';
 import 'package:toneforge/shell/shell_providers.dart';
 import 'package:toneforge/shell/shell_route.dart';
 import 'package:toneforge/shell/snapshot.dart';
+import 'package:toneforge/widgets/tf_sidebar_cards.dart';
 
 import '../support/shell_harness.dart';
 
@@ -59,6 +68,73 @@ void main() {
       await pumpShell(tester, options: const LaunchOptions(mock: true, locale: 'en'));
       expect(find.text('Library'), findsWidgets);
       expect(find.text('Biblioteca'), findsNothing);
+    });
+  });
+
+  group('shell soltar ficheros', () {
+    Future<void> send(WidgetTester tester, String method, Object? args) async {
+      await tester.binding.defaultBinaryMessenger.handlePlatformMessage(
+        'desktop_drop',
+        const StandardMethodCodec().encodeMethodCall(MethodCall(method, args)),
+        (_) {},
+      );
+      await tester.pump();
+    }
+
+    testWidgets('soltar en cualquier sección importa solo wav/flac/mp3', (tester) async {
+      final c = await pumpShell(tester, options: const LaunchOptions(mock: true, locale: 'es', screen: 'settings'));
+      await send(tester, 'entered', <double>[700, 400]);
+      await send(tester, 'performOperation', <String>['/x/a.wav', '/x/b.txt', '/x/c.mp3']);
+      final core = c.read(coreClientProvider) as MockCore;
+      final paths = [
+        for (final call in core.calls)
+          if (call.method == 'import.file') (call.params as Map)['path'],
+      ];
+      expect(paths, <Object?>['/x/a.wav', '/x/c.mp3']);
+    });
+  });
+
+  group('shell tarjeta del tema seleccionado', () {
+    Future<ProjectSummary> firstEntry(WidgetTester tester, ProviderContainer c) async {
+      c.read(libraryStoreProvider);
+      for (var i = 0; i < 40 && c.read(libraryStoreProvider).entries.isEmpty; i++) {
+        await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 25)));
+        await tester.pump();
+      }
+      return c.read(libraryStoreProvider).entries.first;
+    }
+
+    testWidgets('oculta sin selección, visible y activa según el detalle', (tester) async {
+      final c = await pumpShell(tester);
+      final e = await firstEntry(tester, c);
+      expect(find.byType(TfSelectedTrackCard), findsNothing);
+
+      c.read(selectedProjectProvider.notifier).select(e.id);
+      await tester.pump();
+      expect(find.byType(TfSelectedTrackCard), findsOneWidget);
+      expect(tester.widget<TfSelectedTrackCard>(find.byType(TfSelectedTrackCard)).active, isFalse);
+
+      await tester.tap(find.byType(TfSelectedTrackCard));
+      await tester.pump();
+      expect(c.read(libraryDetailProvider), e.id);
+      expect(c.read(shellRouteProvider), ShellRoute.library);
+      expect(tester.widget<TfSelectedTrackCard>(find.byType(TfSelectedTrackCard)).active, isTrue);
+
+      await tester.tap(find.text('Biblioteca').first);
+      await tester.pump();
+      expect(c.read(libraryDetailProvider), isNull);
+      expect(tester.widget<TfSelectedTrackCard>(find.byType(TfSelectedTrackCard)).active, isFalse);
+    });
+
+    testWidgets('pulsarla desde otra sección abre el detalle en Biblioteca', (tester) async {
+      final c = await pumpShell(tester, options: const LaunchOptions(mock: true, locale: 'es', screen: 'montage'));
+      final e = await firstEntry(tester, c);
+      c.read(selectedProjectProvider.notifier).select(e.id);
+      await tester.pump();
+      await tester.tap(find.byType(TfSelectedTrackCard));
+      await tester.pump();
+      expect(c.read(shellRouteProvider), ShellRoute.library);
+      expect(c.read(libraryDetailProvider), e.id);
     });
   });
 

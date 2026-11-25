@@ -124,6 +124,13 @@ final class BridgeTests: XCTestCase {
         XCTAssertEqual(launch["screen"] as? String, "library")
         XCTAssertEqual(launch["snapshot"] as? Bool, true)
         XCTAssertTrue(["macos", "windows"].contains(r["platform"] as? String ?? ""))
+        // La propuesta del primer arranque sale del núcleo: la misma que abre `host.pickProjectsFolder`.
+        XCTAssertEqual(r["proposedProjectsFolder"] as? String, b.proposedFolder.path)
+        XCTAssertTrue((r["proposedProjectsFolder"] as? String ?? "").hasSuffix("ToneForge"))
+        b.proposedFolder = root.appendingPathComponent("Prop")
+        let r2Raw = await call(b, #"{"id":2,"method":"app.info"}"#)
+        let r2 = try XCTUnwrap(r2Raw["result"] as? [String: Any])
+        XCTAssertEqual(r2["proposedProjectsFolder"] as? String, root.appendingPathComponent("Prop").path)
     }
 
     func testListAndDetail() async throws {

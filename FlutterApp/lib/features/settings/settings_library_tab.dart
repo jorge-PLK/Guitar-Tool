@@ -1,18 +1,25 @@
 import 'package:flutter/widgets.dart';
-import 'package:toneforge/l10n/app_localizations.dart';
-import 'package:toneforge/shell/shell_route.dart';
-import 'package:toneforge/theme/icons.dart';
-import 'package:toneforge/widgets/tf_state_message.dart';
+import 'package:toneforge/theme/tokens.dart';
 
-/// Pestaña provisional de Ajustes: la sustituye su ola.
+import 'widgets/language_group.dart';
+import 'widgets/library_folder_group.dart';
+import 'widgets/models_group.dart';
+import 'widgets/tools_group.dart';
+
+/// Pestaña Biblioteca de Ajustes (SettingsView.swift:83-193): carpeta, modelos, fuentes externas e idioma.
 class SettingsLibraryTab extends StatelessWidget {
   const SettingsLibraryTab({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return TfStateMessage(
-      icon: TfIcon.folder,
-      text: SettingsTab.library.label(AppLocalizations.of(context)),
+    return const Column(
+      spacing: TfSpace.s20,
+      children: <Widget>[
+        LibraryFolderGroup(),
+        ModelsGroup(),
+        ToolsGroup(),
+        LanguageGroup(),
+      ],
     );
   }
 }

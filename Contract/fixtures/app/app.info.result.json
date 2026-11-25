@@ -5,5 +5,6 @@
   "mediaBase" : "https://tf.media/",
   "platform" : "macos",
   "projectsFolder" : "/<dir>/Projects",
+  "proposedProjectsFolder" : "/<dir>/Music/ToneForge",
   "version" : "0.1.0"
 }

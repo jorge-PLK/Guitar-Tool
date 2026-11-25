@@ -71,6 +71,8 @@ struct FixtureRig {
                                    levelMeter: nil, analyzer: nil, guitarSplitter: nil)
         bridge = try Bridge(options: LaunchOptions(projectsFolder: projects, supportDir: dir.appendingPathComponent("Support")),
                             mediaBase: "https://tf.media/", reveal: nil, services: services)
+        // La propuesta real depende del usuario: bajo el temporal sale igual en cualquier máquina.
+        bridge.proposedFolder = dir.appendingPathComponent("Music/ToneForge", isDirectory: true)
     }
 
     func cleanup() { try? FileManager.default.removeItem(at: dir) }

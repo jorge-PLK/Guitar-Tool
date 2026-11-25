@@ -1,0 +1,51 @@
+{
+  "added" : "4CJwzwOIPAY",
+  "resolution" : {
+    "artist" : "Marea",
+    "candidates" : [
+      {
+        "artist" : "Marea",
+        "difference" : 0,
+        "duration" : 253,
+        "id" : "4CJwzwOIPAY",
+        "isClose" : true,
+        "isLive" : false,
+        "source" : "youtube",
+        "thumbnail" : "https://i.ytimg.com/vi/4CJwzwOIPAY/mqdefault.jpg",
+        "title" : "La luna me sabe a poco",
+        "url" : "https://www.youtube.com/watch?v=4CJwzwOIPAY"
+      },
+      {
+        "artist" : "Marea",
+        "difference" : -0.80000000000001137,
+        "duration" : 252.19999999999999,
+        "id" : "aaaaaaaaaaa",
+        "isClose" : true,
+        "isLive" : false,
+        "source" : "youtube",
+        "thumbnail" : "https://i.ytimg.com/vi/aaaaaaaaaaa/mqdefault.jpg",
+        "title" : "Marea - La luna me sabe a poco (Audio oficial)",
+        "url" : "https://www.youtube.com/watch?v=aaaaaaaaaaa"
+      },
+      {
+        "artist" : "Marea",
+        "difference" : 48,
+        "duration" : 301,
+        "id" : "bbbbbbbbbbb",
+        "isClose" : false,
+        "isLive" : true,
+        "source" : "youtube",
+        "thumbnail" : "https://i.ytimg.com/vi/bbbbbbbbbbb/mqdefault.jpg",
+        "title" : "Marea - La luna me sabe a poco (Directo)",
+        "url" : "https://www.youtube.com/watch?v=bbbbbbbbbbb"
+      }
+    ],
+    "duration" : 253,
+    "link" : "spotify",
+    "noCloseCandidate" : false,
+    "pastedURL" : "https://open.spotify.com/track/3demoDemoDemoDemoDemox",
+    "thumbnail" : "https://img.test/cover.webp",
+    "title" : "La luna me sabe a poco"
+  },
+  "selectable" : true
+}

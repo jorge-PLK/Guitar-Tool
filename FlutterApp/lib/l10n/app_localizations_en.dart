@@ -101,6 +101,9 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get library_cleanTitleAll => 'Clean the whole library';
+
+  @override
   String library_cleanTitle(String title) {
     return 'Clean “$title”';
   }
@@ -417,6 +420,9 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get library_noticeTitle => 'Notice';
+
+  @override
   String get library_noticeOk => 'OK';
 
   @override
@@ -478,7 +484,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get library_plDownloading => 'Downloading';
+  String get library_plDownloading => 'Downloading…';
 
   @override
   String library_plDownloadingPercent(String percent) {
@@ -764,6 +770,25 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get library_srcRemovedTitle => 'Video unavailable';
+
+  @override
+  String get library_spotifyBadResponse =>
+      'Spotify returned an unexpected response';
+
+  @override
+  String get library_spotifyMissingCredentials =>
+      'Spotify search unavailable: the key (.env) is missing';
+
+  @override
+  String get library_spotifyOffline => 'No connection to Spotify';
+
+  @override
+  String library_spotifyRateLimited(int seconds) {
+    return 'Spotify asks to wait $seconds s';
+  }
+
+  @override
+  String get library_spotifyRejected => 'Spotify rejected the key';
 
   @override
   String get library_srcSpotifyUnreadableDetail =>
@@ -2020,9 +2045,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settings_lang_label => 'Language';
 
   @override
-  String get settings_lang_system => 'System';
-
-  @override
   String get settings_lang_title => 'Language';
 
   @override
@@ -2151,6 +2173,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settings_tools_updated => 'up to date';
+
+  @override
+  String settings_tools_updateDone(String version) {
+    return 'yt-dlp updated to $version.';
+  }
+
+  @override
+  String settings_tools_upToDate(String version) {
+    return 'You already have the latest version ($version).';
+  }
 
   @override
   String get errorAnchor => '';
