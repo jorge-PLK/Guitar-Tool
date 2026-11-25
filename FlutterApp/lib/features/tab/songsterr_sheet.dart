@@ -6,6 +6,7 @@ import 'package:toneforge/contract/tab.dart';
 import 'package:toneforge/features/tab/songsterr_choosing.dart';
 import 'package:toneforge/features/tab/songsterr_failed.dart';
 import 'package:toneforge/features/tab/songsterr_pairing.dart';
+import 'package:toneforge/features/tab/songsterr_preview.dart';
 import 'package:toneforge/features/tab/songsterr_store.dart';
 import 'package:toneforge/features/tab/songsterr_working.dart';
 import 'package:toneforge/l10n/app_localizations.dart';
@@ -123,10 +124,13 @@ class _SongsterrSheetState extends ConsumerState<SongsterrSheet> {
                 ),
               ),
               if (preview)
-                // SLOT: SongsterrPreview (recibe `sheet.selected` y `previewWidth`)
                 SizedBox(
                   key: const ValueKey<String>('songsterr-preview-slot'),
                   width: previewWidth,
+                  child: SongsterrPreview(
+                    selected: sheet?.selected,
+                    onClose: () => setState(() => _previewOpen = false),
+                  ),
                 ),
             ],
           ),

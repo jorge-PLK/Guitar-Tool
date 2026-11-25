@@ -14,6 +14,7 @@ import 'package:toneforge/theme/tokens.dart';
 import 'package:toneforge/widgets/tf_buttons.dart';
 import 'package:toneforge/widgets/tf_progress.dart';
 
+import '../../../support/fake_web_view.dart';
 import '../../../support/harness.dart';
 import '../tab_test_support.dart';
 
@@ -32,10 +33,12 @@ Future<Rig> boot(
   Map<String, Object?> patch = const {},
   Size size = const Size(1400, 800),
   bool open = true,
+  FakeWebViewFactory? web,
 }) async {
   setTestSurface(tester, size);
   final core = (await tester.runAsync(loadCore))!;
   final container = ProviderContainer(overrides: [
+    (web ?? FakeWebViewFactory()).override,
     coreClientProvider.overrideWithValue(core),
     tabStudyProjectProvider.overrideWith((ref) => ref.watch(studyProjectProbe)),
   ]);
