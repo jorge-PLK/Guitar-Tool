@@ -77,6 +77,7 @@ final class TabScoreResult {
     required this.trackIndex,
     required this.trackIDs,
     required this.revision,
+    this.timing,
   });
 
   factory TabScoreResult.fromJson(Json j) => TabScoreResult(
@@ -84,13 +85,32 @@ final class TabScoreResult {
         trackIndex: _i(j['trackIndex']),
         trackIDs: _strs(j['trackIDs']),
         revision: _i(j['revision']),
+        timing: _opt(j['timing'], TabTiming.fromJson),
       );
+
+  /// Tiempos reales de pulso (null si el núcleo no los tiene).
+  final TabTiming? timing;
 
   /// Partitura `tf-score` v1 como cadena JSON, sin modelar (la consume alphaTab).
   final String json;
   final int trackIndex;
   final List<String> trackIDs;
   final int revision;
+}
+
+/// Inicio (s) de cada pulso en orden de rejilla, pulsos por compás y fin de la canción.
+final class TabTiming {
+  const TabTiming({required this.beats, required this.beatsPerBar, required this.end});
+
+  factory TabTiming.fromJson(Json j) => TabTiming(
+        beats: [for (final e in j['beats']! as List<Object?>) _d(e)],
+        beatsPerBar: _ints(j['beatsPerBar']),
+        end: _d(j['end']),
+      );
+
+  final List<double> beats;
+  final List<int> beatsPerBar;
+  final double end;
 }
 
 final class TabQueuedResult {

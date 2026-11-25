@@ -296,6 +296,10 @@ void main() => group('contract · tab', () {
     expect(r.revision, 3);
     final score = jsonDecode(r.json) as Map<String, Object?>;
     expect(score['version'], 1);
+    expect(r.timing!.beats.length, 17);
+    expect(r.timing!.beatsPerBar, [1, 4, 4, 4, 4]);
+    expect(r.timing!.end, 8.5);
+    expect(TabScoreResult.fromJson({..._load('tab.score.result'), 'timing': null}).timing, isNull);
   });
 
   test('tab.progress: estado y fracción', () {

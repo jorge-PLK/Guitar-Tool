@@ -169,6 +169,20 @@ void main() {
     expect(r.js.last, 'TF.setCursorTime(2.5, true);');
   });
 
+  test('cursor con timing: TF.setCursor(compás, fracción) por los tiempos de pulso', () async {
+    final r = await boot();
+    await r.state();
+    r.msg({'event': 'rendered'});
+    // fixture: pulsos cada 0.5 s, compases de [1,4,4,4,4] pulsos, fin 8.5
+    r.position(1.0);
+    expect(r.js.last, 'TF.setCursor(1, 0.25, true);');
+    r.position(1.25);
+    expect(r.js.last, 'TF.setCursor(1, 0.375, true);');
+    r.position(99, playing: true);
+    expect(r.js.last, 'TF.setCursor(4, 1.0, true);');
+    expect(r.js.where((j) => j.startsWith('TF.setCursorTime')), isEmpty);
+  });
+
   test('tab.selection y tab.range llegan al lienzo; sin selección = -1', () async {
     final r = await boot();
     r.core.emit('tab.selection', {'bar': 3, 'fraction': 0.5});
