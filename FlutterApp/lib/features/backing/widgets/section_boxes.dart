@@ -7,6 +7,8 @@ import 'package:toneforge/features/backing/widgets/chord_grid_painter.dart';
 import 'package:toneforge/features/backing/widgets/chord_strip.dart';
 import 'package:toneforge/features/backing/widgets/section_boxes_geometry.dart';
 import 'package:toneforge/features/backing/widgets/section_boxes_painter.dart';
+import 'package:toneforge/features/backing/widgets/section_edge_drag.dart';
+import 'package:toneforge/features/backing/widgets/section_edge_handles.dart';
 import 'package:toneforge/features/backing/widgets/section_selection.dart';
 import 'package:toneforge/theme/icons.dart';
 import 'package:toneforge/theme/tokens.dart';
@@ -35,11 +37,12 @@ class StripSectionBoxes extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final StudyAnalysisInfo? a = ref.watch(studyStoreProvider.select((s) => s.study?.analysis));
-    final List<StudySectionInfo> sections =
+    final List<StudySectionInfo> sections = ref.watch(sectionEdgePreviewProvider) ??
         ref.watch(studyStoreProvider.select((s) => s.study?.sections ?? const <StudySectionInfo>[]));
     if (a == null) return const SizedBox.shrink();
     return SectionBoxesLayer(
       placements: SectionBoxesGeometry.strip(sections, a.chords, layout),
+      mapper: StripEdgeMapper(chords: a.chords, layout: layout),
       onOpenSection: onOpenSection,
     );
   }
@@ -65,7 +68,7 @@ class _GridSectionBoxesState extends ConsumerState<GridSectionBoxes> {
   @override
   Widget build(BuildContext context) {
     final StudyAnalysisInfo? a = ref.watch(studyStoreProvider.select((s) => s.study?.analysis));
-    final List<StudySectionInfo> sections =
+    final List<StudySectionInfo> sections = ref.watch(sectionEdgePreviewProvider) ??
         ref.watch(studyStoreProvider.select((s) => s.study?.sections ?? const <StudySectionInfo>[]));
     if (a == null) return const SizedBox.shrink();
     if (!identical(a, _analysis)) {
@@ -81,6 +84,7 @@ class _GridSectionBoxesState extends ConsumerState<GridSectionBoxes> {
     }
     return SectionBoxesLayer(
       placements: SectionBoxesGeometry.grid(sections, _rows, widget.geometry),
+      mapper: GridEdgeMapper(rows: _rows, geometry: widget.geometry),
       onOpenSection: widget.onOpenSection,
     );
   }
@@ -88,9 +92,12 @@ class _GridSectionBoxesState extends ConsumerState<GridSectionBoxes> {
 
 /// Pinta los trozos ya colocados y gestiona la selección por clic en la cabecera (SB:96).
 class SectionBoxesLayer extends ConsumerWidget {
-  const SectionBoxesLayer({required this.placements, this.onOpenSection, super.key});
+  const SectionBoxesLayer({required this.placements, this.mapper, this.onOpenSection, super.key});
 
   final List<SectionPlacement> placements;
+
+  /// Posición → tiempo para las asas de borde; sin él no hay asas.
+  final EdgeTimeMapper? mapper;
   final void Function(String id)? onOpenSection;
 
   @override
@@ -116,6 +123,14 @@ class SectionBoxesLayer extends ConsumerWidget {
                 onOpenSection?.call(placements[i].section.id);
               },
             ),
+          ),
+        if (mapper != null && selected != null)
+          ...sectionEdgeHandles(
+            pieces: <SectionPlacement>[
+              for (final SectionPlacement p in placements)
+                if (p.section.id == selected) p,
+            ],
+            mapper: mapper!,
           ),
       ],
     );
