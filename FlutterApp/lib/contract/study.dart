@@ -9,6 +9,7 @@ import 'package:toneforge/core/core_client.dart' show Json;
 part 'study_analysis.dart';
 part 'study_events.dart';
 part 'study_params.dart';
+part 'study_params_edits.dart';
 part 'study_types.dart';
 
 Json _map(Object? v) => (v! as Map).cast<String, Object?>();
