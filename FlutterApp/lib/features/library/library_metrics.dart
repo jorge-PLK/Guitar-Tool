@@ -47,4 +47,35 @@ abstract final class LibraryMetrics {
 
   /// Lado de la estrella de «mejor toma» (Text("★") en ProjectRecordingsView.swift:67, sin glifo en la fuente).
   static const double bestStarSize = 14;
+
+  // --- F1: hoja de lista (PlaylistImport.swift:287,314,328) ---
+
+  /// Alto de «Marcar todos» y «Ninguno» (SecondaryButton(height: 34), PI:287).
+  static const double plActionHeight = 34;
+
+  /// Hueco de la casilla en un tema ya en la biblioteca (PI:314).
+  static const double plCheckSlot = 20;
+
+  /// Ancho de la columna de duración (PI:328).
+  static const double plDurationWidth = 48;
+
+  // --- F2: hoja de lista, fases Revisar, Cola y Resumen (PlaylistImport.swift:355-575) ---
+
+  /// Ancho del título en Revisar (PI:381).
+  static const double reviewTitleWidth = 250;
+
+  /// Ancho de la duración en Revisar (PI:382).
+  static const double reviewDurationWidth = 40;
+
+  /// Chevron del selector de candidato (PI:423).
+  static const double candidateChevron = 10;
+
+  /// Ancho de la barra de progreso de una fila de la cola (PI:500).
+  static const double queueBarWidth = 140;
+
+  /// Alto de esa barra (PI:500).
+  static const double queueBarHeight = 5;
+
+  /// Ancho del título en las filas de fallidos (PI:561).
+  static const double failedTitleWidth = 280;
 }
