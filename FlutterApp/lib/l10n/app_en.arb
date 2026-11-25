@@ -29,6 +29,18 @@
       }
     }
   },
+  "shell_deviceConnected": "Connected",
+  "@shell_deviceConnected": {
+    "description": "Audio output card subtitle: device connected (AudioDeviceMonitor.swift:38)."
+  },
+  "shell_deviceNotConnected": "Not connected",
+  "@shell_deviceNotConnected": {
+    "description": "Audio output card subtitle: device not connected (AudioDeviceMonitor.swift:38)."
+  },
+  "shell_deviceDefault": "Default",
+  "@shell_deviceDefault": {
+    "description": "Audio output card subtitle: system output (AudioDeviceMonitor.swift:37)."
+  },
   "libraryAnchor": "",
   "@libraryAnchor": {
     "description": "Anchor for the library block: add this area's keys below, in alphabetical order; do not edit other blocks."

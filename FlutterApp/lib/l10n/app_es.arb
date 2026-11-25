@@ -29,6 +29,18 @@
       }
     }
   },
+  "shell_deviceConnected": "Conectado",
+  "@shell_deviceConnected": {
+    "description": "Subtítulo de la tarjeta de salida de audio: dispositivo conectado (AudioDeviceMonitor.swift:38)."
+  },
+  "shell_deviceNotConnected": "Sin conectar",
+  "@shell_deviceNotConnected": {
+    "description": "Subtítulo de la tarjeta de salida de audio: dispositivo no conectado (AudioDeviceMonitor.swift:38)."
+  },
+  "shell_deviceDefault": "Por defecto",
+  "@shell_deviceDefault": {
+    "description": "Subtítulo de la tarjeta de salida de audio: salida del sistema (AudioDeviceMonitor.swift:37)."
+  },
   "libraryAnchor": "",
   "@libraryAnchor": {
     "description": "Ancla del bloque library: añade las claves del área debajo, en orden alfabético; no edites otros bloques."

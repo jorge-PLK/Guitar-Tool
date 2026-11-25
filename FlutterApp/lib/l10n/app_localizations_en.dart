@@ -60,6 +60,15 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get shell_deviceConnected => 'Connected';
+
+  @override
+  String get shell_deviceNotConnected => 'Not connected';
+
+  @override
+  String get shell_deviceDefault => 'Default';
+
+  @override
   String get libraryAnchor => '';
 
   @override

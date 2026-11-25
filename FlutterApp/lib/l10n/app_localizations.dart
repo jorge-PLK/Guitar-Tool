@@ -194,6 +194,24 @@ abstract class AppLocalizations {
   /// **'Tema seleccionado: {title}'**
   String shell_selectedThemeLabel(String title);
 
+  /// Subtítulo de la tarjeta de salida de audio: dispositivo conectado (AudioDeviceMonitor.swift:38).
+  ///
+  /// In es, this message translates to:
+  /// **'Conectado'**
+  String get shell_deviceConnected;
+
+  /// Subtítulo de la tarjeta de salida de audio: dispositivo no conectado (AudioDeviceMonitor.swift:38).
+  ///
+  /// In es, this message translates to:
+  /// **'Sin conectar'**
+  String get shell_deviceNotConnected;
+
+  /// Subtítulo de la tarjeta de salida de audio: salida del sistema (AudioDeviceMonitor.swift:37).
+  ///
+  /// In es, this message translates to:
+  /// **'Por defecto'**
+  String get shell_deviceDefault;
+
   /// Ancla del bloque library: añade las claves del área debajo, en orden alfabético; no edites otros bloques.
   ///
   /// In es, this message translates to:

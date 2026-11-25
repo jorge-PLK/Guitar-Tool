@@ -11,6 +11,7 @@ import 'package:toneforge/theme/tokens.dart';
 import 'package:toneforge/theme/typography.dart';
 import 'package:toneforge/widgets/tf_sidebar.dart';
 
+import 'device_card.dart';
 import 'shell_providers.dart';
 import 'shell_route.dart';
 
@@ -62,6 +63,7 @@ class ShellScreen extends ConsumerWidget {
                   active: route == ShellRoute.settings,
                   onTap: () => notifier.select(ShellRoute.settings),
                 ),
+                const DeviceCard(),
               ],
             ),
             Expanded(child: _screen(route)),
