@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:toneforge/features/backing/smooth_position.dart';
 import 'package:toneforge/features/backing/study_position.dart';
 import 'package:toneforge/features/backing/study_store.dart';
 import 'package:toneforge/features/backing/widgets/position_bar.dart';
@@ -105,7 +106,13 @@ class CoalescedPositionBar extends ConsumerStatefulWidget {
 }
 
 class _CoalescedPositionBarState extends ConsumerState<CoalescedPositionBar> {
-  late final SeekCoalescer _seek = SeekCoalescer(ref.read(studyStoreProvider.notifier).seek);
+  late final SeekCoalescer _seek;
+
+  @override
+  void initState() {
+    super.initState();
+    _seek = SeekCoalescer(ref.read(studyStoreProvider.notifier).seek);
+  }
 
   @override
   void dispose() {
@@ -115,15 +122,26 @@ class _CoalescedPositionBarState extends ConsumerState<CoalescedPositionBar> {
 
   @override
   Widget build(BuildContext context) {
-    final double position = ref.watch(studyPositionProvider.select((e) => e.seconds));
     final transport = ref.watch(studyStoreProvider.select((s) => s.transport));
-    return PositionBar(
-      position: position,
-      duration: transport?.duration ?? 0,
-      loopStart: transport?.loop?.start,
-      loopEnd: transport?.loop?.end,
-      onSeek: _seek.request,
-      onSeekEnd: _seek.flush,
+    return SmoothPositionBuilder(
+      builder: (BuildContext context, double position) => PositionBar(
+        position: position,
+        duration: transport?.duration ?? 0,
+        loopStart: transport?.loop?.start,
+        loopEnd: transport?.loop?.end,
+        onSeek: _onSeek,
+        onSeekEnd: _onSeekEnd,
+      ),
     );
+  }
+
+  void _onSeek(double seconds) {
+    ref.read(scrubPositionProvider.notifier).set(seconds);
+    _seek.request(seconds);
+  }
+
+  void _onSeekEnd() {
+    _seek.flush();
+    ref.read(scrubPositionProvider.notifier).set(null);
   }
 }
