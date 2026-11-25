@@ -70,7 +70,7 @@ public func ffiTextureDispose(_ channel: Int32) {
     #endif
 }
 
-/// El canal de la toma (`TF_CHANNEL_TAKE`) llega con el reproductor nativo (ola 3): nulo.
+/// El canal de la toma (`TF_CHANNEL_TAKE`) lo alimenta el reproductor nativo en el Mac; en Windows, nulo por ahora.
 @_cdecl("tf_frame_copy")
 public func ffiFrameCopy(_ channel: Int32) -> UnsafeMutableRawPointer? {
     #if canImport(CoreVideo) || os(Windows)

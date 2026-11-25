@@ -49,7 +49,7 @@ TF_API void tf_core_run_main(void);
 
 #define TF_CHANNEL_CAMERA 0   // Grabar y vista previa de Ajustes · Vídeo
 #define TF_CHANNEL_MONTAGE 1  // vista previa de Montaje
-#define TF_CHANNEL_TAKE 2     // vídeo de la toma (Ver toma), reproductor nativo (ola 3: hoy `tf_frame_copy` da nulo)
+#define TF_CHANNEL_TAKE 2     // vídeo de la toma (Ver toma), reproductor nativo (Mac; en Windows `tf_frame_copy` da nulo por ahora)
 
 /// Tabla que da el runner. `register_texture` y `unregister_texture`, desde el hilo de plataforma; `frame_available`,
 /// desde cualquier hilo (el runner reencola si hace falta).

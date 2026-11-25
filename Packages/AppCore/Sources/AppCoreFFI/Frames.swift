@@ -10,6 +10,8 @@ final class FrameChannel: @unchecked Sendable {
     private let textures: FrameTextures
     private let lock = NSLock()
     private var last: CVPixelBuffer?
+    /// Productor por demanda (canal de la toma): `copyForTexture` le pide el fotograma de «ahora».
+    private var pull: (@Sendable () -> CVPixelBuffer?)?
 
     init(channel: Int32, textures: FrameTextures) {
         self.channel = channel
@@ -27,9 +29,24 @@ final class FrameChannel: @unchecked Sendable {
         lock.lock(); last = nil; lock.unlock()
     }
 
+    /// Instala o quita el productor por demanda.
+    func setPull(_ p: (@Sendable () -> CVPixelBuffer?)?) {
+        lock.lock(); pull = p; lock.unlock()
+    }
+
+    /// Avisa al runner de que hay fotograma nuevo sin publicarlo (el productor por demanda lo da en la copia).
+    func signal() {
+        if let id = textures.id(for: channel) { textures.host?.frame_available?(id) }
+    }
+
     /// `CVPixelBufferRef` retenido (+1) del último fotograma; lo suelta Flutter.
     func copyForTexture() -> UnsafeMutableRawPointer? {
+        lock.lock()
+        let p = pull
+        lock.unlock()
+        let fresh = p?()
         lock.lock(); defer { lock.unlock() }
+        if let fresh { last = fresh }
         guard let last else { return nil }
         return Unmanaged.passRetained(last).toOpaque()
     }

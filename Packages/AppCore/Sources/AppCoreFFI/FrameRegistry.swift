@@ -15,10 +15,14 @@ final class FrameTextures: @unchecked Sendable {
     func setID(_ id: Int64?, for ch: Int32) { lock.lock(); ids[ch] = id; lock.unlock() }
 }
 
-/// Canales con fotogramas por textura (`TF_CHANNEL_CAMERA`, `TF_CHANNEL_MONTAGE`). El de la toma (`TF_CHANNEL_TAKE`)
-/// no está aquí: llega con el reproductor nativo (ola 3) y `tf_frame_copy(2)` devuelve nulo mientras tanto.
+/// Canales con fotogramas por textura (`TF_CHANNEL_CAMERA`, `TF_CHANNEL_MONTAGE` y, con AVFoundation, `TF_CHANNEL_TAKE`
+/// del reproductor nativo de tomas). En Windows la toma aún no tiene reproductor: `tf_frame_copy(2)` devuelve nulo.
 final class FrameChannels: @unchecked Sendable {
+    #if canImport(AVFoundation)
+    static let supported: Set<Int32> = [Int32(TF_CHANNEL_CAMERA), Int32(TF_CHANNEL_MONTAGE), Int32(TF_CHANNEL_TAKE)]
+    #else
     static let supported: Set<Int32> = [Int32(TF_CHANNEL_CAMERA), Int32(TF_CHANNEL_MONTAGE)]
+    #endif
     private let lock = NSLock()
     private var map: [Int32: FrameChannel] = [:]
 

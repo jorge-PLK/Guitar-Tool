@@ -42,6 +42,12 @@ struct TakeViewOffsetSource: Sendable {
     var videoWidth: Int = 0
     var videoHeight: Int = 0
     var videoRotation: Int = 0
+    /// Vídeo nativo (ola 3.3.AS): fichero de la base, punches, desfase inicial (s) y lectura en vivo del desfase de la hoja
+    /// (nil si la hoja ya no está).
+    var videoURL: URL? = nil
+    var punches: [PreviewPunch] = []
+    var offset: Double = 0
+    var liveOffset: (@MainActor @Sendable () -> Double?)? = nil
 }
 
 /// Reloj que publica el núcleo: la posición del reproductor alisada contra el reloj de host (lazo de fase de primer orden).
@@ -262,6 +268,25 @@ final class TakeViewService {
     /// Último `takeview.video` emitido (tests).
     private(set) var lastVideoEvent: TakeViewVideoEvent?
 
+    #if canImport(AVFoundation)
+    /// Reproductor nativo del vídeo de la toma abierta (nil = sin vídeo o fallo). Esclavo de `takeview.position`.
+    private(set) var videoPlayer: TakeVideoPlayer?
+    /// Receptor del reproductor (canal `take` de AppCoreFFI): recibe el reproductor al abrir y nil al cerrar. La pone el `Bridge`.
+    nonisolated(unsafe) var takeVideoSink: (@Sendable (TakeVideoPlayer?) -> Void)?
+    private var liveOffset: (@MainActor @Sendable () -> Double?)?
+
+    /// Arma el reproductor de vídeo; un fallo no impide abrir el visor (el audio sigue).
+    private func startVideo(audioURL: URL, songStart: Double, videoURL: URL?, punches: [PreviewPunch], offset: Double,
+                            live: (@MainActor @Sendable () -> Double?)?) async {
+        guard videoURL != nil || punches.contains(where: { $0.videoURL != nil }) else { return }
+        guard let preview = try? await TakePreview.load(audioURL: audioURL, songStart: songStart, videoURL: videoURL, punches: punches),
+              let p = try? TakeVideoPlayer(preview: preview, offset: offset) else { return }
+        videoPlayer = p
+        liveOffset = live
+        takeVideoSink?(p)
+    }
+    #endif
+
     private(set) var current: TakeViewSession?
     private var ticker: Task<Void, Never>?
     private var endTask: Task<Void, Never>?
@@ -405,6 +430,13 @@ final class TakeViewService {
         let audioError = Self.prepare(audio, first: first)
         audio.player.seek(to: base)
         let layout = ProjectLayout(folder: folder)
+        #if canImport(AVFoundation)
+        await startVideo(audioURL: takeURL, songStart: start, videoURL: take.videoFile.map { layout.url(relative: $0) },
+                         punches: (take.punches ?? []).map {
+                             PreviewPunch(start: $0.start, end: $0.end, videoURL: $0.videoFile.map { layout.url(relative: $0) },
+                                          videoOffset: $0.videoOffset ?? take.videoOffset ?? 0)
+                         }, offset: take.videoOffset ?? 0, live: nil)
+        #endif
         requestVideo(takeId: tid, files: [take.videoFile.map { layout.url(relative: $0) }]
                         + (take.punches ?? []).map { $0.videoFile.map { layout.url(relative: $0) } },
                      title: "\(project.song.title) · vídeo de la toma")
@@ -437,6 +469,10 @@ final class TakeViewService {
         audio.player.endTime = duration
         let audioError = Self.prepare(audio, first: src.audioURL)
         audio.player.seek(to: 0)
+        #if canImport(AVFoundation)
+        await startVideo(audioURL: src.audioURL, songStart: src.songStart, videoURL: src.videoURL, punches: src.punches,
+                         offset: src.offset, live: src.liveOffset)
+        #endif
         requestVideo(takeId: src.takeId, files: src.videoURLs, title: "Vídeo de la toma")
         let session = TakeViewSession(projectId: src.projectId, takeId: src.takeId, audio: audio, duration: duration,
                                       songStart: src.songStart, base: 0, backingIDs: [], hasBacking: false, audioError: audioError,
@@ -490,6 +526,14 @@ final class TakeViewService {
         ticker?.cancel()
         ticker = nil
         cancelEnd()
+        #if canImport(AVFoundation)
+        if let v = videoPlayer {
+            videoPlayer = nil
+            liveOffset = nil
+            takeVideoSink?(nil)
+            v.close()
+        }
+        #endif
         guard let s = current else { return }
         current = nil
         lastPosition = nil
@@ -523,6 +567,9 @@ final class TakeViewService {
 
     func tick() {
         guard let s = current else { return }
+        #if canImport(AVFoundation)
+        if let off = liveOffset?() { videoPlayer?.setOffset(off) }
+        #endif
         if s.isPlaying {
             let remaining = s.duration - s.rawPosition
             if remaining <= 0 { finish(s); return }
@@ -573,6 +620,9 @@ final class TakeViewService {
         // En pausa solo se repite si cambió algo (el `at` no cuenta).
         if !force, !e.playing, let last = lastPosition, !last.playing, last.epoch == e.epoch, last.seconds == e.seconds { return }
         lastPosition = e
+        #if canImport(AVFoundation)
+        videoPlayer?.apply(e)
+        #endif
         emit("takeview.position", e)
     }
 }

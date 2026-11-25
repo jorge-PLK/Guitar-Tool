@@ -727,6 +727,14 @@ extension Bridge {
         recordService?.cameraPixelSink = sink
     }
 
+    /// Receptor del vídeo nativo de «Ver toma» (canal `take` de AppCoreFFI): recibe el reproductor al abrir la toma y nil al
+    /// cerrarla. Vale para las aperturas siguientes. Solo en el Mac (Windows: `tf_mfvideo.c`, pendiente).
+    #if canImport(AVFoundation)
+    public func setTakeVideoSink(_ sink: (@Sendable (TakeVideoPlayer?) -> Void)?) {
+        takeViewService.takeVideoSink = sink
+    }
+    #endif
+
     /// Registra `record.*` y cierra Grabar cuando se cierra el tema de Backing.
     func registerRecordMethods(options: LaunchOptions) {
         let service = RecordService(options: options, studyService: studyService, emit: { [weak self] in self?.send($0) })
@@ -752,7 +760,9 @@ extension Bridge {
             c.player.pause()
             return TakeViewOffsetSource(projectId: c.session.projectID, takeId: r.takeID, audioURL: r.audioURL, songStart: r.songStart,
                                         videoURLs: [r.videoURL] + r.punches.map(\.videoURL),
-                                        videoWidth: r.videoWidth, videoHeight: r.videoHeight, videoRotation: r.rotation)
+                                        videoWidth: r.videoWidth, videoHeight: r.videoHeight, videoRotation: r.rotation,
+                                        videoURL: r.videoURL, punches: r.punches, offset: r.offsetMs / 1000,
+                                        liveOffset: { [weak service] in service?.controller?.offsetRequest.map { $0.offsetMs / 1000 } })
         }
         service.willFinishOffset = { [weak takeView] in await takeView?.closeOffset() }
         service.willDeleteTake = { [weak takeView] takeID in await takeView?.release(takeId: takeID) }

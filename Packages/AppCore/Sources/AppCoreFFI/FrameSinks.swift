@@ -17,7 +17,27 @@ func publishFrame(_ pixels: MontageFramePixels, channel: Int32) {
 func installFrameSinks(on bridge: Bridge) {
     bridge.setCameraFrameSink(cameraFrameSink)
     bridge.setMontageFrameSink(montageFrameSink)
+    #if canImport(AVFoundation)
+    bridge.setTakeVideoSink(takeVideoSink)
+    #endif
+    // TODO(Windows, pasada del PC): reproductor de tomas con Media Foundation y reloj externo
+    // (base `Probes/P9-flutter/AppCoreFFI/Sources/CAppCoreFFI/tf_mfvideo.c`); hasta entonces el canal take es nulo.
 }
+
+#if canImport(AVFoundation)
+/// Canal de la toma: el reproductor nativo entrega por demanda (`copyFrame` en cada `tf_frame_copy`) y avisa al runner
+/// cuando hay fotograma nuevo. Con nil (visor cerrado) se quita el productor y se suelta el último fotograma.
+let takeVideoSink: @Sendable (TakeVideoPlayer?) -> Void = { player in
+    guard let channel = frameChannels.channel(Int32(TF_CHANNEL_TAKE), textures: frameTextures) else { return }
+    if let player {
+        channel.setPull { player.copyFrame() }
+        player.onFrameAvailable = { channel.signal() }
+    } else {
+        channel.setPull(nil)
+        channel.clear()
+    }
+}
+#endif
 
 let cameraFrameSink: @Sendable (MontageFramePixels, Double) -> Void = { pixels, _ in
     publishFrame(pixels, channel: Int32(TF_CHANNEL_CAMERA))
