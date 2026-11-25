@@ -8,6 +8,7 @@ import 'package:flutter/services.dart' show AssetManifest, rootBundle;
 import 'core_client.dart';
 
 /// Origen de los fixtures de `Contract/fixtures/<grupo>/<nombre>.<params|result|error|event>.json`.
+/// Variantes: `<nombre>.<estado>.<tipo>.json` y `<nombre>.<tipo>.<estado>.json` (tipo = result|error|event).
 abstract class FixtureSource {
   /// Rutas relativas a la carpeta de fixtures (`app/app.info.result.json`).
   Future<List<String>> list();
@@ -81,6 +82,8 @@ class MockCore implements CoreClient {
 
   /// Carga todos los fixtures de [source]. Con [state], `<clave>.<state>` sustituye a `<clave>`
   /// en resultados y errores, y los eventos `<evento>.<state>` se emiten una vez al primer suscriptor.
+  /// Las variantes `<clave>.<state>.<tipo>.json` y `<clave>.<tipo>.<state>.json` se guardan como `<clave>.<state>`;
+  /// los ficheros `params` se saltan.
   static Future<MockCore> load(FixtureSource source, {String? state}) async {
     final m = MockCore(state: state);
     await m._loadFrom(source);
@@ -122,13 +125,20 @@ class MockCore implements CoreClient {
     final results = _results, errors = _errors, events = _events;
     final kinds = {'result': results, 'error': errors, 'event': events};
     for (final path in await source.list()) {
-      final file = path.split('/').last; // <nombre>.<tipo>.json
+      final file = path.split('/').last; // <nombre>.<tipo>.json o <nombre>.<tipo>.<estado>.json
       final parts = file.split('.');
       if (parts.length < 3) continue;
-      final target = kinds[parts[parts.length - 2]];
-      if (target == null) continue;
-      target[parts.sublist(0, parts.length - 2).join('.')] =
-          json.decode(await source.read(path));
+      final last = parts.length - 1; // 'json'
+      // Tipo: el segmento más cercano al final (sin contar json) que sea tipo o params.
+      var i = last - 1;
+      while (i >= 0 && !kinds.containsKey(parts[i]) && parts[i] != 'params') {
+        i--;
+      }
+      if (i < 0 || parts[i] == 'params') continue;
+      // Clave: <nombre>.<estado>, quitando el segmento de tipo (sea antes o después del estado).
+      final key = [...parts.sublist(0, i), ...parts.sublist(i + 1, last)].join('.');
+      if (key.isEmpty) continue;
+      kinds[parts[i]]![key] = json.decode(await source.read(path));
     }
     _applyState();
   }
