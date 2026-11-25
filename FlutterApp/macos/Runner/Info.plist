@@ -28,5 +28,11 @@
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Para grabar tu vídeo tocando.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Para grabar tu guitarra desde la pedalera.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Para conectar con el Remote Editor de la Flex Prime por Wi-Fi.</string>
 </dict>
 </plist>
