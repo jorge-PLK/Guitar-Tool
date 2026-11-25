@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:toneforge/core/core_client.dart';
@@ -57,6 +59,12 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 20));
     expect(a, isEmpty);
     await sub.cancel();
+  });
+
+  testWidgets('state null no deja temporizadores pendientes al suscribirse', (_) async {
+    final c = _core();
+    final sub = c.on('record.state', (j) => j['s']).listen((_) {});
+    unawaited(sub.cancel());
   });
 
   test('estado sin claves avisa con debugPrint', () {

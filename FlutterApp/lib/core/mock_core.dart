@@ -200,6 +200,7 @@ class MockCore implements CoreClient {
     return Stream<T>.multi((c) {
       final sub = base.listen(c.add, onError: c.addError, onDone: c.close);
       c.onCancel = sub.cancel;
+      if (state == null) return;
       Future<void>(() async {
         await _ready;
         if (!_seeds.containsKey(event)) return;
