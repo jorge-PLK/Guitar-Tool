@@ -49,7 +49,13 @@ class _TfSheetShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CallbackShortcuts(
+    // La ruta cuelga del Overlay sin Material: sin esto el texto hereda el estilo de error.
+    return DefaultTextStyle(
+      style: TfText.body().copyWith(
+        color: TfColors.text,
+        decoration: TextDecoration.none,
+      ),
+      child: CallbackShortcuts(
       bindings: <ShortcutActivator, VoidCallback>{
         const SingleActivator(LogicalKeyboardKey.escape): onCancel,
         if (onPrimary != null) ...<ShortcutActivator, VoidCallback>{
@@ -68,6 +74,7 @@ class _TfSheetShell extends StatelessWidget {
             ),
           ),
         ),
+      ),
       ),
     );
   }

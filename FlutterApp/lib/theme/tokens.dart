@@ -221,6 +221,14 @@ abstract final class TfSize {
   static const double font12 = 12;
   static const double font13 = 13;
   static const double font14 = 14;
+  // Escala de letra completa (Jorge, 25/11/2026): ningún tamaño numérico fuera de theme/.
+  static const double font15 = 15;
+  static const double font16 = 16;
+  static const double font18 = 18;
+  static const double font22 = 22;
+  static const double font26 = 26;
+  static const double font30 = 30;
+  static const double font32 = 32;
   static const double iconButtonIcon = 14;
   static const double nudgeWidth = 30;
   static const double nudgeHeight = 24;
@@ -342,4 +350,22 @@ abstract final class TfSize {
   static const double sectionColorDot = 20;
   static const double sectionSuggestionHeight = 24;
   static const double sectionTimeMinWidth = 64;
+
+  // Ola 2 · M3: medidas locales de Songsterr (features/tab) y de Backing (info y popover de sección).
+  static const double songsterrWorkingBarWidth = 260; // TSS:179-189
+  static const double songsterrPairingRowHeight = 44; // TSS:298
+  static const double songsterrSlotDropdownWidth = 260; // TSS:298-319
+  static const double songsterrSoloDropdownWidth = 200; // TSS:270-294
+  static const double songsterrSoloLabelWidth = 90; // TSS:270-294; la ficha no da medida
+  static const double songsterrWarningsMaxHeight = 140; // TSS:205-248
+  static const double songsterrListWidth = 612;
+  static const double songsterrSheetHeight = 640;
+  static const double songsterrSheetMaxWidth = 1320;
+  static const double songsterrChoosingColumnWidth = 190; // TSS:63-90, columna de pista
+  static const double songsterrChoosingNarrowWidth = 170; // TSS:63-90, columna de instrumento
+  static const double sectionSwatchRowHeight = 24;
+  static const double sectionSwatchRingGap = 3;
+  static const double backingInfoChevron = 10;
+  static const double backingInfoFlowSpacing = 10;
+  static const double backingInfoRunSpacing = 10;
 }
