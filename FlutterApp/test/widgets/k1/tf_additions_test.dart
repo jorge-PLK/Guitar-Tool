@@ -67,6 +67,24 @@ void main() {
       expect(taps, 1);
     });
 
+    testWidgets('iconFilled true pasa filled al TfIconView', (WidgetTester tester) async {
+      await pumpK4(
+        tester,
+        Center(
+          child: TfSecondaryButton(label: 'Ver toma', icon: TfIcon.playFill, iconFilled: true, onPressed: () {}),
+        ),
+      );
+      expect(tester.widget<TfIconView>(find.byType(TfIconView)).filled, isTrue);
+    });
+
+    testWidgets('iconFilled por defecto es false', (WidgetTester tester) async {
+      await pumpK4(
+        tester,
+        Center(child: TfSecondaryButton(label: 'Ver toma', icon: TfIcon.playFill, onPressed: () {})),
+      );
+      expect(tester.widget<TfIconView>(find.byType(TfIconView)).filled, isFalse);
+    });
+
     testWidgets('sin parametros nuevos: sin icono, color text; deshabilitado muted', (WidgetTester tester) async {
       await pumpK4(tester, const Center(child: TfSecondaryButton(label: 'Hola', onPressed: null)));
       expect(find.byType(TfIconView), findsNothing);
