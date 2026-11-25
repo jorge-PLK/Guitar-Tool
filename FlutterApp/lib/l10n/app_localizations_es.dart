@@ -2005,6 +2005,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get tab_waitingTitle => 'Esperando el análisis del tema';
 
   @override
+  String get tab_webError => 'No se pudo mostrar la tablatura.';
+
+  @override
   String get tab_workingBody =>
       'La primera vez tarda un poco. Lo hecho se guarda pista a pista.';
 

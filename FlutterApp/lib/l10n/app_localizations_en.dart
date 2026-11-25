@@ -1992,6 +1992,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tab_waitingTitle => 'Waiting for the theme analysis';
 
   @override
+  String get tab_webError => 'The tablature could not be displayed.';
+
+  @override
   String get tab_workingBody =>
       'The first time takes a while. Work done is saved track by track.';
 

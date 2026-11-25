@@ -870,6 +870,7 @@
   "tab_waitingAction": "Analyze",
   "tab_waitingBody": "Tabs need the bars and beats from the analysis. You can start it from Backing track.",
   "tab_waitingTitle": "Waiting for the theme analysis",
+  "tab_webError": "The tablature could not be displayed.",
   "tab_workingBody": "The first time takes a while. Work done is saved track by track.",
   "tab_workingTitle": "Transcribing…",
   "recordAnchor": "",

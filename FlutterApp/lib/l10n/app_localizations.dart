@@ -3337,6 +3337,12 @@ abstract class AppLocalizations {
   /// **'Esperando el análisis del tema'**
   String get tab_waitingTitle;
 
+  /// No description provided for @tab_webError.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo mostrar la tablatura.'**
+  String get tab_webError;
+
   /// No description provided for @tab_workingBody.
   ///
   /// In es, this message translates to:

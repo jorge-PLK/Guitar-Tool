@@ -870,6 +870,7 @@
   "tab_waitingAction": "Analizar",
   "tab_waitingBody": "La tablatura necesita los compases y pulsos del análisis. Puedes lanzarlo desde Backing track.",
   "tab_waitingTitle": "Esperando el análisis del tema",
+  "tab_webError": "No se pudo mostrar la tablatura.",
   "tab_workingBody": "La primera vez tarda un poco. Lo hecho se guarda pista a pista.",
   "tab_workingTitle": "Transcribiendo…",
   "recordAnchor": "",
