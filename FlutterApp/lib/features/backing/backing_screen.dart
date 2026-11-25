@@ -4,6 +4,7 @@ import 'package:toneforge/features/backing/analysis_banner.dart';
 import 'package:toneforge/features/backing/backing_chooser.dart';
 import 'package:toneforge/features/backing/backing_header.dart';
 import 'package:toneforge/features/backing/backing_layout.dart';
+import 'package:toneforge/features/backing/backing_shortcuts.dart';
 import 'package:toneforge/features/backing/not_separated_card.dart';
 import 'package:toneforge/features/backing/study_store.dart';
 import 'package:toneforge/features/backing/widgets/chords_expanded.dart';
@@ -30,7 +31,7 @@ class BackingScreen extends ConsumerWidget {
     if (!hasProject) return const BackingChooser();
     final status = ref.watch(studyStoreProvider.select((s) => s.status));
     return switch (status) {
-      StudyLoadStatus.open => const _BackingContent(),
+      StudyLoadStatus.open => const BackingShortcuts(child: _BackingContent()),
       StudyLoadStatus.error => const _OpenError(),
       StudyLoadStatus.idle || StudyLoadStatus.opening => const Center(child: TfSpinner.small()),
     };
