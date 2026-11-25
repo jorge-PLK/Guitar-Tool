@@ -27,6 +27,9 @@ import '../chords/chords_support.dart';
 const String _intro = '00000000-0000-0000-0000-000000000003';
 const String _solo = '00000000-0000-0000-0000-000000000004';
 
+/// Todos los goldens corren como macOS para que los atajos salgan con ⌥/⌘.
+final TargetPlatformVariant _macOS = TargetPlatformVariant.only(TargetPlatform.macOS);
+
 Future<ProviderContainer> _pump(
   WidgetTester tester,
   Widget home, {
@@ -79,74 +82,102 @@ Future<void> _golden(String name) =>
     expectLater(find.byType(WidgetsApp), matchesGoldenFile('$name.png'));
 
 void main() {
-  testWidgets('golden tira de acordes con cajas de sección y bucle en Solo', (tester) async {
-    await _pump(tester, const ChordsArea(sectionsLayer: stripSectionBoxes),
-        size: const Size(700, 130), tweak: _loop);
-    await _golden('chord_strip_sections_loop');
-  });
+  testWidgets(
+    'golden tira de acordes con cajas de sección y bucle en Solo',
+    (tester) async {
+      await _pump(tester, const ChordsArea(sectionsLayer: stripSectionBoxes),
+          size: const Size(700, 130), tweak: _loop);
+      await _golden('chord_strip_sections_loop');
+    },
+    variant: _macOS,
+  );
 
-  testWidgets('golden rejilla con cajas de sección y Solo seleccionada con asas', (tester) async {
-    final ProviderContainer c = await _pump(tester, const ChordGrid(sectionsLayer: gridSectionBoxes),
-        size: const Size(1100, 160));
-    c.read(sectionSelectionProvider.notifier).select(_solo);
-    await settleFrames(tester);
-    await _golden('chord_grid_sections_selected');
-  });
+  testWidgets(
+    'golden rejilla con cajas de sección y Solo seleccionada con asas',
+    (tester) async {
+      final ProviderContainer c = await _pump(tester, const ChordGrid(sectionsLayer: gridSectionBoxes),
+          size: const Size(1100, 160));
+      c.read(sectionSelectionProvider.notifier).select(_solo);
+      await settleFrames(tester);
+      await _golden('chord_grid_sections_selected');
+    },
+    variant: _macOS,
+  );
 
-  testWidgets('golden mezclador normal', (tester) async {
-    await _pump(tester, const SizedBox(width: 1000, height: 346, child: MixerCard(compact: false, lowHeight: false)), size: const Size(1000, 346));
-    await _golden('mixer_card_normal');
-  });
+  testWidgets(
+    'golden mezclador normal',
+    (tester) async {
+      await _pump(tester, const SizedBox(width: 1000, height: 346, child: MixerCard(compact: false, lowHeight: false)), size: const Size(1000, 346));
+      await _golden('mixer_card_normal');
+    },
+    variant: _macOS,
+  );
 
-  testWidgets('golden mezclador compacto', (tester) async {
-    await _pump(tester, const SizedBox(width: 1000, child: MixerCard(compact: true, lowHeight: true)),
-        size: const Size(1000, 200));
-    await _golden('mixer_card_compact');
-  });
+  testWidgets(
+    'golden mezclador compacto',
+    (tester) async {
+      await _pump(tester, const SizedBox(width: 1000, child: MixerCard(compact: true, lowHeight: true)),
+          size: const Size(1000, 200));
+      await _golden('mixer_card_compact');
+    },
+    variant: _macOS,
+  );
 
-  testWidgets('golden hoja Sección / Solo', (tester) async {
-    final ProviderContainer c = await _pump(tester, const SizedBox(), size: const Size(500, 520));
-    c.read(sectionPopoverProvider.notifier).open(_intro);
-    await tester.pumpWidget(UncontrolledProviderScope(
-      container: c,
-      child: WidgetsApp(
-        color: TfColors.bg,
-        locale: const Locale('es'),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        debugShowCheckedModeBanner: false,
-        pageRouteBuilder: <T>(RouteSettings s, WidgetBuilder b) => PageRouteBuilder<T>(
-          settings: s,
-          pageBuilder: (BuildContext c, Animation<double> a, Animation<double> b2) => b(c),
-        ),
-        home: const ColoredBox(
+  testWidgets(
+    'golden hoja Sección / Solo',
+    (tester) async {
+      final ProviderContainer c = await _pump(tester, const SizedBox(), size: const Size(500, 520));
+      c.read(sectionPopoverProvider.notifier).open(_intro);
+      await tester.pumpWidget(UncontrolledProviderScope(
+        container: c,
+        child: WidgetsApp(
           color: TfColors.bg,
-          child: Align(alignment: Alignment.topLeft, child: SectionPopover(sectionId: _intro)),
+          locale: const Locale('es'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          debugShowCheckedModeBanner: false,
+          pageRouteBuilder: <T>(RouteSettings s, WidgetBuilder b) => PageRouteBuilder<T>(
+            settings: s,
+            pageBuilder: (BuildContext c, Animation<double> a, Animation<double> b2) => b(c),
+          ),
+          home: const ColoredBox(
+            color: TfColors.bg,
+            child: Align(alignment: Alignment.topLeft, child: SectionPopover(sectionId: _intro)),
+          ),
         ),
-      ),
-    ));
-    await settleFrames(tester);
-    await _golden('section_popover');
-  });
+      ));
+      await settleFrames(tester);
+      await _golden('section_popover');
+    },
+    variant: _macOS,
+  );
 
-  testWidgets('golden hoja Acorde', (tester) async {
-    final ChordsRig rig = await pumpChords(tester, size: const Size(1100, 900), tweak: (Json o) {
-      fourChords(o, position: 3);
-      final Json a = (o['analysis']! as Map).cast<String, Object?>();
-      a['beats'] = <Object?>[for (int i = 0; i < 8; i++) i.toDouble()];
-      (a['chords']! as List).cast<Map>()[1]['shown'] = <String, Object?>{'root': 0, 'quality': 7};
-    });
-    rig.container.read(studyStoreProvider.notifier).setEditMode(true);
-    await settleFrames(tester);
-    await tester.tap(find.byType(ChordChip).at(1));
-    await settleFrames(tester);
-    expect(find.byType(ChordEditor), findsOneWidget);
-    await _golden('chord_editor');
-  });
+  testWidgets(
+    'golden hoja Acorde',
+    (tester) async {
+      final ChordsRig rig = await pumpChords(tester, size: const Size(1100, 900), tweak: (Json o) {
+        fourChords(o, position: 3);
+        final Json a = (o['analysis']! as Map).cast<String, Object?>();
+        a['beats'] = <Object?>[for (int i = 0; i < 8; i++) i.toDouble()];
+        (a['chords']! as List).cast<Map<String, Object?>>()[1]['shown'] = <String, Object?>{'root': 0, 'quality': 7};
+      });
+      rig.container.read(studyStoreProvider.notifier).setEditMode(true);
+      await settleFrames(tester);
+      await tester.tap(find.byType(ChordChip).at(1));
+      await settleFrames(tester);
+      expect(find.byType(ChordEditor), findsOneWidget);
+      await _golden('chord_editor');
+    },
+    variant: _macOS,
+  );
 
-  testWidgets('golden tarjeta de tiempo completa con bucle', (tester) async {
-    await _pump(tester, const TimelineCard(), size: const Size(1100, 420), tweak: _loop);
-    expect(find.byType(ChordsHeader), findsWidgets);
-    await _golden('timeline_card');
-  });
+  testWidgets(
+    'golden tarjeta de tiempo completa con bucle',
+    (tester) async {
+      await _pump(tester, const TimelineCard(), size: const Size(1100, 420), tweak: _loop);
+      expect(find.byType(ChordsHeader), findsWidgets);
+      await _golden('timeline_card');
+    },
+    variant: _macOS,
+  );
 }
