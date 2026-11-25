@@ -2,14 +2,15 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:toneforge/features/backing/backing_layout.dart';
 
-Widget _host(double available, List<Widget> kids) => Directionality(
+Widget _host(double available, List<Widget> kids, {double? ideal = 346, double blend = 0}) => Directionality(
       textDirection: TextDirection.ltr,
       child: SingleChildScrollView(
         child: FillLastLayout(
           available: available,
           spacing: 14,
           lastMinHeight: 270,
-          lastIdealHeight: 346,
+          lastIdealHeight: ideal,
+          naturalBlend: blend,
           children: kids,
         ),
       ),
@@ -44,5 +45,16 @@ void main() {
   testWidgets('hijo de alto <= 0,5 no suma hueco', (t) async {
     await t.pumpWidget(_host(2000, [_box(a, 100), _box(b, 0), _box(last, 10)]));
     expect(t.getTopLeft(find.byKey(last)).dy, 114);
+  });
+
+  testWidgets('ideal null: el ultimo mide su alto natural', (t) async {
+    await t.pumpWidget(_host(2000, [_box(a, 100), _box(last, 115)], ideal: null));
+    expect(t.getSize(find.byKey(last)).height, 115);
+  });
+
+  testWidgets('naturalBlend interpola entre relleno y natural', (t) async {
+    await t.pumpWidget(_host(450, [_box(a, 100), _box(last, 10)], blend: 0.5));
+    // relleno 336, natural 10 -> 173.
+    expect(t.getSize(find.byKey(last)).height, 173);
   });
 }
