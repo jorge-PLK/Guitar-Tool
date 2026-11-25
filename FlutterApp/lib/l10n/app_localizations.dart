@@ -236,6 +236,12 @@ abstract class AppLocalizations {
   /// **'Se borrarán tomas descartadas y stems por {bytes}. Los stems se pueden volver a generar.'**
   String library_cleanMessage(String bytes);
 
+  /// Cabecera: título del diálogo de limpieza de toda la biblioteca (SettingsView:131).
+  ///
+  /// In es, this message translates to:
+  /// **'Limpiar toda la biblioteca'**
+  String get library_cleanTitleAll;
+
   /// Cabecera: título del diálogo de limpieza de un tema.
   ///
   /// In es, this message translates to:
@@ -805,6 +811,12 @@ abstract class AppLocalizations {
   /// In es, this message translates to:
   /// **'Ningún tema coincide con «{query}»'**
   String library_noMatch(String query);
+
+  /// Diálogos y avisos: título genérico de un aviso de error del núcleo.
+  ///
+  /// In es, this message translates to:
+  /// **'Aviso'**
+  String get library_noticeTitle;
 
   /// Diálogos y avisos: botón del aviso.
   ///

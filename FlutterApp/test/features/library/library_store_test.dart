@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:toneforge/contract/library.dart';
 import 'package:toneforge/core/core_client.dart';
 import 'package:toneforge/core/core_providers.dart';
 import 'package:toneforge/core/mock_core.dart';
@@ -188,7 +187,7 @@ void main() {
 
   test('trashContent junta stems y tomas de la lista con los vídeos de library.project', () async {
     final (c, core, _) = await setup();
-    core.handle('library.project', (_) => {...project('00000000-0000-0000-0000-000000000005', 'Delta'), 'stems': [], 'parts': [], 'videoCount': 3});
+    core.handle('library.project', (_) => {...project('00000000-0000-0000-0000-000000000005', 'Delta'), 'stems': <Object>[], 'parts': <Object>[], 'videoCount': 3});
     final t = await c.read(libraryStoreProvider.notifier).trashContent('00000000-0000-0000-0000-000000000005');
     expect((t.stems, t.takes, t.videos), (2, 4, 3));
   });
@@ -225,19 +224,5 @@ void main() {
     expect(await st.artistPhoto(' bela '), isNull);
     expect(await st.artistPhoto(''), isNull);
     expect(core.calls.where((x) => x.method == 'library.artistPhoto').length, 1);
-  });
-
-  test('indicador de lista: solo con texto', () async {
-    final (c, core, _) = await setup();
-    core.emit('playlist.changed', {'indicator': 'Buscando 2 de 5'});
-    await pumpEventQueue();
-    expect(c.read(libraryStoreProvider).playlistIndicator, 'Buscando 2 de 5');
-    core.emit('playlist.changed', {'indicator': ''});
-    await pumpEventQueue();
-    expect(c.read(libraryStoreProvider).playlistIndicator, isNull);
-    core.emit('playlist.changed', <String, Object?>{});
-    await pumpEventQueue();
-    expect(c.read(libraryStoreProvider).playlistIndicator, isNull);
-    expect(c.read(libraryStoreProvider).projectsFolder, isNotNull);
   });
 }

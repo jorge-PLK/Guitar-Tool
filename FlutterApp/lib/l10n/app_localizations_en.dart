@@ -101,6 +101,9 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get library_cleanTitleAll => 'Clean the whole library';
+
+  @override
   String library_cleanTitle(String title) {
     return 'Clean “$title”';
   }
@@ -415,6 +418,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String library_noMatch(String query) {
     return 'No song matches “$query”';
   }
+
+  @override
+  String get library_noticeTitle => 'Notice';
 
   @override
   String get library_noticeOk => 'OK';

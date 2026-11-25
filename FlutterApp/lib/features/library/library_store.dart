@@ -25,7 +25,6 @@ class LibraryState {
     this.grouping = LibraryGrouping.songs,
     this.openArtist,
     this.projectsFolder,
-    this.playlistIndicator,
     this.error,
   });
 
@@ -45,9 +44,6 @@ class LibraryState {
   /// Nombre del artista abierto en la vista Artistas (vacío = «Sin artista»); no se persiste.
   final String? openArtist;
   final String? projectsFolder;
-
-  /// Texto del indicador de lista; `null` si no hay texto.
-  final String? playlistIndicator;
 
   /// Último error de `library.list` distinto de `no-projects-folder`.
   final CoreError? error;
@@ -81,7 +77,6 @@ class LibraryState {
     LibraryGrouping? grouping,
     Object? openArtist = _keep,
     Object? projectsFolder = _keep,
-    Object? playlistIndicator = _keep,
     Object? error = _keep,
   }) => LibraryState(
     entries: entries ?? this.entries,
@@ -92,9 +87,6 @@ class LibraryState {
     grouping: grouping ?? this.grouping,
     openArtist: identical(openArtist, _keep) ? this.openArtist : openArtist as String?,
     projectsFolder: identical(projectsFolder, _keep) ? this.projectsFolder : projectsFolder as String?,
-    playlistIndicator: identical(playlistIndicator, _keep)
-        ? this.playlistIndicator
-        : playlistIndicator as String?,
     error: identical(error, _keep) ? this.error : error as CoreError?,
   );
 }
@@ -120,9 +112,6 @@ class LibraryStore extends Notifier<LibraryState> {
   LibraryState build() {
     final subs = [
       _core.on<Json>('library.changed', (j) => j).listen((_) => refresh()),
-      _core
-          .on<Json>('playlist.changed', (j) => j)
-          .listen((j) => _setIndicator(indicatorText(j['indicator']))),
     ];
     ref.onDispose(() {
       for (final s in subs) {
@@ -151,18 +140,10 @@ class LibraryStore extends Notifier<LibraryState> {
     try {
       final info = await _core.call<Json>('app.info', const <String, Object?>{}, (j) => j);
       if (!ref.mounted) return;
-      final playlist = info['playlist'];
-      state = state.copyWith(
-        projectsFolder: info['projectsFolder'] as String?,
-        playlistIndicator: playlist is Map ? indicatorText(playlist['indicator']) : null,
-      );
+      state = state.copyWith(projectsFolder: info['projectsFolder'] as String?);
     } on CoreError {
       // la carpeta la decide library.list
     }
-  }
-
-  void _setIndicator(String? text) {
-    if (ref.mounted) state = state.copyWith(playlistIndicator: text);
   }
 
   /// Vuelve a pedir `library.list`. Las peticiones solapadas se funden en una repetición.

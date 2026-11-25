@@ -101,6 +101,9 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
+  String get library_cleanTitleAll => 'Limpiar toda la biblioteca';
+
+  @override
   String library_cleanTitle(String title) {
     return 'Limpiar «$title»';
   }
@@ -419,6 +422,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String library_noMatch(String query) {
     return 'Ningún tema coincide con «$query»';
   }
+
+  @override
+  String get library_noticeTitle => 'Aviso';
 
   @override
   String get library_noticeOk => 'Aceptar';
