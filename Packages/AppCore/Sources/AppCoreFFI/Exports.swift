@@ -51,6 +51,9 @@ public func ffiTextureCreate(_ channel: Int32) -> Int64 {
     guard let reg = frameTextures.host?.register_texture else { return -1 }
     let id = reg(channel)
     frameTextures.setID(id, for: channel)
+    // El productor pudo dejar fotograma antes de que existiera la textura (la toma abre en pausa y Dart crea la
+    // textura tras `takeview.open`): sin este aviso el runner no lo pide hasta el siguiente, y en pausa no hay otro.
+    if id >= 0 { frameChannels.get(channel)?.signal() }
     return id
     #else
     return -1
