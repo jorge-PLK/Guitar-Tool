@@ -19,10 +19,12 @@ class TabThemeChooser extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l = AppLocalizations.of(context);
     // Temas con separación terminada (TabScreen.swift:27-46); un error cuenta como lista vacía.
+    final list = ref.watch(separatedProjectsProvider);
     final themes = [
-      for (final p in ref.watch(separatedProjectsProvider).value ?? const <ProjectSummary>[])
-        (id: p.id, title: p.title),
+      for (final p in list.value ?? const <ProjectSummary>[]) (id: p.id, title: p.title),
     ];
+    // Lista cargando o `--project` por resolver: aún no se sabe si hay temas, no se muestra «vacío».
+    final resolving = list.isLoading || ref.watch(launchProjectIdProvider).isLoading;
     final muted = TfText.body(TfSize.font13).copyWith(color: TfColors.muted);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: TfSpace.s40, vertical: TfSpace.s32),
@@ -34,7 +36,9 @@ class TabThemeChooser extends ConsumerWidget {
           spacing: TfSpace.s16,
           children: [
             Text(l.tab_title, style: TfText.display(30).copyWith(color: TfColors.text)),
-            if (themes.isEmpty)
+            if (themes.isEmpty && resolving)
+              const SizedBox.shrink()
+            else if (themes.isEmpty)
               Text(l.tab_chooserEmpty, style: muted)
             else ...[
               Text(l.tab_chooserPick, style: muted),
