@@ -41,11 +41,19 @@ class TfDropdown<T> extends StatefulWidget {
 
 class _TfDropdownState<T> extends State<TfDropdown<T>> {
   final OverlayPortalController _portal = OverlayPortalController();
-  final LayerLink _link = LayerLink();
   final FocusNode _focus = FocusNode();
   bool _open = false;
   int _highlight = 0;
   double _menuWidth = 0;
+  Rect _target = Rect.zero;
+
+  /// Alto natural del menú: filas + relleno + borde, con el tope del token.
+  double _estimatedHeight() {
+    final double natural = widget.items.length * TfSize.dropdownMenuItem +
+        2 * TfSpace.s4 +
+        2 * TfStroke.hairline;
+    return natural < TfSize.dropdownMenuMaxHeight ? natural : TfSize.dropdownMenuMaxHeight;
+  }
 
   @override
   void initState() {
@@ -84,6 +92,13 @@ class _TfDropdownState<T> extends State<TfDropdown<T>> {
     const double chrome = 2 * TfSpace.s4 + 2 * TfStroke.hairline + 2 * TfSpace.s8 +
         TfSize.checkboxMark + TfSpace.s6;
     _menuWidth = widest + chrome > buttonWidth ? widest + chrome : buttonWidth;
+    final RenderObject? box = context.findRenderObject();
+    final RenderObject? overlay = Overlay.maybeOf(context)?.context.findRenderObject();
+    if (box is RenderBox && overlay is RenderBox) {
+      _target = box.localToGlobal(Offset.zero, ancestor: overlay) & box.size;
+    } else {
+      _target = Rect.zero;
+    }
     _highlight = _selected < 0 ? 0 : _selected;
     _open = true;
     _portal.show();
@@ -138,13 +153,9 @@ class _TfDropdownState<T> extends State<TfDropdown<T>> {
         Positioned.fill(
           child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: _close),
         ),
-        Align(
-          alignment: Alignment.topLeft,
-          child: CompositedTransformFollower(
-            link: _link,
-            targetAnchor: Alignment.bottomLeft,
-            followerAnchor: Alignment.topLeft,
-            offset: const Offset(0, TfSpace.s4),
+        Positioned.fill(
+          child: CustomSingleChildLayout(
+            delegate: _MenuLayout(target: _target, menuHeight: _estimatedHeight()),
             child: Container(
               width: _menuWidth,
               constraints: const BoxConstraints(maxHeight: TfSize.dropdownMenuMaxHeight),
@@ -277,10 +288,48 @@ class _TfDropdownState<T> extends State<TfDropdown<T>> {
     return OverlayPortal(
       controller: _portal,
       overlayChildBuilder: _menu,
-      child: CompositedTransformTarget(
-        link: _link,
-        child: Focus(focusNode: _focus, onKeyEvent: _onKey, child: button),
-      ),
+      child: Focus(focusNode: _focus, onKeyEvent: _onKey, child: button),
     );
   }
+}
+
+/// Coloca el menú respecto al botón [target] (coordenadas del overlay): debajo si cabe, si no
+/// encima, y si no en el lado con más sitio con el alto recortado (el menú hace scroll).
+class _MenuLayout extends SingleChildLayoutDelegate {
+  const _MenuLayout({required this.target, required this.menuHeight});
+
+  final Rect target;
+  final double menuHeight;
+
+  double _below(Size size) => size.height - target.bottom - TfSpace.s4 - TfSpace.s8;
+  double _above() => target.top - TfSpace.s4 - TfSpace.s8;
+
+  bool _opensDown(Size size) {
+    final double below = _below(size);
+    if (menuHeight <= below) return true;
+    if (menuHeight <= _above()) return false;
+    return below >= _above();
+  }
+
+  @override
+  BoxConstraints getConstraintsForChild(BoxConstraints constraints) {
+    final Size size = constraints.biggest;
+    final double room = _opensDown(size) ? _below(size) : _above();
+    final double maxH = menuHeight <= room ? menuHeight : (room < 0 ? 0 : room);
+    return BoxConstraints(maxWidth: size.width, maxHeight: maxH);
+  }
+
+  @override
+  Offset getPositionForChild(Size size, Size childSize) {
+    double x = target.left;
+    if (x + childSize.width > size.width) x = target.right - childSize.width;
+    if (x < 0) x = 0;
+    final double y = _opensDown(size)
+        ? target.bottom + TfSpace.s4
+        : target.top - TfSpace.s4 - childSize.height;
+    return Offset(x, y);
+  }
+
+  @override
+  bool shouldRelayout(_MenuLayout old) => old.target != target || old.menuHeight != menuHeight;
 }
