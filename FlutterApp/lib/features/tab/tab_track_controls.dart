@@ -19,7 +19,7 @@ class TabTrackControls extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final AppLocalizations l = AppLocalizations.of(context);
     final TabStore store = ref.read(tabStoreProvider.notifier);
-    final String? header = ref.watch(tabStoreProvider.select((TabStoreState s) => s.tab?.header));
+    final TabHeaderSummary? header = ref.watch(tabStoreProvider.select((TabStoreState s) => s.tab?.header));
     final TextStyle base = TfText.body(TfSize.font13).copyWith(color: TfColors.text2);
     final TextStyle muted = base.copyWith(color: TfColors.muted);
     final TabTuningInfo? tuning = track.tuning;
@@ -64,7 +64,7 @@ class TabTrackControls extends ConsumerWidget {
               children: <Widget>[const TfSpinner.small(), Text(l.tab_synthRendering, style: muted)],
             ),
           const Spacer(),
-          if (header != null && header.isNotEmpty) Text(header, style: muted),
+          if (header != null) Text(header.bpm == null ? header.bar : l.tab_headerSummary(header.bar, header.bpm!), style: muted),
         ],
       ),
     );

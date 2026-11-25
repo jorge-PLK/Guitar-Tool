@@ -25,7 +25,7 @@ void main() {
 
   group('TabCard', () {
     testWidgets('compone selector, pastillas, controles, zona y pie', (tester) async {
-      final tab = tabState(<TabTrackInfo>[track('g', name: 'Guitarra')], selected: 'g', header: '4/4 · 120 BPM');
+      final tab = tabState(<TabTrackInfo>[track('g', name: 'Guitarra')], selected: 'g', header: const TabHeaderSummary(code: TabHeaderCode.meterBpm, bar: '4/4', bpm: 120));
       await pumpCard(tester, const SizedBox(height: 560, child: TabCard(stage: SizedBox(key: Key('stage')))), tab: tab);
       expect(find.byType(TabListenSelector), findsOneWidget);
       expect(find.byType(TabTrackStrip), findsOneWidget);
@@ -163,13 +163,44 @@ void main() {
   });
 
   group('Pie', () {
-    const sel = TabSelectionInfo(track: 'g', beat: 1, tick: 0, hasNote: false, summary: 'Compás 2, pulso 1 · cuerda 3, traste 5');
+    const sel = TabSelectionInfo(track: 'g', beat: 1, tick: 0, hasNote: false, summary: TabSelectionSummary(code: TabSummaryCode.note, bar: 2, beat: 1, string: 3, fret: 5));
+    const summaryText = 'Compás 2, pulso 1 · cuerda 3, traste 5';
 
     testWidgets('fijo según la fuente, en muted', (tester) async {
       await pumpCard(tester, const TabFooter(), tab: tabState(<TabTrackInfo>[track('g')]));
       expect(find.text('Transcripción automática · revisa y corrige si hace falta'), findsOneWidget);
       expect(_textColor(tester, 'Transcripción automática · revisa y corrige si hace falta'), TfColors.muted);
       expect(tester.getSize(find.byType(TabFooter)).height, 18);
+    });
+
+    for (final (String, TabSelectionSummary) c in <(String, TabSelectionSummary)>[
+      ('Compás 3, pulso 1 · cuerda 2, sin nota', const TabSelectionSummary(code: TabSummaryCode.noNote, bar: 3, beat: 1, string: 2)),
+      ('Compás 1, pulso 2 · sin golpes', const TabSelectionSummary(code: TabSummaryCode.drumsNoHits, bar: 1, beat: 2)),
+      (
+        'Compás 1, pulso 2 · bombo, charles abierto, platos',
+        const TabSelectionSummary(
+          code: TabSummaryCode.drums,
+          bar: 1,
+          beat: 2,
+          pieces: <TabDrumPiece>[TabDrumPiece.kick, TabDrumPiece.openHiHat, TabDrumPiece.crash],
+        ),
+      ),
+    ]) {
+      testWidgets('resumen ${c.$1}', (tester) async {
+        final s = TabSelectionInfo(track: 'g', beat: 1, tick: 0, hasNote: false, summary: c.$2);
+        await pumpCard(tester, const TabFooter(), tab: tabState(<TabTrackInfo>[track('g')], selection: s));
+        expect(find.text(c.$1), findsOneWidget);
+      });
+    }
+
+    testWidgets('cabecera sin BPM pinta solo el compás', (tester) async {
+      final tab = tabState(
+        <TabTrackInfo>[track('g', name: 'Guitarra')],
+        selected: 'g',
+        header: const TabHeaderSummary(code: TabHeaderCode.meter, bar: '6/8'),
+      );
+      await pumpCard(tester, TabTrackControls(track: tab.tracks.first), tab: tab);
+      expect(find.text('6/8'), findsOneWidget);
     });
 
     testWidgets('fuente Songsterr', (tester) async {
@@ -180,16 +211,16 @@ void main() {
     testWidgets('selección gana al fijo; el flash gana a la selección', (tester) async {
       final tab = tabState(<TabTrackInfo>[track('g')], selection: sel);
       final store = await pumpCard(tester, const TabFooter(), tab: tab);
-      expect(find.text(sel.summary!), findsOneWidget);
-      expect(_textColor(tester, sel.summary!), TfColors.muted);
+      expect(find.text(summaryText), findsOneWidget);
+      expect(_textColor(tester, summaryText), TfColors.muted);
       store.set(TabStoreState(tab: tab, flash: 'Guardado x.gp.'));
       await tester.pump();
       expect(find.text('Guardado x.gp.'), findsOneWidget);
-      expect(find.text(sel.summary!), findsNothing);
+      expect(find.text(summaryText), findsNothing);
       expect(_textColor(tester, 'Guardado x.gp.'), TfColors.accent);
       store.set(TabStoreState(tab: tab));
       await tester.pump();
-      expect(find.text(sel.summary!), findsOneWidget);
+      expect(find.text(summaryText), findsOneWidget);
     });
   });
 }

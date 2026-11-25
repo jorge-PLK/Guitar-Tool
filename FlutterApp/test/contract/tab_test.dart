@@ -204,6 +204,33 @@ void main() => group('contract · tab', () {
     expect(fallos, isEmpty);
   });
 
+  test('tab.select: summary noNote y drumsNoHits; header meterBpm', () {
+    final s = TabState.fromJson(_load('tab.select.result'));
+    expect(s.header?.code, TabHeaderCode.meterBpm);
+    expect(s.header?.bar, '4/4');
+    expect(s.header?.bpm, 120);
+    final sum = s.selection!.summary!;
+    expect((sum.code, sum.bar, sum.beat, sum.string), (TabSummaryCode.noNote, 3, 1, 2));
+    final d = TabState.fromJson(_load('tab.select.result.drums'));
+    expect(d.selection!.summary!.code, TabSummaryCode.drumsNoHits);
+    expect(d.selection!.summary!.pieces, isEmpty);
+  });
+
+  test('summary: note, drums con piezas, header meter y codes desconocidos', () {
+    final n = TabSelectionSummary.fromJson(<String, Object?>{'code': 'note', 'bar': 2, 'beat': 3, 'string': 4, 'fret': 7});
+    expect((n.code, n.string, n.fret), (TabSummaryCode.note, 4, 7));
+    final d = TabSelectionSummary.fromJson(<String, Object?>{
+      'code': 'drums', 'bar': 1, 'beat': 1, 'pieces': <Object?>['kick', 'openHiHat', 'zzz'],
+    });
+    expect(d.code, TabSummaryCode.drums);
+    expect(d.pieces, <TabDrumPiece>[TabDrumPiece.kick, TabDrumPiece.openHiHat, TabDrumPiece.unknown]);
+    expect(d.toJson()['pieces'], <Object?>['kick', 'openHiHat', 'unknown']);
+    final m = TabHeaderSummary.fromJson(<String, Object?>{'code': 'meter', 'bar': '3/4'});
+    expect((m.code, m.bar, m.bpm), (TabHeaderCode.meter, '3/4', null));
+    expect(TabHeaderSummary.fromJson(<String, Object?>{'code': 'x', 'bar': ''}).code, TabHeaderCode.unknown);
+    expect(TabSelectionSummary.fromJson(<String, Object?>{'code': 'x', 'bar': 1, 'beat': 1}).code, TabSummaryCode.unknown);
+  });
+
   test('tab.edit: cada factoría produce exactamente su fixture', () {
     final casos = <String, TabEditParams>{
       'tab.edit.params.digit': TabEditParams.digit(5),

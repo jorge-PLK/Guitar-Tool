@@ -90,7 +90,7 @@ TabState tabState(
   TabListenMode mode = TabListenMode.stems,
   TabSource source = TabSource.automatic,
   TabSelectionInfo? selection,
-  String? header,
+  TabHeaderSummary? header,
 }) =>
     TabState(
       projectId: 'p',

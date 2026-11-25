@@ -125,6 +125,63 @@ final class TabBarRange {
   final double end;
 }
 
+/// Cabecera del arreglo: compás y, si lo hay, tempo.
+final class TabHeaderSummary {
+  const TabHeaderSummary({required this.code, required this.bar, this.bpm});
+
+  factory TabHeaderSummary.fromJson(Json j) => TabHeaderSummary(
+        code: _enumOr(TabHeaderCode.values, j['code'], TabHeaderCode.unknown),
+        bar: _s(j['bar']),
+        bpm: _in(j['bpm']),
+      );
+
+  final TabHeaderCode code;
+  final String bar;
+  final int? bpm;
+}
+
+/// Resumen de la selección. `bar` y `beat` son 1-based.
+final class TabSelectionSummary {
+  const TabSelectionSummary({
+    required this.code,
+    required this.bar,
+    required this.beat,
+    this.string,
+    this.fret,
+    this.pieces = const <TabDrumPiece>[],
+  });
+
+  factory TabSelectionSummary.fromJson(Json j) => TabSelectionSummary(
+        code: _enumOr(TabSummaryCode.values, j['code'], TabSummaryCode.unknown),
+        bar: _i(j['bar']),
+        beat: _i(j['beat']),
+        string: _in(j['string']),
+        fret: _in(j['fret']),
+        pieces: j['pieces'] == null
+            ? const <TabDrumPiece>[]
+            : [
+                for (final String p in _strs(j['pieces']))
+                  _enumOr(TabDrumPiece.values, p, TabDrumPiece.unknown),
+              ],
+      );
+
+  Json toJson() => <String, Object?>{
+        'code': code.wire,
+        'bar': bar,
+        'beat': beat,
+        if (string != null) 'string': string,
+        if (fret != null) 'fret': fret,
+        if (pieces.isNotEmpty) 'pieces': [for (final TabDrumPiece p in pieces) p.wire],
+      };
+
+  final TabSummaryCode code;
+  final int bar;
+  final int beat;
+  final int? string;
+  final int? fret;
+  final List<TabDrumPiece> pieces;
+}
+
 final class TabSelectionInfo {
   const TabSelectionInfo({
     required this.track,
@@ -142,7 +199,7 @@ final class TabSelectionInfo {
         tick: _i(j['tick']),
         hasNote: _b(j['hasNote']),
         string: _in(j['string']),
-        summary: _sn(j['summary']),
+        summary: _opt(j['summary'], TabSelectionSummary.fromJson),
         barRange: _opt(j['barRange'], TabBarRange.fromJson),
       );
 
@@ -152,7 +209,7 @@ final class TabSelectionInfo {
         'tick': tick,
         'hasNote': hasNote,
         if (string != null) 'string': string,
-        if (summary != null) 'summary': summary,
+        if (summary != null) 'summary': summary!.toJson(),
         if (barRange != null) 'barRange': barRange!.toJson(),
       };
 
@@ -163,7 +220,7 @@ final class TabSelectionInfo {
   /// Hay una nota bajo la selección (`sin nota` en el resumen cuando es `false`).
   final bool hasNote;
   final int? string;
-  final String? summary;
+  final TabSelectionSummary? summary;
   final TabBarRange? barRange;
 }
 
@@ -205,7 +262,7 @@ final class TabState {
         projectId: _s(j['projectId']),
         phase: _enumOr(TabPhase.values, j['phase'], TabPhase.unknown),
         error: _sn(j['error']),
-        header: _sn(j['header']),
+        header: _opt(j['header'], TabHeaderSummary.fromJson),
         source: _enumN(TabSource.values, j['source'], TabSource.unknown),
         tracks: _items(j['tracks'], TabTrackInfo.fromJson),
         selectedTrack: _sn(j['selectedTrack']),
@@ -231,8 +288,8 @@ final class TabState {
   final TabPhase phase;
   /// Solo con `failed`.
   final String? error;
-  /// Ej. «4/4 · 120 BPM».
-  final String? header;
+  /// Compás y tempo.
+  final TabHeaderSummary? header;
   /// Ausente = sin elegir.
   final TabSource? source;
   final List<TabTrackInfo> tracks;

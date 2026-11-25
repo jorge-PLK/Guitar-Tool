@@ -108,3 +108,39 @@ enum TabTuningPreset with TabWire {
   @override
   final String wire;
 }
+
+enum TabHeaderCode with TabWire {
+  meterBpm('meterBpm'),
+  meter('meter'),
+  unknown('unknown');
+
+  const TabHeaderCode(this.wire);
+  @override
+  final String wire;
+}
+
+enum TabSummaryCode with TabWire {
+  note('note'),
+  noNote('noNote'),
+  drums('drums'),
+  drumsNoHits('drumsNoHits'),
+  unknown('unknown');
+
+  const TabSummaryCode(this.wire);
+  @override
+  final String wire;
+}
+
+enum TabDrumPiece with TabWire {
+  kick('kick'),
+  snare('snare'),
+  hiHat('hiHat'),
+  openHiHat('openHiHat'),
+  tom('tom'),
+  crash('crash'),
+  unknown('unknown');
+
+  const TabDrumPiece(this.wire);
+  @override
+  final String wire;
+}
