@@ -123,6 +123,13 @@ void main() {
       },
     });
     expect(find.text('Calibrada'), findsOneWidget);
+    // Alto del contenido (no de la ventana) y título sin subrayado por falta de Material.
+    expect(tester.getSize(find.byType(CalibrationSheet)).height, lessThan(400));
+    final title = tester.widget<RichText>(find.descendant(
+        of: find.byType(CalibrationSheet), matching: find.byWidgetPredicate((w) {
+      return w is RichText && w.text.toPlainText() == 'Calibrar latencia';
+    })));
+    expect(title.text.style?.decoration ?? TextDecoration.none, TextDecoration.none);
     expect(find.text('Latencia'), findsOneWidget);
     expect(find.text('53,15 ms · 2551,2 muestras'), findsOneWidget);
     expect(find.byType(TfSecondaryButton), findsNothing);

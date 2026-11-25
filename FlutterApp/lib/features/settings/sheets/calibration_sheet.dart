@@ -16,7 +16,14 @@ import '../widgets/audio_texts.dart';
 
 /// Abre la hoja «Calibrar latencia» (Ajustes · Audio). Lee y actúa solo por [audioStoreProvider].
 Future<void> showCalibrationSheet(BuildContext context) =>
-    showTfSheet<void>(context: context, builder: (_) => const CalibrationSheet());
+    showTfSheet<void>(
+      context: context,
+      // La ruta modal queda fuera de cualquier Material: sin esto el título hereda el subrayado de error.
+      builder: (_) => DefaultTextStyle(
+        style: TfText.body().copyWith(color: TfColors.text, decoration: TextDecoration.none),
+        child: const CalibrationSheet(),
+      ),
+    );
 
 /// Hoja «Calibrar latencia» (CalibrationSheet.swift:19-134): pasos, midiendo, resultado, fallo y error.
 /// No se puede cerrar midiendo; al destruirse envía `closeCalibration` (cancela si mide, si no descarta).
@@ -114,6 +121,7 @@ class _Steps extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       spacing: TfSpace.s18,
       children: <Widget>[
@@ -136,6 +144,7 @@ class _Running extends StatelessWidget {
   Widget build(BuildContext context) {
     final double? p = progress;
     return Column(
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       spacing: TfSpace.s18,
       children: <Widget>[
@@ -158,6 +167,7 @@ class _Success extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       spacing: TfSpace.s12,
       children: <Widget>[
@@ -173,6 +183,7 @@ class _Success extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.all(TfSpace.s14),
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 spacing: TfSpace.s8,
                 children: <Widget>[
@@ -238,6 +249,7 @@ class _Problem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       spacing: TfSpace.s8,
       children: <Widget>[
