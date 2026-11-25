@@ -45,7 +45,9 @@ class TabCard extends ConsumerWidget {
                     color: TfColors.bg.withValues(alpha: TfOpacity.dim),
                     borderRadius: BorderRadius.circular(TfRadius.control),
                   ),
-                  child: ClipRRect(borderRadius: BorderRadius.circular(TfRadius.control), child: stage),
+                  // Sin ClipRRect aquí: un recorte sobre la vista nativa (WKWebView) rompe su hit test en macOS.
+                  // El recorte de las esquinas va solo sobre el overlay (TabStage).
+                  child: stage,
                 ),
               ),
             ),
