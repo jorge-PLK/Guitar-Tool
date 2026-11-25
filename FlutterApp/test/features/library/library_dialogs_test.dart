@@ -167,12 +167,11 @@ void main() {
 
   testWidgets('duplicado: «Abrir el existente» cambia a Biblioteca y selecciona', (tester) async {
     final (c, _) = await _pump(tester, (ctx, ref) => showDuplicateDialog(ctx, ref, _id));
-    // Los botones de «Este tema ya está…» desbordan la alerta de 320 px (kit): se ignora aquí.
-    tester.takeException();
     c.read(shellRouteProvider.notifier).select(ShellRoute.settings);
     expect(find.text(l.library_duplicateTitle), findsOneWidget);
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pump(const Duration(milliseconds: 300));
+    expect(tester.takeException(), isNull);
     expect(c.read(shellRouteProvider), ShellRoute.library);
     expect(c.read(selectedProjectProvider), _id);
   });
