@@ -1,14 +1,17 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:toneforge/contract/tab.dart';
+import 'package:toneforge/features/tab/songsterr_sheet.dart';
 import 'package:toneforge/features/tab/tab_canvas.dart';
 import 'package:toneforge/features/tab/tab_canvas_controller.dart';
 import 'package:toneforge/features/tab/tab_card.dart';
+import 'package:toneforge/features/tab/tab_edit_bar.dart';
 import 'package:toneforge/features/tab/tab_header.dart';
 import 'package:toneforge/features/tab/tab_notice.dart';
 import 'package:toneforge/features/tab/tab_stage.dart';
 import 'package:toneforge/features/tab/tab_store.dart';
 import 'package:toneforge/features/tab/tab_theme_chooser.dart';
+import 'package:toneforge/features/tab/tab_transport.dart';
 import 'package:toneforge/shell/selected_project.dart';
 import 'package:toneforge/shell/shell_route.dart';
 import 'package:toneforge/theme/tokens.dart';
@@ -32,7 +35,7 @@ class TabScreen extends ConsumerWidget {
       return const Center(child: TfSpinner.small());
     }
     final editing = tab.editMode && tab.phase == TabPhase.ready;
-    return Padding(
+    final body = Padding(
       padding: const EdgeInsets.symmetric(horizontal: TfSpace.s36, vertical: TfSpace.s20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -41,11 +44,13 @@ class TabScreen extends ConsumerWidget {
           const TabHeader(),
           const TabNotice(),
           const Expanded(child: TabCard(stage: _Stage())),
-          if (editing) const _SlotEditBar(),
-          const _SlotTransport(),
+          if (editing) const TabEditBar(),
+          const TabTransport(),
         ],
       ),
     );
+    // La hoja de Songsterr se abre y cierra sola según `songsterrStoreProvider` (TabScreen.swift:99-102).
+    return Stack(children: [body, const SongsterrSheetHost()]);
   }
 }
 
@@ -58,21 +63,4 @@ class _Stage extends ConsumerWidget {
     final webError = ref.watch(tabCanvasProvider.select((s) => s.webError));
     return TabStage(canvas: const TabCanvas(), webError: webError);
   }
-}
-
-// SLOT: TabEditBar
-// Barra de edición; solo se monta con `editMode && phase == ready`.
-class _SlotEditBar extends StatelessWidget {
-  const _SlotEditBar();
-
-  @override
-  Widget build(BuildContext context) => const SizedBox.shrink();
-}
-
-// SLOT: TabTransport
-class _SlotTransport extends StatelessWidget {
-  const _SlotTransport();
-
-  @override
-  Widget build(BuildContext context) => const SizedBox.shrink();
 }
