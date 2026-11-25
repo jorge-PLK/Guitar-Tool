@@ -5,29 +5,20 @@ import 'package:toneforge/features/backing/study_store.dart';
 import 'package:toneforge/features/backing/widgets/chord_grid_geometry.dart';
 import 'package:toneforge/features/backing/widgets/chord_grid_painter.dart';
 import 'package:toneforge/features/backing/widgets/chord_strip.dart';
+import 'package:toneforge/features/backing/widgets/section_box_header.dart';
 import 'package:toneforge/features/backing/widgets/section_boxes_geometry.dart';
 import 'package:toneforge/features/backing/widgets/section_boxes_painter.dart';
 import 'package:toneforge/features/backing/widgets/section_edge_drag.dart';
 import 'package:toneforge/features/backing/widgets/section_edge_handles.dart';
-import 'package:toneforge/features/backing/widgets/section_menu.dart';
-import 'package:toneforge/features/backing/widgets/section_popover.dart';
 import 'package:toneforge/features/backing/widgets/section_popover_state.dart';
 import 'package:toneforge/features/backing/widgets/section_selection.dart';
-import 'package:toneforge/l10n/app_localizations.dart';
-import 'package:toneforge/theme/fmt.dart';
 import 'package:toneforge/theme/icons.dart';
 import 'package:toneforge/theme/tokens.dart';
 import 'package:toneforge/theme/typography.dart';
-import 'package:toneforge/widgets/tf_menu.dart';
 import 'package:toneforge/widgets/tf_popover.dart';
-import 'package:toneforge/widgets/tf_tooltip.dart';
 
-// TOKEN: sectionIconSize 10 (SB:76)
-const double _iconSize = 10;
 // TOKEN: sectionLabelSize 12 (SB:76)
 const double _labelSize = 12;
-// TOKEN: loopSameTime 0.01 s (SectionEditor.sameTime, ficha §6.3)
-const double _sameTime = 0.01;
 
 /// SLOT de [ChordStrip.sectionsLayer]: cajas de sección sobre la tira (SB:191-265).
 Widget stripSectionBoxes(BuildContext context, ChordStripLayout layout) =>
@@ -143,8 +134,8 @@ class SectionBoxesLayer extends ConsumerWidget {
               loopActive:
                   loop != null &&
                   (loop.start - placements[i].section.start).abs() <
-                      _sameTime &&
-                  (loop.end - placements[i].section.end).abs() < _sameTime,
+                      sectionBoxSameTime &&
+                  (loop.end - placements[i].section.end).abs() < sectionBoxSameTime,
             ),
           ),
         if (mapper != null && selected != null)
@@ -187,12 +178,6 @@ class _SectionBoxState extends ConsumerState<_SectionBox> {
     });
   }
 
-  void _open() {
-    final String id = widget.placement.section.id;
-    ref.read(sectionSelectionProvider.notifier).select(id);
-    ref.read(sectionPopoverProvider.notifier).open(id);
-  }
-
   @override
   Widget build(BuildContext context) {
     final SectionPlacement placement = widget.placement;
@@ -209,7 +194,7 @@ class _SectionBoxState extends ConsumerState<_SectionBox> {
     final Color ink = s.solo ? TfColors.accent : color;
     final Widget icon = TfIconView(
       TfIcon.guitarsFill,
-      size: _iconSize,
+      size: sectionBoxIconSize,
       color: ink,
     );
     final TextStyle nameStyle = TfText.body(
@@ -242,92 +227,15 @@ class _SectionBoxState extends ConsumerState<_SectionBox> {
           top: 0,
           right: 0,
           height: placement.headerHeight,
-          child: _header(s, ink, icon, nameStyle, name),
-        ),
-      ],
-    );
-  }
-
-  Widget _header(
-    StudySectionInfo s,
-    Color ink,
-    Widget icon,
-    TextStyle nameStyle,
-    Widget name,
-  ) {
-    final SectionPlacement placement = widget.placement;
-    final AppLocalizations l = AppLocalizations.of(context);
-    final String from = TfFmt.clock(s.start);
-    final String to = TfFmt.clock(s.end);
-    final Widget box = TfTooltip(
-      message: l.backing_sectionBoxTooltip(
-        s.name,
-        s.solo ? 'yes' : 'no',
-        from,
-        to,
-      ),
-      child: Semantics(
-        label: l.backing_sectionA11y(
-          s.solo ? 'solo' : 'section',
-          s.name,
-          from,
-          to,
-        ),
-        hint: l.backing_sectionA11yHint,
-        button: true,
-        excludeSemantics: true,
-        onTap: _open,
-        child: MouseRegion(
-          cursor: SystemMouseCursors.click,
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: _open,
-            onLongPress: () => toggleSectionLoop(ref, s, sameTime: _sameTime),
-            child: !placement.labeled
-                ? const SizedBox.expand()
-                : Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: TfSpace.s8),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      // Como `ViewThatFits`: nombre con icono, solo el icono (si es solo) o nada.
-                      child: LayoutBuilder(
-                        builder: (BuildContext context, BoxConstraints c) {
-                          final double text = (TextPainter(
-                            text: TextSpan(text: s.name, style: nameStyle),
-                            maxLines: 1,
-                            textDirection: TextDirection.ltr,
-                          )..layout()).width;
-                          final double full =
-                              text + (s.solo ? _iconSize + TfSpace.s4 : 0);
-                          if (full <= c.maxWidth) {
-                            return Row(
-                              mainAxisSize: MainAxisSize.min,
-                              spacing: TfSpace.s4,
-                              children: <Widget>[if (s.solo) icon, name],
-                            );
-                          }
-                          return s.solo && _iconSize <= c.maxWidth
-                              ? icon
-                              : const SizedBox.shrink();
-                        },
-                      ),
-                    ),
-                  ),
+          child: SectionBoxHeader(
+            placement: placement,
+            icon: icon,
+            nameStyle: nameStyle,
+            name: name,
+            popover: _pop,
           ),
         ),
-      ),
-    );
-    final Widget anchored = placement.labeled
-        ? TfPopover(
-            controller: _pop,
-            onClosed: ref.read(sectionPopoverProvider.notifier).close,
-            popoverBuilder: (BuildContext _) => SectionPopover(sectionId: s.id),
-            child: box,
-          )
-        : box;
-    return TfContextMenu(
-      entries: sectionMenuEntries(ref, s, AppLocalizations.of(context)),
-      child: anchored,
+      ],
     );
   }
 }

@@ -7,7 +7,6 @@ import 'package:toneforge/core/core_providers.dart';
 import 'package:toneforge/core/launch_options.dart';
 import 'package:toneforge/core/mock_core.dart';
 import 'package:toneforge/features/backing/study_store.dart';
-import 'package:toneforge/features/backing/widgets/chord_strip.dart';
 import 'package:toneforge/features/backing/widgets/chords_area.dart';
 import 'package:toneforge/features/backing/widgets/section_boxes.dart';
 import 'package:toneforge/features/backing/widgets/section_popover.dart';
