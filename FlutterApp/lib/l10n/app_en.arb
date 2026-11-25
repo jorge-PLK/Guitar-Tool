@@ -637,7 +637,7 @@
   "backing_menuUnmarkSolo": "Remove solo mark",
   "backing_metronome": "Metronome",
   "backing_mixer": "Mixer",
-  "backing_mixerOutput": "Output: {device} (— if empty)",
+  "backing_mixerOutput": "Output: {device}",
   "@backing_mixerOutput": {"placeholders": {"device": {"type": "String"}}},
   "backing_muteA11y": "Mute {name}",
   "@backing_muteA11y": {"placeholders": {"name": {"type": "String"}}},

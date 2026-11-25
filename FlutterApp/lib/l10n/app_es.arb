@@ -637,7 +637,7 @@
   "backing_menuUnmarkSolo": "Quitar marca de solo",
   "backing_metronome": "Metrónomo",
   "backing_mixer": "Mezclador",
-  "backing_mixerOutput": "Salida: {device} (— si vacío)",
+  "backing_mixerOutput": "Salida: {device}",
   "@backing_mixerOutput": {"placeholders": {"device": {"type": "String"}}},
   "backing_muteA11y": "Silenciar {name}",
   "@backing_muteA11y": {"placeholders": {"name": {"type": "String"}}},
