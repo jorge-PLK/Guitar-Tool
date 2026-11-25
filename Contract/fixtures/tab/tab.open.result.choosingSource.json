@@ -1,0 +1,42 @@
+{
+  "anySolo" : false,
+  "canRedo" : false,
+  "canUndo" : false,
+  "editMode" : false,
+  "graceMode" : false,
+  "listenMode" : "stems",
+  "notices" : [
+
+  ],
+  "phase" : "choosingSource",
+  "projectId" : "00000000-0000-0000-0000-000000000001",
+  "revision" : 0,
+  "tracks" : [
+    {
+      "dimmed" : false,
+      "id" : "bass",
+      "kind" : "bass",
+      "listening" : false,
+      "muted" : false,
+      "name" : "Bajo",
+      "noteCount" : 0,
+      "origin" : "stem",
+      "playerTrack" : "bass",
+      "solo" : false,
+      "transcription" : "missing"
+    },
+    {
+      "dimmed" : false,
+      "id" : "drums",
+      "kind" : "drums",
+      "listening" : false,
+      "muted" : false,
+      "name" : "Batería",
+      "noteCount" : 0,
+      "origin" : "stem",
+      "playerTrack" : "drums",
+      "solo" : false,
+      "transcription" : "missing"
+    }
+  ]
+}

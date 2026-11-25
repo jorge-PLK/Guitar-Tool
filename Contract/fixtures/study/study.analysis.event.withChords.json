@@ -1,0 +1,89 @@
+{
+  "analysis" : {
+    "beats" : [
+      0.5,
+      1,
+      1.5,
+      2,
+      2.5,
+      3,
+      3.5,
+      4
+    ],
+    "beatsPerBar" : 4,
+    "bpm" : 120,
+    "chords" : [
+      {
+        "display" : "A#m",
+        "end" : 2,
+        "index" : 0,
+        "name" : "Cm",
+        "overridden" : false,
+        "shape" : {
+          "barre" : {
+            "fret" : 3,
+            "fromString" : 6,
+            "toString" : 1
+          },
+          "baseFret" : 3,
+          "frets" : [
+            3,
+            5,
+            5,
+            3,
+            3,
+            3
+          ]
+        },
+        "shown" : {
+          "quality" : 0,
+          "root" : 10
+        },
+        "start" : 0
+      },
+      {
+        "display" : "A#m(maj7)",
+        "end" : 4,
+        "index" : 7,
+        "name" : "Cm(maj7)",
+        "overridden" : false,
+        "shape" : {
+          "barre" : {
+            "fret" : 3,
+            "fromString" : 6,
+            "toString" : 1
+          },
+          "baseFret" : 3,
+          "frets" : [
+            3,
+            5,
+            4,
+            3,
+            3,
+            3
+          ]
+        },
+        "shown" : {
+          "quality" : 7,
+          "root" : 10
+        },
+        "start" : 2
+      }
+    ],
+    "downbeats" : [
+      0.5,
+      2.5
+    ],
+    "key" : {
+      "confidence" : 0.40000000000000002,
+      "detected" : "C:maj",
+      "display" : {
+        "mode" : "maj",
+        "tonic" : "A#"
+      },
+      "effective" : "C:maj"
+    },
+    "state" : "ready"
+  },
+  "state" : "ready"
+}

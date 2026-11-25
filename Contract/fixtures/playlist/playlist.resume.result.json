@@ -1,0 +1,85 @@
+{
+  "indicator" : "Importando 1 de 2",
+  "isLive" : true,
+  "items" : [
+    {
+      "artist" : "Canal",
+      "candidates" : [
+
+      ],
+      "chosen" : {
+        "artist" : "Canal",
+        "duration" : 200,
+        "id" : "yyyyyyyyyy1",
+        "isClose" : false,
+        "isLive" : false,
+        "source" : "youtube",
+        "thumbnail" : "https://i.ytimg.com/vi/yyyyyyyyyy1/mqdefault.jpg",
+        "title" : "Uno",
+        "url" : "https://www.youtube.com/watch?v=yyyyyyyyyy1"
+      },
+      "duration" : 200,
+      "id" : "yyyyyyyyyy1",
+      "kind" : "youtube",
+      "selected" : true,
+      "stage" : "download",
+      "status" : "downloading",
+      "title" : "Uno"
+    },
+    {
+      "artist" : "Canal",
+      "candidates" : [
+
+      ],
+      "chosen" : {
+        "artist" : "Canal",
+        "duration" : 210,
+        "id" : "yyyyyyyyyy2",
+        "isClose" : false,
+        "isLive" : false,
+        "source" : "youtube",
+        "thumbnail" : "https://i.ytimg.com/vi/yyyyyyyyyy2/mqdefault.jpg",
+        "title" : "Dos",
+        "url" : "https://www.youtube.com/watch?v=yyyyyyyyyy2"
+      },
+      "duration" : 210,
+      "id" : "yyyyyyyyyy2",
+      "kind" : "youtube",
+      "selected" : true,
+      "status" : "pending",
+      "title" : "Dos"
+    }
+  ],
+  "kind" : "playlist",
+  "mayBeTruncated" : false,
+  "name" : "Lista YT",
+  "progress" : 0,
+  "source" : "youtube",
+  "step" : "running",
+  "summary" : {
+    "cancelled" : false,
+    "failed" : 0,
+    "imported" : 0,
+    "inLibrary" : 0,
+    "remaining" : 2,
+    "skipped" : 0
+  },
+  "totals" : {
+    "duplicates" : 0,
+    "failed" : 0,
+    "imported" : 0,
+    "inLibrary" : 0,
+    "queued" : 2,
+    "remaining" : 2,
+    "selected" : 2,
+    "skipped" : 0,
+    "total" : 2
+  },
+  "update" : {
+    "alreadyLatest" : false,
+    "updating" : false
+  },
+  "warnings" : [
+
+  ]
+}

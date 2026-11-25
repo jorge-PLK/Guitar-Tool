@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
@@ -7,7 +9,7 @@ import '../theme/tokens.dart';
 /// pomo circular blanco. `step` cuantiza; `snapTo` imanta a un valor si la distancia es
 /// <= `snapTolerance` (solo con el ratón). Flechas ±paso, Inicio/Fin con el foco.
 /// Sin `width` ocupa el ancho disponible (o `TfSize.sliderWidth` si no está acotado).
-class TfSlider extends StatelessWidget {
+class TfSlider extends StatefulWidget {
   const TfSlider({
     super.key,
     required this.value,
@@ -33,6 +35,63 @@ class TfSlider extends StatelessWidget {
   final double? width;
   final ValueChanged<double>? onChangeEnd;
 
+  @override
+  State<TfSlider> createState() => _TfSliderState();
+}
+
+class _TfSliderState extends State<TfSlider> {
+  double? _drag;
+  bool _active = false;
+  Timer? _hold;
+
+  double get value => widget.value;
+  double get min => widget.min;
+  double get max => widget.max;
+  double? get step => widget.step;
+  double? get snapTo => widget.snapTo;
+  double get snapTolerance => widget.snapTolerance;
+  double? get width => widget.width;
+  double get _shown => _drag ?? widget.value;
+
+  @override
+  void didUpdateWidget(TfSlider old) {
+    super.didUpdateWidget(old);
+    // Tras soltar, _drag se mantiene hasta que el padre trae un valor nuevo (o 300 ms).
+    if (!_active && _drag != null && old.value != widget.value) _clearDrag();
+  }
+
+  @override
+  void dispose() {
+    _hold?.cancel();
+    super.dispose();
+  }
+
+  void _clearDrag() {
+    _hold?.cancel();
+    _hold = null;
+    if (_drag != null && mounted) setState(() => _drag = null);
+  }
+
+  void _emit(double v) {
+    _hold?.cancel();
+    _active = true;
+    final bool changed = v != _shown;
+    if (changed || _drag == null) setState(() => _drag = v);
+    if (changed) widget.onChanged?.call(v);
+  }
+
+  void _release({bool notify = true}) {
+    if (!_active) return;
+    _active = false;
+    final double? v = _drag;
+    if (notify && v != null) widget.onChangeEnd?.call(v);
+    if (v == null || v == widget.value) {
+      _clearDrag();
+    } else {
+      _hold = Timer(const Duration(milliseconds: 300), _clearDrag);
+    }
+  }
+
   double _clamp(double v) => v.clamp(min, max).toDouble();
 
   double _quantize(double v) {
@@ -52,17 +111,17 @@ class TfSlider extends StatelessWidget {
 
   void _keyStep(double delta) {
     final double inc = step ?? (max - min) * 0.05;
-    final double next = _quantize(value + delta * inc);
-    if (next != value) onChanged!(next);
+    final double next = _quantize(_shown + delta * inc);
+    if (next != _shown) widget.onChanged!(next);
   }
 
   @override
   Widget build(BuildContext context) {
-    final bool enabled = onChanged != null;
+    final bool enabled = widget.onChanged != null;
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints c) {
         final double w = width ?? (c.hasBoundedWidth ? c.maxWidth : TfSize.sliderWidth);
-        final double t = max == min ? 0 : ((value - min) / (max - min)).clamp(0.0, 1.0);
+        final double t = max == min ? 0 : ((_shown - min) / (max - min)).clamp(0.0, 1.0);
         final double usable = w - TfSize.sliderKnob;
         final double knobLeft = t * usable;
         const double trackTop = (TfSize.sliderHit - TfSize.sliderTrack) / 2;
@@ -116,11 +175,12 @@ class TfSlider extends StatelessWidget {
         }
         body = GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTapDown: (TapDownDetails d) => onChanged!(_fromDx(d.localPosition.dx, w)),
-          onTapUp: (TapUpDetails d) => onChangeEnd?.call(_fromDx(d.localPosition.dx, w)),
-          onHorizontalDragUpdate: (DragUpdateDetails d) =>
-              onChanged!(_fromDx(d.localPosition.dx, w)),
-          onHorizontalDragEnd: (DragEndDetails d) => onChangeEnd?.call(value),
+          onTapDown: (TapDownDetails d) => _emit(_fromDx(d.localPosition.dx, w)),
+          onTapUp: (TapUpDetails d) => _release(),
+          onTapCancel: () => _release(notify: false),
+          onHorizontalDragUpdate: (DragUpdateDetails d) => _emit(_fromDx(d.localPosition.dx, w)),
+          onHorizontalDragEnd: (DragEndDetails d) => _release(),
+          onHorizontalDragCancel: _release,
           child: body,
         );
         return Focus(
@@ -134,9 +194,9 @@ class TfSlider extends StatelessWidget {
             } else if (k == LogicalKeyboardKey.arrowLeft || k == LogicalKeyboardKey.arrowDown) {
               _keyStep(-1);
             } else if (k == LogicalKeyboardKey.home) {
-              onChanged!(min);
+              widget.onChanged!(min);
             } else if (k == LogicalKeyboardKey.end) {
-              onChanged!(max);
+              widget.onChanged!(max);
             } else {
               return KeyEventResult.ignored;
             }

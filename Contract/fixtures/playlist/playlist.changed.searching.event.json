@@ -1,0 +1,76 @@
+{
+  "indicator" : "Buscando 1 de 3",
+  "isLive" : true,
+  "items" : [
+    {
+      "artist" : "Marea",
+      "candidates" : [
+
+      ],
+      "duration" : 252,
+      "id" : "3demoDemoDemoDemoDemoA",
+      "kind" : "spotify",
+      "selected" : true,
+      "status" : "searching",
+      "title" : "Tema A"
+    },
+    {
+      "artist" : "Marea",
+      "candidates" : [
+
+      ],
+      "duration" : 300,
+      "id" : "3demoDemoDemoDemoDemoB",
+      "kind" : "spotify",
+      "selected" : true,
+      "status" : "pending",
+      "title" : "Tema B"
+    },
+    {
+      "artist" : "Marea",
+      "candidates" : [
+
+      ],
+      "duration" : 252,
+      "id" : "3demoDemoDemoDemoDemoC",
+      "kind" : "spotify",
+      "selected" : true,
+      "status" : "pending",
+      "title" : "Tema C"
+    }
+  ],
+  "kind" : "playlist",
+  "mayBeTruncated" : false,
+  "name" : "Mi lista",
+  "progress" : 0,
+  "searchDone" : 0,
+  "searchTotal" : 3,
+  "source" : "spotify",
+  "step" : "searching",
+  "summary" : {
+    "cancelled" : false,
+    "failed" : 0,
+    "imported" : 0,
+    "inLibrary" : 0,
+    "remaining" : 3,
+    "skipped" : 0
+  },
+  "totals" : {
+    "duplicates" : 0,
+    "failed" : 0,
+    "imported" : 0,
+    "inLibrary" : 0,
+    "queued" : 0,
+    "remaining" : 3,
+    "selected" : 3,
+    "skipped" : 0,
+    "total" : 3
+  },
+  "update" : {
+    "alreadyLatest" : false,
+    "updating" : false
+  },
+  "warnings" : [
+
+  ]
+}

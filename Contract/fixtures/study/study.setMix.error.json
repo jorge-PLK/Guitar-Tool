@@ -1,0 +1,4 @@
+{
+  "code" : "bad-params",
+  "message" : "«channel» no es un canal del mezclador: no-existe"
+}

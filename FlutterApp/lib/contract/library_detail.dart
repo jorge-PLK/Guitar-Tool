@@ -1,4 +1,5 @@
 import '../core/core_client.dart' show Json;
+import 'json_read.dart';
 import 'library.dart';
 
 /// Tipo de stem (`StemInfo.kind`). Valor no previsto → [unknown].

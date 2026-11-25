@@ -110,6 +110,9 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
+  String get library_cleanTitleAll => 'Limpiar toda la biblioteca';
+
+  @override
   String library_cleanTitle(String title) {
     return 'Limpiar «$title»';
   }
@@ -430,6 +433,9 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
+  String get library_noticeTitle => 'Aviso';
+
+  @override
   String get library_noticeOk => 'Aceptar';
 
   @override
@@ -491,7 +497,7 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String get library_plDownloading => 'Descargando';
+  String get library_plDownloading => 'Descargando…';
 
   @override
   String library_plDownloadingPercent(String percent) {
@@ -783,6 +789,25 @@ class AppLocalizationsEs extends AppLocalizations {
   String get library_srcRemovedTitle => 'Vídeo no disponible';
 
   @override
+  String get library_spotifyBadResponse =>
+      'Spotify ha devuelto una respuesta inesperada';
+
+  @override
+  String get library_spotifyMissingCredentials =>
+      'Búsqueda en Spotify no disponible: falta la clave (.env)';
+
+  @override
+  String get library_spotifyOffline => 'Sin conexión con Spotify';
+
+  @override
+  String library_spotifyRateLimited(int seconds) {
+    return 'Spotify pide esperar $seconds s';
+  }
+
+  @override
+  String get library_spotifyRejected => 'Spotify ha rechazado la clave';
+
+  @override
   String get library_srcSpotifyUnreadableDetail =>
       'Pega un enlace de YouTube del tema en su lugar.';
 
@@ -996,7 +1021,1032 @@ class AppLocalizationsEs extends AppLocalizations {
   String get backingAnchor => '';
 
   @override
+  String backing_analysisFailed(String message) {
+    return 'No se pudo analizar: $message';
+  }
+
+  @override
+  String get backing_analysisMissing =>
+      'Sin análisis de acordes ni pulso todavía.';
+
+  @override
+  String get backing_analyze => 'Analizar';
+
+  @override
+  String get backing_analyzing =>
+      'Analizando acordes y pulso… Puedes reproducir mientras tanto.';
+
+  @override
+  String get backing_apply => 'Aplicar';
+
+  @override
+  String get backing_applyTooltip =>
+      'Guarda las secciones. Las pistas de guitarra se rehacen, en segundo plano, solo si cambian los solos';
+
+  @override
+  String backing_barLabel(int number) {
+    return 'c. $number';
+  }
+
+  @override
+  String backing_bpm(int bpm) {
+    return '$bpm BPM';
+  }
+
+  @override
+  String get backing_capo => 'Capo virtual';
+
+  @override
+  String backing_capoFret(int n) {
+    return 'Traste $n';
+  }
+
+  @override
+  String get backing_capoNone => 'Sin capo';
+
+  @override
+  String backing_capoShown(int fret) {
+    return 'Capo $fret';
+  }
+
+  @override
+  String backing_cents(int n) {
+    return '$n cents';
+  }
+
+  @override
+  String get backing_channelNameField => 'Nombre';
+
+  @override
+  String get backing_channelRenameMenu => 'Cambiar nombre…';
+
+  @override
+  String get backing_channelRenameTooltip =>
+      'Doble clic para cambiar el nombre';
+
+  @override
+  String get backing_chooserEmpty =>
+      'Aún no hay temas separados. Importa uno y sepáralo en la biblioteca.';
+
+  @override
+  String get backing_chooserPick => 'Elige un tema';
+
+  @override
+  String get backing_chordDiagramA11y => 'Diagrama del acorde';
+
+  @override
+  String get backing_chordMajor => 'mayor';
+
+  @override
+  String get backing_chordNone => 'N (sin acorde)';
+
+  @override
+  String get backing_chordRemoveOverride => 'Quitar corrección';
+
+  @override
+  String get backing_chords => 'Acordes';
+
+  @override
+  String get backing_chordsAfterAnalysis =>
+      'Los acordes aparecerán al terminar el análisis.';
+
+  @override
+  String get backing_chordSheetTitle => 'Acorde';
+
+  @override
+  String get backing_chordSplit => 'Partir aquí';
+
+  @override
+  String get backing_chordSplitTooltip =>
+      'Parte el tramo en el pulso más cercano al cursor de reproducción';
+
+  @override
+  String backing_clearOverrides(int count) {
+    return 'Quitar todas ($count)';
+  }
+
+  @override
+  String get backing_clearOverridesTooltip =>
+      'Quita todas las correcciones de acordes de este tema';
+
+  @override
+  String get backing_collapse => 'Plegar';
+
+  @override
+  String get backing_collapseA11y => 'Plegar acordes';
+
+  @override
+  String backing_dbValue(double value) {
+    final intl.NumberFormat valueNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String valueString = valueNumberFormat.format(value);
+
+    return '$valueString dB';
+  }
+
+  @override
+  String get backing_discard => 'Descartar';
+
+  @override
+  String get backing_discardTooltip => 'Vuelve a las secciones guardadas';
+
+  @override
+  String get backing_dragHintMac =>
+      'Clic: saltar · arrastrar: bucle (⌥ = compases)';
+
+  @override
+  String get backing_dragHintWin =>
+      'Clic: saltar · arrastrar: bucle (Alt = compases)';
+
+  @override
+  String get backing_editChords => 'Editar acordes';
+
+  @override
+  String get backing_editModeHint =>
+      'Modo edición: clic en un acorde para cambiarlo o partirlo. No se marcan bucles.';
+
+  @override
+  String backing_errorLoadStems(String error) {
+    return 'No se pudieron cargar los stems ($error).';
+  }
+
+  @override
+  String backing_errorPlay(String error) {
+    return 'No se pudo reproducir ($error).';
+  }
+
+  @override
+  String backing_errorSaveGuitarNames(String error) {
+    return 'No se pudieron guardar los nombres: $error';
+  }
+
+  @override
+  String backing_errorSaveGuitarOptions(String error) {
+    return 'No se pudieron guardar las opciones: $error';
+  }
+
+  @override
+  String backing_errorSaveSections(String error) {
+    return 'No se pudieron guardar las secciones: $error';
+  }
+
+  @override
+  String backing_errorSaveStudy(String error) {
+    return 'No se pudo guardar el estudio: $error';
+  }
+
+  @override
+  String get backing_expand => 'Expandir';
+
+  @override
+  String get backing_expandA11y => 'Expandir acordes';
+
+  @override
+  String get backing_faderA11y => 'Volumen';
+
+  @override
+  String get backing_fineTune => 'Afinación fina';
+
+  @override
+  String backing_fretLabel(int base) {
+    return '${base}fr';
+  }
+
+  @override
+  String get backing_goToLibrary => 'Ir a la biblioteca';
+
+  @override
+  String get backing_guitarsProcessing => 'Procesando guitarras…';
+
+  @override
+  String get backing_handleEndA11y => 'Borde de fin';
+
+  @override
+  String get backing_handleStartA11y => 'Borde de inicio';
+
+  @override
+  String get backing_key => 'Tonalidad:';
+
+  @override
+  String get backing_keyBackToDetected => 'Volver a la detectada';
+
+  @override
+  String get backing_keyCorrected => '(corregida)';
+
+  @override
+  String backing_keyMajor(String note) {
+    return '$note mayor';
+  }
+
+  @override
+  String backing_keyMinor(String note) {
+    return '$note menor';
+  }
+
+  @override
+  String backing_keyNote(String tonic) {
+    String _temp0 = intl.Intl.selectLogic(tonic, {
+      'C': 'Do',
+      'Cs': 'Do#',
+      'D': 'Re',
+      'Ds': 'Re#',
+      'E': 'Mi',
+      'F': 'Fa',
+      'Fs': 'Fa#',
+      'G': 'Sol',
+      'Gs': 'Sol#',
+      'A': 'La',
+      'As': 'La#',
+      'B': 'Si',
+      'other': '$tonic',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get backing_loopClearA11y => 'Quitar bucle';
+
+  @override
+  String get backing_loopEnd => 'Fin';
+
+  @override
+  String get backing_loopEndTooltip =>
+      'Marca el final del bucle en la posición actual';
+
+  @override
+  String get backing_loopFree => 'libre';
+
+  @override
+  String backing_loopLabel(String name, String from, String to) {
+    return 'Bucle: $name · $from–$to';
+  }
+
+  @override
+  String get backing_loopNameBars => 'compases';
+
+  @override
+  String get backing_loopNameChords => 'acordes';
+
+  @override
+  String backing_loopStartButton(String time) {
+    return 'Inicio $time';
+  }
+
+  @override
+  String get backing_loopStartTooltip =>
+      'Marca el inicio del bucle en la posición actual';
+
+  @override
+  String get backing_markSection => 'Marcar sección';
+
+  @override
+  String get backing_markSectionTooltip => 'Marca el bucle como una sección';
+
+  @override
+  String get backing_markSolo => 'Marcar como solo';
+
+  @override
+  String get backing_markSoloTooltip =>
+      'Marca el bucle como un solo: sus guitarras se separan al aplicar';
+
+  @override
+  String get backing_master => 'Master';
+
+  @override
+  String get backing_menuDeleteSection => 'Eliminar sección';
+
+  @override
+  String get backing_menuMarkSolo => 'Marcar como solo';
+
+  @override
+  String get backing_menuRenameAdjust => 'Renombrar y ajustar…';
+
+  @override
+  String get backing_menuUnmarkSolo => 'Quitar marca de solo';
+
+  @override
+  String get backing_metronome => 'Metrónomo';
+
+  @override
+  String get backing_mixer => 'Mezclador';
+
+  @override
+  String backing_mixerOutput(String device) {
+    return 'Salida: $device';
+  }
+
+  @override
+  String backing_muteA11y(String name) {
+    return 'Silenciar $name';
+  }
+
+  @override
+  String get backing_muted => 'Silenciado';
+
+  @override
+  String get backing_muteLetter => 'M';
+
+  @override
+  String backing_nextChord(String name) {
+    return 'Siguiente: $name';
+  }
+
+  @override
+  String get backing_noChordDiagramA11y => 'Sin diagrama';
+
+  @override
+  String get backing_noChords => 'Sin acordes detectados.';
+
+  @override
+  String get backing_noGrid => 'Sin rejilla de compases todavía.';
+
+  @override
+  String get backing_notSeparatedBody =>
+      'Backing track necesita los stems. Sepáralo desde la biblioteca y vuelve.';
+
+  @override
+  String get backing_notSeparatedTitle => 'Este tema aún no está separado';
+
+  @override
+  String get backing_pause => 'Pausar';
+
+  @override
+  String get backing_play => 'Reproducir';
+
+  @override
+  String get backing_positionA11y => 'Posición';
+
+  @override
+  String backing_positionValueA11y(String time, String duration) {
+    return '$time de $duration';
+  }
+
+  @override
+  String get backing_retry => 'Reintentar';
+
+  @override
+  String backing_sectionA11y(String kind, String name, String from, String to) {
+    String _temp0 = intl.Intl.selectLogic(kind, {
+      'solo': 'Solo',
+      'other': 'Sección',
+    });
+    return '$_temp0 $name, $from a $to';
+  }
+
+  @override
+  String get backing_sectionA11yHint =>
+      'Clic para editarla; mantener pulsado para repetirla en bucle';
+
+  @override
+  String backing_sectionBoxTooltip(
+    String name,
+    String solo,
+    String from,
+    String to,
+  ) {
+    String _temp0 = intl.Intl.selectLogic(solo, {
+      'yes': ' (solo)',
+      'other': '',
+    });
+    return '$name$_temp0 · $from–$to · clic: editar, mantener: bucle';
+  }
+
+  @override
+  String get backing_sectionColor => 'Color';
+
+  @override
+  String backing_sectionColorN(int n) {
+    return 'Color $n';
+  }
+
+  @override
+  String get backing_sectionDelete => 'Eliminar';
+
+  @override
+  String get backing_sectionDone => 'Hecho';
+
+  @override
+  String get backing_sectionEnd => 'Fin';
+
+  @override
+  String get backing_sectionListen => 'Escuchar en bucle';
+
+  @override
+  String get backing_sectionName => 'Nombre';
+
+  @override
+  String backing_sectionNudgeA11y(String edge, String direction) {
+    String _temp0 = intl.Intl.selectLogic(edge, {
+      'start': 'Inicio',
+      'other': 'Fin',
+    });
+    String _temp1 = intl.Intl.selectLogic(direction, {
+      'after': 'después',
+      'other': 'antes',
+    });
+    return '$_temp0 $_temp1';
+  }
+
+  @override
+  String get backing_sectionNudgeHintMac =>
+      '◀ ▶ mueven por acorde · ⌥ por compás';
+
+  @override
+  String get backing_sectionNudgeHintWin =>
+      '◀ ▶ mueven por acorde · Alt por compás';
+
+  @override
+  String get backing_sectionSheetSection => 'Sección';
+
+  @override
+  String get backing_sectionSheetSolo => 'Solo';
+
+  @override
+  String get backing_sectionSolo => 'Solo';
+
+  @override
+  String get backing_sectionSoloOrange => 'Los solos van en naranja';
+
+  @override
+  String get backing_sectionStart => 'Inicio';
+
+  @override
+  String get backing_sectionSuggestBridge => 'Puente';
+
+  @override
+  String get backing_sectionSuggestChorus => 'Estribillo';
+
+  @override
+  String get backing_sectionSuggestEnd => 'Final';
+
+  @override
+  String get backing_sectionSuggestIntro => 'Intro';
+
+  @override
+  String get backing_sectionSuggestVerse => 'Estrofa';
+
+  @override
+  String backing_soloA11y(String name) {
+    return 'Solo $name';
+  }
+
+  @override
+  String get backing_soloLetter => 'S';
+
+  @override
+  String get backing_stemBass => 'Bajo';
+
+  @override
+  String get backing_stemDrums => 'Batería';
+
+  @override
+  String get backing_stemGuitar => 'Guitarra';
+
+  @override
+  String get backing_stemOther => 'Resto';
+
+  @override
+  String get backing_stemPiano => 'Piano';
+
+  @override
+  String get backing_stemVocals => 'Voz';
+
+  @override
+  String get backing_stereoSplit => 'Guitarras en L y R';
+
+  @override
+  String get backing_stereoSplitTooltip =>
+      'L = canal izquierdo, R = canal derecho de la pista de guitarras';
+
+  @override
+  String get backing_tabButton => 'Tablatura';
+
+  @override
+  String get backing_tabButtonTooltip => 'Abrir la tablatura de este tema';
+
+  @override
+  String get backing_tempo => 'Tempo';
+
+  @override
+  String get backing_tempoDetected => 'Tempo detectado:';
+
+  @override
+  String get backing_title => 'Backing track';
+
+  @override
+  String get backing_transpose => 'Transponer';
+
+  @override
+  String get backing_transposeZero => '0 semitonos';
+
+  @override
+  String backing_unmuteA11y(String name) {
+    return 'Activar $name';
+  }
+
+  @override
+  String get backing_withoutGuitars => 'Sin guitarras';
+
+  @override
   String get tabAnchor => '';
+
+  @override
+  String get tab_a11yCloseNotice => 'Cerrar aviso';
+
+  @override
+  String get tab_a11yLengthenNote => 'Alargar nota';
+
+  @override
+  String tab_a11yMute(String track) {
+    return 'Silenciar $track';
+  }
+
+  @override
+  String get tab_a11yPause => 'Pausar';
+
+  @override
+  String get tab_a11yPlay => 'Reproducir';
+
+  @override
+  String get tab_a11yRewind => 'Volver al inicio';
+
+  @override
+  String get tab_a11yShortenNote => 'Acortar nota';
+
+  @override
+  String tab_a11ySolo(String track) {
+    return 'Solo $track';
+  }
+
+  @override
+  String tab_a11yUnmute(String track) {
+    return 'Activar $track';
+  }
+
+  @override
+  String get tab_addNote => 'Añadir nota';
+
+  @override
+  String get tab_chooserEmpty =>
+      'Aún no hay temas separados. Importa uno y sepáralo en la biblioteca.';
+
+  @override
+  String get tab_chooserPick => 'Elige un tema';
+
+  @override
+  String get tab_choosingAutomatic => 'Transcribir automáticamente';
+
+  @override
+  String get tab_choosingBody =>
+      'Songsterr trae la tablatura hecha por la comunidad; la transcripción automática sale del audio.';
+
+  @override
+  String get tab_choosingSongsterr => 'Buscar en Songsterr';
+
+  @override
+  String get tab_choosingTitle => 'Elige la fuente de la tablatura';
+
+  @override
+  String get tab_confirmAutoAction => 'Pasar a automática';
+
+  @override
+  String get tab_confirmAutoBody =>
+      'Se quitan las pistas de Songsterr y sus ediciones; las demás se transcriben del audio.';
+
+  @override
+  String get tab_confirmAutoCancel => 'Cancelar';
+
+  @override
+  String get tab_confirmAutoTitle => '¿Pasar a transcripción automática?';
+
+  @override
+  String get tab_delete => 'Borrar';
+
+  @override
+  String get tab_drumKeysHint =>
+      'B bombo · C caja · H charles · T tom · P platos';
+
+  @override
+  String get tab_editFretRange => 'El traste saldría de 0–24.';
+
+  @override
+  String get tab_editInvalidDuration => 'Esa duración no cabe.';
+
+  @override
+  String get tab_editInvalidPosition =>
+      'Esa posición no está en la rejilla de la pista.';
+
+  @override
+  String get tab_editNoOtherString => 'No hay otra cuerda en esa dirección.';
+
+  @override
+  String get tab_editNotes => 'Editar notas';
+
+  @override
+  String get tab_editNothingSelected => 'No hay nada seleccionado.';
+
+  @override
+  String get tab_editNoTieOrigin =>
+      'No hay una nota anterior igual en esa cuerda a la que ligarla.';
+
+  @override
+  String get tab_editStringOccupied =>
+      'Ya hay una nota en esa cuerda en ese punto.';
+
+  @override
+  String get tab_editWrongKind => 'Esa edición no vale para esta pista.';
+
+  @override
+  String get tab_emptyBody =>
+      'Este tema no tiene stems de guitarra, bajo o batería con audio.';
+
+  @override
+  String get tab_emptyTitle => 'No hay pistas que transcribir';
+
+  @override
+  String get tab_exportGuitarPro => 'Exportar a Guitar Pro';
+
+  @override
+  String get tab_failedTitle => 'No se pudo transcribir';
+
+  @override
+  String tab_flashExportFailed(String error) {
+    return 'No se pudo exportar: $error';
+  }
+
+  @override
+  String get tab_flashNoHits => 'No hay golpes seleccionados.';
+
+  @override
+  String get tab_flashNoNote => 'No hay ninguna nota seleccionada.';
+
+  @override
+  String get tab_flashNoSoundfont =>
+      'Falta el soundfont de alphaTab en la app.';
+
+  @override
+  String tab_flashRetuned(int n, String dropped) {
+    String _temp0 = intl.Intl.pluralLogic(
+      n,
+      locale: localeName,
+      other: '$n notas se movieron una octava',
+      one: '1 nota se movió una octava',
+    );
+    return '$_temp0 y $dropped se quitaron por no caber en la afinación.';
+  }
+
+  @override
+  String tab_flashSaveFailed(String error) {
+    return 'No se pudo guardar la tablatura: $error';
+  }
+
+  @override
+  String tab_flashSaved(String file) {
+    return 'Guardado $file.';
+  }
+
+  @override
+  String tab_flashSynthFailed(String error) {
+    return 'No se pudo sintetizar la pista: $error';
+  }
+
+  @override
+  String get tab_footerAutomatic =>
+      'Transcripción automática · revisa y corrige si hace falta';
+
+  @override
+  String get tab_footerSongsterr =>
+      'Tablatura de Songsterr · revisa y corrige si hace falta';
+
+  @override
+  String tab_headerSummary(String bar, int bpm) {
+    return '$bar · $bpm BPM';
+  }
+
+  @override
+  String get tab_issueFormatChanged => 'Songsterr ha cambiado su formato.';
+
+  @override
+  String tab_issueHttp(int code) {
+    return 'Songsterr respondió con el error $code.';
+  }
+
+  @override
+  String get tab_issueInvalidLink => 'Ese enlace no es de Songsterr.';
+
+  @override
+  String get tab_issueNoResults => 'No está en Songsterr.';
+
+  @override
+  String get tab_issueOffline =>
+      'No se pudo conectar con Songsterr. Comprueba la conexión.';
+
+  @override
+  String get tab_issueRateLimited =>
+      'Songsterr está limitando las peticiones. Espera un poco y vuelve a intentarlo.';
+
+  @override
+  String get tab_keysHintMac =>
+      'Dígitos: traste · ↑ ↓: cuerda · ← →: mover · +/−: duración · ⌘Z deshacer';
+
+  @override
+  String get tab_keysHintWin =>
+      'Dígitos: traste · ↑ ↓: cuerda · ← →: mover · +/−: duración · Ctrl+Z deshacer';
+
+  @override
+  String get tab_listenLabel => 'Oír';
+
+  @override
+  String get tab_listenMixed => 'Mixto';
+
+  @override
+  String get tab_listenStems => 'Stems';
+
+  @override
+  String get tab_listenTrack => 'Oír transcripción';
+
+  @override
+  String get tab_listenTranscription => 'Transcripción';
+
+  @override
+  String get tab_loop => 'Bucle';
+
+  @override
+  String tab_loopActive(String name, String from, String to) {
+    return 'Bucle: $name · $from–$to';
+  }
+
+  @override
+  String tab_loopBar(int n) {
+    return 'Compás $n';
+  }
+
+  @override
+  String tab_loopBarName(int n) {
+    return 'compás $n';
+  }
+
+  @override
+  String get tab_loopFree => 'libre';
+
+  @override
+  String get tab_loopNone => 'Sin bucle';
+
+  @override
+  String get tab_loopSelection => 'Selección';
+
+  @override
+  String get tab_metronome => 'Metrónomo';
+
+  @override
+  String tab_noticeAnd(String a, String b) {
+    return '$a y $b';
+  }
+
+  @override
+  String tab_noticeDropped(String dropped) {
+    return '$dropped se quitaron por no caber en las cuerdas';
+  }
+
+  @override
+  String tab_noticeRedone(String tracks) {
+    return 'Se han rehecho: $tracks. Su audio cambió, así que se perdieron las ediciones de esas pistas.';
+  }
+
+  @override
+  String tab_noticeShifted(int n) {
+    String _temp0 = intl.Intl.pluralLogic(
+      n,
+      locale: localeName,
+      other:
+          '$n notas fuera del registro de la afinación se subieron o bajaron una octava',
+      one: '1 nota fuera del registro de la afinación se subió o bajó una octava',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String tab_noticeTranscription(String parts) {
+    return 'Transcripción: $parts.';
+  }
+
+  @override
+  String get tab_pieceCrash => 'platos';
+
+  @override
+  String get tab_pieceHiHat => 'charles';
+
+  @override
+  String get tab_pieceKick => 'bombo';
+
+  @override
+  String get tab_pieceOpenHiHat => 'charles abierto';
+
+  @override
+  String get tab_pieceSnare => 'caja';
+
+  @override
+  String get tab_pieceTom => 'tom';
+
+  @override
+  String get tab_redo => 'Rehacer';
+
+  @override
+  String tab_selectionDrums(String place, String pieces) {
+    return '$place · $pieces';
+  }
+
+  @override
+  String get tab_selectionNoHits => 'sin golpes';
+
+  @override
+  String tab_selectionNote(String place, int string, int fret) {
+    return '$place · cuerda $string, traste $fret';
+  }
+
+  @override
+  String tab_selectionNoNote(String place, int string) {
+    return '$place · cuerda $string, sin nota';
+  }
+
+  @override
+  String tab_selectionPlace(int bar, int beat) {
+    return 'Compás $bar, pulso $beat';
+  }
+
+  @override
+  String get tab_sheetAccept => 'Aceptar';
+
+  @override
+  String get tab_sheetAllAutomatic => 'Todo automático';
+
+  @override
+  String get tab_sheetAutomatic => 'Transcribir automáticamente';
+
+  @override
+  String get tab_sheetBack => 'Volver';
+
+  @override
+  String get tab_sheetBackShort => 'Atrás';
+
+  @override
+  String get tab_sheetCancel => 'Cancelar';
+
+  @override
+  String get tab_sheetClose => 'Cerrar';
+
+  @override
+  String get tab_sheetConfidenceUnmeasured => 'sin medir';
+
+  @override
+  String tab_sheetExtraTracks(String names) {
+    return 'Pistas extra, sin stem: $names. Entran en la tablatura y en el .gp y solo suenan con «Oír transcripción».';
+  }
+
+  @override
+  String get tab_sheetLinkHint => 'O pega un enlace de Songsterr';
+
+  @override
+  String get tab_sheetNoSolos =>
+      'Transcripción automática (el tema no tiene secciones de solo)';
+
+  @override
+  String get tab_sheetOtherResults => 'Otros resultados';
+
+  @override
+  String get tab_sheetPairingHelp =>
+      'Qué pista de Songsterr va con cada stem. La confianza es el parecido medido con el audio.';
+
+  @override
+  String get tab_sheetPickAutomatic => 'Transcripción automática';
+
+  @override
+  String get tab_sheetPreview => 'Vista previa';
+
+  @override
+  String get tab_sheetReadingTracks => 'Leyendo las pistas…';
+
+  @override
+  String get tab_sheetRetry => 'Reintentar';
+
+  @override
+  String tab_sheetSearch(String query) {
+    return 'Búsqueda: $query';
+  }
+
+  @override
+  String get tab_sheetSearching => 'Buscando en Songsterr…';
+
+  @override
+  String get tab_sheetSoloNone => 'Ninguna';
+
+  @override
+  String tab_sheetSoloRow(int n, String time) {
+    return 'Solo $n ($time)';
+  }
+
+  @override
+  String get tab_sheetSuggestAuto =>
+      'Puedes transcribir el tema automáticamente.';
+
+  @override
+  String get tab_sheetTitle => 'Tablatura de Songsterr';
+
+  @override
+  String get tab_sheetUseLink => 'Usar enlace';
+
+  @override
+  String get tab_sheetUseThis => 'Usar esta';
+
+  @override
+  String get tab_sheetWorkingDownload => 'Descargando pistas de Songsterr…';
+
+  @override
+  String get tab_sheetWorkingRead => 'Leyendo Songsterr…';
+
+  @override
+  String get tab_sourceAutomatic => 'Transcripción automática';
+
+  @override
+  String get tab_sourceChangePairing => 'Cambiar emparejamiento…';
+
+  @override
+  String tab_sourceMenu(String source) {
+    return 'Fuente: $source';
+  }
+
+  @override
+  String get tab_sourceNone => 'Sin elegir';
+
+  @override
+  String get tab_sourceSongsterr => 'Songsterr';
+
+  @override
+  String get tab_sourceSongsterrSearch => 'Buscar en Songsterr…';
+
+  @override
+  String get tab_synthFailedSoundfont => 'Falta el soundfont en la app';
+
+  @override
+  String tab_synthProgress(int done, int total) {
+    return 'Sintetizando $done/$total…';
+  }
+
+  @override
+  String get tab_synthRendering => 'Sintetizando…';
+
+  @override
+  String get tab_tempo => 'Tempo';
+
+  @override
+  String get tab_title => 'Tablatura';
+
+  @override
+  String get tab_trackMuteLetter => 'M';
+
+  @override
+  String get tab_trackSoloLetter => 'S';
+
+  @override
+  String get tab_tuning => 'Afinación';
+
+  @override
+  String get tab_tuningCustom => 'Personalizada';
+
+  @override
+  String get tab_tuningDropD => 'Drop D';
+
+  @override
+  String get tab_tuningHalfDown => 'Medio tono abajo';
+
+  @override
+  String get tab_tuningStandard => 'Estándar';
+
+  @override
+  String get tab_tuningWholeDown => 'Un tono abajo';
+
+  @override
+  String get tab_undo => 'Deshacer';
+
+  @override
+  String get tab_waitingAction => 'Analizar';
+
+  @override
+  String get tab_waitingBody =>
+      'La tablatura necesita los compases y pulsos del análisis. Puedes lanzarlo desde Backing track.';
+
+  @override
+  String get tab_waitingTitle => 'Esperando el análisis del tema';
+
+  @override
+  String get tab_webError => 'No se pudo mostrar la tablatura.';
+
+  @override
+  String get tab_workingBody =>
+      'La primera vez tarda un poco. Lo hecho se guarda pista a pista.';
+
+  @override
+  String get tab_workingTitle => 'Transcribiendo…';
 
   @override
   String get recordAnchor => '';
@@ -1925,9 +2975,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settings_lang_label => 'Idioma';
 
   @override
-  String get settings_lang_system => 'Sistema';
-
-  @override
   String get settings_lang_title => 'Idioma';
 
   @override
@@ -2055,6 +3102,16 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get settings_tools_updated => 'actualizada';
+
+  @override
+  String settings_tools_updateDone(String version) {
+    return 'yt-dlp actualizado a $version.';
+  }
+
+  @override
+  String settings_tools_upToDate(String version) {
+    return 'Ya tienes la última versión ($version).';
+  }
 
   @override
   String get errorAnchor => '';

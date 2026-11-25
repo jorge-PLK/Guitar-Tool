@@ -1,0 +1,14 @@
+{
+  "busy" : true,
+  "canUse" : false,
+  "open" : true,
+  "query" : "Banda · Tema",
+  "results" : [
+
+  ],
+  "search" : {
+    "phase" : "searching"
+  },
+  "stage" : "working",
+  "workingText" : "Leyendo Songsterr…"
+}

@@ -21,7 +21,42 @@ MockCore _core({String? state}) => MockCore(
       },
     );
 
+class _MemorySource implements FixtureSource {
+  _MemorySource(this.files);
+  final Map<String, String> files;
+
+  @override
+  Future<List<String>> list() async => files.keys.toList();
+
+  @override
+  Future<String> read(String path) async => files[path]!;
+}
+
 void main() {
+  group('fixtures con estado antes o después del tipo', () {
+    final source = _MemorySource({
+      'x.do.result.json': '{"v":"base"}',
+      'x.do.result.missing.json': '{"v":"missing"}',
+      'x.ev.event.missing.json': '{"s":"seed"}',
+      'x.do.params.missing.json': 'no es json',
+    });
+
+    test('sin state: resultado base; variante y params no se aplican', () async {
+      final c = await MockCore.load(source);
+      expect(await c.call('x.do', null, (j) => j['v']), 'base');
+    });
+
+    test('state missing: variante sustituye al base y el evento se siembra al primer suscriptor', () async {
+      final c = await MockCore.load(source, state: 'missing');
+      expect(await c.call('x.do', null, (j) => j['v']), 'missing');
+      final a = <Object?>[];
+      final sub = c.on('x.ev', (j) => j['s']).listen(a.add);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(a, ['seed']);
+      await sub.cancel();
+    });
+  });
+
   test('resultado sustituido por <metodo>.<state>', () async {
     final c = _core(state: 'no-video');
     final r = await c.call('takeview.open', null, (j) => j['v']);

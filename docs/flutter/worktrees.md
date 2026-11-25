@@ -36,6 +36,9 @@ cp -R "$R/Temp/flutter/ref-projects" Temp/flutter/ref-projects
 - `Temp/` está en `.gitignore` y es propio de cada worktree: logs en `Temp/logs/` y `Temp/last-run.txt` del gate (el hook se ejecuta en el worktree donde se hace el commit).
 - `Tools/flutter/run.sh` usa `Temp/flutter/ref-projects` y `Temp/flutter/support` relativos a la raíz del worktree. Nunca apuntes a la carpeta real de proyectos.
 - `ref-projects` se copia, no se enlaza: la app escribe en los proyectos y cada worktree debe tener los suyos.
+- El modelo grande `App/Resources/Models/LeadRhythmMelRoformer_fp16.mlpackage.zip` va con enlace DURO (`ln`, no `ln -s`) en cada worktree.
+- Turno del Mac en `Tools/test.sh` (31229f9, 1c02bfd): cerrojo `lockf` y cola por número en `<repo>/.git/toneforge-test.queue/`. La suite entera y los paquetes Swift hacen cola (en encargos, con `run_in_background`). `TF_TEST_FORCE=1` salta la cola en pasadas cortas de paquete; `FlutterApp <Filtro>` no hace cola. `TF_TEST_NOLOCK=1` solo con permiso de Jorge.
+- En tests de Flutter, `DirectoryFixtureSource.find()` fuera de `tester.runAsync` cuelga el test.
 
 ## 4. Qué se recompila por worktree
 

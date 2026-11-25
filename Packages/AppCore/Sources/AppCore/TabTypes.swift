@@ -35,9 +35,30 @@ struct TabSelectionInfo: Codable, Sendable {
     var beat: Int
     var tick: Int
     var string: Int?
-    var summary: String?
+    /// Resumen por datos (Dart lo compone con `tab_selection*`), sin texto del núcleo.
+    var summary: TabSelectionSummary?
     /// Compás de la selección (0-based) y su rango en segundos: lo usa el bucle «Compás N» (Mac `selectedBarRange`).
     var barRange: TabBarRange?
+    /// Hay una nota bajo la selección (habilita «Añadir nota»/«–»/«+»/«Borrar» en la barra de edición).
+    var hasNote: Bool
+}
+
+/// `code`: `drums` (`pieces`), `drumsNoHits`, `note` (`string`, `fret`), `noNote` (`string`). Siempre `bar` y `beat` (1-based).
+struct TabSelectionSummary: Codable, Sendable, Equatable {
+    var code: String
+    var bar: Int
+    var beat: Int
+    var string: Int?
+    var fret: Int?
+    /// Códigos de pieza: kick, snare, hiHat, openHiHat, tom, crash.
+    var pieces: [String]?
+}
+
+/// `code`: `meterBpm` (`bar` = compás «4/4», `bpm`) o `meter` (solo `bar`).
+struct TabHeaderSummary: Codable, Sendable, Equatable {
+    var code: String
+    var bar: String
+    var bpm: Int?
 }
 
 struct TabBarRange: Codable, Sendable {
@@ -55,7 +76,8 @@ struct TabState: Codable, Sendable {
     var projectId: String
     var phase: String
     var error: String?
-    var header: String?
+    /// Resumen de cabecera por datos (Dart lo compone con `tab_headerSummary`).
+    var header: TabHeaderSummary?
     var source: String?
     var tracks: [TabTrackInfo]
     var selectedTrack: String?
@@ -115,7 +137,11 @@ struct TabClickParams: Decodable, Sendable {
     var string: Int?
 }
 struct TabSelectParams: Decodable, Sendable { var track: String; var beat: Int; var tick: Int; var string: Int? }
-struct TabSpanParams: Decodable, Sendable { var action: String }
+struct TabSpanParams: Decodable, Sendable {
+    var action: String
+    /// Solo con `clear`: conserva el ancla del tramo (como Esc / «Sin bucle» de SwiftUI); por defecto la borra.
+    var keepAnchor: Bool?
+}
 struct TabListeningParams: Decodable, Sendable { var track: String?; var on: Bool }
 struct TabExportParams: Decodable, Sendable { var data: String; var path: String? }
 struct TabEditParams: Decodable, Sendable {

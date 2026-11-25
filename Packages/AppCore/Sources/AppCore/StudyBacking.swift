@@ -19,6 +19,8 @@ final class BackingController {
     /// Bucle activo (no se guarda: cada sesión empieza sin bucle).
     private(set) var loop: ClosedRange<Double>?
     private(set) var loopName: String?
+    /// Marca propia del bucle del tramo de Tablatura (decisiones-interfaz): no depende del nombre.
+    private(set) var loopIsSpan = false
     /// Pistas extra del reproductor (Fase 5: transcripción sintetizada de Tablatura, `cache/tab/synth_*.wav`).
     /// Entran con ganancia 0 dB y sin tocar la mezcla guardada; al cambiarlas hay que llamar a `loadTracks()`.
     var extraTracks: [Track] = []
@@ -140,10 +142,11 @@ final class BackingController {
 
     func seek(to t: Double) { player.seek(to: min(max(t, 0), duration)) }
 
-    func setLoop(_ range: ClosedRange<Double>?, name: String? = nil) {
+    func setLoop(_ range: ClosedRange<Double>?, name: String? = nil, span: Bool = false) {
         player.loop = range
         loop = player.loop
         loopName = loop == nil ? nil : name
+        loopIsSpan = loop != nil && span
     }
 
     // MARK: Ajustes del reproductor

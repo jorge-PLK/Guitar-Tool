@@ -41,6 +41,9 @@ flutter:
   # Licencias OFL (texto obligatorio en el paquete). Se lee el directorio entero.
   assets:
     - assets/licenses/
+    # Lienzo de Tablatura (alphaTab + puente + Bravura; sin SoundFont, D8). Copia de App/Resources/alphaTab.
+    - assets/alphatab/
+    - assets/alphatab/font/
 
   # Caras estáticas latinas (App/Resources/Fonts). Solo existen estos pesos (docs/flutter/tokens-componentes.md §1.2).
   fonts:

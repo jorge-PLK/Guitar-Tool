@@ -1,0 +1,39 @@
+{
+  "indicator" : "Leyendo la lista…",
+  "isLive" : true,
+  "items" : [
+
+  ],
+  "kind" : "playlist",
+  "mayBeTruncated" : false,
+  "name" : "",
+  "progress" : 0,
+  "source" : "spotify",
+  "step" : "loading",
+  "summary" : {
+    "cancelled" : false,
+    "failed" : 0,
+    "imported" : 0,
+    "inLibrary" : 0,
+    "remaining" : 0,
+    "skipped" : 0
+  },
+  "totals" : {
+    "duplicates" : 0,
+    "failed" : 0,
+    "imported" : 0,
+    "inLibrary" : 0,
+    "queued" : 0,
+    "remaining" : 0,
+    "selected" : 0,
+    "skipped" : 0,
+    "total" : 0
+  },
+  "update" : {
+    "alreadyLatest" : false,
+    "updating" : false
+  },
+  "warnings" : [
+
+  ]
+}

@@ -42,6 +42,8 @@ struct StudyLoop: Codable, Sendable {
     var start: Double
     var end: Double
     var name: String?
+    /// true solo en el bucle creado desde una selección de rango en Tablatura. Se codifica siempre (Bool no opcional).
+    var span: Bool = false
 }
 
 struct StudyTransport: Codable, Sendable {
@@ -62,11 +64,56 @@ struct StudyTransport: Codable, Sendable {
     var outputName: String
 }
 
+/// K7: cejilla de una forma. Cuerdas numeradas como en guitarra (6 = Mi grave, 1 = Mi agudo).
+struct StudyBarre: Codable, Sendable, Equatable {
+    var fret: Int
+    var fromString: Int
+    var toString: Int
+}
+
+/// K7: forma de un acorde (de `ChordShapes.shape(for:capo:)`). `frets` va de la 6.ª a la 1.ª cuerda: null = muda, 0 = al aire.
+/// Ausente en «?» y «N».
+struct StudyChordShape: Codable, Sendable, Equatable {
+    var frets: [Int?]
+    var baseFret: Int
+    var barre: StudyBarre?
+}
+
+/// K8: tonalidad neutra de idioma («A» + «min»); los nombres «La menor»/«A minor» los pone la interfaz.
+/// `tonic` en sostenidos («C#»), `mode` = `maj` o `min`.
+struct StudyShownKey: Codable, Sendable, Equatable {
+    var tonic: String
+    var mode: String
+}
+
+/// Acorde tal como lo ve la interfaz (ya transpuesto): raíz 0-11 (C = 0) y calidad = posición en `study.chordVocabulary`.
+struct StudyShownChord: Codable, Sendable, Equatable {
+    var root: Int
+    var quality: Int
+}
+
+struct StudyChordQuality: Codable, Sendable { var suffix: String }
+
+/// `study.chordVocabulary`: `suffix` vacío = mayor (el texto lo pone la interfaz).
+struct StudyChordVocabulary: Codable, Sendable {
+    var roots: [String]
+    var qualities: [StudyChordQuality]
+    var noChordIndex: Int
+}
+
 struct StudyChord: Codable, Sendable {
     var start: Double
     var end: Double
     var index: Int
+    /// Nombre guardado, sin transponer.
     var name: String
+    /// K8: nombre transpuesto según `transport.transpose` en el momento de emitirse («D» con +2 -> «E»).
+    var display: String
+    /// Acorde mostrado como raíz/calidad (mismo transpose que `display`); null en «?» y «N».
+    var shown: StudyShownChord?
+    /// K7: forma del acorde mostrado (`display`) con el capo del momento; ausente en «?» y «N».
+    /// Como `display`, se queda vieja si cambian `transpose`/`capo` (`study.state`): pídela de nuevo con `study.chordShape`.
+    var shape: StudyChordShape?
     var overridden: Bool
 }
 
@@ -75,6 +122,8 @@ struct StudyKey: Codable, Sendable {
     var override: String?
     var effective: String?
     var confidence: Double?
+    /// K8: `effective` ya transpuesta; ausente si no hay tonalidad o no es mayor/menor.
+    var display: StudyShownKey?
 }
 
 struct StudyAnalysisInfo: Codable, Sendable {
@@ -155,9 +204,16 @@ struct StudyLevelsEvent: Codable, Sendable {
     var channels: [String: StudyMeter]
 }
 
-struct StudyErrorEvent: Codable, Sendable {
-    var code: String
-    var message: String
+// K12: no existe `study.error` (nunca se emitió). Los fallos de audio van por `StudyTransport.audioError`.
+
+/// K7: `capo` por defecto, el del transporte. Siempre con la transposición actual (la forma es la del acorde mostrado).
+struct StudyChordShapeParams: Decodable, Sendable { var index: Int; var capo: Int? }
+
+struct StudyChordShapeResult: Codable, Sendable {
+    var index: Int
+    var display: String
+    var capo: Int
+    var shape: StudyChordShape?
 }
 
 struct StudyOpenParams: Decodable, Sendable { var projectId: String }
@@ -165,7 +221,9 @@ struct StudySeekParams: Decodable, Sendable { var seconds: Double }
 struct StudyRateParams: Decodable, Sendable { var rate: Double }
 struct StudyTransposeParams: Decodable, Sendable { var semitones: Int?; var fineCents: Double? }
 struct StudyCapoParams: Decodable, Sendable { var capo: Int }
-struct StudyLoopParams: Decodable, Sendable { var start: Double?; var end: Double?; var name: String? }
+/// `snap` (D-3): `none` (por defecto, el rango tal cual), `chord` (a pulsos, SwiftUI sin ⌥) o `bar` (a compases, ⌥).
+/// Sin `name`, el bucle ajustado se llama «acordes»/«compases» como en SwiftUI.
+struct StudyLoopParams: Decodable, Sendable { var start: Double?; var end: Double?; var name: String?; var snap: String? }
 struct StudyMixParams: Decodable, Sendable { var channel: String; var gainDB: Double?; var mute: Bool?; var solo: Bool? }
 struct StudyMasterParams: Decodable, Sendable { var gainDB: Double }
 struct StudyMetronomeParams: Decodable, Sendable { var on: Bool?; var gainDB: Double? }
@@ -253,7 +311,20 @@ final class StudyService {
         }
         router.register("study.setLoop") { [self] (p: StudyLoopParams) -> StudyTransport in
             try await with { c in
-                if let s = p.start, let e = p.end, s.isFinite, e.isFinite { c.setLoop(s...max(s, e), name: p.name) } else { c.setLoop(nil) }
+                guard let s = p.start, let e = p.end, s.isFinite, e.isFinite else { c.setLoop(nil); return }
+                var range = s...max(s, e)
+                var name = p.name
+                switch p.snap ?? "none" {
+                case "none": break
+                case "chord", "bar":
+                    let bar = p.snap == "bar"
+                    guard let o = self.current else { break }
+                    // `StudyBridge.snap(session.beats, r, bar:)` de `BackingTimeline`/`ChordGrid`.
+                    range = StudyEditsBridge.snap(beats: o.session.beats, downbeats: o.session.downbeats, range, bar: bar)
+                    name = name ?? (bar ? "compases" : "acordes")
+                default: throw RPCError(code: "bad-params", message: "«snap» debe ser none, chord o bar.")
+                }
+                c.setLoop(range, name: name)
             }
         }
         router.register("study.setMix") { [self] (p: StudyMixParams) -> StudyTransport in
@@ -342,7 +413,10 @@ final class StudyService {
     private func with(_ change: @MainActor (BackingController) throws -> Void) async throws -> StudyTransport {
         guard let o = current else { throw RPCError(code: "not-open", message: "No hay ningún tema abierto en Backing.") }
         defer { stateChanged() }
+        let before = (o.controller.settings.transpose, o.controller.settings.capo)
         try change(o.controller)
+        // K7/K8: el nombre mostrado y la forma dependen de la transposición y del capo.
+        if (o.controller.settings.transpose, o.controller.settings.capo) != before { emitAnalysisInfo() }
         return transport(o.session, o.controller)
     }
 
@@ -406,13 +480,13 @@ final class StudyService {
             playing: c.isPlaying, position: c.player.currentTime, duration: c.duration, rate: p.rate,
             transpose: p.transpose, fineCents: p.fineCents, capo: p.capo,
             metronome: StudyMetronome(on: p.metronomeOn, gainDB: p.metronomeGainDB, available: s.hasBeatGrid),
-            loop: c.loop.map { StudyLoop(start: $0.lowerBound, end: $0.upperBound, name: c.loopName) },
+            loop: c.loop.map { StudyLoop(start: $0.lowerBound, end: $0.upperBound, name: c.loopName, span: c.loopIsSpan) },
             masterGainDB: c.masterGainDB, channels: channels(s), anySolo: c.anyStemSolo, audioError: c.audioError,
             outputName: c.audio.outputName)
     }
 
     func snapshot(_ s: StudySession, _ c: BackingController) -> StudyOpenResult {
-        let analysis = analysisInfo(s)
+        let analysis = analysisInfo(s, c)
         let sections = sectionInfos(s)
         return StudyOpenResult(
             projectId: s.projectID.uuidString, title: s.project.song.title, artist: s.project.song.artist,

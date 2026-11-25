@@ -1,0 +1,19 @@
+{
+  "query" : "luna marea",
+  "tracks" : [
+    {
+      "album" : "Besos de Perro",
+      "appURL" : "spotify:track:3demoDemoDemoDemoDemox",
+      "artists" : [
+        "Marea",
+        "Invitado"
+      ],
+      "durationText" : "4:13",
+      "id" : "3demoDemoDemoDemoDemox",
+      "imageURL" : "https://img.test/c.jpg",
+      "name" : "La luna me sabe a poco",
+      "trackURL" : "https://open.spotify.com/track/3demoDemoDemoDemoDemox",
+      "year" : 2004
+    }
+  ]
+}

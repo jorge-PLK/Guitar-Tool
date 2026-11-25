@@ -1,0 +1,78 @@
+{
+  "anySolo" : true,
+  "canRedo" : false,
+  "canUndo" : true,
+  "editMode" : true,
+  "graceMode" : false,
+  "header" : {
+    "bar" : "4/4",
+    "bpm" : 120,
+    "code" : "meterBpm"
+  },
+  "listenMode" : "stems",
+  "notices" : [
+
+  ],
+  "phase" : "ready",
+  "projectId" : "00000000-0000-0000-0000-000000000001",
+  "revision" : 6,
+  "selectedTrack" : "bass",
+  "source" : "automatic",
+  "span" : {
+    "endTick" : 45,
+    "startTick" : 21
+  },
+  "tracks" : [
+    {
+      "dimmed" : false,
+      "fingerprint" : {
+        "modelVersion" : "icassp2022-fa5997a",
+        "modifiedMillis" : 1700000000000,
+        "parametersVersion" : 3,
+        "path" : "stems/bass.wav",
+        "size" : 1411244
+      },
+      "id" : "bass",
+      "kind" : "bass",
+      "listening" : false,
+      "muted" : false,
+      "name" : "Bajo",
+      "noteCount" : 4,
+      "origin" : "stem",
+      "playerTrack" : "bass",
+      "solo" : true,
+      "synth" : "ready",
+      "transcription" : "ready",
+      "tuning" : {
+        "name" : "Drop D",
+        "preset" : "dropD",
+        "strings" : [
+          43,
+          38,
+          33,
+          26
+        ]
+      }
+    },
+    {
+      "dimmed" : true,
+      "fingerprint" : {
+        "modelVersion" : "framernn-85c192e-fp32-grunative",
+        "modifiedMillis" : 1700000000000,
+        "parametersVersion" : 3,
+        "path" : "stems/drums.wav",
+        "size" : 1411244
+      },
+      "id" : "drums",
+      "kind" : "drums",
+      "listening" : false,
+      "muted" : true,
+      "name" : "Batería",
+      "noteCount" : 3,
+      "origin" : "stem",
+      "playerTrack" : "drums",
+      "solo" : false,
+      "transcription" : "ready"
+    }
+  ]
+}

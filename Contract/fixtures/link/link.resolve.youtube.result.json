@@ -1,0 +1,22 @@
+{
+  "artist" : "Otro",
+  "candidates" : [
+    {
+      "artist" : "Otro",
+      "duration" : 253,
+      "id" : "aaaaaaaaaaa",
+      "isClose" : true,
+      "isLive" : true,
+      "source" : "youtube",
+      "thumbnail" : "https://img.test/yt.webp",
+      "title" : "Versión en directo",
+      "url" : "https://www.youtube.com/watch?v=aaaaaaaaaaa"
+    }
+  ],
+  "duration" : 253,
+  "link" : "youtube",
+  "noCloseCandidate" : false,
+  "pastedURL" : "https://youtu.be/aaaaaaaaaaa",
+  "thumbnail" : "https://img.test/yt.webp",
+  "title" : "Versión en directo"
+}
