@@ -57,20 +57,30 @@ class _LibraryAlertsHostState extends ConsumerState<LibraryAlertsHost> {
 
   @override
   Widget build(BuildContext context) {
+    // Sin núcleo (store en error) el host no tumba la app: ignora los errores.
+    void ignore(Object _, StackTrace _) {}
     ref.listen(libraryStoreProvider.select((s) => s.needsFolder), (_, needs) {
       if (needs) _firstRun();
-    });
+    }, onError: ignore);
     ref.listen(importStoreProvider.select((s) => s.duplicateOf), (_, id) {
       if (id != null) _duplicate(id);
-    });
+    }, onError: ignore);
     ref.listen(importStoreProvider.select((s) => s.notice), (_, n) {
       if (n != null) _notice(n);
-    });
-    if (ref.read(libraryStoreProvider).needsFolder && !_firstRunOpen) {
+    }, onError: ignore);
+    if (_needsFolder && !_firstRunOpen) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && ref.read(libraryStoreProvider).needsFolder) _firstRun();
+        if (mounted && _needsFolder) _firstRun();
       });
     }
     return widget.child;
+  }
+
+  bool get _needsFolder {
+    try {
+      return ref.read(libraryStoreProvider).needsFolder;
+    } catch (_) {
+      return false;
+    }
   }
 }

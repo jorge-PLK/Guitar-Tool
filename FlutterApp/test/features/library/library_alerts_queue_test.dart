@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:toneforge/core/core_client.dart';
+import 'package:toneforge/core/core_providers.dart';
 import 'package:toneforge/core/mock_core.dart';
 import 'package:toneforge/features/library/import_store.dart';
 import 'package:toneforge/features/library/library_alerts_host.dart';
@@ -17,6 +18,23 @@ const _ms = Duration(milliseconds: 300);
 final _l = AppLocalizationsEs();
 
 void main() {
+  testWidgets('host: con el núcleo en error no lanza y muestra el hijo', (tester) async {
+    final c = ProviderContainer(overrides: [coreClientProvider.overrideWith((ref) => throw StateError('sin núcleo'))]);
+    addTearDown(c.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: c,
+        child: const Directionality(
+          textDirection: TextDirection.ltr,
+          child: LibraryAlertsHost(child: Text('hijo')),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('hijo'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('host: avisos seguidos se muestran uno a uno, en orden', (tester) async {
     late ProviderContainer c;
     late MockCore core;

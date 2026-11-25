@@ -2,7 +2,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:toneforge/core/core_client.dart';
 import 'package:toneforge/features/library/link_import_logic.dart';
 import 'package:toneforge/features/library/source_messages.dart';
-import 'package:toneforge/l10n/app_localizations.dart';
 import 'package:toneforge/l10n/app_localizations_en.dart';
 import 'package:toneforge/l10n/app_localizations_es.dart';
 

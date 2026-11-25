@@ -29,7 +29,7 @@ class PlaylistReviewRow extends ConsumerWidget {
       child: DecoratedBox(
         decoration: BoxDecoration(color: doubtful ? TfColors.dangerBg.withValues(alpha: TfOpacity.tint35) : null),
         child: Padding(
-          padding: EdgeInsets.symmetric(vertical: doubtful ? TfSpace.s4 : 0),
+          padding: doubtful ? const EdgeInsets.symmetric(vertical: TfSpace.s4) : EdgeInsets.zero,
           child: Row(
             spacing: TfSpace.s12,
             children: [
