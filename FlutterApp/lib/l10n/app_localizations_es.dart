@@ -1298,7 +1298,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String backing_mixerOutput(String device) {
-    return 'Salida: $device (— si vacío)';
+    return 'Salida: $device';
   }
 
   @override

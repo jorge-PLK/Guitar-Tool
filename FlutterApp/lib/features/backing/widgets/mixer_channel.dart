@@ -124,11 +124,14 @@ class MixerChannel extends ConsumerWidget {
 
 Widget _titleText(String t) => Padding(
       padding: const EdgeInsets.symmetric(horizontal: TfSpace.s4),
-      child: Text(
-        t,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TfText.body(TfSize.font12, TfWeight.semibold).copyWith(color: TfColors.text),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          t,
+          maxLines: 1,
+          softWrap: false,
+          style: TfText.body(TfSize.font12, TfWeight.semibold).copyWith(color: TfColors.text),
+        ),
       ),
     );
 

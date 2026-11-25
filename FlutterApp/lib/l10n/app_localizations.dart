@@ -2183,7 +2183,7 @@ abstract class AppLocalizations {
   /// No description provided for @backing_mixerOutput.
   ///
   /// In es, this message translates to:
-  /// **'Salida: {device} (— si vacío)'**
+  /// **'Salida: {device}'**
   String backing_mixerOutput(String device);
 
   /// No description provided for @backing_muteA11y.

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:toneforge/contract/study.dart';
 import 'package:toneforge/features/backing/study_store.dart';
 import 'package:toneforge/l10n/app_localizations.dart';
+import 'package:toneforge/theme/icons.dart';
 import 'package:toneforge/theme/tokens.dart';
 import 'package:toneforge/theme/typography.dart';
 import 'package:toneforge/widgets/tf_dropdown.dart';
@@ -14,6 +15,7 @@ const double _pickerWidth = 112;
 const double _fineSliderWidth = 70;
 const double _centsWidth = 56;
 const double _flowSpacing = 10;
+const double _chevronSize = 10;
 
 const List<String> _tonics = <String>['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
@@ -141,7 +143,11 @@ class InfoRow extends ConsumerWidget {
               key: const ValueKey<String>('key_menu'),
               behavior: HitTestBehavior.opaque,
               onTap: enabled ? toggle : null,
-              child: Text(key == null ? '—' : _keyName(l, key), style: strong),
+              child: Row(mainAxisSize: MainAxisSize.min, children: <Widget>[
+                Text(key == null ? '—' : _keyName(l, key), style: strong),
+                const SizedBox(width: TfSpace.s4),
+                const TfIconView(TfIcon.chevronDown, size: _chevronSize, color: TfColors.text),
+              ]),
             ),
           ),
         ),

@@ -12,7 +12,6 @@ import 'package:toneforge/features/backing/widgets/loop_marking.dart';
 import 'package:toneforge/features/backing/widgets/transport_row.dart';
 import 'package:toneforge/l10n/app_localizations.dart';
 import 'package:toneforge/shell/selected_project.dart';
-import 'package:toneforge/theme/icons.dart';
 import 'package:toneforge/theme/tokens.dart';
 import 'package:toneforge/widgets/tf_slider.dart';
 
@@ -92,15 +91,19 @@ Future<void> _tap(WidgetTester tester, Finder f) async {
   await _settle(tester);
 }
 
-bool _hasIcon(TfIcon i) => find.byWidgetPredicate((w) => w is TfIconView && w.icon == i).evaluate().isNotEmpty;
+bool _hasPlayPaint(bool paused) => find
+    .byWidgetPredicate((w) =>
+        w is CustomPaint && w.painter is PlayPauseFillPainter && (w.painter! as PlayPauseFillPainter).paused == paused)
+    .evaluate()
+    .isNotEmpty;
 
 void main() {
   testWidgets('play llama y cambia a pausa; pausa llama study.pause', (tester) async {
     await pumpRows(tester);
-    expect(_hasIcon(TfIcon.playFill), isTrue);
+    expect(_hasPlayPaint(false), isTrue);
     await _tap(tester, find.byKey(const ValueKey<String>('transport_play')));
     expect(_methods, contains('study.play'));
-    expect(_hasIcon(TfIcon.pauseFill), isTrue);
+    expect(_hasPlayPaint(true), isTrue);
     await _tap(tester, find.byKey(const ValueKey<String>('transport_play')));
     expect(_methods, contains('study.pause'));
   });

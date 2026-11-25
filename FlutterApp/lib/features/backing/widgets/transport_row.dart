@@ -6,7 +6,6 @@ import 'package:toneforge/features/backing/widgets/loop_marking.dart';
 import 'package:toneforge/features/backing/widgets/loop_pill.dart';
 import 'package:toneforge/l10n/app_localizations.dart';
 import 'package:toneforge/theme/fmt.dart';
-import 'package:toneforge/theme/icons.dart';
 import 'package:toneforge/theme/tokens.dart';
 import 'package:toneforge/theme/typography.dart';
 import 'package:toneforge/widgets/tf_buttons.dart';
@@ -105,16 +104,68 @@ class _PlayButton extends ConsumerWidget {
             height: _playSize,
             alignment: Alignment.center,
             decoration: const BoxDecoration(color: TfColors.accent, shape: BoxShape.circle),
-            child: TfIconView(
-              playing ? TfIcon.pauseFill : TfIcon.playFill,
-              size: _playIcon,
-              color: TfColors.accentInk,
+            child: CustomPaint(
+              size: const Size.square(_playIcon),
+              painter: PlayPauseFillPainter(paused: playing, color: TfColors.accentInk),
             ),
           ),
         ),
       ),
     );
   }
+}
+
+/// `play.fill` / `pause.fill` relleno (trazos de `icons_data_2/3`). `TfIconView` solo pinta trazo, así que
+/// el relleno vive aquí en privado; mismas coordenadas 24x24 escaladas a `size`.
+class PlayPauseFillPainter extends CustomPainter {
+  PlayPauseFillPainter({required this.paused, required this.color});
+
+  final bool paused;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Path path = Path();
+    if (paused) {
+      path
+        ..moveTo(15, 3)
+        ..lineTo(18, 3)
+        ..arcToPoint(const Offset(19, 4), radius: const Radius.circular(1), clockwise: true) // tf-literal-ok: icon path geometry (24-unit viewBox)
+        ..lineTo(19, 20)
+        ..arcToPoint(const Offset(18, 21), radius: const Radius.circular(1), clockwise: true) // tf-literal-ok: icon path geometry (24-unit viewBox)
+        ..lineTo(15, 21)
+        ..arcToPoint(const Offset(14, 20), radius: const Radius.circular(1), clockwise: true) // tf-literal-ok: icon path geometry (24-unit viewBox)
+        ..lineTo(14, 4)
+        ..arcToPoint(const Offset(15, 3), radius: const Radius.circular(1), clockwise: true) // tf-literal-ok: icon path geometry (24-unit viewBox)
+        ..close()
+        ..moveTo(6, 3)
+        ..lineTo(9, 3)
+        ..arcToPoint(const Offset(10, 4), radius: const Radius.circular(1), clockwise: true) // tf-literal-ok: icon path geometry (24-unit viewBox)
+        ..lineTo(10, 20)
+        ..arcToPoint(const Offset(9, 21), radius: const Radius.circular(1), clockwise: true) // tf-literal-ok: icon path geometry (24-unit viewBox)
+        ..lineTo(6, 21)
+        ..arcToPoint(const Offset(5, 20), radius: const Radius.circular(1), clockwise: true) // tf-literal-ok: icon path geometry (24-unit viewBox)
+        ..lineTo(5, 4)
+        ..arcToPoint(const Offset(6, 3), radius: const Radius.circular(1), clockwise: true) // tf-literal-ok: icon path geometry (24-unit viewBox)
+        ..close();
+    } else {
+      path
+        ..moveTo(5, 5)
+        ..arcToPoint(const Offset(8.008, 3.272), radius: const Radius.circular(2), clockwise: true) // tf-literal-ok: icon path geometry (24-unit viewBox)
+        ..lineTo(20.005, 10.27)
+        ..arcToPoint(const Offset(20.008, 13.728), radius: const Radius.circular(2), clockwise: true) // tf-literal-ok: icon path geometry (24-unit viewBox)
+        ..lineTo(8.008, 20.728)
+        ..arcToPoint(const Offset(5, 19), radius: const Radius.circular(2), clockwise: true) // tf-literal-ok: icon path geometry (24-unit viewBox)
+        ..close();
+    }
+    canvas.save();
+    canvas.scale(size.width / 24, size.height / 24);
+    canvas.drawPath(path, Paint()..color = color..style = PaintingStyle.fill);
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant PlayPauseFillPainter old) => old.paused != paused || old.color != color;
 }
 
 /// «m:ss» en `text` + « / m:ss» en `muted`, display 20 con cifras tabulares. Aislado para que el
