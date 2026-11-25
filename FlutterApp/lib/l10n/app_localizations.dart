@@ -1406,6 +1406,36 @@ abstract class AppLocalizations {
   /// **'Vídeo no disponible'**
   String get library_srcRemovedTitle;
 
+  /// Búsqueda en Spotify: respuesta inesperada (spotify-bad-response).
+  ///
+  /// In es, this message translates to:
+  /// **'Spotify ha devuelto una respuesta inesperada'**
+  String get library_spotifyBadResponse;
+
+  /// Búsqueda en Spotify: sin credenciales (spotify-missing-credentials).
+  ///
+  /// In es, this message translates to:
+  /// **'Búsqueda en Spotify no disponible: falta la clave (.env)'**
+  String get library_spotifyMissingCredentials;
+
+  /// Búsqueda en Spotify: sin red (spotify-offline).
+  ///
+  /// In es, this message translates to:
+  /// **'Sin conexión con Spotify'**
+  String get library_spotifyOffline;
+
+  /// Búsqueda en Spotify: límite de peticiones (spotify-rate-limited).
+  ///
+  /// In es, this message translates to:
+  /// **'Spotify pide esperar {seconds} s'**
+  String library_spotifyRateLimited(int seconds);
+
+  /// Búsqueda en Spotify: clave rechazada (spotify-rejected).
+  ///
+  /// In es, this message translates to:
+  /// **'Spotify ha rechazado la clave'**
+  String get library_spotifyRejected;
+
   /// Errores de fuente: detalle.
   ///
   /// In es, this message translates to:

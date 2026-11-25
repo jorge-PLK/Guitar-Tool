@@ -31,12 +31,16 @@ const Set<String> linkReturnsToCandidates = {
 
 /// Error mostrado. `message` es `«título\ndetalle»` o solo título; la vista traduce por `code`.
 class LinkImportError {
-  const LinkImportError({required this.code, required this.message});
+  const LinkImportError({required this.code, required this.message, this.args = const {}});
 
-  factory LinkImportError.fromCore(CoreError e) => LinkImportError(code: e.code, message: e.message);
+  factory LinkImportError.fromCore(CoreError e) =>
+      LinkImportError(code: e.code, message: e.message, args: e.args);
 
   final String code;
   final String message;
+
+  /// Datos del error (`CoreError.args`): versión, componente, código HTTP, espera.
+  final Json args;
 
   /// Ofrece «Actualizar y reintentar» (`SourceError.suggestsYtDlpUpdate`).
   bool get suggestsUpdate => code == 'extractor-broken';

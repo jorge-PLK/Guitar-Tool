@@ -780,6 +780,25 @@ class AppLocalizationsEs extends AppLocalizations {
   String get library_srcRemovedTitle => 'Vídeo no disponible';
 
   @override
+  String get library_spotifyBadResponse =>
+      'Spotify ha devuelto una respuesta inesperada';
+
+  @override
+  String get library_spotifyMissingCredentials =>
+      'Búsqueda en Spotify no disponible: falta la clave (.env)';
+
+  @override
+  String get library_spotifyOffline => 'Sin conexión con Spotify';
+
+  @override
+  String library_spotifyRateLimited(int seconds) {
+    return 'Spotify pide esperar $seconds s';
+  }
+
+  @override
+  String get library_spotifyRejected => 'Spotify ha rechazado la clave';
+
+  @override
   String get library_srcSpotifyUnreadableDetail =>
       'Pega un enlace de YouTube del tema en su lugar.';
 

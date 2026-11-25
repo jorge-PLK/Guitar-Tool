@@ -772,6 +772,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get library_srcRemovedTitle => 'Video unavailable';
 
   @override
+  String get library_spotifyBadResponse =>
+      'Spotify returned an unexpected response';
+
+  @override
+  String get library_spotifyMissingCredentials =>
+      'Spotify search unavailable: the key (.env) is missing';
+
+  @override
+  String get library_spotifyOffline => 'No connection to Spotify';
+
+  @override
+  String library_spotifyRateLimited(int seconds) {
+    return 'Spotify asks to wait $seconds s';
+  }
+
+  @override
+  String get library_spotifyRejected => 'Spotify rejected the key';
+
+  @override
   String get library_srcSpotifyUnreadableDetail =>
       'Paste a YouTube link for the song instead.';
 
