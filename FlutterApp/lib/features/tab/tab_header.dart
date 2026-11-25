@@ -21,6 +21,7 @@ final tabSavePathProvider = Provider<TabSavePath>((ref) => (name) async {
 
 /// `.gp` en base64 que genera alphaTab (`exportGpBase64`). Lo enchufa la zona del WebView; `null` = sin lienzo.
 final tabExportDataProvider = Provider<Future<String?> Function()?>((ref) =>
+    // ignore: deprecated_member_use
     () async => ref.exists(tabCanvasProvider) ? ref.read(tabCanvasProvider.notifier).exportGpBase64() : null);
 
 /// «Exportar a Guitar Pro»: nombre sugerido, diálogo de guardado, `.gp` del lienzo y `tab.export {data, path}`.
