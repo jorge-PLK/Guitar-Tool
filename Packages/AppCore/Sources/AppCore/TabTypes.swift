@@ -96,11 +96,22 @@ struct TabState: Codable, Sendable {
     var handled: Bool?
 }
 
+/// Tabla de tiempos de la rejilla para mapear segundos → compás/fracción igual que `TabScore.position(at:)`.
+/// `beats[i]` = inicio del pulso i (orden de rejilla); `beatsPerBar[b]` = pulsos del compás b (los pulsos son
+/// uniformes en ticks dentro del compás); `end` = fin de la rejilla (`endTime`).
+struct TabTimingInfo: Codable, Sendable, Equatable {
+    var beats: [Double]
+    var beatsPerBar: [Int]
+    var end: Double
+}
+
 struct TabScoreResult: Codable, Sendable {
     var json: String
     var trackIndex: Int
     var trackIDs: [String]
     var revision: Int
+    /// nil si no hay rejilla.
+    var timing: TabTimingInfo?
 }
 
 struct TabProgressEvent: Codable, Sendable {

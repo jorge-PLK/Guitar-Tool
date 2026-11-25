@@ -190,6 +190,31 @@ final class TabTests: XCTestCase {
         XCTAssertEqual(tracks(again).compactMap { $0["transcription"] as? String }, ["ready", "ready"])
         let r2 = try await result(f, "tab.score")
         XCTAssertEqual(r2["json"] as? String, expected.json)
+        try checkTiming(r2, matches: saved)
+    }
+
+    /// `timing` de tab.score reproduce `TabScore.position(at:)` (bar + (índice + fracción de pulso) / pulsos del compás).
+    func checkTiming(_ r: [String: Any], matches score: TabScore) throws {
+        let t = try XCTUnwrap(r["timing"] as? [String: Any])
+        let beats = try XCTUnwrap(t["beats"] as? [Double])
+        let perBar = try XCTUnwrap(t["beatsPerBar"] as? [Int])
+        let end = try XCTUnwrap(t["end"] as? Double)
+        XCTAssertEqual(beats, score.beats.map(\.time))
+        XCTAssertEqual(perBar, score.bars.map(\.beatCount))
+        XCTAssertEqual(end, score.endTime)
+        for k in 0..<7 {
+            let time = beats[0] + (end - beats[0]) * Double(k) / 6.3
+            var b = beats.lastIndex { $0 <= time } ?? 0
+            b = min(b, beats.count - 1)
+            let t1 = b + 1 < beats.count ? beats[b + 1] : end
+            let frac = min(max(0, (time - beats[b]) / (t1 - beats[b])), 1)
+            var bar = 0, first = 0
+            while bar + 1 < perBar.count, first + perBar[bar] <= b { first += perBar[bar]; bar += 1 }
+            let mine = (Double(bar), (Double(b - first) + frac) / Double(perBar[bar]))
+            let p = score.position(at: time)
+            XCTAssertEqual(mine.0, Double(p.bar))
+            XCTAssertEqual(mine.1, (Double(p.beatInBar) + p.beatFraction) / Double(score.bars[p.bar].beatCount), accuracy: 1e-9)
+        }
     }
 
     func openAndTranscribeWait(_ f: Fixture) async throws -> [String: Any] {

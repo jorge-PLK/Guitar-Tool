@@ -362,7 +362,12 @@ final class TabService {
             guard let i = a.trackIDs.firstIndex(of: track) else { throw RPCError(code: "bad-params", message: "Pista desconocida: \(track).") }
             index = i
         }
-        return TabScoreResult(json: a.json, trackIndex: index, trackIDs: a.trackIDs, revision: revision)
+        return TabScoreResult(json: a.json, trackIndex: index, trackIDs: a.trackIDs, revision: revision, timing: timingInfo())
+    }
+
+    func timingInfo() -> TabTimingInfo? {
+        guard let score = editor?.score, !score.beats.isEmpty else { return nil }
+        return TabTimingInfo(beats: score.beats.map(\.time), beatsPerBar: score.bars.map(\.beatCount), end: score.endTime)
     }
 
     func selectTrack(_ id: String) throws -> TabState {
