@@ -5,28 +5,31 @@
 //  - Windows webview_flutter_windows: no hay canal con nombre; el stream webMessage recoge window.chrome.webview.postMessage.
 (function () {
   function str(o) { return typeof o === 'string' ? o : JSON.stringify(o); }
-  try {
-    if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.tf) {
-      var h = window.webkit.messageHandlers.tf;
-      var orig = h.postMessage.bind(h);
-      h.postMessage = function (o) { return orig(str(o)); };
-      window.__shimOk = (window.webkit.messageHandlers.tf.postMessage !== orig);
-      window.__shimVia = 'webkit';
-      return;
-    }
-    window.webkit = window.webkit || {};
-    window.webkit.messageHandlers = window.webkit.messageHandlers || {};
-    window.webkit.messageHandlers.tf = {
-      postMessage: function (o) {
-        var s = str(o);
-        if (window.tf && typeof window.tf.postMessage === 'function') return window.tf.postMessage(s);
-        if (window.chrome && window.chrome.webview) return window.chrome.webview.postMessage(s);
-        throw new Error('sin canal JS->Dart (ni window.tf ni chrome.webview)');
+  // El canal va en su propia funcion: su `return` temprano (macOS) no debe saltarse el listener de teclado de abajo.
+  (function routeChannel() {
+    try {
+      if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.tf) {
+        var h = window.webkit.messageHandlers.tf;
+        var orig = h.postMessage.bind(h);
+        h.postMessage = function (o) { return orig(str(o)); };
+        window.__shimOk = (window.webkit.messageHandlers.tf.postMessage !== orig);
+        window.__shimVia = 'webkit';
+        return;
       }
-    };
-    window.__shimVia = (window.tf && typeof window.tf.postMessage === 'function') ? 'window.tf' : 'chrome.webview';
-    window.__shimOk = true;
-  } catch (e) { window.__shimOk = false; window.__shimErr = String(e); }
+      window.webkit = window.webkit || {};
+      window.webkit.messageHandlers = window.webkit.messageHandlers || {};
+      window.webkit.messageHandlers.tf = {
+        postMessage: function (o) {
+          var s = str(o);
+          if (window.tf && typeof window.tf.postMessage === 'function') return window.tf.postMessage(s);
+          if (window.chrome && window.chrome.webview) return window.chrome.webview.postMessage(s);
+          throw new Error('sin canal JS->Dart (ni window.tf ni chrome.webview)');
+        }
+      };
+      window.__shimVia = (window.tf && typeof window.tf.postMessage === 'function') ? 'window.tf' : 'chrome.webview';
+      window.__shimOk = true;
+    } catch (e) { window.__shimOk = false; window.__shimErr = String(e); }
+  })();
 
   // Teclado (solo Flutter). En SwiftUI un monitor local de NSEvent ve cada keyDown antes que el WKWebView; aqui, si el
   // WebView tiene el foco, la tecla no llega a Flutter y el navegador haria su accion (Espacio = desplazar). Se reenvia
