@@ -134,21 +134,35 @@ class TfPrimaryButton extends StatelessWidget {
 }
 
 /// Botón secundario: `SecondaryButton` (Theme.swift:72). Alturas usadas: 44, 36, 28.
+/// Opcionales: [weight] (por defecto medium), [color] (color del texto activo, por defecto `text`),
+/// [hPadding] (por defecto 16) e [icon] (a la izquierda del texto, `Label` de SwiftUI; [iconSize] 14).
 class TfSecondaryButton extends StatelessWidget {
   const TfSecondaryButton({
     super.key,
     required this.label,
     required this.onPressed,
     this.height = TfSize.controlLg,
+    this.weight = TfWeight.medium,
+    this.color = TfColors.text,
+    this.hPadding = TfSpace.s16,
+    this.icon,
+    this.iconSize = TfSize.font14,
   });
 
   final String label;
   final VoidCallback? onPressed;
   final double height;
+  final TfWeight weight;
+  final Color color;
+  final double hPadding;
+  final TfIcon? icon;
+  final double iconSize;
 
   @override
   Widget build(BuildContext context) {
     final bool enabled = onPressed != null;
+    final Color fg = enabled ? color : TfColors.muted;
+    final TextStyle style = _label(TfSize.font14, weight, fg);
     return _TfPress(
       onPressed: onPressed,
       semanticLabel: label,
@@ -156,7 +170,18 @@ class TfSecondaryButton extends StatelessWidget {
         enabled: enabled,
         pressed: pressed,
         height: height,
-        child: _labelRow(label, _label(TfSize.font14, TfWeight.medium, enabled ? TfColors.text : TfColors.muted)),
+        hPadding: hPadding,
+        child: icon == null
+            ? _labelRow(label, style)
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                spacing: TfSpace.s6,
+                children: <Widget>[
+                  TfIconView(icon!, size: iconSize, color: fg),
+                  Flexible(child: Text(label, style: style, maxLines: 1, softWrap: false, overflow: TextOverflow.clip)),
+                ],
+              ),
       ),
     );
   }
@@ -193,13 +218,14 @@ Widget _secondaryBox({
   required double height,
   required Widget child,
   double? width,
+  double hPadding = TfSpace.s16,
 }) =>
     Opacity(
       opacity: enabled ? 1 : TfOpacity.disabled,
       child: Container(
         height: height,
         width: width,
-        padding: const EdgeInsets.symmetric(horizontal: TfSpace.s16),
+        padding: EdgeInsets.symmetric(horizontal: hPadding),
         decoration: BoxDecoration(
           color: TfColors.field.withValues(alpha: pressed ? TfOpacity.pressedSecondary : 1),
           borderRadius: BorderRadius.circular(TfRadius.control),
