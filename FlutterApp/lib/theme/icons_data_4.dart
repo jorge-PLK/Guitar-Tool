@@ -73,13 +73,21 @@ const Map<TfIcon, List<_Cmd>> _tfIconDataD = {
   ],
   // rotate.right
   TfIcon.rotateRight: [
-    _M(21, 12),
-    _A(9, 9, 0, true, true, 12, 3),
-    _C(14.52, 3, 16.93, 4, 18.74, 5.74),
-    _L(21, 8),
-    _M(21, 3),
-    _L(21, 8),
-    _L(16, 8),
+    _M(5, 10),
+    _L(13, 10),
+    _A(2, 2, 0, false, true, 15, 12),
+    _L(15, 19),
+    _A(2, 2, 0, false, true, 13, 21),
+    _L(5, 21),
+    _A(2, 2, 0, false, true, 3, 19),
+    _L(3, 12),
+    _A(2, 2, 0, false, true, 5, 10),
+    _Z(),
+    _M(8, 6.5),
+    _A(8, 8, 0, false, true, 20, 13),
+    _M(17.8, 11),
+    _L(20, 13),
+    _L(22, 10.8),
   ],
   // line.3.horizontal
   TfIcon.line3Horizontal: [
