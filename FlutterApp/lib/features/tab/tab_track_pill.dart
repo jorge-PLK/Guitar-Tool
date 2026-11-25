@@ -41,6 +41,7 @@ class TabTrackPill extends ConsumerWidget {
                   TfIcon.speakerWave2Fill,
                   size: TfSize.font11,
                   color: active ? TfColors.accent : TfColors.text2,
+                  filled: true,
                 )
               : null,
         ),

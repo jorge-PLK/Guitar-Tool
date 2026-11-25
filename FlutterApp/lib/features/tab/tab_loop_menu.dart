@@ -6,6 +6,7 @@ import 'package:toneforge/features/backing/study_store.dart';
 import 'package:toneforge/features/tab/tab_store.dart';
 import 'package:toneforge/l10n/app_localizations.dart';
 import 'package:toneforge/theme/fmt.dart';
+import 'package:toneforge/theme/icons.dart';
 import 'package:toneforge/theme/tokens.dart';
 import 'package:toneforge/theme/typography.dart';
 import 'package:toneforge/widgets/tf_menu.dart';
@@ -38,6 +39,7 @@ class TabLoopMenu extends ConsumerWidget {
       label = l.tab_loopActive(name, TfFmt.clock(loop.start), TfFmt.clock(loop.end));
     }
 
+    final Color color = loop == null ? TfColors.text2 : TfColors.accent;
     final List<TfMenuEntry> entries = <TfMenuEntry>[
       TfMenuItem(
         label: l.tab_loopNone,
@@ -65,13 +67,16 @@ class TabLoopMenu extends ConsumerWidget {
           key: const ValueKey<String>('tab_loop_menu'),
           behavior: HitTestBehavior.opaque,
           onTap: toggle,
-          child: Text(
-            label,
-            maxLines: 1,
-            softWrap: false,
-            style: TfText.body(TfSize.font13, TfWeight.semibold)
-                .copyWith(color: loop == null ? TfColors.text2 : TfColors.accent),
-          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: <Widget>[
+            Text(
+              label,
+              maxLines: 1,
+              softWrap: false,
+              style: TfText.body(TfSize.font13, TfWeight.semibold).copyWith(color: color),
+            ),
+            const SizedBox(width: TfSpace.s4),
+            TfIconView(TfIcon.chevronDown, size: TfSize.backingInfoChevron, color: color),
+          ]),
         ),
       ),
     );
