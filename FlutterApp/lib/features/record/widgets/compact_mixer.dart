@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -126,12 +127,145 @@ class CompactMixer extends ConsumerWidget {
         children: <Widget>[for (final MixerRow r in rows) _CompactChannel(row: r)],
       ),
     );
-    // Desvío: SwiftUI usa ViewThatFits (una fila o dos); Flutter no lo tiene, queda siempre una
-    // fila con los canales desplazables.
-    return Row(
-      spacing: TfSpace.s10,
-      children: <Widget>[header, const TfDivider.vertical(), Expanded(child: channels)],
+    final int n = rows.length;
+    final double channelsWidth =
+        n == 0 ? 0 : n * TfSize.compactChannelWidth + (n - 1) * TfSpace.s6;
+    // ViewThatFits de SwiftUI (RecordMixer.swift:117-120): una fila si cabe todo; si no, el
+    // encabezado y debajo los canales con desplazamiento horizontal.
+    return _ViewThatFits(
+      channelsWidth: channelsWidth,
+      rowGap: TfSpace.s10,
+      columnGap: TfSpace.s8,
+      children: <Widget>[header, const TfDivider.vertical(), channels],
     );
+  }
+}
+
+/// Hijos: encabezado, separador y canales (desplazables). Si `encabezado + separador + canales`
+/// caben en el ancho disponible van en una fila (el separador visible); si no, en dos líneas
+/// (sin separador, canales con scroll al ancho disponible).
+class _ViewThatFits extends MultiChildRenderObjectWidget {
+  const _ViewThatFits({
+    required this.channelsWidth,
+    required this.rowGap,
+    required this.columnGap,
+    required super.children,
+  });
+
+  final double channelsWidth;
+  final double rowGap;
+  final double columnGap;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => _RenderViewThatFits(channelsWidth, rowGap, columnGap);
+
+  @override
+  void updateRenderObject(BuildContext context, _RenderViewThatFits r) {
+    r
+      ..channelsWidth = channelsWidth
+      ..rowGap = rowGap
+      ..columnGap = columnGap;
+  }
+}
+
+class _Slot extends ContainerBoxParentData<RenderBox> {}
+
+class _RenderViewThatFits extends RenderBox
+    with
+        ContainerRenderObjectMixin<RenderBox, _Slot>,
+        RenderBoxContainerDefaultsMixin<RenderBox, _Slot> {
+  _RenderViewThatFits(this._channelsWidth, this._rowGap, this._columnGap);
+
+  double _channelsWidth;
+  double _rowGap;
+  double _columnGap;
+  bool _oneRow = true;
+
+  set channelsWidth(double v) {
+    if (v == _channelsWidth) return;
+    _channelsWidth = v;
+    markNeedsLayout();
+  }
+
+  set rowGap(double v) {
+    if (v == _rowGap) return;
+    _rowGap = v;
+    markNeedsLayout();
+  }
+
+  set columnGap(double v) {
+    if (v == _columnGap) return;
+    _columnGap = v;
+    markNeedsLayout();
+  }
+
+  @override
+  void setupParentData(RenderBox child) {
+    if (child.parentData is! _Slot) {
+      child.parentData = _Slot();
+    }
+  }
+
+  RenderBox get _header => firstChild!;
+  RenderBox get _divider => childAfter(_header)!;
+  RenderBox get _channels => childAfter(_divider)!;
+
+  @override
+  void performLayout() {
+    final double max = constraints.maxWidth;
+    _header.layout(const BoxConstraints(), parentUsesSize: true);
+    _divider.layout(const BoxConstraints(), parentUsesSize: true);
+    final double rowWidth = _header.size.width + _rowGap + _divider.size.width + _rowGap + _channelsWidth;
+    _oneRow = !max.isFinite || rowWidth <= max;
+    if (_oneRow) {
+      _channels.layout(BoxConstraints.tightFor(width: _channelsWidth), parentUsesSize: true);
+      final double hgt = <double>[_header.size.height, _divider.size.height, _channels.size.height]
+          .reduce((double a, double b) => a > b ? a : b);
+      double x = 0;
+      for (final RenderBox c in <RenderBox>[_header, _divider, _channels]) {
+        (c.parentData! as _Slot).offset = Offset(x, (hgt - c.size.height) / 2);
+        x += c.size.width + _rowGap;
+      }
+      size = constraints.constrain(Size(rowWidth, hgt));
+    } else {
+      _channels.layout(BoxConstraints(maxWidth: max), parentUsesSize: true);
+      (_header.parentData! as _Slot).offset = Offset.zero;
+      (_channels.parentData! as _Slot).offset =
+          Offset(0, _header.size.height + _columnGap);
+      final double w = _header.size.width > _channels.size.width ? _header.size.width : _channels.size.width;
+      size = constraints.constrain(Size(w, _header.size.height + _columnGap + _channels.size.height));
+    }
+  }
+
+  @override
+  Size computeDryLayout(BoxConstraints constraints) => constraints.constrain(Size.zero);
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    for (final RenderBox c in <RenderBox>[_header, if (_oneRow) _divider, _channels]) {
+      context.paintChild(c, (c.parentData! as _Slot).offset + offset);
+    }
+  }
+
+  @override
+  bool hitTestChildren(BoxHitTestResult result, {required Offset position}) {
+    for (final RenderBox c in <RenderBox>[_channels, if (_oneRow) _divider, _header]) {
+      final Offset o = (c.parentData! as _Slot).offset;
+      final bool hit = result.addWithPaintOffset(
+        offset: o,
+        position: position,
+        hitTest: (BoxHitTestResult r, Offset p) => c.hitTest(r, position: p),
+      );
+      if (hit) return true;
+    }
+    return false;
+  }
+
+  @override
+  void visitChildrenForSemantics(RenderObjectVisitor visitor) {
+    visitor(_header);
+    if (_oneRow) visitor(_divider);
+    visitor(_channels);
   }
 }
 

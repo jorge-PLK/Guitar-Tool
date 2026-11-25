@@ -33,7 +33,7 @@ Map<String, Object?> chan(String id, String name, {bool forced = false}) => {
     };
 
 /// Abre Grabar con un mix de dos canales: «Bajo» normal y «Guitarra» forzada a silencio.
-Future<(MockCore, ProviderContainer)> open({String? launchState}) async {
+Future<(MockCore, ProviderContainer)> open({String? launchState, int extra = 0}) async {
   final core = MockCore()
     ..result('study.open', <String, Object?>{})
     ..result('audio.settings', fx('audio/audio.settings.result'))
@@ -51,14 +51,18 @@ Future<(MockCore, ProviderContainer)> open({String? launchState}) async {
   await c.read(recordStoreProvider.notifier).open('p1');
   final base = fx('record/record.state.base.result');
   final mix = Map<String, Object?>.of((base['mix'] as Map).cast<String, Object?>())
-    ..['channels'] = [chan('bass', 'Bajo'), chan('guitar', 'Guitarra', forced: true)];
+    ..['channels'] = [
+      chan('bass', 'Bajo'),
+      chan('guitar', 'Guitarra', forced: true),
+      for (var i = 0; i < extra; i++) chan('x$i', 'Canal $i'),
+    ];
   core.emit('record.state', {...base, 'mix': mix});
   await pumpEventQueue();
   return (core, c);
 }
 
-Future<void> pumpMixer(WidgetTester tester, ProviderContainer c, {ValueChanged<bool>? onExpanded}) async {
-  setTestSurface(tester, const Size(1100, 700));
+Future<void> pumpMixer(WidgetTester tester, ProviderContainer c, {ValueChanged<bool>? onExpanded, double width = 1100}) async {
+  setTestSurface(tester, Size(width, 700));
   await tester.pumpWidget(
     UncontrolledProviderScope(
       container: c,
@@ -164,4 +168,35 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100)); // vacía el temporizador del doble toque
     expect(core.calls.last.params, {'channel': 'bass', 'gainDB': 0.0});
   });
+
+  for (final double w in <double>[1400, 800, 420]) {
+    testWidgets('compacto con 8 canales a ancho $w: todos los M localizables y pulsables', (tester) async {
+      final (core, c) = (await tester.runAsync(() => open(extra: 6)))!;
+      await pumpMixer(tester, c, width: w);
+      expect(tester.takeException(), isNull);
+      final names = <String>['Bajo', for (var i = 0; i < 6; i++) 'Canal $i'];
+      // El resultado de record.setMix del mock repone los canales del fixture: se comprueba cada M
+      // (localizable, habilitado, visible tras desplazar) y solo se pulsa el último.
+      for (final String n in names) {
+        final Finder m = toggle('Silenciar $n');
+        expect(m, findsOneWidget);
+        expect(tester.widget<TfToggleButton>(m).onPressed, isNotNull);
+        await tester.ensureVisible(m);
+        await tester.pump();
+        expect(tester.getRect(m).right, lessThanOrEqualTo(w));
+        expect(tester.getRect(m).left, greaterThanOrEqualTo(0));
+      }
+      expect(toggle('Activar Guitarra'), findsOneWidget);
+      if (w == 1400) {
+        // Cabe en una fila: sin desplazamiento, Master y el último canal a la vista.
+        final Rect last = tester.getRect(toggle('Silenciar Canal 5'));
+        expect(last.right, lessThanOrEqualTo(w));
+        final double dy = tester.getTopLeft(find.text('Canal 5')).dy - tester.getTopLeft(find.text('Master')).dy;
+        expect(dy.abs(), lessThan(40), reason: 'dy=$dy');
+      }
+      await tester.tap(toggle('Silenciar Canal 5'));
+      await tester.pump();
+      expect(core.calls.last.params, {'channel': 'x5', 'mute': true});
+    });
+  }
 }
