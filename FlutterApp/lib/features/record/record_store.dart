@@ -7,6 +7,7 @@ import 'package:toneforge/contract/core_message.dart';
 import 'package:toneforge/contract/record.dart';
 import 'package:toneforge/core/core_client.dart';
 import 'package:toneforge/core/core_providers.dart';
+import 'package:toneforge/features/record/record_camera_poll.dart';
 
 const Object _keep = Object();
 
@@ -141,12 +142,29 @@ class RecordStore extends Notifier<RecordState> {
         if (state.opened) state = state.copyWith(calibrationValid: a.calibrationValid);
       }),
     ];
+    final poller = _poller = CameraPoller(_pollCamera);
+    // Como SwiftUI (RecordController.swift:483): siempre en reposo y con sesión abierta; el núcleo decide qué hacer.
+    listenSelf((_, n) {
+      if (n.opened && n.phase == RecordPhase.idle) {
+        poller.start();
+      } else {
+        poller.stop();
+      }
+    });
     ref.onDispose(() {
+      poller.stop();
       for (final s in subs) {
         s.cancel();
       }
     });
     return const RecordState();
+  }
+
+  CameraPoller? _poller;
+
+  Future<void> _pollCamera() async {
+    final s = await _core.call('record.pollCamera', const RecordEmptyParams().toJson(), RecordSnapshot.fromJson);
+    if (ref.mounted) applySnapshot(s);
   }
 
   /// Aplica un snapshot (evento o respuesta). Lo usa también `MixerStore`. Ignorado si Grabar no está abierta.
@@ -195,6 +213,7 @@ class RecordStore extends Notifier<RecordState> {
 
   /// Salir: `audio.setMeters {visible:false}`, `record.close` y `study.close` salvo rumbo a Montaje.
   Future<void> close({bool toMontage = false}) async {
+    _poller?.stop();
     state = state.copyWith(opened: false);
     try {
       await _core.call('audio.setMeters', const AudioSetMetersParams(visible: false).toJson(), AudioState.fromJson);
