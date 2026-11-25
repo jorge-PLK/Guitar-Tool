@@ -6,6 +6,7 @@ import 'package:toneforge/core/core_providers.dart';
 import 'package:toneforge/core/launch_options.dart';
 import 'package:toneforge/core/mock_core.dart';
 import 'package:toneforge/features/backing/study_store.dart';
+import 'package:toneforge/features/backing/widgets/chord_editor.dart';
 import 'package:toneforge/features/backing/widgets/chord_grid.dart';
 import 'package:toneforge/features/backing/widgets/chord_grid_geometry.dart';
 import 'package:toneforge/features/backing/widgets/chord_grid_painter.dart';
@@ -187,6 +188,25 @@ void main() {
     expect(core.calls.any((x) => x.method == 'study.setLoop'), isFalse);
     expect(core.calls.any((x) => x.method == 'study.seek'), isFalse);
     expect(edited, <int>[3]);
+  });
+
+  testWidgets('la hoja Acorde solo se abre en edición y parte en el pulso de la celda', (tester) async {
+    final (core, c) = await pumpGrid(tester, tweak: withBeats, size: const Size(1100, 900));
+    await tester.tapAt(at(tester, cx(1, 1), cy));
+    await settleFrames(tester);
+    expect(find.byType(ChordEditor), findsNothing);
+    c.read(studyStoreProvider.notifier).setEditMode(true);
+    await settleFrames(tester);
+    await tester.tapAt(at(tester, cx(1, 1), cy));
+    await settleFrames(tester);
+    expect(find.byType(ChordEditor), findsOneWidget);
+    await tester.tap(find.descendant(of: find.byType(ChordEditor), matching: find.text(es.backing_chordSplit)));
+    await settleFrames(tester);
+    expect(call(core, 'study.splitChord')['at'], 5.0);
+    expect(find.byType(ChordEditor), findsOneWidget);
+    c.read(studyStoreProvider.notifier).setEditMode(false);
+    await settleFrames(tester);
+    expect(find.byType(ChordEditor), findsNothing);
   });
 
   test('una sola geometría', () {

@@ -6,11 +6,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:toneforge/contract/study.dart';
 import 'package:toneforge/features/backing/study_position.dart';
 import 'package:toneforge/features/backing/study_store.dart';
+import 'package:toneforge/features/backing/widgets/chord_editor.dart';
 import 'package:toneforge/features/backing/widgets/chord_grid_geometry.dart';
 import 'package:toneforge/features/backing/widgets/chord_grid_painter.dart';
 import 'package:toneforge/l10n/app_localizations.dart';
 import 'package:toneforge/theme/tokens.dart';
 import 'package:toneforge/theme/typography.dart';
+import 'package:toneforge/widgets/tf_popover.dart';
 
 /// Rejilla expandida (CG:116-192): filas de 4 compases (8 si cabe), scroll vertical sin barra, autoscroll a la
 /// fila del compás actual. Clic = saltar al pulso; arrastre = bucle (⌥ = compases). En edición no hay gesto de bucle
@@ -28,6 +30,8 @@ class ChordGrid extends ConsumerStatefulWidget {
 
 class _ChordGridState extends ConsumerState<ChordGrid> {
   final ScrollController _scroll = ScrollController();
+  final TfPopoverController _pop = TfPopoverController();
+  ({Rect rect, double start, double end, double time})? _editing;
   StudyAnalysisInfo? _analysis;
   ChordGridLayout? _layout;
   int _perRow = 0;
@@ -83,6 +87,27 @@ class _ChordGridState extends ConsumerState<ChordGrid> {
     return bar.cells[math.min(cell.beat, bar.cells.length - 1)];
   }
 
+  /// Marco de la celda del pulso pulsado, para anclar la hoja «Acorde».
+  Rect? _cellRect(Offset p, ChordGridGeometry g) {
+    if (_rows.isEmpty) return null;
+    final GridCell probe = g.hitTest(p, rows: _rows.length, beats: 1);
+    final List<GridBar> row = _rows[probe.row];
+    final int col = math.min(probe.col, row.length - 1);
+    final int beats = row[col].cells.length;
+    final GridCell cell = g.hitTest(p, rows: _rows.length, beats: beats);
+    return g.cellRect(probe.row, col, math.min(cell.beat, beats - 1), beats);
+  }
+
+  void _openEditor(GridBeat beat, Rect rect, StudyOpenResult? study) {
+    final int? i = beat.chord;
+    if (study == null || i == null || i >= study.analysis.chords.length) return;
+    final StudyChord c = study.analysis.chords[i];
+    setState(() => _editing = (rect: rect, start: c.start, end: c.end, time: beat.time));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _pop.show();
+    });
+  }
+
   (double, double)? _range(GridBeat? a, GridBeat? b) {
     if (a == null || b == null) return null;
     final GridBeat lo = a.time <= b.time ? a : b;
@@ -120,7 +145,11 @@ class _ChordGridState extends ConsumerState<ChordGrid> {
     if (a == null || b == null) return;
     final bool drag = _moved && (e.localPosition - d0).distance >= ChordGridGeometry.clickSlop;
     if (edit) {
-      if (!drag && a.chord != null) widget.onEditChord?.call(a.chord!);
+      if (!drag && a.chord != null) {
+        widget.onEditChord?.call(a.chord!);
+        final Rect? r = _cellRect(d0, g);
+        if (r != null) _openEditor(a, r, ref.read(studyStoreProvider).study);
+      }
       return;
     }
     final StudyStore store = ref.read(studyStoreProvider.notifier);
@@ -149,6 +178,7 @@ class _ChordGridState extends ConsumerState<ChordGrid> {
     final StudyOpenResult? study = ref.watch(studyStoreProvider.select((s) => s.study));
     final bool edit = ref.watch(studyStoreProvider.select((s) => s.editMode));
     final double seconds = ref.watch(studyPositionProvider.select((p) => p.seconds));
+    if (!edit) _editing = null;
     return SizedBox(
       height: ChordGridGeometry.visibleHeight,
       child: LayoutBuilder(builder: (BuildContext context, BoxConstraints c) {
@@ -202,6 +232,19 @@ class _ChordGridState extends ConsumerState<ChordGrid> {
                     // SLOT: GridSectionBoxesLayer
                     if (widget.sectionsLayer != null)
                       Positioned.fill(child: widget.sectionsLayer!(context, g)),
+                    if (edit && _editing != null)
+                      Positioned.fromRect(
+                        rect: _editing!.rect,
+                        child: IgnorePointer(
+                          child: TfPopover(
+                            controller: _pop,
+                            onClosed: () => setState(() => _editing = null),
+                            popoverBuilder: (BuildContext _) =>
+                                ChordEditor(start: _editing!.start, end: _editing!.end, time: _editing!.time),
+                            child: const SizedBox.expand(),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),

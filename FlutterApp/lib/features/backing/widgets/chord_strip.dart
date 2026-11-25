@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:toneforge/contract/study.dart';
 import 'package:toneforge/features/backing/widgets/chord_chip.dart';
+import 'package:toneforge/features/backing/widgets/chord_editor.dart';
+import 'package:toneforge/widgets/tf_popover.dart';
 
 /// Nombre que se ve de un acorde: el transpuesto si el núcleo lo da.
 String chordShownName(StudyChord c) => c.display ?? c.name;
@@ -112,6 +114,7 @@ class ChordStrip extends StatefulWidget {
 
 class _ChordStripState extends State<ChordStrip> {
   final ScrollController _scroll = ScrollController();
+  final Map<double, TfPopoverController> _pops = <double, TfPopoverController>{};
   ChordStripLayout _layout = const ChordStripLayout(rects: <Rect>[], width: 0);
   double _viewport = 0;
   double? _downX;
@@ -221,13 +224,24 @@ class _ChordStripState extends State<ChordStrip> {
         isPast: cur != null && i < cur,
         inLoop: ls != null && le != null && mid >= ls && mid <= le,
       );
-      if (widget.edit && widget.onEditChord != null) {
-        chip = MouseRegion(
-          cursor: SystemMouseCursors.click,
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => widget.onEditChord!(i),
-            child: chip,
+      if (widget.edit) {
+        final TfPopoverController pop = _pops.putIfAbsent(c.start, TfPopoverController.new);
+        chip = TfPopover(
+          controller: pop,
+          popoverBuilder: (BuildContext _) => ChordEditor(start: c.start, end: c.end),
+          child: MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () {
+                widget.onEditChord?.call(i);
+                for (final TfPopoverController p in _pops.values) {
+                  if (p != pop) p.hide();
+                }
+                pop.show();
+              },
+              child: chip,
+            ),
           ),
         );
       }
