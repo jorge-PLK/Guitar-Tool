@@ -21,6 +21,7 @@ import 'package:toneforge/theme/tokens.dart';
 import 'package:toneforge/theme/typography.dart';
 import 'package:toneforge/widgets/tf_chip.dart';
 import 'package:toneforge/widgets/tf_list_row.dart';
+import 'package:toneforge/widgets/tf_song_cover.dart';
 
 import '../../support/harness.dart';
 
@@ -63,12 +64,13 @@ final _projects = [
 late MockCore _core;
 late ProviderContainer _c;
 
-Future<void> _pump(WidgetTester tester, Widget child, {List<Json>? projects, bool load = true}) async {
+Future<void> _pump(WidgetTester tester, Widget child, {List<Json>? projects, bool load = true, Json? appInfo}) async {
   await tester.runAsync(loadTfFonts);
   setTestSurface(tester, const Size(1100, 700));
   _core = (await tester.runAsync(() async => MockCore.load((await DirectoryFixtureSource.find())!)))!;
   _core.result('library.list', {'projects': projects ?? _projects, 'skipped': <Object>[]});
-  _c = ProviderContainer(
+  if (appInfo != null) _core.result('app.info', appInfo);
+  _c =ProviderContainer(
     overrides: [coreClientProvider.overrideWithValue(_core), libraryPrefsProvider.overrideWithValue(_MemoryPrefs())],
   );
   addTearDown(_c.dispose);
@@ -113,6 +115,23 @@ Future<void> _emitPlaylist(WidgetTester tester, String step, String indicator) a
 }
 
 void main() {
+  testWidgets('portada: con cover y carpeta usa FileImage; sin cover, placeholder', (tester) async {
+    await _pump(
+      tester,
+      const LibraryScreen(),
+      projects: [
+        {..._project('1', 'Con portada'), 'cover': 'Con portada/source/cover.jpg'},
+        _project('2', 'Sin portada'),
+      ],
+      appInfo: {'projectsFolder': '/tmp/tf', 'proposedProjectsFolder': null},
+    );
+    final covers = tester.widgetList<TfSongCover>(find.byType(TfSongCover)).toList();
+    expect(covers, hasLength(2));
+    expect(covers[0].image, isA<FileImage>());
+    expect((covers[0].image! as FileImage).file.path, '/tmp/tf/Con portada/source/cover.jpg');
+    expect(covers[1].image, isNull);
+  });
+
   testWidgets('nada antes de loaded', (tester) async {
     await _pump(tester, const LibraryScreen(), load: false);
     expect(find.byType(SongTable), findsNothing);

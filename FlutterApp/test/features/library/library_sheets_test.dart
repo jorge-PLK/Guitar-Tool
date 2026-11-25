@@ -162,7 +162,7 @@ void main() {
     final (_, core) = await _pump(tester, _opener);
     Json? sent;
     core.handle('library.rename', (p) {
-      sent = p as Json;
+      sent = p;
       return {'id': _id, 'title': 'Nuevo', 'artist': null};
     });
     await tester.tap(find.byType(GestureDetector).first);

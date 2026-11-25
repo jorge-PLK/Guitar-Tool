@@ -39,6 +39,7 @@ extension LibraryStoreActions on LibraryStore {
     final err = await _run(() async {
       final r = await _core.call('host.pickProjectsFolder', const <String, Object?>{}, PickedFolderResult.fromJson);
       if (r.path != null) await refresh();
+      return null;
     });
     return err;
   }

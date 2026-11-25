@@ -15,6 +15,24 @@ String formatDuration(double seconds, String locale) => TfFmt.duration(seconds);
 /// `Fmt.clock`: duración de una toma en reloj (`m:ss`); null → «–».
 String formatClock(double? seconds) => seconds == null ? '–' : TfFmt.clock(seconds);
 
+/// Ruta absoluta de la portada: `cover` es relativa a la carpeta de proyectos y usa `/`
+/// (contrato.md, rutas de medios). Sin carpeta o sin portada → null (placeholder).
+String? resolveCoverPath(String? projectsFolder, String? cover) {
+  if (projectsFolder == null || projectsFolder.isEmpty || cover == null || cover.isEmpty) return null;
+  final base = projectsFolder.endsWith('/') || projectsFolder.endsWith(r'\')
+      ? projectsFolder.substring(0, projectsFolder.length - 1)
+      : projectsFolder;
+  final sep = base.contains(r'\') && !base.contains('/') ? r'\' : '/';
+  return '$base$sep${sep == '/' ? cover : cover.replaceAll('/', sep)}';
+}
+
+/// Ruta para mostrar: en macOS/Linux, `$HOME` inicial → `~`; en Windows tal cual. Solo presentación.
+String displayPath(String path, {required String? home, required bool windows}) {
+  if (windows || home == null || home.isEmpty) return path;
+  if (path == home) return '~';
+  return path.startsWith('$home/') ? '~${path.substring(home.length)}' : path;
+}
+
 const _monthsEs = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sept', 'oct', 'nov', 'dic'];
 const _monthsEn = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 

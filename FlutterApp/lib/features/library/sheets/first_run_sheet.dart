@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:toneforge/l10n/app_localizations.dart';
@@ -7,6 +9,7 @@ import 'package:toneforge/widgets/tf_buttons.dart';
 import 'package:toneforge/widgets/tf_sheet.dart';
 
 import '../library_errors.dart';
+import '../library_format.dart';
 import '../library_metrics.dart';
 import '../library_store.dart';
 
@@ -27,7 +30,11 @@ class _FirstRunSheet extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l = AppLocalizations.of(context);
-    final proposed = ref.watch(libraryStoreProvider.select((s) => s.proposedFolder)) ?? proposedProjectsFolder;
+    final proposed = displayPath(
+      ref.watch(libraryStoreProvider.select((s) => s.proposedFolder)) ?? proposedProjectsFolder,
+      home: Platform.environment['HOME'],
+      windows: Platform.isWindows,
+    );
     ref.listen(libraryStoreProvider.select((s) => s.needsFolder), (_, needs) {
       final route = ModalRoute.of(context);
       if (!needs && route != null) route.navigator?.removeRoute(route);

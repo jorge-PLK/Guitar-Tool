@@ -1,8 +1,12 @@
+import 'dart:io' show File;
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:toneforge/contract/library.dart';
 import 'package:toneforge/features/library/dialogs/trash_dialog.dart';
 import 'package:toneforge/features/library/import_store.dart';
+import 'package:toneforge/features/library/library_format.dart';
+import 'package:toneforge/features/library/library_store.dart';
 import 'package:toneforge/features/library/sheets/song_info_sheet.dart';
 import 'package:toneforge/features/library/widgets/row_context_menu.dart';
 import 'package:toneforge/features/library/widgets/song_table.dart';
@@ -30,6 +34,11 @@ class SongRow extends ConsumerWidget {
     final l = AppLocalizations.of(context);
     final selected = ref.watch(selectedProjectProvider) == entry.id;
     final artist = entry.artist;
+    final coverPath = resolveCoverPath(
+      ref.watch(libraryStoreProvider.select((s) => s.projectsFolder)),
+      entry.cover,
+    );
+    final coverImage = coverPath == null ? null : FileImage(File(coverPath));
     return RowContextMenu(
       entry: entry,
       child: TfListRow(
@@ -40,7 +49,7 @@ class SongRow extends ConsumerWidget {
             Expanded(
               child: Row(
                 children: [
-                  const TfSongCover(),
+                  TfSongCover(image: coverImage),
                   const SizedBox(width: TfSpace.s14),
                   Expanded(
                     child: Column(

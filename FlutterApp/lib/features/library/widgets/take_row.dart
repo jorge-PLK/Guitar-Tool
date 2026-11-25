@@ -9,6 +9,7 @@ import 'package:toneforge/features/library/library_metrics.dart';
 import 'package:toneforge/features/library/project_detail_store.dart';
 import 'package:toneforge/features/library/take_viewer_link.dart';
 import 'package:toneforge/l10n/app_localizations.dart';
+import 'package:toneforge/theme/icons.dart';
 import 'package:toneforge/theme/tokens.dart';
 import 'package:toneforge/theme/typography.dart';
 import 'package:toneforge/widgets/tf_buttons.dart';
@@ -101,6 +102,7 @@ class TakeRow extends ConsumerWidget {
         TfSecondaryButton(
           label: l.library_takeView,
           height: _buttonHeight,
+          icon: TfIcon.playFill,
           onPressed: take.audio == null || take.songStart == null
               ? null
               : () => openTakeViewer(context, projectId: projectId, takeId: take.id),
