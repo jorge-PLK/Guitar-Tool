@@ -5,14 +5,11 @@ import 'package:toneforge/theme/tokens.dart';
 import 'package:toneforge/theme/typography.dart';
 import 'package:toneforge/widgets/tf_buttons.dart';
 
-/// Medidas de la hoja que SwiftUI da como literales (SectionBoxes.swift:305-367) y no tienen token.
-const double sectionPopoverWidth = 300;
-const double sectionLabelWidth = 46;
-const double _swatchSize = 20;
+/// Ancho de la hoja (SectionBoxes.swift:305-367), desde el token del tema.
+const double sectionPopoverWidth = TfSize.sectionPopoverWidth;
+const double sectionLabelWidth = TfSize.sectionPopoverLabelWidth;
 const double _swatchRingGap = 3;
 const double _swatchRowHeight = 24;
-const double _chipHeight = 24;
-const double _timeMinWidth = 64;
 const int _suggestionColumns = 3;
 
 /// `SectionPopover.precise` (SectionBoxes.swift:393): `m:ss.d`, nunca negativo.
@@ -77,7 +74,7 @@ class _SuggestionChip extends StatelessWidget {
         onTap: () => onTap(name),
         child: Container(
           key: ValueKey<String>('section-suggest-$name'),
-          height: _chipHeight,
+          height: TfSize.sectionSuggestionHeight,
           alignment: Alignment.center,
           decoration: BoxDecoration(
             color: active ? TfColors.line : TfColors.field,
@@ -158,22 +155,22 @@ class _Dot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: _swatchSize,
-      height: _swatchSize,
+      width: TfSize.sectionColorDot,
+      height: TfSize.sectionColorDot,
       child: OverflowBox(
-        maxWidth: _swatchSize + 2 * _swatchRingGap + 2 * TfStroke.thick,
-        maxHeight: _swatchSize + 2 * _swatchRingGap + 2 * TfStroke.thick,
+        maxWidth: TfSize.sectionColorDot + 2 * _swatchRingGap + 2 * TfStroke.thick,
+        maxHeight: TfSize.sectionColorDot + 2 * _swatchRingGap + 2 * TfStroke.thick,
         child: Container(
-          width: _swatchSize + 2 * _swatchRingGap + 2 * TfStroke.thick,
-          height: _swatchSize + 2 * _swatchRingGap + 2 * TfStroke.thick,
+          width: TfSize.sectionColorDot + 2 * _swatchRingGap + 2 * TfStroke.thick,
+          height: TfSize.sectionColorDot + 2 * _swatchRingGap + 2 * TfStroke.thick,
           alignment: Alignment.center,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             border: ring ? Border.all(color: TfColors.text, width: TfStroke.thick) : null,
           ),
           child: Container(
-            width: _swatchSize,
-            height: _swatchSize,
+            width: TfSize.sectionColorDot,
+            height: TfSize.sectionColorDot,
             decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           ),
         ),
@@ -217,7 +214,7 @@ class SectionEdgeRow extends StatelessWidget {
       ),
       const SizedBox(width: TfSpace.s8),
       ConstrainedBox(
-        constraints: const BoxConstraints(minWidth: _timeMinWidth),
+        constraints: const BoxConstraints(minWidth: TfSize.sectionTimeMinWidth),
         child: Text(
           sectionPreciseTime(time),
           key: ValueKey<String>('section-$edge-time'),

@@ -12,6 +12,7 @@ import 'package:toneforge/features/backing/widgets/loop_marking.dart';
 import 'package:toneforge/features/backing/widgets/transport_row.dart';
 import 'package:toneforge/l10n/app_localizations.dart';
 import 'package:toneforge/shell/selected_project.dart';
+import 'package:toneforge/theme/icons.dart';
 import 'package:toneforge/theme/tokens.dart';
 import 'package:toneforge/widgets/tf_slider.dart';
 
@@ -92,8 +93,7 @@ Future<void> _tap(WidgetTester tester, Finder f) async {
 }
 
 bool _hasPlayPaint(bool paused) => find
-    .byWidgetPredicate((w) =>
-        w is CustomPaint && w.painter is PlayPauseFillPainter && (w.painter! as PlayPauseFillPainter).paused == paused)
+    .byWidgetPredicate((w) => w is TfIconView && w.icon == (paused ? TfIcon.pauseFill : TfIcon.playFill))
     .evaluate()
     .isNotEmpty;
 

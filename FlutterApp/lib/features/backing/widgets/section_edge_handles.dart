@@ -9,14 +9,6 @@ import 'package:toneforge/features/backing/widgets/section_boxes_painter.dart';
 import 'package:toneforge/features/backing/widgets/section_edge_drag.dart';
 import 'package:toneforge/theme/tokens.dart';
 
-// TOKEN: sectionEdgeGrab 16 (SB:139)
-const double _grab = 16;
-// TOKEN: sectionEdgeBarWidth 6 (SB:145)
-const double _barWidth = 6;
-// TOKEN: sectionEdgeBarMin 16, sectionEdgeBarMax 30, sectionEdgeBarPad 10 (SB:145)
-const double _barMin = 16;
-const double _barMax = 30;
-const double _barPad = 10;
 // TOKEN: sectionEdgeStartDistance 1 (DragGesture(minimumDistance: 1), SB:150)
 const double _startDistance = 1;
 
@@ -36,9 +28,9 @@ Widget _handle(SectionPlacement p, bool isStart, EdgeTimeMapper mapper) {
   final double h = p.rect.height - p.headerHeight;
   return Positioned(
     key: ValueKey<String>(isStart ? 'section-edge-start' : 'section-edge-end'),
-    left: x - _grab / 2,
+    left: x - TfSize.sectionEdgeGrab / 2,
     top: p.rect.top + p.headerHeight,
-    width: _grab,
+    width: TfSize.sectionEdgeGrab,
     height: h,
     child: SectionEdgeHandle(piece: p, isStart: isStart, mapper: mapper),
   );
@@ -133,7 +125,8 @@ class _SectionEdgeHandleState extends ConsumerState<SectionEdgeHandle> {
   Widget build(BuildContext context) {
     final SectionPlacement p = widget.piece;
     final Color color = sectionColor(solo: p.section.solo, paletteIndex: p.section.paletteIndex ?? p.index);
-    final double barHeight = (p.rect.height - p.headerHeight - _barPad).clamp(_barMin, _barMax);
+    final double barHeight = (p.rect.height - p.headerHeight - TfSize.sectionEdgeBarInset)
+        .clamp(TfSize.sectionEdgeBarMin, TfSize.sectionEdgeBarMax);
     return MouseRegion(
       cursor: SystemMouseCursors.resizeColumn,
       child: RawGestureDetector(
@@ -157,7 +150,7 @@ class _SectionEdgeHandleState extends ConsumerState<SectionEdgeHandle> {
               color: color,
               borderRadius: const BorderRadius.all(Radius.circular(TfRadius.r3)),
             ),
-            child: SizedBox(width: _barWidth, height: barHeight),
+            child: SizedBox(width: TfSize.sectionEdgeBarWidth, height: barHeight),
           ),
         ),
       ),

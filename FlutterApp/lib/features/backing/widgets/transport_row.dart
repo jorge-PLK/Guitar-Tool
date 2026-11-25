@@ -6,6 +6,7 @@ import 'package:toneforge/features/backing/widgets/loop_marking.dart';
 import 'package:toneforge/features/backing/widgets/loop_pill.dart';
 import 'package:toneforge/l10n/app_localizations.dart';
 import 'package:toneforge/theme/fmt.dart';
+import 'package:toneforge/theme/icons.dart';
 import 'package:toneforge/theme/tokens.dart';
 import 'package:toneforge/theme/typography.dart';
 import 'package:toneforge/widgets/tf_buttons.dart';
@@ -14,12 +15,6 @@ import 'package:toneforge/widgets/tf_slider.dart';
 import 'package:toneforge/widgets/tf_tooltip.dart';
 
 // Medidas de BackingTimeline.swift:427-468 sin token propio.
-const double _playSize = 52;
-const double _playIcon = 20;
-const double _markHeight = 30;
-const double _tempoSliderWidth = 120;
-const double _tempoValueWidth = 54;
-const double _flowSpacing = 14;
 const double _runSpacing = 10;
 
 const List<FontFeature> _tabular = <FontFeature>[FontFeature.tabularFigures()];
@@ -41,7 +36,7 @@ class TransportRow extends ConsumerWidget {
       child: DefaultTextStyle(
         style: TfText.body(TfSize.font13).copyWith(color: TfColors.text2),
         child: Wrap(
-          spacing: _flowSpacing,
+          spacing: TfSize.transportFlowSpacing,
           runSpacing: _runSpacing,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: <Widget>[
@@ -57,12 +52,12 @@ class TransportRow extends ConsumerWidget {
                 min: 50,
                 max: 200,
                 step: 5,
-                width: _tempoSliderWidth,
+                width: TfSize.transportTempoSlider,
                 onChanged: (double v) => store.setRate(v / 100),
               ),
               const SizedBox(width: TfSpace.s10),
               SizedBox(
-                width: _tempoValueWidth,
+                width: TfSize.transportTempoValue,
                 child: Text(
                   TfFmt.percent(rate),
                   style: TfText.body(TfSize.font13, TfWeight.semibold)
@@ -100,72 +95,21 @@ class _PlayButton extends ConsumerWidget {
           behavior: HitTestBehavior.opaque,
           onTap: playing ? store.pause : store.play,
           child: Container(
-            width: _playSize,
-            height: _playSize,
+            width: TfSize.transportPlay,
+            height: TfSize.transportPlay,
             alignment: Alignment.center,
             decoration: const BoxDecoration(color: TfColors.accent, shape: BoxShape.circle),
-            child: CustomPaint(
-              size: const Size.square(_playIcon),
-              painter: PlayPauseFillPainter(paused: playing, color: TfColors.accentInk),
+            child: TfIconView(
+              playing ? TfIcon.pauseFill : TfIcon.playFill,
+              size: TfSize.transportPlayIcon,
+              color: TfColors.accentInk,
+              filled: true,
             ),
           ),
         ),
       ),
     );
   }
-}
-
-/// `play.fill` / `pause.fill` relleno (trazos de `icons_data_2/3`). `TfIconView` solo pinta trazo, así que
-/// el relleno vive aquí en privado; mismas coordenadas 24x24 escaladas a `size`.
-class PlayPauseFillPainter extends CustomPainter {
-  PlayPauseFillPainter({required this.paused, required this.color});
-
-  final bool paused;
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final Path path = Path();
-    if (paused) {
-      path
-        ..moveTo(15, 3)
-        ..lineTo(18, 3)
-        ..arcToPoint(const Offset(19, 4), radius: const Radius.circular(1), clockwise: true) // tf-literal-ok: icon path geometry (24-unit viewBox)
-        ..lineTo(19, 20)
-        ..arcToPoint(const Offset(18, 21), radius: const Radius.circular(1), clockwise: true) // tf-literal-ok: icon path geometry (24-unit viewBox)
-        ..lineTo(15, 21)
-        ..arcToPoint(const Offset(14, 20), radius: const Radius.circular(1), clockwise: true) // tf-literal-ok: icon path geometry (24-unit viewBox)
-        ..lineTo(14, 4)
-        ..arcToPoint(const Offset(15, 3), radius: const Radius.circular(1), clockwise: true) // tf-literal-ok: icon path geometry (24-unit viewBox)
-        ..close()
-        ..moveTo(6, 3)
-        ..lineTo(9, 3)
-        ..arcToPoint(const Offset(10, 4), radius: const Radius.circular(1), clockwise: true) // tf-literal-ok: icon path geometry (24-unit viewBox)
-        ..lineTo(10, 20)
-        ..arcToPoint(const Offset(9, 21), radius: const Radius.circular(1), clockwise: true) // tf-literal-ok: icon path geometry (24-unit viewBox)
-        ..lineTo(6, 21)
-        ..arcToPoint(const Offset(5, 20), radius: const Radius.circular(1), clockwise: true) // tf-literal-ok: icon path geometry (24-unit viewBox)
-        ..lineTo(5, 4)
-        ..arcToPoint(const Offset(6, 3), radius: const Radius.circular(1), clockwise: true) // tf-literal-ok: icon path geometry (24-unit viewBox)
-        ..close();
-    } else {
-      path
-        ..moveTo(5, 5)
-        ..arcToPoint(const Offset(8.008, 3.272), radius: const Radius.circular(2), clockwise: true) // tf-literal-ok: icon path geometry (24-unit viewBox)
-        ..lineTo(20.005, 10.27)
-        ..arcToPoint(const Offset(20.008, 13.728), radius: const Radius.circular(2), clockwise: true) // tf-literal-ok: icon path geometry (24-unit viewBox)
-        ..lineTo(8.008, 20.728)
-        ..arcToPoint(const Offset(5, 19), radius: const Radius.circular(2), clockwise: true) // tf-literal-ok: icon path geometry (24-unit viewBox)
-        ..close();
-    }
-    canvas.save();
-    canvas.scale(size.width / 24, size.height / 24);
-    canvas.drawPath(path, Paint()..color = color..style = PaintingStyle.fill);
-    canvas.restore();
-  }
-
-  @override
-  bool shouldRepaint(covariant PlayPauseFillPainter old) => old.paused != paused || old.color != color;
 }
 
 /// «m:ss» en `text` + « / m:ss» en `muted`, display 20 con cifras tabulares. Aislado para que el
@@ -203,7 +147,7 @@ class _LoopMarks extends ConsumerWidget {
         message: l.backing_loopStartTooltip,
         child: pending == null
             ? TfSecondaryButton(
-                label: l.backing_sectionStart, height: _markHeight, onPressed: () => markLoopStart(ref))
+                label: l.backing_sectionStart, height: TfSize.transportMarkHeight, onPressed: () => markLoopStart(ref))
             : _AccentButton(
                 label: l.backing_loopStartButton(TfFmt.clock(pending)), onTap: () => markLoopStart(ref)),
       ),
@@ -212,7 +156,7 @@ class _LoopMarks extends ConsumerWidget {
         message: l.backing_loopEndTooltip,
         child: TfSecondaryButton(
           label: l.backing_loopEnd,
-          height: _markHeight,
+          height: TfSize.transportMarkHeight,
           onPressed: pending == null && !hasLoop ? null : () => markLoopEnd(ref),
         ),
       ),
@@ -238,7 +182,7 @@ class _AccentButton extends StatelessWidget {
           behavior: HitTestBehavior.opaque,
           onTap: onTap,
           child: Container(
-            height: _markHeight,
+            height: TfSize.transportMarkHeight,
             padding: const EdgeInsets.symmetric(horizontal: TfSpace.s16),
             alignment: Alignment.center,
             decoration: BoxDecoration(

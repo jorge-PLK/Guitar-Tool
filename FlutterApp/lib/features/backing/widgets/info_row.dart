@@ -11,9 +11,6 @@ import 'package:toneforge/widgets/tf_menu.dart';
 import 'package:toneforge/widgets/tf_slider.dart';
 
 // Medidas de BackingTimeline.swift:342-385 sin token propio.
-const double _pickerWidth = 112;
-const double _fineSliderWidth = 70;
-const double _centsWidth = 56;
 const double _flowSpacing = 10;
 const double _chevronSize = 10;
 
@@ -50,7 +47,7 @@ class InfoRow extends ConsumerWidget {
             _labeled(
               l.backing_transpose,
               TfDropdown<int>(
-                width: _pickerWidth,
+                width: TfSize.infoPickerWidth,
                 value: t?.transpose ?? 0,
                 items: <TfDropdownItem<int>>[
                   for (int n = -12; n <= 12; n++)
@@ -65,7 +62,7 @@ class InfoRow extends ConsumerWidget {
             _labeled(
               l.backing_capo,
               TfDropdown<int>(
-                width: _pickerWidth,
+                width: TfSize.infoPickerWidth,
                 value: t?.capo ?? 0,
                 items: <TfDropdownItem<int>>[
                   for (int n = 0; n <= 12; n++)
@@ -82,12 +79,12 @@ class InfoRow extends ConsumerWidget {
                   min: -50,
                   max: 50,
                   step: 1,
-                  width: _fineSliderWidth,
+                  width: TfSize.infoFineSliderWidth,
                   onChanged: (double v) => store.setTranspose(fineCents: v.roundToDouble()),
                 ),
                 const SizedBox(width: TfSpace.s6),
                 SizedBox(
-                  width: _centsWidth,
+                  width: TfSize.infoCentsWidth,
                   child: Text(
                     l.backing_cents((t?.fineCents ?? 0).toInt()),
                     style: const TextStyle(fontFeatures: <FontFeature>[FontFeature.tabularFigures()]),
