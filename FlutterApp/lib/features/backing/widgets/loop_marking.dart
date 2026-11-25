@@ -65,6 +65,15 @@ class SeekCoalescer {
     _flush();
   }
 
+  /// Fin del arrastre: manda YA el valor pendiente y cancela el temporizador. Sin valor pendiente
+  /// no envía nada (el último enviado ya es el final). Si hay una petición en vuelo, el pendiente
+  /// sale en cuanto esa termine.
+  void flush() {
+    _timer?.cancel();
+    _timer = null;
+    _flush();
+  }
+
   void _flush() {
     final double? p = _pending;
     if (p == null || _inFlight || _timer != null) return;
@@ -114,6 +123,7 @@ class _CoalescedPositionBarState extends ConsumerState<CoalescedPositionBar> {
       loopStart: transport?.loop?.start,
       loopEnd: transport?.loop?.end,
       onSeek: _seek.request,
+      onSeekEnd: _seek.flush,
     );
   }
 }

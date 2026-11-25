@@ -12,6 +12,7 @@ class PositionBar extends StatelessWidget {
     this.loopStart,
     this.loopEnd,
     this.onSeek,
+    this.onSeekEnd,
   });
 
   static const double height = 22;
@@ -24,6 +25,9 @@ class PositionBar extends StatelessWidget {
   final double? loopStart;
   final double? loopEnd;
   final void Function(double seconds)? onSeek;
+
+  /// Fin de un toque o arrastre: el último seek debe salir ya (sin esperar al coalescer).
+  final VoidCallback? onSeekEnd;
 
   @override
   Widget build(BuildContext context) {
@@ -46,6 +50,8 @@ class PositionBar extends StatelessWidget {
         onTapDown: (TapDownDetails d) => seek(d.localPosition.dx),
         onHorizontalDragStart: (DragStartDetails d) => seek(d.localPosition.dx),
         onHorizontalDragUpdate: (DragUpdateDetails d) => seek(d.localPosition.dx),
+        onHorizontalDragEnd: (DragEndDetails d) => onSeekEnd?.call(),
+        onTapUp: (TapUpDetails d) => onSeekEnd?.call(),
         child: CustomPaint(
           size: Size(w, height),
           painter: PositionBarPainter(
