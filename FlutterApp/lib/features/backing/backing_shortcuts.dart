@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:toneforge/features/backing/study_position.dart';
 import 'package:toneforge/features/backing/study_store.dart';
+import 'package:toneforge/features/backing/widgets/section_selection.dart';
 
 /// Espacio: reproducir/pausar (`ctl.togglePlay()`, SectionGridBoxes.swift:114-130).
 class TogglePlayIntent extends Intent {
@@ -19,11 +20,20 @@ bool primaryFocusIsTextInput() {
   return ctx.findAncestorWidgetOfExactType<EditableText>() != null;
 }
 
+/// Supr / Retroceso: borra la sección seleccionada (`selection.clear()` + `removeSection`, SGB:151).
+class DeleteSectionIntent extends Intent {
+  const DeleteSectionIntent();
+}
+
+/// Esc: quita la selección de sección (SGB:155).
+class ClearSectionSelectionIntent extends Intent {
+  const ClearSectionSelectionIntent();
+}
+
 /// Atajos de teclado de la pantalla Backing (ficha backing-interaccion §6.1).
 ///
-/// Hechos: Espacio (sin ⌘ ⌃ ⌥ ⇧, sin auto-repetición, no escribiendo).
-/// Pendientes: Supr/Retroceso (borrar sección) y Esc (deseleccionar) necesitan la selección de
-/// secciones, que aún no existe en la vista.
+/// Espacio (sin ⌘ ⌃ ⌥ ⇧, sin auto-repetición, no escribiendo). Supr/Retroceso (⇧ vale; sin ⌘ ⌃ ⌥) y Esc
+/// solo actúan con una sección seleccionada y sin foco en un campo de texto; si no, dejan pasar la tecla.
 class BackingShortcuts extends ConsumerStatefulWidget {
   const BackingShortcuts({required this.child, super.key});
 
@@ -48,6 +58,17 @@ class _BackingShortcutsState extends ConsumerState<BackingShortcuts> {
     unawaited(playing ? store.pause() : store.play());
   }
 
+  bool get _hasSelection => ref.read(sectionSelectionProvider) != null;
+
+  void _deleteSection() {
+    final String? id = ref.read(sectionSelectionProvider);
+    if (id == null) return;
+    ref.read(sectionSelectionProvider.notifier).clear();
+    unawaited(ref.read(studyStoreProvider.notifier).deleteSection(id));
+  }
+
+  void _clearSelection() => ref.read(sectionSelectionProvider.notifier).clear();
+
   /// Un clic fuera de un campo de texto devuelve el foco a los atajos.
   void _onPointerDown(PointerDownEvent _) {
     if (!primaryFocusIsTextInput()) _node.requestFocus();
@@ -60,12 +81,23 @@ class _BackingShortcutsState extends ConsumerState<BackingShortcuts> {
     return Listener(
       onPointerDown: _onPointerDown,
       child: Shortcuts(
-        shortcuts: const <ShortcutActivator, Intent>{
-          SingleActivator(LogicalKeyboardKey.space, includeRepeats: false): TogglePlayIntent(),
+        shortcuts: <ShortcutActivator, Intent>{
+          const SingleActivator(LogicalKeyboardKey.space, includeRepeats: false): const TogglePlayIntent(),
+          for (final bool shift in <bool>[false, true]) ...<ShortcutActivator, Intent>{
+            SingleActivator(LogicalKeyboardKey.delete, shift: shift, includeRepeats: false):
+                const DeleteSectionIntent(),
+            SingleActivator(LogicalKeyboardKey.backspace, shift: shift, includeRepeats: false):
+                const DeleteSectionIntent(),
+            SingleActivator(LogicalKeyboardKey.escape, shift: shift, includeRepeats: false):
+                const ClearSectionSelectionIntent(),
+          },
         },
         child: Actions(
           actions: <Type, Action<Intent>>{
             TogglePlayIntent: _GuardedAction<TogglePlayIntent>(_togglePlay),
+            DeleteSectionIntent: _GuardedAction<DeleteSectionIntent>(_deleteSection, when: () => _hasSelection),
+            ClearSectionSelectionIntent:
+                _GuardedAction<ClearSectionSelectionIntent>(_clearSelection, when: () => _hasSelection),
           },
           child: Focus(focusNode: _node, autofocus: true, child: widget.child),
         ),
@@ -76,12 +108,15 @@ class _BackingShortcutsState extends ConsumerState<BackingShortcuts> {
 
 /// Acción que se desactiva (y deja pasar la tecla) mientras se escribe en un campo de texto.
 class _GuardedAction<T extends Intent> extends Action<T> {
-  _GuardedAction(this._run);
+  _GuardedAction(this._run, {this.when});
 
   final VoidCallback _run;
 
+  /// Condición extra (p. ej. «hay sección seleccionada»); sin ella solo cuenta no estar escribiendo.
+  final bool Function()? when;
+
   @override
-  bool isEnabled(T intent) => !primaryFocusIsTextInput();
+  bool isEnabled(T intent) => !primaryFocusIsTextInput() && (when?.call() ?? true);
 
   @override
   Object? invoke(T intent) {

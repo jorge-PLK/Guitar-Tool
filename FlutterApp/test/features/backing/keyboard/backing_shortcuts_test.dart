@@ -10,6 +10,7 @@ import 'package:toneforge/core/launch_options.dart';
 import 'package:toneforge/core/mock_core.dart';
 import 'package:toneforge/features/backing/backing_shortcuts.dart';
 import 'package:toneforge/features/backing/study_store.dart';
+import 'package:toneforge/features/backing/widgets/section_selection.dart';
 import 'package:toneforge/shell/selected_project.dart';
 import 'package:toneforge/theme/tokens.dart';
 
@@ -118,6 +119,54 @@ void main() {
     await tester.sendKeyUpEvent(LogicalKeyboardKey.space);
     await _settle(tester);
     expect(_methods.where((m) => m == 'study.play').length, 1);
+  });
+
+  const String section = '00000000-0000-0000-0000-000000000003';
+
+  Future<void> key(WidgetTester tester, LogicalKeyboardKey k) async {
+    await tester.sendKeyEvent(k);
+    await _settle(tester);
+  }
+
+  testWidgets('Supr y Retroceso borran la sección seleccionada y la deseleccionan', (tester) async {
+    for (final LogicalKeyboardKey k in <LogicalKeyboardKey>[
+      LogicalKeyboardKey.delete,
+      LogicalKeyboardKey.backspace,
+    ]) {
+      await _pump(tester);
+      container.read(sectionSelectionProvider.notifier).select(section);
+      await key(tester, k);
+      final calls = core.calls.where((c) => c.method == 'study.deleteSection').toList();
+      expect(calls.length, 1);
+      expect((calls.single.params! as Map)['id'], section);
+      expect(container.read(sectionSelectionProvider), isNull);
+    }
+  });
+
+  testWidgets('Esc deselecciona sin borrar', (tester) async {
+    await _pump(tester);
+    container.read(sectionSelectionProvider.notifier).select(section);
+    await key(tester, LogicalKeyboardKey.escape);
+    expect(container.read(sectionSelectionProvider), isNull);
+    expect(_methods, isNot(contains('study.deleteSection')));
+  });
+
+  testWidgets('sin selección, Supr y Esc no hacen nada', (tester) async {
+    await _pump(tester);
+    await key(tester, LogicalKeyboardKey.delete);
+    await key(tester, LogicalKeyboardKey.escape);
+    expect(_methods, isNot(contains('study.deleteSection')));
+  });
+
+  testWidgets('Supr y Esc no actúan con el foco en un campo de texto', (tester) async {
+    await _pump(tester);
+    container.read(sectionSelectionProvider.notifier).select(section);
+    _fieldFocus.requestFocus();
+    await _settle(tester);
+    await key(tester, LogicalKeyboardKey.delete);
+    await key(tester, LogicalKeyboardKey.escape);
+    expect(_methods, isNot(contains('study.deleteSection')));
+    expect(container.read(sectionSelectionProvider), section);
   });
 
   testWidgets('no se dispara con el foco en un campo de texto', (tester) async {
