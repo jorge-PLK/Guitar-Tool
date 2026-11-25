@@ -16,7 +16,6 @@ class LanguageGroup extends ConsumerWidget {
     final choice = ref.watch(localeChoiceProvider);
     return TfSettingsGroup(
       title: l.settings_lang_title,
-      note: '',
       children: <Widget>[
         TfInfoRow(
           label: l.settings_lang_label,

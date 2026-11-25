@@ -10,6 +10,7 @@ import 'package:toneforge/theme/tokens.dart';
 import 'package:toneforge/theme/typography.dart';
 import 'package:toneforge/widgets/tf_alert.dart';
 import 'package:toneforge/widgets/tf_buttons.dart';
+import 'package:toneforge/widgets/tf_middle_ellipsis.dart';
 import 'package:toneforge/widgets/tf_settings_group.dart';
 
 import 'folder_dialog.dart';
@@ -98,10 +99,8 @@ class _FolderField extends StatelessWidget {
         borderRadius: BorderRadius.circular(TfRadius.field),
         border: Border.all(color: TfColors.fieldLine, width: TfStroke.hairline),
       ),
-      child: Text(
+      child: TfMiddleEllipsisText(
         path,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
         style: TfText.body().copyWith(color: TfColors.text),
       ),
     );

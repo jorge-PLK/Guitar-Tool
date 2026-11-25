@@ -5,11 +5,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:toneforge/core/core_client.dart';
 import 'package:toneforge/core/mock_core.dart';
 import 'package:toneforge/features/library/dialogs/clean_dialog.dart';
+import 'package:toneforge/features/library/dialogs/duplicate_dialog.dart';
 import 'package:toneforge/features/library/dialogs/trash_dialog.dart';
 import 'package:toneforge/features/library/library_errors.dart';
 import 'package:toneforge/features/library/library_store.dart';
 import 'package:toneforge/l10n/app_localizations.dart';
 import 'package:toneforge/l10n/app_localizations_es.dart';
+import 'package:toneforge/shell/selected_project.dart';
+import 'package:toneforge/shell/shell_providers.dart';
+import 'package:toneforge/shell/shell_route.dart';
 import 'package:toneforge/theme/fmt.dart';
 import 'package:toneforge/theme/tokens.dart';
 
@@ -159,6 +163,18 @@ void main() {
     await tester.tap(find.textContaining(RegExp('^Limpiar \\d')));
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.text(l.library_errBusy), findsOneWidget);
+  });
+
+  testWidgets('duplicado: «Abrir el existente» cambia a Biblioteca y selecciona', (tester) async {
+    final (c, _) = await _pump(tester, (ctx, ref) => showDuplicateDialog(ctx, ref, _id));
+    // Los botones de «Este tema ya está…» desbordan la alerta de 320 px (kit): se ignora aquí.
+    tester.takeException();
+    c.read(shellRouteProvider.notifier).select(ShellRoute.settings);
+    expect(find.text(l.library_duplicateTitle), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(c.read(shellRouteProvider), ShellRoute.library);
+    expect(c.read(selectedProjectProvider), _id);
   });
 
   test('coreErrorText: código conocido, desconocido y sin mensaje', () {

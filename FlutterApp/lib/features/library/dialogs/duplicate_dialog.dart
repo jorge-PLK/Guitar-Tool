@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:toneforge/l10n/app_localizations.dart';
 import 'package:toneforge/shell/library_detail.dart';
 import 'package:toneforge/shell/selected_project.dart';
+import 'package:toneforge/shell/shell_providers.dart';
+import 'package:toneforge/shell/shell_route.dart';
 import 'package:toneforge/widgets/tf_alert.dart';
 
 /// Alerta «Este tema ya está en la biblioteca» (RootView.swift:38-47): «Abrir el existente»
@@ -18,6 +20,7 @@ Future<void> showDuplicateDialog(BuildContext context, WidgetRef ref, String exi
   );
   if (!open) return;
   // AppModel.open(id): selecciona y abre la página del tema.
+  ref.read(shellRouteProvider.notifier).select(ShellRoute.library);
   ref.read(selectedProjectProvider.notifier).select(existingId);
   ref.read(libraryDetailProvider.notifier).open(existingId);
 }
