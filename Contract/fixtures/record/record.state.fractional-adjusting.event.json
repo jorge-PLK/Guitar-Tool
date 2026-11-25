@@ -1,0 +1,178 @@
+{
+  "activePartId" : "00000000-0000-0000-0000-000000000001",
+  "audio" : {
+    "hosting" : true,
+    "outputName" : "Salida simulada",
+    "recording" : false,
+    "sessionOpen" : true
+  },
+  "barSeconds" : 2,
+  "beatsPerBar" : 4,
+  "bpm" : 120,
+  "busy" : true,
+  "camera" : {
+    "cameras" : [
+      {
+        "id" : "sim-camera",
+        "name" : "Cámara simulada"
+      }
+    ],
+    "chosenId" : "sim-camera",
+    "defaultOffsetMs" : 33.5,
+    "fps" : 29.969999999999999,
+    "height" : 360,
+    "label" : "640×360 · 30 fps",
+    "name" : "Cámara simulada",
+    "rotation" : 90,
+    "state" : "simulated",
+    "width" : 640
+  },
+  "countIn" : false,
+  "downbeats" : [
+
+  ],
+  "duration" : 8,
+  "guitarRoles" : [
+    {
+      "name" : "Guitarra rítmica",
+      "role" : "rhythm"
+    }
+  ],
+  "messages" : [
+
+  ],
+  "mix" : {
+    "anySolo" : false,
+    "channels" : [
+      {
+        "forcedMuted" : false,
+        "gainDB" : -3,
+        "id" : "bass",
+        "kind" : "bass",
+        "muted" : false,
+        "name" : "Bajo",
+        "solo" : false
+      }
+    ],
+    "masterGainDB" : -1.5,
+    "outputName" : "Salida simulada",
+    "takeChannels" : [
+
+    ]
+  },
+  "nextTakeNumber" : 2,
+  "notices" : [
+
+  ],
+  "offset" : {
+    "audioPath" : "Banda - Tema/takes/00000000-0000-0000-0000-000000000002/processed.wav",
+    "cameraId" : "sim-camera",
+    "cameraName" : "Cámara simulada",
+    "fps" : 29.969999999999999,
+    "frameMs" : 33.366700033366705,
+    "initialMs" : 41.700000000000003,
+    "isNew" : false,
+    "maxMs" : 500.5,
+    "minMs" : -499.5,
+    "punches" : [
+
+    ],
+    "rotation" : 90,
+    "songStart" : 2,
+    "takeId" : "00000000-0000-0000-0000-000000000002",
+    "valueMs" : 41.700000000000003,
+    "videoPath" : "Banda - Tema/takes/00000000-0000-0000-0000-000000000002/video.mov"
+  },
+  "parts" : [
+    {
+      "bestTakeId" : "00000000-0000-0000-0000-000000000002",
+      "id" : "00000000-0000-0000-0000-000000000001",
+      "isLead" : false,
+      "name" : "Guitarra",
+      "status" : "done",
+      "takes" : [
+        {
+          "audioPath" : "Banda - Tema/takes/00000000-0000-0000-0000-000000000002/processed.wav",
+          "best" : true,
+          "createdAt" : "2026-01-01T00:00:00Z",
+          "discarded" : false,
+          "durationSeconds" : 3,
+          "hasVideo" : true,
+          "id" : "00000000-0000-0000-0000-000000000002",
+          "number" : 1,
+          "punches" : [
+
+          ],
+          "selected" : false,
+          "songStart" : 2,
+          "videoFormat" : {
+            "cameraId" : "sim-camera",
+            "cameraName" : "Cámara simulada",
+            "fps" : 29.969999999999999,
+            "height" : 360,
+            "width" : 640
+          },
+          "videoOffsetMs" : 41.700000000000003,
+          "videoPath" : "Banda - Tema/takes/00000000-0000-0000-0000-000000000002/video.mov",
+          "videoRotation" : 90
+        },
+        {
+          "audioPath" : "Banda - Tema/takes/00000000-0000-0000-0000-000000000002/processed.wav",
+          "best" : false,
+          "createdAt" : "2026-01-01T00:00:00Z",
+          "discarded" : false,
+          "durationSeconds" : 3,
+          "hasVideo" : true,
+          "id" : "00000000-0000-0000-0000-000000000003",
+          "number" : 2,
+          "punches" : [
+
+          ],
+          "selected" : false,
+          "songStart" : 2,
+          "videoFormat" : {
+            "cameraId" : "sim-camera",
+            "cameraName" : "Cámara simulada",
+            "fps" : 12.5,
+            "height" : 360,
+            "width" : 640
+          },
+          "videoOffsetMs" : -12.25,
+          "videoPath" : "Banda - Tema/takes/00000000-0000-0000-0000-000000000002/video.mov",
+          "videoRotation" : 90
+        }
+      ]
+    },
+    {
+      "id" : "00000000-0000-0000-0000-000000000004",
+      "isLead" : false,
+      "name" : "Solo",
+      "status" : "pending",
+      "takes" : [
+
+      ]
+    }
+  ],
+  "phase" : "adjusting",
+  "plannedStop" : 2,
+  "position" : 0,
+  "preRollBars" : 0,
+  "projectId" : "00000000-0000-0000-0000-000000000005",
+  "punch" : {
+    "enabled" : false,
+    "ready" : false
+  },
+  "sections" : [
+    {
+      "end" : 2,
+      "id" : "00000000-0000-0000-0000-000000000006",
+      "name" : "Estrofa",
+      "paletteIndex" : 0,
+      "solo" : false,
+      "start" : 0.5
+    }
+  ],
+  "startSectionId" : "00000000-0000-0000-0000-000000000006",
+  "startTime" : 0.5,
+  "title" : "Tema"
+}

@@ -57,6 +57,16 @@ extension FixtureRig {
     }
 }
 
+extension FixtureRig {
+    /// Resultado de método con nombre `<método>.<variante>.result.json` a partir de un valor real de AppCore.
+    func variantResult<T: Encodable>(_ method: String, variant: String, _ value: T,
+                                     file: StaticString = #filePath, line: UInt = #line) throws {
+        let m = try XCTUnwrap(Router.eventMessage("x", value))
+        let o = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(m.utf8)) as? [String: Any])
+        try golden("\(method).\(variant)", .result, try Self.sorted(try XCTUnwrap(o["payload"])), file: file, line: line)
+    }
+}
+
 /// Tema determinista: una parte «Guitarra» con dos tomas (la 1 con vídeo y es la mejor; la 2 solo audio) y una sección.
 @MainActor
 final class RecordFixtureWorld {
@@ -220,6 +230,43 @@ final class ContractFixturesRecordTests: XCTestCase {
         try rig.variantEvent("record.state", variant: "camera-simulated", base)
         var best = base; best.selectedTakeId = t1
         try rig.variantEvent("record.state", variant: "take-best-selected", best)
+        // Estado de cámara que faltaba (el enum de Swift: idle | none | denied | simulated | failed | live).
+        var cameraIdle = base; cameraIdle.camera.state = "idle"
+        try rig.variantEvent("record.state", variant: "camera-idle", cameraIdle)
+        // Parte en grabación (`status` = recording).
+        var partRecording = base; partRecording.phase = "recording"; partRecording.busy = true; partRecording.audio.recording = true
+        partRecording.parts[0].status = "recording"
+        try rig.variantEvent("record.state", variant: "part-recording", partRecording)
+        // Opcionales a nil: cámara sin datos, sección sin `paletteIndex`, sin parte activa ni toma elegida.
+        var minimal = base
+        minimal.camera.state = "idle"; minimal.camera.message = nil; minimal.camera.name = nil; minimal.camera.label = nil
+        minimal.camera.chosenId = nil; minimal.camera.defaultOffsetMs = nil
+        minimal.camera.width = nil; minimal.camera.height = nil; minimal.camera.fps = nil
+        minimal.camera.cameras = []
+        minimal.sections[0].paletteIndex = nil
+        minimal.activePartId = nil; minimal.selectedTakeId = nil
+        try rig.variantEvent("record.state", variant: "minimal-camera", minimal)
+        try rig.variantResult("record.open", variant: "minimal-camera", minimal)
+        // Valores fraccionarios: fps NTSC y 12,5, desfases con decimales y rango de ajuste no entero.
+        var fractional = base
+        fractional.parts[0].takes[0].videoOffsetMs = 41.7
+        fractional.parts[0].takes[0].videoFormat = RecordTakeFormat(cameraId: "sim-camera", cameraName: "Cámara simulada",
+                                                                    width: 640, height: 360, fps: 29.97)
+        var second = fractional.parts[0].takes[0]
+        second.id = t2; second.number = 2; second.best = false; second.selected = false
+        second.videoOffsetMs = -12.25
+        second.videoFormat = RecordTakeFormat(cameraId: "sim-camera", cameraName: "Cámara simulada", width: 640, height: 360, fps: 12.5)
+        fractional.parts[0].takes.append(second)
+        fractional.camera.fps = 29.97
+        fractional.camera.defaultOffsetMs = 33.5
+        var fracOffset = try XCTUnwrap(adjustSnap.offset)
+        fracOffset.fps = 29.97; fracOffset.frameMs = 1000 / 29.97
+        fracOffset.initialMs = 41.7; fracOffset.valueMs = 41.7; fracOffset.minMs = -499.5; fracOffset.maxMs = 500.5
+        var fractionalAdjusting = fractional; fractionalAdjusting.phase = "adjusting"; fractionalAdjusting.busy = true
+        fractionalAdjusting.offset = fracOffset
+        try rig.variantEvent("record.state", variant: "fractional", fractional)
+        try rig.variantEvent("record.state", variant: "fractional-adjusting", fractionalAdjusting)
+        try rig.variantResult("record.open", variant: "fractional", fractional)
         try rig.variantEvent("record.position", RecordPositionEvent(seconds: 1.5, playing: true, phase: "recording"))
         try rig.variantEvent("record.levels", RecordLevelsEvent(channels: ["bass": StudyMeter(rmsDB: -18.5, peakDB: -6.25),
                                                                            "guitar": StudyMeter(rmsDB: -120, peakDB: -120)]))
