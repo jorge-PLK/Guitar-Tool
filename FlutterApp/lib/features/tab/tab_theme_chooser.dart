@@ -41,7 +41,11 @@ class TabThemeChooser extends ConsumerWidget {
             else if (themes.isEmpty)
               Text(l.tab_chooserEmpty, style: muted)
             else ...[
-              Text(l.tab_chooserPick, style: muted),
+              // SwiftUI pinta esta línea 2 px más abajo que la de Flutter (y≈128 vs 126).
+              Padding(
+                padding: const EdgeInsets.only(top: TfSpace.s2),
+                child: Text(l.tab_chooserPick, style: muted),
+              ),
               for (final t in themes)
                 _ThemeRow(
                   title: t.title,
@@ -74,16 +78,19 @@ class _ThemeRow extends StatelessWidget {
           behavior: HitTestBehavior.opaque,
           onTap: onTap,
           child: Container(
+            // Fila de SwiftUI: alto 37 (= 36 + 1 px de la altura de texto de SwiftUI); con el hueco 16 da paso 53.
+            height: TfSpace.s36 + TfSpace.s1,
             padding: const EdgeInsets.symmetric(horizontal: TfSpace.s12, vertical: TfSpace.s10),
             decoration: BoxDecoration(
               color: TfColors.field,
               borderRadius: BorderRadius.circular(TfRadius.control),
             ),
+            alignment: Alignment.centerLeft,
             child: Text(
               title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TfText.body(TfSize.font13).copyWith(color: TfColors.text),
+              style: TfText.body(TfSize.font14, TfWeight.medium).copyWith(color: TfColors.text),
             ),
           ),
         ),
