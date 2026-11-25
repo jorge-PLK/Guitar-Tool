@@ -6,20 +6,19 @@ import 'package:toneforge/features/backing/backing_header.dart';
 import 'package:toneforge/features/backing/backing_layout.dart';
 import 'package:toneforge/features/backing/not_separated_card.dart';
 import 'package:toneforge/features/backing/study_store.dart';
+import 'package:toneforge/features/backing/widgets/chords_expanded.dart';
+import 'package:toneforge/features/backing/widgets/mixer_card.dart';
+import 'package:toneforge/features/backing/widgets/timeline_card.dart';
 import 'package:toneforge/l10n/app_localizations.dart';
 import 'package:toneforge/shell/selected_project.dart';
 import 'package:toneforge/theme/tokens.dart';
 import 'package:toneforge/theme/typography.dart';
 import 'package:toneforge/widgets/tf_buttons.dart';
-import 'package:toneforge/widgets/tf_card.dart';
 import 'package:toneforge/widgets/tf_progress.dart';
 
 /// Por debajo de este alto de pantalla el mezclador usa su mínimo bajo (BackingView.swift:78).
 const double _lowHeight = 780;
 const double _verticalPadding = TfSpace.s20;
-const double _mixerMin = 270;
-const double _mixerMinLow = 236;
-const double _mixerIdeal = 346;
 
 /// Backing track: elige entre selector de tema, spinner, error de apertura, «sin separar» y contenido.
 class BackingScreen extends ConsumerWidget {
@@ -56,14 +55,14 @@ class _BackingContent extends ConsumerWidget {
               ? FillLastLayout(
                   available: box.maxHeight - 2 * _verticalPadding,
                   spacing: TfSpace.s14,
-                  lastMinHeight: low ? _mixerMinLow : _mixerMin,
-                  lastIdealHeight: _mixerIdeal,
-                  children: const [
-                    BackingHeader(),
-                    LoadErrorBanner(),
-                    AnalysisBanner(),
-                    _TimelineCardSlot(),
-                    _MixerCardSlot(),
+                  lastMinHeight: low ? MixerCard.minHeightLow : MixerCard.minHeight,
+                  lastIdealHeight: MixerCard.idealHeight,
+                  children: [
+                    const BackingHeader(),
+                    const LoadErrorBanner(),
+                    const AnalysisBanner(),
+                    const TimelineCard(),
+                    _Mixer(low: low),
                   ],
                 )
               : const Column(
@@ -77,20 +76,17 @@ class _BackingContent extends ConsumerWidget {
   }
 }
 
-// SLOT: TimelineCard. Sustituir por la tarjeta «Línea de tiempo» (alto natural; recibe el store por Riverpod).
-class _TimelineCardSlot extends StatelessWidget {
-  const _TimelineCardSlot();
+/// Mezclador: último hijo, recibe alto fijo entre su mínimo y su ideal; compacto con la rejilla expandida.
+class _Mixer extends ConsumerWidget {
+  const _Mixer({required this.low});
+
+  final bool low;
 
   @override
-  Widget build(BuildContext context) => const TfCard(child: SizedBox(height: 200));
-}
-
-// SLOT: MixerCard. Sustituir por el mezclador; último hijo: recibe alto fijo entre 270 (236 si < 780) y 346.
-class _MixerCardSlot extends StatelessWidget {
-  const _MixerCardSlot();
-
-  @override
-  Widget build(BuildContext context) => const TfCard(child: SizedBox.expand());
+  Widget build(BuildContext context, WidgetRef ref) {
+    final expanded = ref.watch(chordsExpandedProvider);
+    return MixerCard(compact: expanded, lowHeight: low);
+  }
 }
 
 /// Fallo al abrir el estudio (`study.open`): mensaje del núcleo y «Reintentar».
