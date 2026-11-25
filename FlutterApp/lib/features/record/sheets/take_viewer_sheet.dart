@@ -67,6 +67,7 @@ class TakeViewerSheet extends ConsumerWidget {
           background: TfColors.bg,
           titleSize: 18,
           title: title,
+          titleTrailing: best ? const _BestChip() : null,
           body: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             spacing: TfSpace.s14,
@@ -109,7 +110,6 @@ class TakeViewerSheet extends ConsumerWidget {
           child: Row(
             spacing: TfSpace.s12,
             children: <Widget>[
-              if (best) const _BestChip(),
               Semantics(
                 button: true,
                 label: l.takeview_close,

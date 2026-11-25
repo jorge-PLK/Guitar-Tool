@@ -84,10 +84,7 @@ class _ViewerControlsState extends ConsumerState<ViewerControls> with SingleTick
     final AppLocalizations l = AppLocalizations.of(context);
     final bool on = widget.enabled;
     final double max = s.duration > 0.1 ? s.duration : 0.1;
-    final TextStyle timeStyle = TfText.body(TfSize.font12).copyWith(
-      color: TfColors.muted,
-      fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
-    );
+    final TextStyle timeStyle = TfText.body(TfSize.font12, TfWeight.regular, true).copyWith(color: TfColors.muted);
     return Row(
       spacing: TfSpace.s12,
       children: <Widget>[
@@ -154,7 +151,7 @@ class _RoundButton extends StatelessWidget {
       child: DecoratedBox(
         decoration: const BoxDecoration(color: TfColors.accent, shape: BoxShape.circle),
         child: Center(
-          child: TfIconView(playing ? TfIcon.pauseFill : TfIcon.playFill, size: 15, color: TfColors.accentInk),
+          child: TfIconView(playing ? TfIcon.pauseFill : TfIcon.playFill, size: TfSize.viewerPlayIcon, color: TfColors.accentInk),
         ),
       ),
     );

@@ -92,6 +92,7 @@ class _CalibrationSheetState extends ConsumerState<CalibrationSheet> {
       child: TfSheetScaffold(
         width: 540,
         padding: TfSpace.s28,
+        spacing: TfSpace.s18,
         background: TfColors.bg,
         title: l.settings_cal_title,
         body: body,
@@ -140,8 +141,9 @@ class _Running extends StatelessWidget {
       children: <Widget>[
         Text(text, style: _body(TfSize.font14, TfColors.text2)),
         TfAccentBar(value: p, height: TfSpace.s8),
-        // TODO(ola3): falta cifras tabulares (monospacedDigit) en TfText.
-        if (p != null) Text('${(p.clamp(0.0, 1.0) * 100).round()} %', style: _body(TfSize.font13, TfColors.muted)),
+        if (p != null) Text('${(p.clamp(0.0, 1.0) * 100).round()} %',
+            style: TfText.body(TfSize.font13, TfWeight.regular, true)
+                .copyWith(color: TfColors.muted, decoration: TextDecoration.none)),
       ],
     );
   }

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../contract/record_state.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../theme/icons.dart';
 import '../../../theme/tokens.dart';
 import '../../../theme/typography.dart';
 import '../../../widgets/tf_buttons.dart';
@@ -89,12 +90,14 @@ class _OffsetSheetState extends ConsumerState<OffsetSheet> {
               TfSecondaryButton(
                 key: const ValueKey<String>('offset-play'),
                 label: l.record_offsetPlayPause,
+                icon: TfIcon.playpauseFill,
                 height: TfSize.offsetButtonHeight,
                 onPressed: ready ? () => _togglePlay(v) : null,
               ),
               TfSecondaryButton(
                 key: const ValueKey<String>('offset-restart'),
                 label: l.record_offsetRestart,
+                icon: TfIcon.backwardEndFill,
                 height: TfSize.offsetButtonHeight,
                 onPressed: ready ? () => unawaited(ref.read(takeViewerStoreProvider.notifier).seek(0)) : null,
               ),

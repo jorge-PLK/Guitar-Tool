@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:toneforge/l10n/app_localizations.dart';
 import 'package:toneforge/theme/tokens.dart';
 import 'package:toneforge/theme/typography.dart';
+import 'package:toneforge/widgets/tf_buttons.dart';
 
 /// Cabecera de Grabar (RecordView.swift:145-164): `artista · título · Multitoma`, «Grabar» y «Ir al montaje».
 class RecordHeader extends StatelessWidget {
@@ -42,7 +43,6 @@ class RecordHeader extends StatelessWidget {
   }
 }
 
-// TODO(ola3): falta variante del kit TfSecondaryButton con texto semibold `text2` (RV:154-160).
 class _GoMontage extends StatelessWidget {
   const _GoMontage({required this.label, required this.help, required this.onTap});
 
@@ -52,33 +52,14 @@ class _GoMontage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final BorderRadius radius = BorderRadius.circular(TfRadius.control);
     return Semantics(
-      button: true,
-      enabled: onTap != null,
-      label: label,
       tooltip: help,
-      excludeSemantics: true,
-      child: MouseRegion(
-        cursor: onTap == null ? MouseCursor.defer : SystemMouseCursors.click,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: onTap,
-          child: Opacity(
-            opacity: onTap == null ? TfOpacity.disabled : 1,
-            child: Container(
-              height: TfSize.controlLg,
-              padding: const EdgeInsets.symmetric(horizontal: TfSpace.s18),
-              alignment: Alignment.center,
-              decoration: BoxDecoration(color: TfColors.field, borderRadius: radius),
-              foregroundDecoration: BoxDecoration(
-                borderRadius: radius,
-                border: Border.all(color: TfColors.fieldLine, width: TfStroke.hairline),
-              ),
-              child: Text(label, style: TfText.body(14, TfWeight.semibold).copyWith(color: TfColors.text2)),
-            ),
-          ),
-        ),
+      child: TfSecondaryButton(
+        label: label,
+        weight: TfWeight.semibold,
+        color: TfColors.text2,
+        hPadding: TfSpace.s18,
+        onPressed: onTap,
       ),
     );
   }

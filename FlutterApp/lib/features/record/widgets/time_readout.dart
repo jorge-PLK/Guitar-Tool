@@ -19,7 +19,6 @@ class TimeReadout extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final AppLocalizations l = AppLocalizations.of(context);
-    const List<FontFeature> mono = <FontFeature>[FontFeature.tabularFigures()];
     return Semantics(
       tooltip: autoStop ? l.record_durationHelpAuto : l.record_durationHelpTheme,
       child: Text.rich(
@@ -27,11 +26,11 @@ class TimeReadout extends StatelessWidget {
           children: <InlineSpan>[
             TextSpan(
               text: TfFmt.duration(position < 0 ? 0 : position),
-              style: TfText.display(20).copyWith(color: TfColors.text, fontFeatures: mono),
+              style: TfText.display(20, TfWeight.bold, true).copyWith(color: TfColors.text),
             ),
             TextSpan(
               text: ' / ${TfFmt.duration(total)}',
-              style: TfText.body(16, TfWeight.medium).copyWith(color: TfColors.muted, fontFeatures: mono),
+              style: TfText.body(16, TfWeight.medium, true).copyWith(color: TfColors.muted),
             ),
           ],
         ),
