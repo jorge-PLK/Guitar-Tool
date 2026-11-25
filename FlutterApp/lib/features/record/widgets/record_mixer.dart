@@ -91,8 +91,7 @@ class _FoldButton extends StatelessWidget {
           behavior: HitTestBehavior.opaque,
           onTap: onPressed,
           child: Container(
-            // TODO(ola3): falta TfSize.foldButtonHeight (30, RM:29-33).
-            height: 30,
+            height: TfSize.foldButtonHeight,
             padding: const EdgeInsets.symmetric(horizontal: TfSpace.s12),
             alignment: Alignment.center,
             decoration: BoxDecoration(

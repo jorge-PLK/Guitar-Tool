@@ -7,9 +7,8 @@ import '../../../theme/tokens.dart';
 class HorizontalLevelMeter extends StatelessWidget {
   const HorizontalLevelMeter({super.key, required this.level});
 
-  // TODO(ola3): falta TfSize.compactMeterWidth/Height (22×8, RM:78-85).
-  static const double width = 22;
-  static const double height = 8;
+  static const double width = TfSize.compactMeterWidth;
+  static const double height = TfSize.compactMeterHeight;
 
   /// Nivel 0…1 (se recorta).
   final double level;

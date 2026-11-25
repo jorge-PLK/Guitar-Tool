@@ -136,8 +136,7 @@ class RecordButton extends StatelessWidget {
     final AppLocalizations l = AppLocalizations.of(context);
     final Widget capsule = Container(
       height: TfSpace.s48,
-      // TODO(ola3): falta token del padding horizontal 22 del botón de grabar (RV:482).
-      padding: const EdgeInsets.symmetric(horizontal: TfSpace.s20 + TfSpace.s2),
+      padding: const EdgeInsets.symmetric(horizontal: TfSize.recordButtonPaddingH),
       decoration: const BoxDecoration(
         color: TfColors.recordButton,
         borderRadius: BorderRadius.all(Radius.circular(TfRadius.pill)),

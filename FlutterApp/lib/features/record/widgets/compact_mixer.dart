@@ -12,10 +12,6 @@ import '../../../widgets/tf_toggle_button.dart';
 import '../mixer_store.dart';
 import 'horizontal_level_painter.dart';
 
-// TODO(ola3): faltan TfSize.compactMasterWidth (40, RM:71) y compactChannelWidth (76, RM:123).
-const double _compactMasterWidth = 40;
-const double _compactChannelWidth = 76;
-
 /// Canal del mezclador visto por la interfaz: stems, guitarras y «Tú · parte» (`take-<partId>`).
 @immutable
 class MixerRow {
@@ -156,7 +152,7 @@ class _Header extends ConsumerWidget {
       children: <Widget>[
         Text(l.record_master, style: label),
         TfSlider(
-          width: _compactMasterWidth,
+          width: TfSize.compactMasterWidth,
           min: kFaderMinDb,
           max: kFaderMaxDb,
           value: master,
@@ -187,7 +183,7 @@ class _CompactChannel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final Widget channel = SizedBox(
-      width: _compactChannelWidth,
+      width: TfSize.compactChannelWidth,
       child: Column(
         spacing: TfSpace.s4,
         children: <Widget>[

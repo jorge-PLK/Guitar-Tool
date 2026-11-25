@@ -7,9 +7,6 @@ import 'package:toneforge/theme/tokens.dart';
 import 'package:toneforge/theme/typography.dart';
 import 'package:toneforge/widgets/tf_tooltip.dart';
 
-// TODO(ola3): falta TfSize.recDot (RV:433, círculo de la píldora REC).
-const double _recDot = 10;
-
 TextStyle _pillStyle([TfWeight w = TfWeight.regular]) =>
     TfText.body(TfSize.font14, w).copyWith(color: TfColors.white);
 
@@ -81,7 +78,7 @@ class PreviewPillRow extends StatelessWidget {
         ),
     ];
     return LayoutBuilder(builder: (BuildContext context, BoxConstraints c) {
-      final double recW = 2 * TfSpace.s12 + _recDot + TfSpace.s8 + _textWidth(context, recLabel, _pillStyle(TfWeight.semibold));
+      final double recW = 2 * TfSpace.s12 + TfSize.recDot + TfSpace.s8 + _textWidth(context, recLabel, _pillStyle(TfWeight.semibold));
       double camW = 0;
       if (format != null) {
         camW = (2 * TfSpace.s12 + _textWidth(context, format, _pillStyle())) +
@@ -161,7 +158,7 @@ class RecPill extends StatelessWidget {
               shape: BoxShape.circle,
               color: recording ? TfColors.recordLive : TfColors.muted,
             ),
-            child: const SizedBox.square(dimension: _recDot),
+            child: const SizedBox.square(dimension: TfSize.recDot),
           ),
           Flexible(child: Text(label, style: _pillStyle(TfWeight.semibold))),
         ],

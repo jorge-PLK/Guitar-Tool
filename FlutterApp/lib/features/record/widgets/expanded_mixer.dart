@@ -35,8 +35,7 @@ class ExpandedMixer extends ConsumerWidget {
         GuitarInputChannel(level: inputLevel),
         const Padding(
           padding: EdgeInsets.symmetric(horizontal: TfSpace.s6),
-          // TODO(ola3): falta TfSize.mixerDividerHeight (200, RM:47).
-          child: TfDivider.vertical(height: 200),
+          child: TfDivider.vertical(height: TfSize.mixerDividerHeight),
         ),
         Expanded(
           child: TfScroll(

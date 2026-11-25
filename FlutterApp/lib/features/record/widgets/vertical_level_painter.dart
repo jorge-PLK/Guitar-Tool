@@ -7,8 +7,7 @@ import '../../../theme/tokens.dart';
 class VerticalLevelMeter extends StatelessWidget {
   const VerticalLevelMeter({super.key, required this.level, required this.height});
 
-  // TODO(ola3): falta TfSize.inputLevelBarWidth (12, RM:198-207).
-  static const double width = 12;
+  static const double width = TfSize.inputLevelBarWidth;
 
   /// Nivel 0…1 (se recorta).
   final double level;

@@ -12,10 +12,6 @@ import 'package:toneforge/widgets/tf_dropdown.dart';
 import 'package:toneforge/widgets/tf_progress.dart';
 import 'package:toneforge/widgets/tf_settings_group.dart';
 
-// TODO(ola3): faltan TfSize.settingsCameraWidth (280), settingsResFpsWidth (160) (VS:244-284).
-const double _cameraWidth = 280;
-const double _resFpsWidth = 160;
-
 /// Valor del selector de cámara para «Por defecto del sistema» (`cameraUID: null`).
 const String _systemDefault = '';
 
@@ -102,7 +98,7 @@ class _CameraGroup extends ConsumerWidget {
                   TfInfoRow(
                     label: l.settings_video_camera,
                     trailing: TfDropdown<String>(
-                      width: _cameraWidth,
+                      width: TfSize.settingsCameraWidth,
                       value: uid ?? _systemDefault,
                       items: cams,
                       onChanged: (String id) => store.setCamera(id == _systemDefault ? null : id),
@@ -111,7 +107,7 @@ class _CameraGroup extends ConsumerWidget {
                   TfInfoRow(
                     label: l.settings_video_resolution,
                     trailing: TfDropdown<int>(
-                      width: _resFpsWidth,
+                      width: TfSize.settingsResFpsWidth,
                       value: ri < 0 ? null : ri,
                       items: <TfDropdownItem<int>>[
                         for (int i = 0; i < resolutions.length; i++)
@@ -125,7 +121,7 @@ class _CameraGroup extends ConsumerWidget {
                   TfInfoRow(
                     label: l.settings_video_fps,
                     trailing: TfDropdown<double>(
-                      width: _resFpsWidth,
+                      width: TfSize.settingsResFpsWidth,
                       value: fpsList.any((VideoFps f) => f.value == fps) ? fps : null,
                       items: <TfDropdownItem<double>>[
                         for (final VideoFps f in fpsList) TfDropdownItem<double>(value: f.value, label: f.label),

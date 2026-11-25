@@ -10,10 +10,6 @@ import 'package:toneforge/widgets/tf_segmented.dart';
 import 'package:toneforge/widgets/tf_settings_group.dart';
 import 'package:toneforge/widgets/tf_switch.dart';
 
-// TODO(ola3): faltan TfSize.exportCodecWidth (160, VS:354-383) y TfSize.exportResolutionWidth (100).
-const double _codecWidth = 160;
-const double _resolutionWidth = 100;
-
 String _codecLabel(String codec) => switch (codec) {
       'h264' => 'H.264',
       _ => codec.toUpperCase(),
@@ -45,7 +41,7 @@ class ExportGroup extends ConsumerWidget {
             spacing: TfSpace.s12,
             children: <Widget>[
               TfSegmented<String>(
-                width: _codecWidth,
+                width: TfSize.exportCodecWidth,
                 value: e.codec,
                 segments: <TfSegment<String>>[
                   for (final String c in settings.choices.codecs)
@@ -54,7 +50,7 @@ class ExportGroup extends ConsumerWidget {
                 onChanged: (String c) => store.setExport(VideoExportParams(codec: c)),
               ),
               TfDropdown<int>(
-                width: _resolutionWidth,
+                width: TfSize.exportResolutionWidth,
                 value: res.isEmpty ? null : idx,
                 items: <TfDropdownItem<int>>[
                   for (int i = 0; i < res.length; i++)

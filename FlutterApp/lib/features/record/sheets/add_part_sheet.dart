@@ -13,9 +13,6 @@ import '../../../widgets/tf_sheet.dart';
 import '../../../widgets/tf_text_field.dart';
 import '../record_store.dart';
 
-// TODO(ola3): falta token TfSize para el ancho de hoja 420.
-const double _width = 420;
-
 /// «Añadir parte» (RV:332-356): nombre y guitarra que sustituye. Intro no hace nada; Esc cierra.
 Future<void> showAddPartSheet(BuildContext context) =>
     showTfSheet<void>(context: context, builder: (BuildContext ctx) => const AddPartSheet());
@@ -55,7 +52,7 @@ class _AddPartSheetState extends ConsumerState<AddPartSheet> {
     final AppLocalizations l = AppLocalizations.of(context);
     final List<RecordGuitarRole> roles = ref.watch(recordStoreProvider.select((s) => s.snapshot?.guitarRoles)) ?? const <RecordGuitarRole>[];
     return TfSheetScaffold(
-      width: _width,
+      width: TfSize.sheetWidthNarrow,
       title: l.record_addPartTitle,
       titleSize: 20,
       body: Column(

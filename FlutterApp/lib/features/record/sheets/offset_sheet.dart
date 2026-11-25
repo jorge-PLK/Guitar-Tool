@@ -17,11 +17,6 @@ import '../record_offset_actions.dart';
 import '../record_store.dart';
 import '../take_viewer_store.dart';
 
-// TODO(ola3): falta token TfSize para el ancho de hoja 720, el alto de botón 34 y el ancho de campo 76.
-const double _width = 720;
-const double _buttonHeight = 34;
-const double _fieldWidth = 76;
-
 /// «Ajustar desfase» (OS, 720). Abre el reproductor de la hoja (`takeview.openOffset`); al cerrar,
 /// `takeview.close` y después `record.finishOffset` (en NTFS no se borra una toma abierta). Esc no cierra.
 Future<void> showOffsetSheet(BuildContext context) async {
@@ -75,10 +70,10 @@ class _OffsetSheetState extends ConsumerState<OffsetSheet> {
     final double value = (o?.valueMs ?? 0).toDouble();
 
     Widget step(String label, VoidCallback f) =>
-        TfSecondaryButton(label: label, height: _buttonHeight, onPressed: o == null ? null : f);
+        TfSecondaryButton(label: label, height: TfSize.offsetButtonHeight, onPressed: o == null ? null : f);
 
     return TfSheetScaffold(
-      width: _width,
+      width: TfSize.sheetWidthWide,
       title: l.record_offsetTitle,
       body: Column(
         mainAxisSize: MainAxisSize.min,
@@ -94,13 +89,13 @@ class _OffsetSheetState extends ConsumerState<OffsetSheet> {
               TfSecondaryButton(
                 key: const ValueKey<String>('offset-play'),
                 label: l.record_offsetPlayPause,
-                height: _buttonHeight,
+                height: TfSize.offsetButtonHeight,
                 onPressed: ready ? () => _togglePlay(v) : null,
               ),
               TfSecondaryButton(
                 key: const ValueKey<String>('offset-restart'),
                 label: l.record_offsetRestart,
-                height: _buttonHeight,
+                height: TfSize.offsetButtonHeight,
                 onPressed: ready ? () => unawaited(ref.read(takeViewerStoreProvider.notifier).seek(0)) : null,
               ),
             ],
@@ -124,7 +119,7 @@ class _OffsetSheetState extends ConsumerState<OffsetSheet> {
                   min: (o?.minMs ?? -500).toDouble(),
                   max: (o?.maxMs ?? 500).toDouble(),
                   decimals: value == value.roundToDouble() ? 0 : 1,
-                  width: _fieldWidth,
+                  width: TfSize.offsetFieldWidth,
                   onChanged: o == null ? null : (double x) => store.setOffset(valueMs: x),
                 ),
               ),

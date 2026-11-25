@@ -14,10 +14,6 @@ import 'package:toneforge/widgets/tf_progress.dart';
 import 'package:toneforge/widgets/tf_state_message.dart';
 import 'package:toneforge/widgets/tf_video_surface.dart';
 
-// TODO(ola3): falta TfSize.settingsPreviewWidth (VS:244-284, ancho 240) y TfSize.previewAspect (16:9).
-const double _previewWidth = 240;
-const double _aspect = 16 / 9;
-
 /// Vista previa de la cámara de Ajustes (VS:286-321): 16:9, fondo negro, radio 10, borde `fieldLine`.
 ///
 /// Pinta la textura del canal `camera` (la crea y la suelta este widget; es idempotente y el store de
@@ -85,9 +81,9 @@ class _CameraPreviewBoxState extends ConsumerState<CameraPreviewBox> {
     final VideoStoreState s = ref.watch(videoStoreProvider);
     final BorderRadius radius = BorderRadius.circular(TfRadius.control);
     return SizedBox(
-      width: _previewWidth,
+      width: TfSize.settingsPreviewWidth,
       child: AspectRatio(
-        aspectRatio: _aspect,
+        aspectRatio: TfSize.previewAspect,
         child: ClipRRect(
           borderRadius: radius,
           child: DecoratedBox(

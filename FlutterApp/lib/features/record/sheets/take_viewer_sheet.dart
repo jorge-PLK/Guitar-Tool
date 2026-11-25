@@ -62,7 +62,7 @@ class TakeViewerSheet extends ConsumerWidget {
     return Stack(
       children: <Widget>[
         TfSheetScaffold(
-          width: _width,
+          width: TfSize.sheetWidthWide,
           padding: TfSpace.s20,
           background: TfColors.bg,
           titleSize: 18,
@@ -117,7 +117,7 @@ class TakeViewerSheet extends ConsumerWidget {
                   key: const ValueKey<String>('viewer-close'),
                   behavior: HitTestBehavior.opaque,
                   onTap: nav.maybePop,
-                  child: const TfIconView(TfIcon.xmark, size: 13, color: TfColors.text2),
+                  child: const TfIconView(TfIcon.xmark, size: TfSize.viewerCloseIcon, color: TfColors.text2),
                 ),
               ),
             ],
@@ -126,9 +126,6 @@ class TakeViewerSheet extends ConsumerWidget {
       ],
     );
   }
-
-  // TODO(ola3): falta token TfSize para el ancho de hoja 720 (y tamaños de icono 13/15, fuente 11).
-  static const double _width = 720;
 
   /// Error del visor (TV:287): del núcleo (`message`, sin códigos propios del visor) o del audio de la toma.
   static String? _errorText(AppLocalizations l, TakeViewerState s) {
@@ -152,7 +149,7 @@ class _BestChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: TfSpace.s8 + TfSpace.s1, vertical: TfSpace.s3),
         child: Text(
           AppLocalizations.of(context).takeview_bestChip,
-          style: TfText.body(11, TfWeight.semibold).copyWith(color: TfColors.ok),
+          style: TfText.body(TfSize.font11, TfWeight.semibold).copyWith(color: TfColors.ok),
         ),
       ),
     );

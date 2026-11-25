@@ -14,12 +14,6 @@ import 'package:toneforge/theme/typography.dart';
 import 'package:toneforge/widgets/tf_progress.dart';
 import 'package:toneforge/widgets/tf_video_surface.dart';
 
-// TODO(ola3): faltan TfSize.previewGradientRadius (RV:367), previewPlaceholderIcon (RV:411) y
-// previewAspect (RV:386) en lib/theme.
-const double _gradientRadius = 520;
-const double _placeholderIcon = 28;
-const double _aspect = 16 / 9;
-
 /// Vista de cámara de Grabar (RV:360-458). Caja 16:9 que ocupa el espacio libre, radio 16, borde `line`.
 ///
 /// El canal de fotogramas `camera` lo crea (`FrameChannel.create`, idempotente) y lo suelta (`dispose`) este
@@ -70,7 +64,7 @@ class _RecordPreviewState extends ConsumerState<RecordPreview> {
     final BorderRadius radius = BorderRadius.circular(TfRadius.hero);
     return Center(
       child: AspectRatio(
-        aspectRatio: _aspect,
+        aspectRatio: TfSize.previewAspect,
         child: ClipRRect(
           borderRadius: radius,
           child: DecoratedBox(
@@ -109,7 +103,7 @@ class PreviewBackdrop extends StatelessWidget {
         decoration: BoxDecoration(
           gradient: RadialGradient(
             center: const Alignment(0, -0.2),
-            radius: shortest.isFinite && shortest > 0 ? _gradientRadius / shortest : 1,
+            radius: shortest.isFinite && shortest > 0 ? TfSize.previewGradientRadius / shortest : 1,
             colors: const <Color>[TfColors.fieldLine, TfColors.previewDeep],
           ),
         ),
@@ -141,7 +135,7 @@ class PreviewPlaceholder extends StatelessWidget {
       final double textH = p.height;
       p.dispose();
       final bool showText = textH <= availH;
-      final bool showIcon = _placeholderIcon + TfSpace.s8 + textH <= availH;
+      final bool showIcon = TfSize.previewPlaceholderIcon + TfSpace.s8 + textH <= availH;
       return Padding(
         padding: pad,
         child: Center(
@@ -151,7 +145,7 @@ class PreviewPlaceholder extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   spacing: TfSpace.s8,
                   children: <Widget>[
-                    if (showIcon) const TfIconView(TfIcon.video, size: _placeholderIcon, color: TfColors.muted),
+                    if (showIcon) const TfIconView(TfIcon.video, size: TfSize.previewPlaceholderIcon, color: TfColors.muted),
                     Text(text, style: style, textAlign: TextAlign.center),
                   ],
                 ),
