@@ -14,15 +14,12 @@ import 'package:toneforge/theme/tokens.dart';
 import 'package:toneforge/theme/typography.dart';
 import 'package:toneforge/widgets/tf_sheet.dart';
 
-const double songsterrListWidth = 612;
-const double songsterrSheetHeight = 640;
-const double _maxWidth = 1320;
 const double _windowMargin = TfSpace.s40;
 
 /// Ancho de la hoja: 660 sin vista previa; con ella, min(1320, ventana − márgenes).
 double songsterrSheetWidth(double window, {required bool preview}) => preview
-    ? math.min(_maxWidth, window - 2 * _windowMargin)
-    : songsterrListWidth + 2 * TfSpace.s24;
+    ? math.min(TfSize.songsterrSheetMaxWidth, window - 2 * _windowMargin)
+    : TfSize.songsterrListWidth + 2 * TfSpace.s24;
 
 /// Muestra la hoja de Songsterr (`TfSheet`) mientras `songsterrStoreProvider.isOpen` y la
 /// cierra cuando deja de estarlo (también tras `accept`/`automatic`: cierre en cliente).
@@ -83,7 +80,7 @@ class _SongsterrSheetState extends ConsumerState<SongsterrSheet> {
     final double width =
         songsterrSheetWidth(MediaQuery.sizeOf(context).width, preview: preview);
     const double padding = TfSpace.s24;
-    final double previewWidth = width - 2 * padding - songsterrListWidth - TfSpace.s20;
+    final double previewWidth = width - 2 * padding - TfSize.songsterrListWidth - TfSpace.s20;
     return Semantics(
       container: true,
       explicitChildNodes: true,
@@ -92,7 +89,7 @@ class _SongsterrSheetState extends ConsumerState<SongsterrSheet> {
       label: l.tab_sheetTitle,
       child: Container(
         width: width,
-        height: songsterrSheetHeight,
+        height: TfSize.songsterrSheetHeight,
         padding: const EdgeInsets.all(padding),
         decoration: BoxDecoration(
           color: TfColors.bg,
@@ -110,7 +107,7 @@ class _SongsterrSheetState extends ConsumerState<SongsterrSheet> {
             spacing: TfSpace.s20,
             children: <Widget>[
               SizedBox(
-                width: songsterrListWidth,
+                width: TfSize.songsterrListWidth,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   spacing: TfSpace.s14,

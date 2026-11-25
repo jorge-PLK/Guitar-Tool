@@ -8,8 +8,6 @@ import 'package:toneforge/widgets/tf_buttons.dart';
 /// Ancho de la hoja (SectionBoxes.swift:305-367), desde el token del tema.
 const double sectionPopoverWidth = TfSize.sectionPopoverWidth;
 const double sectionLabelWidth = TfSize.sectionPopoverLabelWidth;
-const double _swatchRingGap = 3;
-const double _swatchRowHeight = 24;
 const int _suggestionColumns = 3;
 
 /// `SectionPopover.precise` (SectionBoxes.swift:393): `m:ss.d`, nunca negativo.
@@ -110,7 +108,7 @@ class SectionSwatches extends StatelessWidget {
   Widget build(BuildContext context) {
     final AppLocalizations l = AppLocalizations.of(context);
     return SizedBox(
-      height: _swatchRowHeight,
+      height: TfSize.sectionSwatchRowHeight,
       child: Row(children: <Widget>[
         SizedBox(
           width: sectionLabelWidth,
@@ -158,11 +156,11 @@ class _Dot extends StatelessWidget {
       width: TfSize.sectionColorDot,
       height: TfSize.sectionColorDot,
       child: OverflowBox(
-        maxWidth: TfSize.sectionColorDot + 2 * _swatchRingGap + 2 * TfStroke.thick,
-        maxHeight: TfSize.sectionColorDot + 2 * _swatchRingGap + 2 * TfStroke.thick,
+        maxWidth: TfSize.sectionColorDot + 2 * TfSize.sectionSwatchRingGap + 2 * TfStroke.thick,
+        maxHeight: TfSize.sectionColorDot + 2 * TfSize.sectionSwatchRingGap + 2 * TfStroke.thick,
         child: Container(
-          width: TfSize.sectionColorDot + 2 * _swatchRingGap + 2 * TfStroke.thick,
-          height: TfSize.sectionColorDot + 2 * _swatchRingGap + 2 * TfStroke.thick,
+          width: TfSize.sectionColorDot + 2 * TfSize.sectionSwatchRingGap + 2 * TfStroke.thick,
+          height: TfSize.sectionColorDot + 2 * TfSize.sectionSwatchRingGap + 2 * TfStroke.thick,
           alignment: Alignment.center,
           decoration: BoxDecoration(
             shape: BoxShape.circle,

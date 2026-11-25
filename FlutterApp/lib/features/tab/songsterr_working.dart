@@ -6,9 +6,6 @@ import 'package:toneforge/theme/tokens.dart';
 import 'package:toneforge/widgets/tf_accent_bar.dart';
 import 'package:toneforge/widgets/tf_buttons.dart';
 
-// TOKEN: ancho de la barra indeterminada 260 (TSS:179-189)
-const double _barWidth = 260;
-
 /// Paso `.working(text)` de la hoja de Songsterr (TSS:179-189): texto, barra de acento
 /// indeterminada, `Spacer` y «Cancelar» (vuelve a resultados con `back`).
 class SongsterrWorking extends ConsumerWidget {
@@ -24,7 +21,7 @@ class SongsterrWorking extends ConsumerWidget {
       spacing: TfSpace.s12,
       children: <Widget>[
         if (text != null) Text(text!),
-        const SizedBox(width: _barWidth, child: TfAccentBar()),
+        const SizedBox(width: TfSize.songsterrWorkingBarWidth, child: TfAccentBar()),
         const Spacer(),
         TfSecondaryButton(
           label: l.tab_sheetCancel,

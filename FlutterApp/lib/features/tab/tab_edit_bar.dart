@@ -9,7 +9,6 @@ import 'package:toneforge/theme/typography.dart';
 import 'package:toneforge/widgets/tf_buttons.dart';
 
 /// Alto de los botones de la barra de edición (`tablatura.md` §2.5); sin token en `theme/`.
-const double tabEditButtonHeight = 32;
 
 /// Piezas de batería en el orden de la barra: Bombo, Caja, Charles, Charles abierto, Tom, Platos.
 const List<String> tabDrumPieces = <String>['kick', 'snare', 'hiHat', 'openHiHat', 'tom', 'crash'];
@@ -37,33 +36,33 @@ class TabEditBar extends ConsumerWidget {
       children: <Widget>[
         TfSecondaryButton(
           label: l.tab_undo,
-          height: tabEditButtonHeight,
+          height: TfSize.control32,
           onPressed: canUndo ? () => store.edit(TabEditParams.undo()) : null,
         ),
         TfSecondaryButton(
           label: l.tab_redo,
-          height: tabEditButtonHeight,
+          height: TfSize.control32,
           onPressed: canRedo ? () => store.edit(TabEditParams.redo()) : null,
         ),
         if (drums) ...<Widget>[
           for (final String piece in tabDrumPieces)
             TfSecondaryButton(
               label: _capitalize(_pieceLabel(l, piece)),
-              height: tabEditButtonHeight,
+              height: TfSize.control32,
               onPressed: hasSelection ? () => store.edit(TabEditParams.hit(piece: piece)) : null,
             ),
           Flexible(child: Text(l.tab_drumKeysHint, style: muted, maxLines: 1, overflow: TextOverflow.ellipsis)),
         ] else ...<Widget>[
           TfSecondaryButton(
             label: l.tab_addNote,
-            height: tabEditButtonHeight,
+            height: TfSize.control32,
             onPressed: hasNote ? () => store.edit(TabEditParams.addNote()) : null,
           ),
           Semantics(
             label: l.tab_a11yShortenNote,
             child: TfSecondaryButton(
               label: '–',
-              height: tabEditButtonHeight,
+              height: TfSize.control32,
               onPressed: hasNote ? () => store.edit(TabEditParams.duration(sign: -1)) : null,
             ),
           ),
@@ -71,13 +70,13 @@ class TabEditBar extends ConsumerWidget {
             label: l.tab_a11yLengthenNote,
             child: TfSecondaryButton(
               label: '+',
-              height: tabEditButtonHeight,
+              height: TfSize.control32,
               onPressed: hasNote ? () => store.edit(TabEditParams.duration(sign: 1)) : null,
             ),
           ),
           TfSecondaryButton(
             label: l.tab_delete,
-            height: tabEditButtonHeight,
+            height: TfSize.control32,
             onPressed: hasNote ? () => store.edit(TabEditParams.delete()) : null,
           ),
           Flexible(

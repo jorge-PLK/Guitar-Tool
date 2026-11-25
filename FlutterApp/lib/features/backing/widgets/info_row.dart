@@ -10,10 +10,6 @@ import 'package:toneforge/widgets/tf_dropdown.dart';
 import 'package:toneforge/widgets/tf_menu.dart';
 import 'package:toneforge/widgets/tf_slider.dart';
 
-// Medidas de BackingTimeline.swift:342-385 sin token propio.
-const double _flowSpacing = 10;
-const double _chevronSize = 10;
-
 const List<String> _tonics = <String>['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
 /// Fila de info (BT:342-385): tempo detectado, tonalidad, transponer, capo y afinación fina.
@@ -34,8 +30,8 @@ class InfoRow extends ConsumerWidget {
       child: DefaultTextStyle(
         style: TfText.body(TfSize.font13).copyWith(color: TfColors.text2),
         child: Wrap(
-          spacing: _flowSpacing,
-          runSpacing: _flowSpacing,
+          spacing: TfSize.backingInfoFlowSpacing,
+          runSpacing: TfSize.backingInfoRunSpacing,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: <Widget>[
             Row(mainAxisSize: MainAxisSize.min, children: <Widget>[
@@ -143,7 +139,7 @@ class InfoRow extends ConsumerWidget {
               child: Row(mainAxisSize: MainAxisSize.min, children: <Widget>[
                 Text(key == null ? '—' : _keyName(l, key), style: strong),
                 const SizedBox(width: TfSpace.s4),
-                const TfIconView(TfIcon.chevronDown, size: _chevronSize, color: TfColors.text),
+                const TfIconView(TfIcon.chevronDown, size: TfSize.backingInfoChevron, color: TfColors.text),
               ]),
             ),
           ),

@@ -5,12 +5,6 @@ import 'package:toneforge/theme/icons.dart';
 import 'package:toneforge/theme/tokens.dart';
 import 'package:toneforge/widgets/tf_dropdown.dart';
 
-// TOKEN: alto de fila 44 (TSS:298)
-const double _rowHeight = 44;
-// TOKEN: ancho del desplegable de slot 260 (TSS:298-319)
-const double _slotDropdown = 260;
-// TOKEN: ancho del desplegable de solo 200 (TSS:270-294)
-const double _soloDropdown = 200;
 // TOKEN: umbrales orientativos de confianza 0,6 y 0,35 (TSS:323-330)
 const double _okFrom = 0.6;
 const double _accentFrom = 0.35;
@@ -60,7 +54,7 @@ class SongsterrPairingRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final AppLocalizations l = AppLocalizations.of(context);
     return SizedBox(
-      height: _rowHeight,
+      height: TfSize.songsterrPairingRowHeight,
       child: Row(
         spacing: TfSpace.s10,
         children: <Widget>[
@@ -75,7 +69,7 @@ class SongsterrPairingRow extends StatelessWidget {
           ),
           if (soloLabel != null)
             SizedBox(
-              width: _soloLabelWidth,
+              width: TfSize.songsterrSoloLabelWidth,
               child: Text(soloLabel!,
                   maxLines: 1,
                   style: const TextStyle(color: TfColors.text2, fontFeatures: _tabular)),
@@ -136,7 +130,7 @@ List<Widget> songsterrSlotRows(
       name: slot.name,
       arrow: TfIcon.arrowRight,
       dropdown: TfDropdown<int>(
-        width: _slotDropdown,
+        width: TfSize.songsterrSlotDropdownWidth,
         items: _items(slot.choices, l.tab_sheetPickAutomatic),
         value: slot.track ?? songsterrNoTrack,
         onChanged: (int v) => assign(SongsterrAssignParams(
@@ -156,7 +150,7 @@ Widget _soloDropdownFor(
   void Function(SongsterrAssignParams) assign,
 ) {
   return TfDropdown<int>(
-    width: _soloDropdown,
+    width: TfSize.songsterrSoloDropdownWidth,
     items: _items(solo.choices, l.tab_sheetSoloNone),
     value: solo.track ?? songsterrNoTrack,
     onChanged: (int v) => assign(SongsterrAssignParams(
@@ -164,5 +158,3 @@ Widget _soloDropdownFor(
   );
 }
 
-// TOKEN: ancho de la etiqueta «Solo k (m:ss)» 90 (TSS:270-294; la ficha no da medida)
-const double _soloLabelWidth = 90;

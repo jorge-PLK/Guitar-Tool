@@ -10,9 +10,6 @@ import 'package:toneforge/widgets/tf_buttons.dart';
 import 'package:toneforge/widgets/tf_divider.dart';
 import 'package:toneforge/widgets/tf_scroll.dart';
 
-// TOKEN: alto máximo de la lista de avisos 140 (TSS:205-248)
-const double _warningsMaxHeight = 140;
-
 /// Paso `.pairing` de la hoja de Songsterr (TSS:205-248): tabla de emparejamiento, pistas
 /// extra, avisos y botonera.
 class SongsterrPairing extends ConsumerWidget {
@@ -102,7 +99,7 @@ class _Warnings extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxHeight: _warningsMaxHeight),
+      constraints: const BoxConstraints(maxHeight: TfSize.songsterrWarningsMaxHeight),
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.all(TfSpace.s12),

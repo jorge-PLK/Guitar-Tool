@@ -214,11 +214,11 @@ class _SongCard extends StatelessWidget {
               spacing: TfSpace.s10,
               children: <Widget>[
                 SizedBox(
-                  width: 190,
+                  width: TfSize.songsterrChoosingColumnWidth,
                   child: Text(t.name, maxLines: 1, overflow: TextOverflow.ellipsis),
                 ),
                 SizedBox(
-                  width: 170,
+                  width: TfSize.songsterrChoosingNarrowWidth,
                   child: Text(t.instrument,
                       maxLines: 1, overflow: TextOverflow.ellipsis, style: muted),
                 ),
