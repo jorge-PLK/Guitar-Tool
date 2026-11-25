@@ -2,9 +2,15 @@ import 'dart:math' as math;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:toneforge/contract/study.dart';
+import 'package:toneforge/features/backing/study_store.dart';
 import 'package:toneforge/features/backing/widgets/chord_chip.dart';
 import 'package:toneforge/features/backing/widgets/chord_editor.dart';
+import 'package:toneforge/features/backing/widgets/chord_strip_menu.dart';
+import 'package:toneforge/features/backing/widgets/section_boxes_geometry.dart';
+import 'package:toneforge/l10n/app_localizations.dart';
+import 'package:toneforge/widgets/tf_menu.dart';
 import 'package:toneforge/widgets/tf_popover.dart';
 
 /// Nombre que se ve de un acorde: el transpuesto si el núcleo lo da.
@@ -71,7 +77,7 @@ Map<int, int> chordBarNumbers(List<StudyChord> chords, List<double> downbeats, d
 }
 
 /// Tira de acordes (BT:176-231): scroll horizontal sin barra; clic = saltar, arrastre = bucle.
-class ChordStrip extends StatefulWidget {
+class ChordStrip extends ConsumerStatefulWidget {
   const ChordStrip({
     super.key,
     required this.chords,
@@ -109,10 +115,10 @@ class ChordStrip extends StatefulWidget {
   final Widget Function(BuildContext context, ChordStripLayout layout)? sectionsLayer;
 
   @override
-  State<ChordStrip> createState() => _ChordStripState();
+  ConsumerState<ChordStrip> createState() => _ChordStripState();
 }
 
-class _ChordStripState extends State<ChordStrip> {
+class _ChordStripState extends ConsumerState<ChordStrip> {
   final ScrollController _scroll = ScrollController();
   final Map<double, TfPopoverController> _pops = <double, TfPopoverController>{};
   ChordStripLayout _layout = const ChordStripLayout(rects: <Rect>[], width: 0);
@@ -163,6 +169,15 @@ class _ChordStripState extends State<ChordStrip> {
 
   void _down(PointerDownEvent e) {
     if (widget.edit || (e.buttons & kPrimaryButton) == 0) return;
+    // Las cabeceras de sección tienen clic, pulsación larga y menú propios: el Listener ve todo el
+    // pointer que cruza la pila, así que se descarta por geometría (misma que la capa de cajas).
+    if (e.localPosition.dy < ChordStripLayout.topGap) {
+      final List<StudySectionInfo> sections = ref.read(studyStoreProvider).study?.sections ?? const <StudySectionInfo>[];
+      final double x = e.localPosition.dx;
+      for (final SectionPlacement p in SectionBoxesGeometry.strip(sections, widget.chords, _layout)) {
+        if (x >= p.rect.left && x <= p.rect.right) return;
+      }
+    }
     _downX = e.localPosition.dx;
     _moved = false;
   }
@@ -213,6 +228,10 @@ class _ChordStripState extends State<ChordStrip> {
       widget.bpm != null && widget.bpm! > 0 ? 30 / widget.bpm! : 0.05,
     );
     final int? cur = widget.current;
+    final AppLocalizations l = AppLocalizations.of(context);
+    final StudyLoop? loop = ref.watch(studyStoreProvider.select((s) => s.study?.transport.loop));
+    final List<StudySectionInfo> sections =
+        ref.watch(studyStoreProvider.select((s) => s.study?.sections ?? const <StudySectionInfo>[]));
     final List<Widget> chips = <Widget>[];
     for (int i = 0; i < chords.length; i++) {
       final StudyChord c = chords[i];
@@ -244,6 +263,10 @@ class _ChordStripState extends State<ChordStrip> {
             ),
           ),
         );
+      }
+      if (!widget.edit) {
+        final List<TfMenuEntry> entries = chordStripMenuEntries(ref, c, loop, sections, l);
+        if (entries.isNotEmpty) chip = TfContextMenu(entries: entries, child: chip);
       }
       chips.add(Positioned(left: _layout.rects[i].left, top: ChordStripLayout.chipTop, child: chip));
     }
