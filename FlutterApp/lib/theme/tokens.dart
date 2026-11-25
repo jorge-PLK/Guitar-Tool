@@ -139,6 +139,9 @@ abstract final class TfStroke {
 
   /// Trazo discontinuo `dash: [3]` (TabScreen.swift:238): 3 pt de trazo y 3 de hueco.
   static const double dash = 3;
+
+  /// Marco de edición de acordes (BackingTrackView.swift:172).
+  static const double editFrame = 1.5;
 }
 
 /// Opacidades literales de SwiftUI (§2.4). Sin fundir valores casi iguales.
@@ -163,6 +166,9 @@ abstract final class TfOpacity {
   static const double tint16 = 0.16;
   static const double tint12 = 0.12;
   static const double tint07 = 0.07;
+
+  /// `muted@0.7` (BackingTrackView.swift:268). Mismo valor que [pressedSecondary], otro uso.
+  static const double mutedChip = 0.7;
 }
 
 /// Sombras (§2.5), todas negras. SwiftUI `radius` se transcribe como `blurRadius`.
@@ -280,6 +286,23 @@ abstract final class TfSize {
   static const double mixerTitleHeight = 22;
   static const double mixerTogglesHeight = 40;
 
+  // Backing y Tab: transporte, información y escenario (BackingView/TabScreen).
+  static const double transportPlay = 52; // botón de play redondo, Backing y Tab
+  static const double transportPlayIcon = 20;
+  static const double transportRewindIcon = 15;
+  static const double transportMarkHeight = 30; // «Inicio»/«Fin» de bucle
+  static const double transportTempoSlider = 120;
+  static const double transportTempoValue = 54;
+  static const double transportFlowSpacing = 14;
+  static const double infoPickerWidth = 112;
+  static const double infoFineSliderWidth = 70;
+  static const double infoCentsWidth = 56;
+  static const double tabStageMinHeight = 320; // alto mínimo del escenario
+  static const double tabFooterHeight = 18;
+  static const double tabListenOptionHeight = 30;
+  static const double tabTuningWidth = 170;
+  static const double tabNameWidth = 150; // nombre de pista (pairing y fases)
+  static const double tabPhaseBarWidth = 220;
   // Ola 3 · Grabar y Ajustes
   static const double settingsCameraWidth = 280; // VS:244-284
   static const double settingsResFpsWidth = 160; // VS:244-284
@@ -304,4 +327,37 @@ abstract final class TfSize {
   static const double compactMasterWidth = 40; // RM:71
   static const double compactChannelWidth = 76; // RM:123
   static const double foldButtonHeight = 30; // RM:29-33
+
+  // Ola 2 · Backing: acordes, marcos de sección y popover de sección.
+  static const double chordChipHeight = 30;
+  static const double chordQualityCellWidth = 60;
+  static const double control32 = 32;
+  static const double sectionEdgeGrab = 16;
+  static const double sectionEdgeBarWidth = 6;
+  static const double sectionEdgeBarMin = 16;
+  static const double sectionEdgeBarMax = 30;
+  static const double sectionEdgeBarInset = 10;
+  static const double sectionPopoverWidth = 300;
+  static const double sectionPopoverLabelWidth = 46;
+  static const double sectionColorDot = 20;
+  static const double sectionSuggestionHeight = 24;
+  static const double sectionTimeMinWidth = 64;
+
+  // Ola 2 · M3: medidas locales de Songsterr (features/tab) y de Backing (info y popover de sección).
+  static const double songsterrWorkingBarWidth = 260; // TSS:179-189
+  static const double songsterrPairingRowHeight = 44; // TSS:298
+  static const double songsterrSlotDropdownWidth = 260; // TSS:298-319
+  static const double songsterrSoloDropdownWidth = 200; // TSS:270-294
+  static const double songsterrSoloLabelWidth = 90; // TSS:270-294; la ficha no da medida
+  static const double songsterrWarningsMaxHeight = 140; // TSS:205-248
+  static const double songsterrListWidth = 612;
+  static const double songsterrSheetHeight = 640;
+  static const double songsterrSheetMaxWidth = 1320;
+  static const double songsterrChoosingColumnWidth = 190; // TSS:63-90, columna de pista
+  static const double songsterrChoosingNarrowWidth = 170; // TSS:63-90, columna de instrumento
+  static const double sectionSwatchRowHeight = 24;
+  static const double sectionSwatchRingGap = 3;
+  static const double backingInfoChevron = 10;
+  static const double backingInfoFlowSpacing = 10;
+  static const double backingInfoRunSpacing = 10;
 }

@@ -11,12 +11,14 @@ class TfSettingsGroup extends StatelessWidget {
   const TfSettingsGroup({
     super.key,
     required this.title,
-    required this.note,
+    this.note,
     required this.children,
   });
 
   final String title;
-  final String note;
+
+  /// Opcional: sin nota (null o vacía) no se pinta ni deja hueco bajo el título.
+  final String? note;
   final List<Widget> children;
 
   @override
@@ -44,10 +46,11 @@ class TfSettingsGroup extends StatelessWidget {
                       TfWeight.medium,
                     ).copyWith(color: TfColors.text),
                   ),
-                  Text(
-                    note,
-                    style: TfText.body(13).copyWith(color: TfColors.muted),
-                  ),
+                  if (note != null && note!.isNotEmpty)
+                    Text(
+                      note!,
+                      style: TfText.body(13).copyWith(color: TfColors.muted),
+                    ),
                 ],
               ),
               ...children,

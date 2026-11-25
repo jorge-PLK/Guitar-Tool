@@ -50,10 +50,12 @@ Future<bool> showTfConfirm({
       body: message == null ? null : Text(message),
       actions: <Widget>[
         TfSecondaryButton(label: cancelLabel, onPressed: () => nav.pop(false)),
-        if (destructive)
-          TfDangerButton(label: confirmLabel, onPressed: () => nav.pop(true))
-        else
-          TfPrimaryButton(label: confirmLabel, onPressed: () => nav.pop(true)),
+        // Flexible: con fuentes reales la fila excede ~0,7 px; el botón de confirmar cede ese resto.
+        Flexible(
+          child: destructive
+              ? TfDangerButton(label: confirmLabel, onPressed: () => nav.pop(true))
+              : TfPrimaryButton(label: confirmLabel, onPressed: () => nav.pop(true)),
+        ),
       ],
     ),
   );
