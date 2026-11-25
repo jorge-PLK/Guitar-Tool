@@ -342,4 +342,22 @@ abstract final class TfSize {
   static const double sectionColorDot = 20;
   static const double sectionSuggestionHeight = 24;
   static const double sectionTimeMinWidth = 64;
+
+  // Ola 2 · M3: medidas locales de Songsterr (features/tab) y de Backing (info y popover de sección).
+  static const double songsterrWorkingBarWidth = 260; // TSS:179-189
+  static const double songsterrPairingRowHeight = 44; // TSS:298
+  static const double songsterrSlotDropdownWidth = 260; // TSS:298-319
+  static const double songsterrSoloDropdownWidth = 200; // TSS:270-294
+  static const double songsterrSoloLabelWidth = 90; // TSS:270-294; la ficha no da medida
+  static const double songsterrWarningsMaxHeight = 140; // TSS:205-248
+  static const double songsterrListWidth = 612;
+  static const double songsterrSheetHeight = 640;
+  static const double songsterrSheetMaxWidth = 1320;
+  static const double songsterrChoosingColumnWidth = 190; // TSS:63-90, columna de pista
+  static const double songsterrChoosingNarrowWidth = 170; // TSS:63-90, columna de instrumento
+  static const double sectionSwatchRowHeight = 24;
+  static const double sectionSwatchRingGap = 3;
+  static const double backingInfoChevron = 10;
+  static const double backingInfoFlowSpacing = 10;
+  static const double backingInfoRunSpacing = 10;
 }
