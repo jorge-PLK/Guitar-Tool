@@ -54,7 +54,8 @@ class TransportRow extends ConsumerWidget {
                 max: 200,
                 step: 5,
                 width: TfSize.transportTempoSlider,
-                onChanged: (double v) => store.setRate(v / 100),
+                onChanged: (double v) => store.dragRate(v / 100),
+                onChangeEnd: (double v) => store.commitRate(v / 100),
               ),
               const SizedBox(width: TfSpace.s10),
               SizedBox(
