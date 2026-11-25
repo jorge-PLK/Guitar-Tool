@@ -1,7 +1,6 @@
 import 'package:flutter/widgets.dart';
 
 import '../theme/tokens.dart';
-import '../theme/typography.dart';
 import 'tf_buttons.dart';
 import 'tf_sheet.dart';
 
@@ -52,38 +51,11 @@ Future<bool> showTfConfirm({
       actions: <Widget>[
         TfSecondaryButton(label: cancelLabel, onPressed: () => nav.pop(false)),
         if (destructive)
-          _DangerButton(label: confirmLabel, onTap: () => nav.pop(true))
+          TfDangerButton(label: confirmLabel, onPressed: () => nav.pop(true))
         else
           TfPrimaryButton(label: confirmLabel, onPressed: () => nav.pop(true)),
       ],
     ),
   );
   return result ?? false;
-}
-
-/// Confirmar destructivo: `TfPrimaryButton` no tiene variante `danger` y `tf_buttons.dart` no se toca,
-/// así que este botón mínimo replica su caja con fondo `danger`.
-class _DangerButton extends StatelessWidget {
-  const _DangerButton({required this.label, required this.onTap});
-
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Container(
-        height: TfSize.controlLg,
-        padding: const EdgeInsets.symmetric(horizontal: TfSpace.s20),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: TfColors.danger,
-          borderRadius: BorderRadius.circular(TfRadius.control),
-        ),
-        child: Text(label, style: TfText.body(14, TfWeight.semibold).copyWith(color: TfColors.accentInk)),
-      ),
-    );
-  }
 }

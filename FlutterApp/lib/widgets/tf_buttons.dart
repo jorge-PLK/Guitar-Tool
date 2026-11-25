@@ -162,6 +162,31 @@ class TfSecondaryButton extends StatelessWidget {
   }
 }
 
+/// Botón destructivo: caja de [TfPrimaryButton] con fondo `danger` (confirmaciones de borrado).
+class TfDangerButton extends StatelessWidget {
+  const TfDangerButton({super.key, required this.label, required this.onPressed});
+
+  final String label;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return _TfPress(
+      onPressed: onPressed,
+      semanticLabel: label,
+      builder: (BuildContext context, bool pressed, bool hovered) => Container(
+        height: TfSize.controlLg,
+        padding: const EdgeInsets.symmetric(horizontal: TfSpace.s20),
+        decoration: BoxDecoration(
+          color: TfColors.danger.withValues(alpha: pressed ? TfOpacity.pressedPrimary : 1),
+          borderRadius: BorderRadius.circular(TfRadius.control),
+        ),
+        child: _labelRow(label, _label(TfSize.font14, TfWeight.semibold, TfColors.accentInk)),
+      ),
+    );
+  }
+}
+
 Widget _secondaryBox({
   required bool enabled,
   required bool pressed,
