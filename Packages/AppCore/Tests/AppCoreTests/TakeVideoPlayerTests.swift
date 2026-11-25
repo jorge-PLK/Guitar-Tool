@@ -117,6 +117,49 @@ final class TakeVideoPlayerTests: XCTestCase {
         XCTAssertNil(weakPlayer, "TakeVideoPlayer fugado")
     }
 
+    // MARK: fotograma en pausa (ola 3.3.AT)
+
+    private final class Counter: @unchecked Sendable {
+        private let l = NSLock(); private var n = 0
+        var value: Int { l.lock(); defer { l.unlock() }; return n }
+        func bump() { l.lock(); n += 1; l.unlock() }
+    }
+
+    private func waitCount(_ c: Counter, above n: Int, timeout: Double = 1.0) async throws {
+        let t0 = HostClock.nowSeconds
+        while c.value <= n, HostClock.nowSeconds - t0 < timeout { try await Task.sleep(nanoseconds: 5_000_000) }
+    }
+
+    /// PTS del buffer entregado: se mide por la imagen no; se comprueba con el contador de entregas y el buffer no nulo.
+    func testPausedFramesOnOpenSeekAndOffset() async throws {
+        let p = try await makePlayer()
+        defer { p.close() }
+        let c = Counter()
+        p.onFrameAvailable = { c.bump() }
+        // (a) Abrir en pausa.
+        try await waitCount(c, above: 0)
+        XCTAssertGreaterThan(c.value, 0, "sin aviso al abrir en pausa")
+        XCTAssertNotNil(p.copyFrame())
+        XCTAssertEqual(p.lastDisplaySeconds ?? -1, 0, accuracy: TakeVideoConstants.frameDuration)
+        // (b) Seek en pausa a otra posición y de vuelta a 0.
+        var epoch = 1
+        for target in [2.0, 0.0] {
+            epoch += 1
+            let n = c.value
+            p.apply(event(target, playing: false, at: HostClock.nowSeconds, epoch: epoch))
+            try await waitCount(c, above: n, timeout: 2.0)
+            XCTAssertGreaterThan(c.value, n, "sin aviso tras seek a \(target)")
+            XCTAssertNotNil(p.copyFrame())
+            XCTAssertEqual(p.lastDisplaySeconds ?? -1, target, accuracy: TakeVideoConstants.frameDuration, "PTS tras seek a \(target)")
+        }
+        // (c) setOffset en pausa.
+        let n = c.value
+        p.setOffset(0.25)
+        try await waitCount(c, above: n, timeout: 3.0)
+        XCTAssertGreaterThan(c.value, n, "sin aviso tras setOffset")
+        XCTAssertNotNil(p.copyFrame())
+    }
+
     // MARK: medida opt-in (P9: |mediana| y |p95| ≤ medio fotograma; seek < 300 ms)
 
     private func median(_ v: [Double]) -> Double { let s = v.sorted(); return s.isEmpty ? .nan : s[s.count / 2] }

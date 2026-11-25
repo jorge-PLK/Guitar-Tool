@@ -38,7 +38,9 @@ struct TakeVideoClockMap: Equatable, Sendable {
     /// Cambios que obligan a resincronizar el reproductor (los demás eventos solo refrescan el reloj).
     func needsResync(from old: TakeVideoClockMap?) -> Bool {
         guard let old else { return true }
-        return old.moving != moving || old.rate != rate || old.epoch != epoch
+        if old.moving != moving || old.rate != rate || old.epoch != epoch { return true }
+        // En pausa un seek cambia la posición sin tocar nada más: hay que mostrar ese fotograma.
+        return !moving && abs(old.seconds - seconds) > 1e-4
     }
 }
 
@@ -58,6 +60,9 @@ enum TakeVideoConstants {
     static let readyTimeoutSeconds = 5.0
     /// El desfase de la hoja cambia en pasos de 1 ms: por debajo de esto es el mismo.
     static let offsetEpsilon = 1e-6
+    /// En pausa: espera máxima al fotograma tras un seek, y desde cuándo se acepta un buffer sin marca de «nuevo».
+    static let pausedFrameTimeoutSeconds = 2.0
+    static let pausedForceAfterSeconds = 0.3
 }
 
 private func hostNow() -> Double { CMClockGetTime(CMClockGetHostTimeClock()).seconds }
@@ -87,6 +92,10 @@ public final class TakeVideoPlayer: @unchecked Sendable {
     private var lastCheck = 0.0
     private var last: CVPixelBuffer?
     private var notified = false
+    private var pausedTarget: Double?
+    private var pausedDeadline = 0.0
+    private var pausedStart = 0.0
+    private var pausedDisplay: Double?
 
     // Medidas (bajo lock), para tests y diagnóstico.
     private(set) var deliveries = 0
@@ -195,9 +204,21 @@ public final class TakeVideoPlayer: @unchecked Sendable {
         let cm: (Double) -> CMTime = { CMTime(seconds: max(0, $0), preferredTimescale: 600_000) }
         guard c.moving else {
             player.pause()
-            player.seek(to: cm(c.position(at: now)), toleranceBefore: .zero, toleranceAfter: .zero)
+            let target = max(0, c.position(at: now))
+            // Sin reproducción nadie pide fotogramas: tras el seek se pide el de la nueva posición (`pollPaused` en el tick).
+            player.seek(to: cm(target), toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] finished in
+                guard finished, let self else { return }
+                lock.lock()
+                if mine == gen && !closed {
+                    pausedTarget = target
+                    pausedDeadline = hostNow() + TakeVideoConstants.pausedFrameTimeoutSeconds
+                    pausedStart = hostNow()
+                }
+                lock.unlock()
+            }
             return
         }
+        lock.lock(); pausedTarget = nil; lock.unlock()
         player.seek(to: cm(c.position(at: now)), toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] finished in
             guard finished, let self else { return }
             lock.lock()
@@ -225,12 +246,49 @@ public final class TakeVideoPlayer: @unchecked Sendable {
             let d = player.currentTime().seconds - c.position(at: now)
             if abs(d) > TakeVideoConstants.halfFrame { resync(reason: "drift", drift: true) }
         }
+        if !c.moving { pollPaused(now: now) }
         guard !already, let out else { return }
+        guard c.moving else { return }
         let it = out.itemTime(forHostTime: now)
         if out.hasNewPixelBuffer(forItemTime: it) {
             lock.lock(); notified = true; let f = _onFrame; lock.unlock()
             f?()
         }
+    }
+
+    /// En pausa: tras un seek completado, recoge el fotograma de la posición (el output solo marca «nuevo» cuando el decodificador
+    /// lo tiene), lo guarda en `last` y avisa. Acotado por `pausedFrameTimeoutSeconds`.
+    private func pollPaused(now: Double) {
+        lock.lock()
+        guard let target = pausedTarget, let out = output, !closed else { lock.unlock(); return }
+        let deadline = pausedDeadline, started = pausedStart
+        lock.unlock()
+        let t = CMTime(seconds: target, preferredTimescale: 600_000)
+        var display = CMTime.invalid
+        var buf: CVPixelBuffer?
+        // Pasado `pausedForceAfterSeconds` se acepta también un buffer sin marca de «nuevo».
+        if out.hasNewPixelBuffer(forItemTime: t) || now - started > TakeVideoConstants.pausedForceAfterSeconds {
+            buf = out.copyPixelBuffer(forItemTime: t, itemTimeForDisplay: &display)
+        }
+        let timedOut = now > deadline
+        guard let b = buf else {
+            if timedOut { lock.lock(); pausedTarget = nil; lock.unlock() }
+            return
+        }
+        // El fotograma debe ser el de la posición (PTS ≤ destino y a menos de un fotograma); si no, se sigue esperando.
+        let near = display.isValid && display.seconds <= target + 1e-4 && target - display.seconds < TakeVideoConstants.frameDuration + 1e-4
+        guard near || timedOut else { return }
+        lock.lock()
+        guard pausedTarget == target, !closed else { lock.unlock(); return }
+        pausedTarget = nil
+        last = b
+        pausedDisplay = display.isValid ? display.seconds : nil
+        deliveries += 1
+        frameSize = (CVPixelBufferGetWidth(b), CVPixelBufferGetHeight(b))
+        notified = true
+        let f = _onFrame
+        lock.unlock()
+        f?()
     }
 
     // MARK: entrega
@@ -239,7 +297,8 @@ public final class TakeVideoPlayer: @unchecked Sendable {
     public func copyFrame() -> CVPixelBuffer? {
         let now = hostNow()
         lock.lock()
-        let out = output
+        // En pausa el fotograma lo fija `pollPaused` (el reloj del host no dice nada de la posición).
+        let out = clock.moving ? output : nil
         lock.unlock()
         var display = CMTime.invalid
         var fresh: CVPixelBuffer?
@@ -265,6 +324,9 @@ public final class TakeVideoPlayer: @unchecked Sendable {
         lock.lock(); defer { lock.unlock() }
         return (deliveries, resyncs, errorsMs)
     }
+
+    /// Tests: PTS (s) del último fotograma entregado en pausa.
+    var lastDisplaySeconds: Double? { lock.lock(); defer { lock.unlock() }; return pausedDisplay }
 
     /// Tests: espera a que el reproductor esté listo.
     var isReady: Bool { lock.lock(); defer { lock.unlock() }; return ready }
