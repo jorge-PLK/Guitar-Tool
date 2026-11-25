@@ -67,7 +67,7 @@ Vienen del apartado 9 de las fichas de `pantallas/`. La clase sigue [decisiones-
 | GR5 | Grabar, visor | Reproductor de vídeo de Flutter en Windows: HEVC y `playbackRate` fino; mensaje de HEVC en Dart | se mide (P9) | 3 | g:G5 |
 | GR6 | Grabar | Imán de ±1,5 dB del Master en la vista | interfaz en Dart | 3 | g:G6 |
 | GR7 | Visor | Sincronía vídeo-audio sin reloj común; el seguidor en Dart ya no es el plan (decisión 9 enmendada) | se mide (P9) | 3 | g:G7 |
-| GR10 | Grabar | `record.pollCamera` expuesto (SwiftUI pollCamera cada 2 s, RV:99,130); aprobado por Jorge 25/11 | núcleo (resuelto) | 3 | g:G10 |
+| GR10 | Grabar | `record.pollCamera` aditivo en `AppCore` (`RecordMethods.swift:363`); SwiftUI sondea la cámara cada 2 s en reposo (`RecordController.swift:483`). La interfaz sondea siempre en reposo (`opened && phase == idle`), 1:1 con SwiftUI; el núcleo decide por estado. Decisión de Jorge, 25/11/2026 | núcleo (resuelto) | 3 | `RecordController.swift:483` |
 | GR8 | Visor | Audio del visor en el Mac: SwiftUI usa la salida del sistema, `AppCore` la del perfil. Resuelto por robustez: la del perfil en las dos plataformas (un solo camino de audio); Jorge lo comprueba de oído | interfaz en Dart (resuelto) | 3 | g:G8 |
 | MO1 | Montaje | Cancelar la exportación: `cancelled` se trata como reposo | interfaz en Dart | 4 | m:D1 |
 | MO2 | Montaje | `reveal` debe seleccionar el fichero exportado, no abrir la carpeta (depende de T3 en Windows) | hueco claro | 4 | m:D2 |
@@ -109,3 +109,15 @@ Descartados (sin trabajo, constan por si se vuelve a preguntar):
 - AJ10 · «Verificando/Instalando» no viene en `models.progress`: informativo (`a:10`).
 
 Montaje D9 (M1) no se repite: ver la fila M1 de los heredados.
+
+## Cierre de la ola 3 (Grabar, visor y Ajustes · Audio/Vídeo)
+
+| Id | Qué | Estado |
+| --- | --- | --- |
+| GR11 | Motivo de bloqueo por código: `record.state.block` y `audio.*.calibrateBlock` (campo `calibrateBlockMessage`) llevan `CoreMessage {code, message, args}` aditivo junto al texto (commit `4d07d46`; cliente en `core_message.dart`). No existe `audio.recordBlock`: el bloqueo llega solo por `record.state.block` y `calibrateBlock` | resuelto (`4d07d46`) |
+| N1b | Textos del núcleo en español que quedan para la ola 5 (decisión de Jorge, 25/11/2026): filas del resultado de calibración (`success.rows`); los 5 errores de Grabar y Ajustes que se muestran con `error.message`; `AudioMethods.swift` 177-181, 367, 370, 376-379 y 409-416; `CameraPreview` 59, 153 y 172. `video.preview.start.failed` mete `\(error)` en `message` | abierto (ola 5) |
+| GR12 | Un solo códec de vídeo: no se puede fixturear en Mac (el selector oculto de AJ6 solo se prueba con datos de test) | informativo |
+| FC1b | `contrato-tipos-c.md` no recogía `takeview.video` ni los campos FC1 `videoWidth`, `videoHeight` y `videoRotation` de `TakeViewSnapshot` | resuelto (contrato actualizado) |
+| GR13 | Artista: Grabar lo toma de `library.list`, porque el snapshot de `record` no lo trae. `snapshot.projectId` no se compara con el proyecto pedido (el fixture trae `…0004`) | interfaz en Dart |
+| GR14 | `frameChannelProvider(FrameChannelId.x)` es una family en `core` (`123c855` y `6e5ace4` en `fase-7f`); con `--mock` devuelve `null` y no hay fotograma | interfaz en Dart |
+| GR15 | El visor de toma pinta con `rotation: 0` aunque `takeview` trae `videoRotation` 90. Falta confirmar si el fotograma ya llega rotado del núcleo | pregunta abierta: se verifica con hardware en la prueba de Jorge |

@@ -171,6 +171,7 @@ Fichero: `AC/TakeViewMethods.swift`.
 | Evento | Payload | emit | Cadencia |
 |---|---|---|---|
 | `takeview.position` | `TakeViewPositionEvent` | :500 (vía `publish` :487) | Periódico, ticker de **30 Hz** (`TakeViewConstants.positionHz`, :17; tick :448) mientras hay toma abierta. Sonando: cada tick. En pausa: solo si cambió `seconds` o `epoch` (el `at` no cuenta, :498). Además, uno forzado en cada discontinuidad (open, play, pause, seek, final de toma; :287, :414, :483). Sin evento de estado aparte: `playing` y `epoch` van aquí. |
+| `takeview.video` | `TakeViewVideoEvent` | (ver `VideoConversion`, ADR-022) | Cambio del vídeo de la toma abierta: `{takeId, video?}`. `video` ausente = vídeo listo; si va, `{code, takeId, jobId, message, progress?}` con `code` `video-converting` (con `progress` 0…1, clave en `jobs.progress`) o `video-failed` (sin `progress`). Fixtures `takeview.video.{converting,error,ready}.event.json`. |
 
 ### 2. DTO
 
@@ -191,6 +192,8 @@ Fichero: `AC/TakeViewMethods.swift`.
 | `epoch` | Int | no | Sube en cada discontinuidad (play, pausa, seek, final). |
 | `outputName` | String | no | Salida de audio. |
 | `audioError` | String | sí | Fallo al abrir/reproducir la salida. |
+| `videoWidth`, `videoHeight` | Int | sí | FC1: tamaño del fotograma del vídeo de la toma; ausentes si no hay vídeo. |
+| `videoRotation` | Int | sí | FC1: giro del vídeo en grados (p. ej. 90); ausente si no hay vídeo. |
 
 - `TakeViewPositionEvent` (:105): `seconds: Double` (s de la toma que se oye en `at`; alisado por lazo de fase, :45-77), `playing: Bool`, `rate: Double` (1 = el reloj avanza; 0 = quieto, en pausa o esperando la primera muestra), `at: Double` (reloj de host del núcleo en s: QPC en Windows, `mach_absolute_time` en Mac; misma base para extrapolar `seconds + (ahora - at)`), `epoch: Int`. Todos obligatorios.
 
