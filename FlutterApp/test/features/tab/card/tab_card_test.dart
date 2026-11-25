@@ -163,7 +163,7 @@ void main() {
   });
 
   group('Pie', () {
-    const sel = TabSelectionInfo(track: 'g', beat: 1, tick: 0, summary: 'Compás 2, pulso 1 · cuerda 3, traste 5');
+    const sel = TabSelectionInfo(track: 'g', beat: 1, tick: 0, hasNote: false, summary: 'Compás 2, pulso 1 · cuerda 3, traste 5');
 
     testWidgets('fijo según la fuente, en muted', (tester) async {
       await pumpCard(tester, const TabFooter(), tab: tabState(<TabTrackInfo>[track('g')]));

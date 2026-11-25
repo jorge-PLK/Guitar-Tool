@@ -20,6 +20,7 @@
       "start" : 2.5
     },
     "beat" : 5,
+    "hasNote" : false,
     "summary" : "Compás 3, pulso 1 · sin golpes",
     "tick" : 0,
     "track" : "drums"

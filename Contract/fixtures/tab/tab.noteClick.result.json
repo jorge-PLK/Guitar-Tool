@@ -20,6 +20,7 @@
       "start" : 0.5
     },
     "beat" : 1,
+    "hasNote" : false,
     "string" : 2,
     "summary" : "Compás 2, pulso 1 · cuerda 2, sin nota",
     "tick" : 9,

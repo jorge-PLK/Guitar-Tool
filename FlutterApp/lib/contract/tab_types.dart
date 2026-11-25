@@ -117,6 +117,8 @@ final class TabBarRange {
         end: _d(j['end']),
       );
 
+  Json toJson() => <String, Object?>{'bar': bar, 'start': start, 'end': end};
+
   /// 0-based.
   final int bar;
   final double start;
@@ -128,6 +130,7 @@ final class TabSelectionInfo {
     required this.track,
     required this.beat,
     required this.tick,
+    required this.hasNote,
     this.string,
     this.summary,
     this.barRange,
@@ -137,14 +140,28 @@ final class TabSelectionInfo {
         track: _s(j['track']),
         beat: _i(j['beat']),
         tick: _i(j['tick']),
+        hasNote: _b(j['hasNote']),
         string: _in(j['string']),
         summary: _sn(j['summary']),
         barRange: _opt(j['barRange'], TabBarRange.fromJson),
       );
 
+  Json toJson() => <String, Object?>{
+        'track': track,
+        'beat': beat,
+        'tick': tick,
+        'hasNote': hasNote,
+        if (string != null) 'string': string,
+        if (summary != null) 'summary': summary,
+        if (barRange != null) 'barRange': barRange!.toJson(),
+      };
+
   final String track;
   final int beat;
   final int tick;
+
+  /// Hay una nota bajo la selección (`sin nota` en el resumen cuando es `false`).
+  final bool hasNote;
   final int? string;
   final String? summary;
   final TabBarRange? barRange;

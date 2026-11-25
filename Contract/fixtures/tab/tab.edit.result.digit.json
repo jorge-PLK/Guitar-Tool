@@ -20,6 +20,7 @@
       "start" : 2.5
     },
     "beat" : 5,
+    "hasNote" : true,
     "string" : 2,
     "summary" : "Compás 3, pulso 1 · cuerda 2, traste 5",
     "tick" : 0,

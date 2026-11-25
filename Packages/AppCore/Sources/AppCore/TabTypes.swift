@@ -38,6 +38,8 @@ struct TabSelectionInfo: Codable, Sendable {
     var summary: String?
     /// Compás de la selección (0-based) y su rango en segundos: lo usa el bucle «Compás N» (Mac `selectedBarRange`).
     var barRange: TabBarRange?
+    /// Hay una nota bajo la selección (habilita «Añadir nota»/«–»/«+»/«Borrar» en la barra de edición).
+    var hasNote: Bool
 }
 
 struct TabBarRange: Codable, Sendable {

@@ -285,6 +285,16 @@ final class TabTests: XCTestCase {
         XCTAssertGreaterThan(b, a)
     }
 
+    func testSelectionReportsHasNote() async throws {
+        let f = try await makeFixture()
+        _ = try await openAndTranscribe(f)
+        _ = try await result(f, "tab.edit", "{\"op\":\"editMode\",\"on\":true}")
+        var s = try await result(f, "tab.select", "{\"track\":\"bass\",\"beat\":5,\"tick\":0,\"string\":2}")
+        XCTAssertEqual((s["selection"] as? [String: Any])?["hasNote"] as? Bool, false)
+        s = try await result(f, "tab.edit", "{\"op\":\"digit\",\"value\":3}")
+        XCTAssertEqual((s["selection"] as? [String: Any])?["hasNote"] as? Bool, true)
+    }
+
     // MARK: Edición
 
     func testEditWithUndoRedoAndTuning() async throws {

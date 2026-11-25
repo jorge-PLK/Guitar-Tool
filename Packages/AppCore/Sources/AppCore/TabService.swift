@@ -1290,7 +1290,7 @@ final class TabService {
         if case let .failed(m) = phase { err = m }
         let selInfo = selection.map {
             TabSelectionInfo(track: $0.trackID, beat: $0.point.beat, tick: $0.point.tick, string: $0.string, summary: selectionSummary,
-                             barRange: selectedBarRange)
+                             barRange: selectedBarRange, hasNote: selectedNote != nil)
         }
         let sourceName: String? = switch session?.project.tabSource {
         case .songsterr?: "songsterr"
