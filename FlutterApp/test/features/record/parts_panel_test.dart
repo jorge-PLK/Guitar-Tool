@@ -231,4 +231,37 @@ void main() {
     expect(s.calls, isEmpty);
     expect(log, isEmpty);
   });
+
+  testWidgets('status `recording` del núcleo pinta «Grabando» aunque la fase no lo implique (RV:236)', (tester) async {
+    final Json j = Map<String, Object?>.of(_fx('idle'));
+    final List<Object?> parts = List<Object?>.of(j['parts']! as List);
+    parts[0] = <String, Object?>{...(parts[0]! as Map).cast<String, Object?>(), 'status': 'recording'};
+    j['parts'] = parts;
+    await _pump(tester, RecordSnapshot.fromJson(j));
+    expect(find.text('Grabando'), findsOneWidget);
+    expect(find.text('Hecha'), findsNothing);
+  });
+
+  testWidgets('«Sustituye: …» sale de `replaces` (RV:218); sin él, «Parte añadida»', (tester) async {
+    final Json j = Map<String, Object?>.of(_fx('idle'));
+    final List<Object?> parts = List<Object?>.of(j['parts']! as List);
+    final Json p0 = (parts[0]! as Map).cast<String, Object?>();
+    final String name = ((j['guitarRoles']! as List).first as Map)['name']! as String;
+    final String role = ((j['guitarRoles']! as List).first as Map)['role']! as String;
+    parts[0] = <String, Object?>{...p0, 'isLead': false, 'replaces': role};
+    j['parts'] = parts;
+    await _pump(tester, RecordSnapshot.fromJson(j));
+    expect(find.text('Sustituye: $name'), findsOneWidget);
+  });
+
+  testWidgets('sin `replaces` la parte dice «Parte añadida»', (tester) async {
+    final Json j = Map<String, Object?>.of(_fx('idle'));
+    final List<Object?> parts = List<Object?>.of(j['parts']! as List);
+    final Json p0 = (parts[0]! as Map).cast<String, Object?>();
+    parts[0] = <String, Object?>{...p0, 'isLead': true}..remove('replaces');
+    j['parts'] = parts;
+    await _pump(tester, RecordSnapshot.fromJson(j));
+    expect(find.text('Parte añadida'), findsWidgets);
+    expect(find.textContaining('Sustituye'), findsNothing);
+  });
 }

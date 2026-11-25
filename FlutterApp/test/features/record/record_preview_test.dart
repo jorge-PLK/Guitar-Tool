@@ -117,7 +117,14 @@ void main() {
     expect(find.textContaining('Rotar'), findsOneWidget);
   });
 
-  testWidgets('buscando cámara (estado aún desconocido): spinner', (tester) async {
+  testWidgets('simulada sin nombre: «simulada» por defecto (RV:398)', (tester) async {
+    final Json j = Map<String, Object?>.of(fx('camera-simulated'));
+    j['camera'] = Map<String, Object?>.of((j['camera']! as Map).cast<String, Object?>())..remove('name');
+    await _pump(tester, RecordSnapshot.fromJson(j));
+    expect(find.text('Vista previa de la cámara · simulada (simulada)'), findsOneWidget);
+  });
+
+  testWidgets('cámara `idle`: spinner', (tester) async {
     await _pump(tester, snap('camera-simulated', camera: {'state': 'idle'}));
     expect(find.byType(TfSpinner), findsOneWidget);
     expect(find.byType(TfVideoSurface), findsNothing);

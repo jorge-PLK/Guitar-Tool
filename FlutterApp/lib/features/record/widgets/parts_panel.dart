@@ -72,13 +72,14 @@ class PartsPanel extends ConsumerWidget {
     );
   }
 
-  // El DTO de parte no trae «replaces»; solo se sabe `isLead` (ver informe).
+  // RecordView.swift:218: «Sustituye: <guitarName(replaces)>»; sin `replaces`, «Parte añadida».
   static String? _replacesName(RecordPart p, RecordSnapshot? snap) {
-    if (!p.isLead || snap == null) return null;
-    for (final RecordGuitarRole r in snap.guitarRoles) {
-      if (r.role == 'lead') return r.name;
+    final String? role = p.replaces;
+    if (role == null) return null;
+    for (final RecordGuitarRole r in snap?.guitarRoles ?? const <RecordGuitarRole>[]) {
+      if (r.role == role) return r.name;
     }
-    return null;
+    return role;
   }
 
   Future<void> _confirmDelete(BuildContext context, RecordStore store, String takeId) async {

@@ -77,7 +77,8 @@ class PartBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final AppLocalizations l = AppLocalizations.of(context);
-    final PartChipKind chip = active && recording
+    // RecordController.status(of:): el núcleo emite `recording` para la parte activa en curso.
+    final PartChipKind chip = part.status == PartStatus.recording || (active && recording)
         ? PartChipKind.recording
         : (part.status == PartStatus.done ? PartChipKind.done : PartChipKind.pending);
     return Semantics(

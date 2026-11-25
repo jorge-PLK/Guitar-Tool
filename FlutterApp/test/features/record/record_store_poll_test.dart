@@ -13,7 +13,7 @@ import 'package:toneforge/features/record/record_store.dart';
 Json fx(String path) =>
     (json.decode(File('../Contract/fixtures/$path.json').readAsStringSync()) as Map).cast<String, Object?>();
 
-/// Snapshot con el estado de cámara dado (`idle` llega como `unknown`).
+/// Snapshot con el estado de cámara dado (`idle` = buscando cámara). El sondeo no depende de él: es siempre en reposo.
 Json withCamera(String cameraState) {
   final j = fx('record/record.open.result');
   return {...j, 'camera': {...(j['camera'] as Map).cast<String, Object?>(), 'state': cameraState}};
@@ -39,9 +39,9 @@ Future<(MockCore, ProviderContainer)> openWith(WidgetTester t, String cameraStat
 }
 
 void main() {
-  testWidgets('con cámara unknown llama a record.pollCamera a los 2 s y aplica el snapshot', (t) async {
+  testWidgets('en reposo llama a record.pollCamera a los 2 s y aplica el snapshot', (t) async {
     final (core, c) = await openWith(t, 'idle');
-    expect(c.read(recordStoreProvider).snapshot?.camera.state, CameraState.unknown);
+    expect(c.read(recordStoreProvider).snapshot?.camera.state, CameraState.idle);
     await t.pump(kCameraPollInterval - const Duration(milliseconds: 1));
     expect(polls(core), 0);
     await t.pump(const Duration(milliseconds: 1));

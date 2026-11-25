@@ -1306,6 +1306,9 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
+  String get record_previewSimulatedName => 'simulada';
+
+  @override
   String get record_punchEntryA11y => 'Entrada del punch-in';
 
   @override

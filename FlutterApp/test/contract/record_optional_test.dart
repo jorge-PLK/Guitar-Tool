@@ -95,7 +95,7 @@ void main() {
     ];
     final s = RecordSnapshot.fromJson(j);
     expect(s.activePartId, isNull);
-    expect(s.camera.state, CameraState.unknown);
+    expect(s.camera.state, CameraState.idle);
     expect(s.sections.single.paletteIndex, isNull);
     expect(RecordSnapshot.fromJson({...j, 'activePartId': null}).activePartId, isNull);
   });

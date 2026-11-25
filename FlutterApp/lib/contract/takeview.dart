@@ -52,6 +52,7 @@ class TakeViewSnapshot {
     required this.epoch,
     required this.outputName,
     this.audioError,
+    this.video,
     this.videoWidth,
     this.videoHeight,
     this.videoRotation,
@@ -68,6 +69,7 @@ class TakeViewSnapshot {
         epoch: j['epoch'] as int,
         outputName: j['outputName'] as String,
         audioError: j['audioError'] as String?,
+        video: j['video'] == null ? null : TakeViewVideoStatus.fromJson(j['video'] as Json),
         videoWidth: j['videoWidth'] as int?,
         videoHeight: j['videoHeight'] as int?,
         videoRotation: j['videoRotation'] as int?,
@@ -87,6 +89,8 @@ class TakeViewSnapshot {
   final int epoch;
   final String outputName;
   final String? audioError;
+  /// Swift TakeViewSnapshot.video `TakeVideoStatusInfo?`: nil = vídeo listo.
+  final TakeViewVideoStatus? video;
   final int? videoWidth;
   final int? videoHeight;
   final int? videoRotation;
@@ -102,6 +106,7 @@ class TakeViewSnapshot {
         'epoch': epoch,
         'outputName': outputName,
         if (audioError != null) 'audioError': audioError,
+        if (video != null) 'video': video!.toJson(),
         if (videoWidth != null) 'videoWidth': videoWidth,
         if (videoHeight != null) 'videoHeight': videoHeight,
         if (videoRotation != null) 'videoRotation': videoRotation,

@@ -729,6 +729,8 @@
   "@record_previewNoVideo": {"description":"Grabar, vista previa: sin vídeo (RV:400)."},
   "record_previewSimulated": "Camera preview · {camera} (simulated)",
   "@record_previewSimulated": {"description":"Grabar, vista previa de la cámara (RV:398); camera por defecto «simulada».","placeholders":{"camera":{"type":"String"}}},
+  "record_previewSimulatedName": "simulated",
+  "@record_previewSimulatedName": {"description":"Grabar, vista previa: nombre por defecto de la cámara simulada cuando no hay nombre (RV:398)."},
   "record_punchEntryA11y": "Punch-in entry",
   "@record_punchEntryA11y": {"description":"Grabar, punch-in: marca de entrada, accesibilidad (PT:64)."},
   "record_punchExitA11y": "Punch-in exit",

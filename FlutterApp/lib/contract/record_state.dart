@@ -9,9 +9,9 @@ T enumOf<T extends Enum>(Iterable<T> values, T unknown, Object? raw) =>
 
 enum RecordPhase { idle, counting, recording, finishing, adjusting, unknown }
 
-enum CameraState { simulated, live, denied, failed, none, unknown }
+enum CameraState { idle, simulated, live, denied, failed, none, unknown }
 
-enum PartStatus { done, pending, unknown }
+enum PartStatus { done, pending, recording, unknown }
 
 @immutable
 class RecordAudio {
@@ -112,6 +112,7 @@ class RecordMixChannel {
     required this.muted,
     required this.solo,
     required this.forcedMuted,
+    this.guitarRole,
   });
   factory RecordMixChannel.fromJson(Json j) => RecordMixChannel(
         id: j['id'] as String,
@@ -121,6 +122,7 @@ class RecordMixChannel {
         muted: j['muted'] as bool,
         solo: j['solo'] as bool,
         forcedMuted: j['forcedMuted'] as bool,
+        guitarRole: j['guitarRole'] as String?,
       );
   final String id;
   final String kind;
@@ -129,8 +131,11 @@ class RecordMixChannel {
   final bool muted;
   final bool solo;
   final bool forcedMuted;
+  /// Swift RecordMixChannel.guitarRole `String?` (solo canales de guitarra).
+  final String? guitarRole;
   Json toJson() => {
         'forcedMuted': forcedMuted,
+        if (guitarRole != null) 'guitarRole': guitarRole,
         'gainDB': gainDB,
         'id': id,
         'kind': kind,
@@ -313,7 +318,7 @@ class RecordPunchTake {
 
 @immutable
 class RecordPart {
-  const RecordPart({required this.id, required this.isLead, required this.name, required this.status, required this.takes, this.bestTakeId});
+  const RecordPart({required this.id, required this.isLead, required this.name, required this.status, required this.takes, this.bestTakeId, this.replaces});
   factory RecordPart.fromJson(Json j) => RecordPart(
         id: j['id'] as String,
         isLead: j['isLead'] as bool,
@@ -321,8 +326,11 @@ class RecordPart {
         status: enumOf(PartStatus.values, PartStatus.unknown, j['status']),
         takes: [for (final t in j['takes'] as List) RecordTake.fromJson(t as Json)],
         bestTakeId: j['bestTakeId'] as String?,
+        replaces: j['replaces'] as String?,
       );
   final String id;
+  /// Swift RecordPartInfo.replaces `String?`: rol de guitarra que sustituye la parte.
+  final String? replaces;
   final bool isLead;
   final String name;
   final PartStatus status;
@@ -335,16 +343,18 @@ class RecordPart {
         'status': status.name,
         'takes': [for (final t in takes) t.toJson()],
         if (bestTakeId != null) 'bestTakeId': bestTakeId,
+        if (replaces != null) 'replaces': replaces,
       };
 }
 
 @immutable
 class RecordSection {
-  const RecordSection({required this.id, required this.name, required this.solo, required this.start, required this.end, this.paletteIndex});
+  const RecordSection({required this.id, required this.name, required this.solo, required this.start, required this.end, this.paletteIndex, this.color});
   factory RecordSection.fromJson(Json j) => RecordSection(
         id: j['id'] as String,
         name: j['name'] as String,
         paletteIndex: j['paletteIndex'] as int?,
+        color: j['color'] as int?,
         solo: j['solo'] as bool,
         start: j['start'] as num,
         end: j['end'] as num,
@@ -353,6 +363,8 @@ class RecordSection {
   final String name;
   /// Swift StudySectionInfo.paletteIndex es `Int?` (ausente en secciones solo): la vista usa `?? 0`.
   final int? paletteIndex;
+  /// Swift StudySectionInfo.color `Int?`.
+  final int? color;
   final bool solo;
   final num start;
   final num end;
@@ -361,6 +373,7 @@ class RecordSection {
         'id': id,
         'name': name,
         if (paletteIndex != null) 'paletteIndex': paletteIndex,
+        if (color != null) 'color': color,
         'solo': solo,
         'start': start,
       };

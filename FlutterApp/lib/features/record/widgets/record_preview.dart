@@ -46,15 +46,14 @@ class _RecordPreviewState extends ConsumerState<RecordPreview> {
           textureId: _channel?.create(),
           frameSize: s.cameraFrameSize,
           rotation: s.cameraRotation,
-          placeholder: PreviewPlaceholder(text: l.record_previewSimulated(cam.name ?? '')),
+          placeholder: PreviewPlaceholder(text: l.record_previewSimulated(cam.name ?? l.record_previewSimulatedName)),
         );
       case CameraState.simulated:
-        // TODO(ola3): falta clave ARB del nombre por defecto «simulada» (RV:398).
-        return PreviewPlaceholder(text: l.record_previewSimulated(cam.name ?? ''));
+        return PreviewPlaceholder(text: l.record_previewSimulated(cam.name ?? l.record_previewSimulatedName));
       case CameraState.none || CameraState.denied || CameraState.failed:
         return PreviewPlaceholder(text: l.record_previewNoVideo);
-      case CameraState.unknown:
-        // El contrato no emite `idle`: «Buscando cámara» = estado aún desconocido.
+      case CameraState.idle || CameraState.unknown:
+        // RV:397: `.idle` = ProgressView pequeño.
         return const Center(child: TfSpinner.small());
     }
   }

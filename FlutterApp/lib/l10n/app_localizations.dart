@@ -2252,6 +2252,12 @@ abstract class AppLocalizations {
   /// **'Vista previa de la cámara · {camera} (simulada)'**
   String record_previewSimulated(String camera);
 
+  /// Grabar, vista previa: nombre por defecto de la cámara simulada cuando no hay nombre (RV:398).
+  ///
+  /// In es, this message translates to:
+  /// **'simulada'**
+  String get record_previewSimulatedName;
+
   /// Grabar, punch-in: marca de entrada, accesibilidad (PT:64).
   ///
   /// In es, this message translates to:

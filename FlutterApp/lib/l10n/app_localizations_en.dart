@@ -1297,6 +1297,9 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get record_previewSimulatedName => 'simulated';
+
+  @override
   String get record_punchEntryA11y => 'Punch-in entry';
 
   @override

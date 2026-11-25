@@ -213,6 +213,11 @@ class TakeViewerStore extends Notifier<TakeViewerState> {
       if (gen != _generation) return;
       state = state.copyWith(phase: TakeViewerPhase.open);
       _applySnapshot(s);
+      final pending = s.video; // convirtiendo o fallido al abrir (TakeViewSnapshot.video)
+      if (pending != null) {
+        _applyVideoStatus(pending);
+        return;
+      }
       final hasVideo = s.videoWidth != null && s.videoHeight != null;
       state = state.copyWith(video: hasVideo ? TakeVideoState.ready : TakeVideoState.none);
       if (hasVideo) _attachChannel();
@@ -297,13 +302,18 @@ class TakeViewerStore extends Notifier<TakeViewerState> {
     if (v == null) {
       state = state.copyWith(video: TakeVideoState.ready, clearVideoStatus: true);
       unawaited(_refreshVideo());
-    } else if (v.code == 'video-failed') {
+    } else {
+      _applyVideoStatus(v);
+    }
+  }
+
+  void _applyVideoStatus(TakeViewVideoStatus v) {
+    if (v.code == 'video-failed') {
       state = state.copyWith(
           video: TakeVideoState.error, videoMessage: v.message, clearVideoStatus: false, clearTexture: true);
       _releaseChannel();
     } else {
-      state = state.copyWith(
-          video: TakeVideoState.converting, videoProgress: v.progress, videoMessage: v.message);
+      state = state.copyWith(video: TakeVideoState.converting, videoProgress: v.progress, videoMessage: v.message);
     }
   }
 
