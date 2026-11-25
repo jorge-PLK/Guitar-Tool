@@ -368,4 +368,8 @@ abstract final class TfSize {
   static const double backingInfoChevron = 10;
   static const double backingInfoFlowSpacing = 10;
   static const double backingInfoRunSpacing = 10;
+
+  // Ola 3 · tamaños de letra
+  static const double font10 = 10;
+  static const double font20 = 20;
 }
