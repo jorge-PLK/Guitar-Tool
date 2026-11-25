@@ -85,6 +85,8 @@ class TfSheetScaffold extends StatelessWidget {
     this.padding = TfSpace.s24,
     this.background = TfColors.card,
     this.titleSize = 22,
+    this.titleTrailing,
+    this.spacing,
   });
 
   /// 420, 480, 540, 720 o 760 según la hoja.
@@ -101,6 +103,12 @@ class TfSheetScaffold extends StatelessWidget {
 
   /// Display 22-24.
   final double titleSize;
+
+  /// Hueco tras el título, en la misma fila (p. ej. el chip «★ mejor» del visor).
+  final Widget? titleTrailing;
+
+  /// Separación entre cabecera, cuerpo y pie. Nulo = 12 (título-cuerpo) y 20 (cuerpo-pie).
+  final double? spacing;
 
   @override
   Widget build(BuildContext context) {
@@ -124,12 +132,27 @@ class TfSheetScaffold extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(
-                  title,
-                  style: TfText.display(titleSize).copyWith(color: TfColors.text),
-                ),
+                if (titleTrailing == null)
+                  Text(
+                    title,
+                    style: TfText.display(titleSize).copyWith(color: TfColors.text),
+                  )
+                else
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    spacing: TfSpace.s8,
+                    children: <Widget>[
+                      Flexible(
+                        child: Text(
+                          title,
+                          style: TfText.display(titleSize).copyWith(color: TfColors.text),
+                        ),
+                      ),
+                      titleTrailing!,
+                    ],
+                  ),
                 if (body != null) ...<Widget>[
-                  const SizedBox(height: TfSpace.s12),
+                  SizedBox(height: spacing ?? TfSpace.s12),
                   Flexible(
                     child: DefaultTextStyle(
                       style: TfText.body().copyWith(color: TfColors.muted),
@@ -138,7 +161,7 @@ class TfSheetScaffold extends StatelessWidget {
                   ),
                 ],
                 if (actions.isNotEmpty) ...<Widget>[
-                  const SizedBox(height: TfSpace.s20),
+                  SizedBox(height: spacing ?? TfSpace.s20),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     spacing: TfSpace.s12,

@@ -139,6 +139,9 @@ abstract final class TfStroke {
 
   /// Trazo discontinuo `dash: [3]` (TabScreen.swift:238): 3 pt de trazo y 3 de hueco.
   static const double dash = 3;
+
+  /// Marco de edición de acordes (BackingTrackView.swift:172).
+  static const double editFrame = 1.5;
 }
 
 /// Opacidades literales de SwiftUI (§2.4). Sin fundir valores casi iguales.
@@ -163,6 +166,9 @@ abstract final class TfOpacity {
   static const double tint16 = 0.16;
   static const double tint12 = 0.12;
   static const double tint07 = 0.07;
+
+  /// `muted@0.7` (BackingTrackView.swift:268). Mismo valor que [pressedSecondary], otro uso.
+  static const double mutedChip = 0.7;
 }
 
 /// Sombras (§2.5), todas negras. SwiftUI `radius` se transcribe como `blurRadius`.
@@ -279,4 +285,46 @@ abstract final class TfSize {
   static const double mixerChannelMinHeight = 166;
   static const double mixerTitleHeight = 22;
   static const double mixerTogglesHeight = 40;
+
+  // Backing y Tab: transporte, información y escenario (BackingView/TabScreen).
+  static const double transportPlay = 52; // botón de play redondo, Backing y Tab
+  static const double transportPlayIcon = 20;
+  static const double transportRewindIcon = 15;
+  static const double transportMarkHeight = 30; // «Inicio»/«Fin» de bucle
+  static const double transportTempoSlider = 120;
+  static const double transportTempoValue = 54;
+  static const double transportFlowSpacing = 14;
+  static const double infoPickerWidth = 112;
+  static const double infoFineSliderWidth = 70;
+  static const double infoCentsWidth = 56;
+  static const double tabStageMinHeight = 320; // alto mínimo del escenario
+  static const double tabFooterHeight = 18;
+  static const double tabListenOptionHeight = 30;
+  static const double tabTuningWidth = 170;
+  static const double tabNameWidth = 150; // nombre de pista (pairing y fases)
+  static const double tabPhaseBarWidth = 220;
+  // Ola 3 · Grabar y Ajustes
+  static const double settingsCameraWidth = 280; // VS:244-284
+  static const double settingsResFpsWidth = 160; // VS:244-284
+  static const double settingsPreviewWidth = 240; // VS:244-284
+  static const double previewAspect = 16 / 9; // RV:386, VS:286-321
+  static const double exportCodecWidth = 160; // VS:354-383
+  static const double exportResolutionWidth = 100; // VS:354-383
+  static const double sheetWidthWide = 720; // TV:282, OS
+  static const double sheetWidthNarrow = 420; // RV:332-356
+  static const double viewerCloseIcon = 13; // TV: botón cerrar
+  static const double viewerPlayIcon = 15; // TV: icono de reproducción
+  static const double offsetButtonHeight = 34; // OS
+  static const double offsetFieldWidth = 76; // OS
+  static const double compactMeterWidth = 22; // RM:78-85
+  static const double compactMeterHeight = 8; // RM:78-85
+  static const double recordButtonPaddingH = 22; // RV:482
+  static const double recDot = 10; // RV:433
+  static const double previewGradientRadius = 520; // RV:367
+  static const double previewPlaceholderIcon = 28; // RV:411
+  static const double inputLevelBarWidth = 12; // RM:198-207
+  static const double mixerDividerHeight = 200; // RM:47
+  static const double compactMasterWidth = 40; // RM:71
+  static const double compactChannelWidth = 76; // RM:123
+  static const double foldButtonHeight = 30; // RM:29-33
 }
