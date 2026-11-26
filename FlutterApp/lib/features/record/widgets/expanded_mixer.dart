@@ -11,6 +11,7 @@ import '../../../widgets/tf_fader.dart';
 import '../../../widgets/tf_level_bar.dart';
 import '../../../widgets/tf_mixer_channel.dart';
 import '../../../widgets/tf_scroll.dart';
+import '../input_meter.dart';
 import '../mixer_store.dart';
 import 'compact_mixer.dart';
 import 'vertical_level_painter.dart';
@@ -21,7 +22,7 @@ class ExpandedMixer extends ConsumerWidget {
   const ExpandedMixer({super.key, this.inputLevel});
 
   /// Nivel de la entrada de guitarra 0…1 (G2: sin fuente en los stores, el padre lo aporta).
-  final ValueListenable<double>? inputLevel;
+  final ValueListenable<InputMeter>? inputLevel;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -90,7 +91,7 @@ class MasterChannel extends ConsumerWidget {
 class GuitarInputChannel extends StatelessWidget {
   const GuitarInputChannel({super.key, this.level});
 
-  final ValueListenable<double>? level;
+  final ValueListenable<InputMeter>? level;
 
   @override
   Widget build(BuildContext context) {
@@ -99,7 +100,7 @@ class GuitarInputChannel extends StatelessWidget {
       title: Text(l.record_yourGuitar, style: _title()),
       faderBuilder: (double h) => Semantics(
         label: l.record_inputLevelA11y,
-        child: inputLevelBuilder(level, (double v) => VerticalLevelMeter(level: v, height: h)),
+        child: inputLevelBuilder(level, (InputMeter v) => VerticalLevelMeter(level: v.level, hot: v.hot, height: h)),
       ),
       value: Text(l.record_inputWord, style: _caption(TfColors.text2)),
     );

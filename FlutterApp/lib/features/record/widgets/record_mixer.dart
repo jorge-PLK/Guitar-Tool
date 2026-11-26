@@ -7,6 +7,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../theme/tokens.dart';
 import '../../../theme/typography.dart';
 import '../../../widgets/tf_card.dart';
+import '../input_meter.dart';
 import '../mixer_store.dart';
 import 'compact_mixer.dart';
 import 'expanded_mixer.dart';
@@ -19,7 +20,7 @@ class RecordMixer extends ConsumerStatefulWidget {
   final ValueChanged<bool>? onExpandedChanged;
 
   /// Nivel de la entrada de guitarra 0…1; `null` = sin fuente (medidor a 0).
-  final ValueListenable<double>? inputLevel;
+  final ValueListenable<InputMeter>? inputLevel;
 
   @override
   ConsumerState<RecordMixer> createState() => _RecordMixerState();

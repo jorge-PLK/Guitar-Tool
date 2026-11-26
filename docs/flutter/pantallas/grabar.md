@@ -88,6 +88,8 @@ Equivalencias con lo que hace AVFoundation hoy (VS:146-174):
 
 **Medidor horizontal compacto** (RM:78-85): lienzo 22×8; pista `RRect` radio 3 `TF.bg`; relleno `RRect` radio 3 `TF.ok` (sin degradado), ancho `22 × clamp(nivel, 0, 1)`, anclado a la izquierda.
 
+> **Flutter (M-6, desvío GR-tope en `desvios.md`):** los dos medidores pasan a `TfColors.accent` entero cuando el pico de los canales de guitarra llega a −3 dBFS (mantenido 1 s); el degradado del vertical se calcula sobre la pista, no sobre el relleno. La longitud sigue siendo el RMS.
+
 **Zona de punch** (PT:23-68), ancho = el de la tarjeta menos 32, alto fijo **54** (PT:14):
 - Escala: `x(t) = t / max(duration, 0,001) × ancho` (segundos; `duration` = duración del tema).
 - Fondo: `RRect` radio 8 `TF.bg`, toda la zona.
@@ -234,7 +236,7 @@ Solo Jorge puede probarlo con hardware o de vista/oído:
 
 1. Cámara real en Mac y en Windows: imagen, giro con «Rotar» (0, 90, 180, 270), proporciones con vídeo vertical y **espejo** frente a SwiftUI (§2.2.1).
 2. Cuenta atrás y grabación con la Flex Prime: el contador y el cursor del tiempo siguen al audio sin saltos; fluidez a 15 fps de la vista previa de Windows.
-3. Medidor de «Tu guitarra» con la guitarra real: respuesta a 0,05 s y color (naranja cerca del tope).
+3. Medidor de «Tu guitarra» con la guitarra real: respuesta a 0,05 s y color (naranja cuando el pico llega a −3 dBFS, 1 s; desvío GR-tope).
 4. Punch-in: marcar y mover asas con y sin ⌥, parada 0,5 s tras la salida.
 5. «Ver toma»: sincronía imagen y sonido a ojo con un golpe seco, y que coincida con lo que enseña «Ajustar desfase».
 6. Colores y contraste de las píldoras sobre una imagen real clara y oscura.

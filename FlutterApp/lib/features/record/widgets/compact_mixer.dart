@@ -10,6 +10,7 @@ import '../../../theme/typography.dart';
 import '../../../widgets/tf_divider.dart';
 import '../../../widgets/tf_slider.dart';
 import '../../../widgets/tf_toggle_button.dart';
+import '../input_meter.dart';
 import '../mixer_store.dart';
 import 'horizontal_level_painter.dart';
 
@@ -67,9 +68,9 @@ class MixerRow {
 }
 
 /// Nivel de la entrada de guitarra (0…1). `null` = sin fuente: medidor a 0.
-Widget inputLevelBuilder(ValueListenable<double>? level, Widget Function(double v) builder) {
-  if (level == null) return builder(0);
-  return ValueListenableBuilder<double>(valueListenable: level, builder: (_, v, _) => builder(v));
+Widget inputLevelBuilder(ValueListenable<InputMeter>? level, Widget Function(InputMeter v) builder) {
+  if (level == null) return builder(InputMeter.silent);
+  return ValueListenableBuilder<InputMeter>(valueListenable: level, builder: (_, v, _) => builder(v));
 }
 
 /// Botones M y S de un canal; sin acción si está forzado a silencio.
@@ -112,7 +113,7 @@ class CompactMixer extends ConsumerWidget {
   const CompactMixer({super.key, this.inputLevel});
 
   /// Nivel de la entrada de guitarra 0…1 (G2: sin fuente en los stores, el padre lo aporta).
-  final ValueListenable<double>? inputLevel;
+  final ValueListenable<InputMeter>? inputLevel;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -273,7 +274,7 @@ class _Header extends ConsumerWidget {
   const _Header({required this.master, required this.inputLevel});
 
   final double master;
-  final ValueListenable<double>? inputLevel;
+  final ValueListenable<InputMeter>? inputLevel;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -302,7 +303,7 @@ class _Header extends ConsumerWidget {
         Text(l.record_yourGuitar, style: label),
         Semantics(
           label: l.record_inputLevelA11y,
-          child: inputLevelBuilder(inputLevel, (double v) => HorizontalLevelMeter(level: v)),
+          child: inputLevelBuilder(inputLevel, (InputMeter v) => HorizontalLevelMeter(level: v.level, hot: v.hot)),
         ),
       ],
     );

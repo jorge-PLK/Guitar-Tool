@@ -207,12 +207,14 @@ void main() {
     final List<int> guitarIn = (settings['guitarIn']! as List).cast<int>();
     final RecordMixer mixer = t.widget(find.byType(RecordMixer));
     expect(mixer.inputLevel, isNotNull);
-    expect(mixer.inputLevel!.value, 0);
+    expect(mixer.inputLevel!.value.level, 0);
     final List<double> levels = List<double>.filled(guitarIn.reduce((int a, int b) => a > b ? a : b), 0)
       ..[guitarIn.first - 1] = 0.6;
-    core.emit('audio.levels', <String, Object?>{'levels': levels, 'rmsDB': <double>[], 'peakDB': <double>[]});
+    final List<double> peaks = List<double>.filled(levels.length, -60)..[guitarIn.first - 1] = -2;
+    core.emit('audio.levels', <String, Object?>{'levels': levels, 'rmsDB': <double>[], 'peakDB': peaks});
     await _settle(t);
-    expect(mixer.inputLevel!.value, 0.6);
+    expect(mixer.inputLevel!.value.level, 0.6);
+    expect(mixer.inputLevel!.value.hot, isTrue); // M-6: pico -2 dBFS ≥ -3
     // `guitarIn` viene de `record_store`: Grabar no recarga Ajustes.
     expect(_c(t).read(recordStoreProvider).guitarIn, guitarIn);
   });

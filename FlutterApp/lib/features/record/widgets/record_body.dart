@@ -1,5 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:toneforge/contract/audio.dart';
+import 'package:toneforge/features/record/input_meter.dart';
 import 'package:toneforge/features/record/record_audio_actions.dart';
 import 'package:toneforge/features/record/record_store.dart';
 import 'package:toneforge/features/record/sheets/take_viewer_sheet.dart';
@@ -41,7 +43,9 @@ class RecordBody extends ConsumerStatefulWidget {
 
 class _RecordBodyState extends ConsumerState<RecordBody> {
   /// Nivel de «Tu guitarra» (RV:127-128): máximo de `audio.levels` sobre los canales `guitarIn` (1-based).
-  final ValueNotifier<double> _inputLevel = ValueNotifier<double>(0);
+  /// M-6: más el aviso de tope (pico ≥ −3 dBFS, mantenido 1 s).
+  final ValueNotifier<InputMeter> _inputLevel = ValueNotifier<InputMeter>(InputMeter.silent);
+  final ClipHold _clipHold = ClipHold();
 
   @override
   void initState() {
@@ -52,9 +56,11 @@ class _RecordBodyState extends ConsumerState<RecordBody> {
   }
 
   void _updateLevel() {
-    _inputLevel.value = guitarInputLevel(
-      ref.read(recordStoreProvider).guitarIn,
-      ref.read(audioStoreProvider).levels?.levels ?? const <double>[],
+    final List<int> guitarIn = ref.read(recordStoreProvider).guitarIn;
+    final AudioLevels? ev = ref.read(audioStoreProvider).levels;
+    _inputLevel.value = InputMeter(
+      guitarInputLevel(guitarIn, ev?.levels ?? const <double>[]),
+      hot: _clipHold.update(guitarInputPeakDB(guitarIn, ev?.peakDB ?? const <double>[]), DateTime.now()),
     );
   }
 
