@@ -5,10 +5,13 @@ import 'core_client.dart' show Json;
 
 /// Error de un servicio de anfitrión: viaja como `{hostResponse:{id,error:{code,message}}}`.
 class HostError implements Exception {
-  const HostError(this.code, this.message);
+  const HostError(this.code, this.message, {this.status});
   final String code;
   final String message;
-  Json toJson() => {'code': code, 'message': message};
+
+  /// Código HTTP (`httpStatus`); `HostBroker.swift` lo lee de `error.status`.
+  final int? status;
+  Json toJson() => {'code': code, 'message': message, if (status != null) 'status': status};
   @override
   String toString() => 'HostError($code: $message)';
 }

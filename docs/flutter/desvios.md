@@ -59,6 +59,7 @@ Vienen del apartado 9 de las fichas de `pantallas/`. La clase sigue [decisiones-
 | TB5 | Tablatura | Etiqueta «Fuente» por clave ARB | interfaz en Dart | 2 | t:D5 |
 | TB6 | Tablatura | Exportar `.gp`: Dart abre el diálogo (`file_selector`) y pasa `path` a `tab.export` (antes «decisión de Jorge») | interfaz en Dart (resuelto) | 2 | t:D6 |
 | TB7 | Tablatura | Songsterr oculto: sondeo, tope y serialización de cargas los ejecuta el anfitrión; comprobar que el de Flutter cumple los puntos 1-6 del contrato | se mide (requisito de anfitrión) | 2 | t:D7 |
+| TB7b | Tablatura | Songsterr oculto sin cancelación: `HostBroker.load` no avisa a Dart si la tarea se cancela, y Dart sigue cargando hasta el tope (30 s). La cola de Dart (una carga a la vez) lo absorbe; el punto 6 del contrato no se cumple del todo. Arreglarlo pediría un `hostRequest` nuevo `cancelLoad` (contrato, no ABI de C). Se deja así (Jorge, 26/11/2026, prueba a mano) | aceptado | prueba a mano | t (M-1) |
 | TB9 | Tablatura | Eventos del lienzo reenviados a `tab.*` con coalescencia en cliente | interfaz en Dart | 2 | t:D9 |
 | TB10 | Tablatura | Hecho, ola 2: `tab.open`, `tab.songsterr.accept`, `tab.songsterr.automatic` y `tab.songsterr.setSource` arrancan o reabren la cola de transcripción en el núcleo | hueco claro (resuelto) | 2 | t:D10 |
 | TB11 | Tablatura | La hoja de Songsterr se cierra en el cliente tras `accept` y `automatic` | interfaz en Dart | 2 | t:D11 |

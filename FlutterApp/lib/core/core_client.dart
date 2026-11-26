@@ -8,6 +8,7 @@ import 'call_timeouts.dart';
 import 'ffi_bindings.dart';
 import 'host_services.dart';
 import 'launch_options.dart';
+import 'songsterr_hidden_host.dart';
 
 typedef Json = Map<String, Object?>;
 
@@ -73,7 +74,7 @@ class TransportCoreClient implements CoreClient {
     HostServices? host,
     this.timeouts = const CallTimeouts(),
     this.shutdownTimeoutMs = 5000,
-  }) : _host = host ?? const PlatformHostServices();
+  }) : _host = host ?? PlatformHostServices(songsterr: HiddenSongsterrHost());
 
   final CoreTransport _t;
   final HostServices _host;
