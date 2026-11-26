@@ -106,7 +106,7 @@ class TakeRow extends ConsumerWidget {
           iconFilled: true,
           onPressed: take.audio == null || take.songStart == null
               ? null
-              : () => openTakeViewer(context, projectId: projectId, takeId: take.id),
+              : () => openTakeViewer(context, projectId: projectId, takeId: take.id, part: part, take: take),
         ),
         const SizedBox(width: TfSpace.s12),
         TfSecondaryButton(

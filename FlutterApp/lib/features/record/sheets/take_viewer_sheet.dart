@@ -17,13 +17,25 @@ import '../record_store.dart';
 import '../take_viewer_store.dart';
 import '../widgets/viewer_controls.dart';
 
+/// Origen alternativo de título, «mejor» y acciones del visor (Biblioteca: `library.*` en vez de `record.*`).
+class TakeViewerHost {
+  const TakeViewerHost({required this.title, required this.isBest, required this.markBest, required this.delete});
+
+  final String title;
+  final bool Function(WidgetRef ref) isBest;
+  final Future<void> Function(WidgetRef ref) markBest;
+  final Future<void> Function(WidgetRef ref) delete;
+}
+
 /// Abre el visor «Ver toma» (hoja de 720): `takeview.open` al abrir y `takeview.close` al cerrar.
-Future<void> showTakeViewer(BuildContext context, {required String projectId, required String takeId}) async {
+/// Sin [host], título y acciones salen de Grabar.
+Future<void> showTakeViewer(BuildContext context,
+    {required String projectId, required String takeId, TakeViewerHost? host}) async {
   final TakeViewerStore store = ProviderScope.containerOf(context).read(takeViewerStoreProvider.notifier);
   unawaited(store.open(projectId, takeId));
   await showTfSheet<void>(
     context: context,
-    builder: (BuildContext ctx) => TakeViewerSheet(projectId: projectId, takeId: takeId),
+    builder: (BuildContext ctx) => TakeViewerSheet(projectId: projectId, takeId: takeId, host: host),
   );
   await store.close();
 }
@@ -31,10 +43,11 @@ Future<void> showTakeViewer(BuildContext context, {required String projectId, re
 /// Contenido de la hoja (TV:282-301). Estado en `takeViewerStoreProvider`; título y «mejor» salen de
 /// `recordStoreProvider`. «Marcar como mejor» no cierra; «Eliminar…» confirma, cierra y borra.
 class TakeViewerSheet extends ConsumerWidget {
-  const TakeViewerSheet({super.key, required this.projectId, required this.takeId});
+  const TakeViewerSheet({super.key, required this.projectId, required this.takeId, this.host});
 
   final String projectId;
   final String takeId;
+  final TakeViewerHost? host;
 
   static (RecordPart, RecordTake)? _find(RecordSnapshot? s, String takeId) {
     if (s == null) return null;
@@ -51,8 +64,9 @@ class TakeViewerSheet extends ConsumerWidget {
     final AppLocalizations l = AppLocalizations.of(context);
     final TakeViewerState s = ref.watch(takeViewerStoreProvider);
     final (RecordPart, RecordTake)? found = _find(ref.watch(recordStoreProvider).snapshot, takeId);
-    final bool best = found?.$2.best ?? false;
-    final String title = found == null ? '' : l.record_takePill(found.$2.number, found.$1.name);
+    final TakeViewerHost? h = host;
+    final bool best = h != null ? h.isBest(ref) : (found?.$2.best ?? false);
+    final String title = h != null ? h.title : found == null ? '' : l.record_takePill(found.$2.number, found.$1.name);
     final String? error = _errorText(l, s);
     // Cargando, o error del visor: controles deshabilitados (acciones siguen activas).
     final bool controls = s.isOpen && s.audioError == null;
@@ -80,7 +94,7 @@ class TakeViewerSheet extends ConsumerWidget {
                 children: <Widget>[
                   TfSecondaryButton(
                     label: l.takeview_markBest,
-                    onPressed: best ? null : () => record.markBest(takeId),
+                    onPressed: best ? null : () => h != null ? h.markBest(ref) : record.markBest(takeId),
                   ),
                   const Spacer(),
                   TfSecondaryButton(
@@ -96,7 +110,7 @@ class TakeViewerSheet extends ConsumerWidget {
                       );
                       if (!ok) return;
                       nav.pop();
-                      await record.deleteTake(takeId);
+                      await (h != null ? h.delete(ref) : record.deleteTake(takeId));
                     },
                   ),
                 ],
