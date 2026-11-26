@@ -12,7 +12,9 @@ Cerrada 24/11/2026 con visto bueno de Jorge (suite 20:51, Flutter 328 tests); la
 
 Cerrada 25/11/2026 con visto bueno de Jorge tras su prueba a mano. Pendiente de Windows en «Pendiente de Windows»; desvíos L14-L16 abiertos para la ola 5 (`docs/flutter/desvios.md`).
 - [x] **Ola 2 · Estudio:** Backing (mezclador, rejilla de acordes, secciones, bucle, metrónomo) y Tablatura (WebView de alphaTab, edición, Songsterr, exportar `.gp`) (`pantallas/backing.md`, `pantallas/tablatura.md`).
-- [ ] **Ola 3 · Grabación:** Grabar, Ver toma, Ajustar desfase, Ajustes · Audio (calibración) y Ajustes · Cámara y vídeo (`pantallas/grabar.md`, `pantallas/ajustes.md`).
+- [x] **Ola 3 · Grabación:** Grabar, Ver toma, Ajustar desfase, Ajustes · Audio (calibración) y Ajustes · Cámara y vídeo (`pantallas/grabar.md`, `pantallas/ajustes.md`).
+
+Cerrada 26/11/2026 con visto bueno de Jorge; su prueba a mano contra el núcleo real, con las olas 1, 2 y 3 juntas, queda para una sesión aparte. Desvíos GR11-GR19 en `docs/flutter/desvios.md` (GR15 abierto: rotación del fotograma, se verifica con hardware).
 - [ ] **Ola 4 · Montaje:** Montaje y hoja «Encuadre» (`pantallas/montaje.md`).
 - [ ] **Ola 5 · Cierre:** empaquetado de Mac y de Windows (recursos, DLL), mensajes del núcleo por código en todas las áreas que falten, pasada única en el PC x64 al final (tras validar todas las olas en el Mac), borrado de `App/`, `WinApp/Web`, `Tools/webdev` y `FrameRelay` en JPEG, CODEMAP y `CLAUDE.md`.
 
