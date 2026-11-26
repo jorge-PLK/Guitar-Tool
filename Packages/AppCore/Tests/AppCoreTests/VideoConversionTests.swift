@@ -9,8 +9,7 @@ import XCTest
 /// (`ScriptedProcessRunner`) y MP4 sintéticos (solo cajas), sustitución al terminar aunque el visor tenga la toma abierta
 /// (opción b' de Jorge) con el respaldo `busy` (original en uso), puerta del montaje y visor por el puente con el evento
 /// `takeview.video`. Portátil: la política y el `busy` de NTFS se inyectan.
-final class VideoConversionTests: XCTestCase {
-    // MARK: MP4 sintéticos
+final class VideoConversionTests: XCTestCase {    // MARK: MP4 sintéticos
 
     enum MP4 {
         static func u32(_ v: UInt32) -> Data { withUnsafeBytes(of: v.bigEndian) { Data($0) } }

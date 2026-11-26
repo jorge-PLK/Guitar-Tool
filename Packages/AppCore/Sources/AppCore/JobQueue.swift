@@ -96,14 +96,20 @@ final class JobEngine: @unchecked Sendable {
         lock.withLock { hasAnalyzer = s.analyzer != nil }
         await lib.setFileReleaser { [weak self] id, files in await self?.releaseFiles(id, files) }
         let events = lib.events
-        let pumpTask = Task { [self] in
-            for await e in events { await self.handle(e, library: lib) }
+        // Débil: el bucle espera eventos para siempre; con captura fuerte retenía la cola y, con ella, todo el árbol (PC7).
+        let pumpTask = Task { [weak self] in
+            for await e in events {
+                guard let self else { return }
+                await self.handle(e, library: lib)
+            }
         }
         lock.withLock { pump = pumpTask }
         _ = try await lib.rebuildIndex()
         _ = try await lib.recoverInterrupted()
         return lib
     }
+
+    deinit { pump?.cancel() }
 
     /// Arranca la biblioteca (y re-encola lo interrumpido) sin esperar a una petición. Sin carpeta, no hace nada.
     func start() async { _ = try? await library() }

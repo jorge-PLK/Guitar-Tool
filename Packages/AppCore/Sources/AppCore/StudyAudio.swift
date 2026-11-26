@@ -48,6 +48,12 @@ final class StudyAudio {
         }
     }
 
+    /// Un `StudyAudio` soltado sin `shutdown` no deja su hilo de bombeo ni su sesión simulada vivos (PC7).
+    isolated deinit {
+        pump?.stop()
+        session?.close()
+    }
+
     /// Mac: aparato de la ruta de salida. Windows: el endpoint que abrirá (o abrió) la salida propia. Los dos ya al abrir
     /// el tema (8.6d-A); en Windows se relee en cada `study.open` (un `StudyAudio` nuevo) y al dar a play.
     var outputName: String {
@@ -114,6 +120,9 @@ final class RealtimePump: @unchecked Sendable {
     private let block: Int
     private let lock = NSLock()
     private var running = false
+    private var alive = false
+    /// El hilo de esta bomba sigue vivo.
+    var isAlive: Bool { lock.withLock { alive } }
 
     init(io: SimulatedAudioIO, sampleRate: Double, block: Int) {
         self.io = io
@@ -121,13 +130,32 @@ final class RealtimePump: @unchecked Sendable {
         self.block = block
     }
 
+    /// Hilos de bombeo vivos ahora mismo (diagnóstico de fugas entre tests).
+    private static let liveCounter = NSLock()
+    nonisolated(unsafe) private static var live = 0
+    static var liveCount: Int { liveCounter.withLock { live } }
+    /// Margen para que la sesión arranque la E/S antes de dar por abandonada la bomba.
+    static let startGraceSeconds = 10.0
+
     func start() {
         lock.withLock { running = true }
+        Self.liveCounter.withLock { Self.live += 1 }
+        lock.withLock { alive = true }
         let t = Thread { [self] in
+            defer {
+                Self.liveCounter.withLock { Self.live -= 1 }
+                lock.withLock { alive = false }
+            }
             let origin = ProcessInfo.processInfo.systemUptime
             var done = 0
+            var seenRunning = false
             while lock.withLock({ running }) {
-                let target = Int((ProcessInfo.processInfo.systemUptime - origin) * sampleRate)
+                let now = ProcessInfo.processInfo.systemUptime
+                // La E/S se arranca después de crear la bomba: solo se sale al verla parada tras haber corrido,
+                // o si nunca arranca (sesión descartada sin llegar a abrirse).
+                guard let live = io else { return }
+                if live.isRunning { seenRunning = true } else if seenRunning || now - origin > Self.startGraceSeconds { return }
+                let target = Int((now - origin) * sampleRate)
                 while done + block <= target, lock.withLock({ running }) {
                     guard let io else { return }
                     io.pump(frames: block)

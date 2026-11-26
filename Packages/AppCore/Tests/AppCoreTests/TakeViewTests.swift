@@ -9,8 +9,7 @@ import JavaScriptCore
 
 /// «Ver toma» con el audio en el núcleo (W2-V): `--audio simulated` y proyectos temporales.
 @MainActor
-final class TakeViewTests: XCTestCase {
-    struct Rig {
+final class TakeViewTests: XCTestCase {    struct Rig {
         var folder: URL
         var project: Project
         var take: Take
