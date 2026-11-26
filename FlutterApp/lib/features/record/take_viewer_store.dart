@@ -9,6 +9,7 @@ import '../../core/core_client.dart';
 import '../../core/core_providers.dart';
 import '../../core/frame_channel.dart';
 import '../../core/frame_providers.dart';
+import 'take_viewer_scrub.dart';
 
 enum TakeViewerPhase { closed, loading, open }
 
@@ -161,9 +162,14 @@ class TakeViewerStore extends Notifier<TakeViewerState> {
   int _generation = 0;
   /// Hay (o puede haber) una toma abierta en el núcleo que cerrar al soltar el store.
   bool _live = false;
+  late final ScrubThrottle _scrub = ScrubThrottle(
+      ref.read(scrubClockProvider), (x) => unawaited(_transport('takeview.seek', TakeViewSeekParams(seconds: x).toJson(), apply: false)));
+  bool _dragging = false;
+  bool _settling = false;
 
   @override
   TakeViewerState build() {
+    _scrub; // inicializa aquí: `ref.read` no vale dentro de onDispose
     final subs = <StreamSubscription<Object?>>[
       // Un evento mal formado se registra y se ignora: no mata el stream.
       _core.on('takeview.position', TakeViewPositionEvent.fromJson).listen(_onPosition, onError: _badEvent('takeview.position')),
@@ -173,6 +179,7 @@ class TakeViewerStore extends Notifier<TakeViewerState> {
       for (final s in subs) {
         s.cancel();
       }
+      _scrub.reset();
       _channel?.dispose();
       _channel = null;
       if (_live) {
@@ -249,18 +256,40 @@ class TakeViewerStore extends Notifier<TakeViewerState> {
   /// Salta a [seconds] (el núcleo recorta a `0...duration`).
   Future<void> seek(double seconds) => _transport('takeview.seek', TakeViewSeekParams(seconds: seconds).toJson());
 
+  /// Arrastre del timeline: seeks a como mucho uno cada 80 ms; el núcleo coalesce («el último gana»).
+  /// Como SwiftUI (TV:343), no pausa ni reanuda. Mientras dura, se ignoran las posiciones del núcleo.
+  void scrub(double seconds) {
+    if (!state.isOpen) return;
+    _dragging = true;
+    _scrub.push(seconds);
+  }
+
+  /// Fin del arrastre: seek final exacto y vuelve a seguir al núcleo al responder.
+  Future<void> scrubEnd(double seconds) async {
+    if (!_dragging) return seek(seconds);
+    _dragging = false;
+    _settling = true;
+    _scrub.reset();
+    try {
+      await seek(seconds);
+    } finally {
+      if (!_dragging) _settling = false;
+    }
+  }
+
   /// Enciende o apaga el backing. Sin stems, o en la hoja de desfase, no hace nada.
   Future<void> setBacking(bool on) async {
     if (!state.canToggleBacking) return;
     await _transport('takeview.setBacking', TakeViewBackingParams(on: on).toJson());
   }
 
-  Future<void> _transport(String method, Object params) async {
+  Future<void> _transport(String method, Object params, {bool apply = true}) async {
     if (!state.isOpen) return;
     final gen = _generation;
     try {
       final s = await _core.call(method, params, TakeViewSnapshot.fromJson);
       if (gen != _generation || !state.isOpen) return;
+      if (!apply) return;
       state = state.copyWith(clearError: true);
       _applySnapshot(s);
     } catch (err) {
@@ -292,7 +321,7 @@ class TakeViewerStore extends Notifier<TakeViewerState> {
   }
 
   void _onPosition(TakeViewPositionEvent e) {
-    if (!state.isOpen || e.epoch < state.epoch) return;
+    if (!state.isOpen || e.epoch < state.epoch || _dragging || _settling) return;
     state = state.copyWith(position: e.seconds, playing: e.playing, rate: e.rate, at: e.at, epoch: e.epoch);
   }
 

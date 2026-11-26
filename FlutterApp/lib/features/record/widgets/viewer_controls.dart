@@ -106,12 +106,12 @@ class _ViewerControlsState extends ConsumerState<ViewerControls> with SingleTick
               builder: (BuildContext _, double v, Widget? _) => TfSlider(
                 value: v.clamp(0.0, max).toDouble(),
                 max: max,
-                onChanged: on ? _setDrag : null,
+                onChanged: on ? (double x) => _setDrag(x, store) : null,
                 onChangeEnd: on
                     ? (double x) {
                         _drag = null;
                         _pos.value = x;
-                        store.seek(x);
+                        store.scrubEnd(x);
                       }
                     : null,
               ),
@@ -131,9 +131,10 @@ class _ViewerControlsState extends ConsumerState<ViewerControls> with SingleTick
     );
   }
 
-  void _setDrag(double x) {
+  void _setDrag(double x, TakeViewerStore store) {
     _drag = x;
     _pos.value = x;
+    store.scrub(x);
   }
 }
 

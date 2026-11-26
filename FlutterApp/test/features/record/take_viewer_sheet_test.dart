@@ -115,9 +115,26 @@ void main() {
     await t.tap(find.byType(TfSlider));
     await t.pump(const Duration(milliseconds: 100));
     final seeks = core.calls.where((c) => c.method == 'takeview.seek').toList();
-    expect(seeks, hasLength(1));
-    final secs = ((seeks.single.params as Map)['seconds'] as num).toDouble();
+    expect(seeks, isNotEmpty);
+    final secs = ((seeks.last.params as Map)['seconds'] as num).toDouble();
     expect(secs, inInclusiveRange(1.0, 2.0));
+  });
+
+  testWidgets('arrastrar el slider: seeks durante el gesto y el último al soltar', (t) async {
+    final core = newCore();
+    await openViewer(t, core);
+    final g = await t.startGesture(t.getCenter(find.byType(TfSlider)));
+    await t.pump(const Duration(milliseconds: 100));
+    await g.moveBy(const Offset(120, 0));
+    await t.pump(const Duration(milliseconds: 200));
+    final during = count(core, 'takeview.seek');
+    expect(during, greaterThanOrEqualTo(2));
+    final shown = slider(t).value;
+    await g.up();
+    await t.pump(const Duration(milliseconds: 100));
+    final seeks = core.calls.where((c) => c.method == 'takeview.seek').toList();
+    expect(seeks.length, during + 1);
+    expect(((seeks.last.params as Map)['seconds'] as num).toDouble(), closeTo(shown, 1e-6));
   });
 
   testWidgets('sin backing: el botón queda deshabilitado', (t) async {
