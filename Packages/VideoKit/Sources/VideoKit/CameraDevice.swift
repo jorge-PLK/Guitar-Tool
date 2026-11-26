@@ -132,12 +132,17 @@ public protocol CameraProviding: AnyObject, Sendable {
     func cameras() -> [CameraDevice]
     /// Cámara por defecto del sistema (`nil` si no hay ninguna).
     func defaultCamera() -> CameraDevice?
+    /// La cámara `id` con sus formatos (solo la que se elige o se abre; no toca las demás).
+    func camera(id: String) -> CameraDevice?
+    /// Si la cámara `id` está conectada, sin leer formatos de ningún dispositivo (el sondeo de Grabar la usa cada 2 s).
+    func hasCamera(id: String) -> Bool
     /// Aviso al conectar o desconectar una cámara (en cualquier hilo).
     func setChangeHandler(_ handler: (@Sendable () -> Void)?)
 }
 
 public extension CameraProviding {
     func camera(id: String) -> CameraDevice? { cameras().first { $0.id == id } }
+    func hasCamera(id: String) -> Bool { cameras().contains { $0.id == id } }
 }
 
 #if canImport(AVFoundation)
@@ -168,7 +173,20 @@ public final class AVCameraProvider: CameraProviding, @unchecked Sendable {
 
     public func cameras() -> [CameraDevice] { Self.discovery().devices.map(Self.describe) }
 
-    public func defaultCamera() -> CameraDevice? { AVCaptureDevice.default(for: .video).map(Self.describe) }
+    /// Sin cámara elegida: la integrada antes que la de Continuity (no `AVCaptureDevice.default`, que con un iPhone
+    /// cerca puede devolver el iPhone y encenderlo). Solo se leen los formatos de la devuelta.
+    public func defaultCamera() -> CameraDevice? {
+        let devices = Self.discovery().devices
+        let pick = devices.first { $0.deviceType == .builtInWideAngleCamera }
+            ?? devices.first { $0.deviceType != .continuityCamera } ?? devices.first
+        return pick.map(Self.describe)
+    }
+
+    public func camera(id: String) -> CameraDevice? {
+        Self.discovery().devices.first { $0.uniqueID == id }.map(Self.describe)
+    }
+
+    public func hasCamera(id: String) -> Bool { Self.discovery().devices.contains { $0.uniqueID == id } }
 
     static func kind(_ d: AVCaptureDevice) -> CameraKind {
         switch d.deviceType {

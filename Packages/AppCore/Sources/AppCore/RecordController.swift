@@ -690,7 +690,7 @@ final class RecordController {
     func pollCamera() {
         guard phase == .idle, !closed, let source = cameras else { return }
         let present: Bool
-        if let uid = video.cameraUID { present = source.provider.camera(id: uid) != nil } else { present = source.provider.defaultCamera() != nil }
+        if let uid = video.cameraUID { present = source.provider.hasCamera(id: uid) } else { present = source.provider.defaultCamera() != nil }
         switch cameraState {
         case .idle, .denied: break
         case .none: if present { cameraTask = Task { await startCamera() } }
