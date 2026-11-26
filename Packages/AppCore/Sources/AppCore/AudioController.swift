@@ -148,17 +148,26 @@ extension ChannelPair: @retroactive Hashable {
 
 /// Combinaciones de canales ofrecidas (`AudioSettingsView.swift` del Mac); solo las que pasan `AudioSettings.validate()`.
 enum ChannelChoices {
+    /// Todos los canales caben en un dispositivo de `channels` canales.
+    static func fits(_ g: [Int], channels: Int) -> Bool { g.allSatisfy { $0 <= channels } }
+
     static func backing(channels: Int, current: AudioSettings) -> [ChannelChoice<ChannelPair>] {
+        // Salida de un canal: solo «Salida 1 · mono» (M-3d); el núcleo mezcla el backing a mono por ese canal.
+        if channels == 1 { return [ChannelChoice(label: monoLabel, value: .mono)] }
         var pairs = stride(from: 1, to: max(channels, 2), by: 2).map { ChannelPair(left: $0, right: $0 + 1) }
-        if !pairs.contains(current.backingOut) { pairs.append(current.backingOut) }
+        if !pairs.contains(current.backingOut), fits([current.backingOut.left, current.backingOut.right], channels: channels) {
+            pairs.append(current.backingOut)
+        }
         return pairs.filter { p in var a = current; a.backingOut = p; return a.isValid }
-            .map { ChannelChoice(label: "Salidas \($0.left) y \($0.right) · estéreo", value: $0) }
+            .map { ChannelChoice(label: $0.isMono ? monoLabel : "Salidas \($0.left) y \($0.right) · estéreo", value: $0) }
     }
+
+    static let monoLabel = "Salida 1 · mono"
 
     static func guitar(channels: Int, current: AudioSettings) -> [ChannelChoice<[Int]?>] {
         var options: [[Int]] = (1...max(channels, 1)).map { [$0] }
-        options += stride(from: 1, to: max(channels, 2), by: 2).map { [$0, $0 + 1] }
-        if let g = current.guitarIn, !options.contains(g) { options.append(g) }
+        options += stride(from: 1, to: channels, by: 2).map { [$0, $0 + 1] }
+        if let g = current.guitarIn, !options.contains(g), fits(g, channels: channels) { options.append(g) }
         let valid = options.filter { g in var a = current; a.guitarIn = g; return a.isValid }
         return [ChannelChoice<[Int]?>(label: "Sin asignar", value: nil)]
             + valid.map { ChannelChoice<[Int]?>(label: $0.count == 1 ? "Entrada \($0[0])" : "Entradas \($0[0]) y \($0[1])", value: $0) }
@@ -297,6 +306,16 @@ final class AudioController {
     func updateAudio(workingRate: Double? = nil, _ change: (inout AudioSettings) -> Void) throws {
         var a = settings ?? AudioSettings()
         change(&a)
+        // Una guitarra que no cabe en el dispositivo de entrada elegido (p. ej. [1, 2] en uno de 1 canal) queda «Sin asignar».
+        if let g = a.guitarIn, let uid = a.inputDeviceUID, let d = devices.inputs.first(where: { $0.uid == uid }),
+           !ChannelChoices.fits(g, channels: d.inputChannels) {
+            a.guitarIn = nil
+        }
+        // Una salida de un canal solo admite el backing mono (M-3d); vale también como valor por defecto de un dispositivo nuevo.
+        if let uid = a.outputDeviceUID, let d = devices.outputs.first(where: { $0.uid == uid }), d.outputChannels == 1,
+           a.backingOut != .mono {
+            a.setBacking(.mono)
+        }
         try a.validate()
         try modifyProfile {
             $0.audio = a

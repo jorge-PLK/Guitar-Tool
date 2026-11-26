@@ -150,8 +150,13 @@ final class HostedRenderer: @unchecked Sendable {
         while done < total {
             let n = min(maxFrames, total - done)
             if pull(n) {
-                if l >= 0, l < buffer.channelCount { (buffer[l].baseAddress! + done).update(from: left, count: n) }
-                if r >= 0, r < buffer.channelCount { (buffer[r].baseAddress! + done).update(from: right, count: n) }
+                if l == r, l >= 0, l < buffer.channelCount {
+                    // Backing mono (M-3d): L y R suman al único canal.
+                    BackingMono.mix(left: left, right: right, into: buffer[l].baseAddress! + done, count: n)
+                } else {
+                    if l >= 0, l < buffer.channelCount { (buffer[l].baseAddress! + done).update(from: left, count: n) }
+                    if r >= 0, r < buffer.channelCount { (buffer[r].baseAddress! + done).update(from: right, count: n) }
+                }
             } else {
                 owed += Int64(n)
                 failedPullFrames.add(n, ordering: .relaxed)

@@ -74,6 +74,11 @@ struct AudioSettingsResult: Codable, Sendable, Equatable {
     var allowedSampleRates: [AudioRateOption]
     var backingChoices: [AudioBackingChoice]
     var guitarChoices: [AudioGuitarChoice]
+    /// Canales de salida del dispositivo de backing (el elegido o, sin elegir, el del sistema); 0 = no hay dispositivo
+    /// presente (ninguno, o el elegido está desconectado). Con 0 no hay canales sobre los que elegir: ocultar «Salida del backing».
+    var outputChannelCount: Int
+    /// Canales de entrada del dispositivo elegido; 0 = sin entrada elegida o desconectada: ocultar «Entrada de guitarra».
+    var inputChannelCount: Int
     var rateMismatch: AudioRateMismatch?
     var calibration: AudioCalibrationInfo
     /// Motivo por el que «Calibrar latencia» está desactivado; nil si se puede.
@@ -310,8 +315,8 @@ final class AudioService {
             try c.updateAudio(workingRate: p.workingSampleRate) { a in
                 if let o = p.outputDeviceUID { a.chooseOutput(o) }
                 if let i = p.inputDeviceUID { a.chooseInput(i) }
-                if let b = p.backingOut { a.backingOut = ChannelPair(left: b.left, right: b.right) }
-                if let g = p.guitarIn { a.guitarIn = g }
+                if let b = p.backingOut { a.setBacking(ChannelPair(left: b.left, right: b.right)) }
+                if let g = p.guitarIn { a.setGuitar(g) }
             }
         } catch is AudioSettingsError {
             throw RPCError(code: "bad-params", message: RecordBlock.invalidChannels.message)
@@ -363,8 +368,8 @@ final class AudioService {
     static func settingsResult(_ c: AudioController) -> AudioSettingsResult {
         let a = c.settings ?? AudioSettings()
         let rate = c.workingRate
-        let outChannels = c.chosenOutput?.outputChannels ?? 2
-        let inChannels = c.chosenInput?.inputChannels ?? 2
+        let outChannels = c.chosenOutput?.outputChannels ?? 0
+        let inChannels = c.chosenInput?.inputChannels ?? 0
         let calibration: AudioCalibrationInfo
         if let l = c.validCalibration {
             let ms = l.latencySamples / rate * 1000
@@ -384,15 +389,17 @@ final class AudioService {
         }
         return AudioSettingsResult(
             outputDeviceUID: a.outputDeviceUID, inputDeviceUID: a.inputDeviceUID,
-            backingOut: AudioChannelPair(left: a.backingOut.left, right: a.backingOut.right), guitarIn: a.guitarIn,
+            backingOut: AudioChannelPair(left: a.backingOut.left, right: a.backingOut.right),
+            guitarIn: a.guitarIn.flatMap { inChannels == 0 || ChannelChoices.fits($0, channels: inChannels) ? $0 : nil },
             workingSampleRate: rate,
             allowedSampleRates: EquipmentProfile.allowedSampleRates.map { AudioRateOption(rate: $0, label: AudioController.rateText($0)) },
-            backingChoices: ChannelChoices.backing(channels: outChannels, current: a).map {
+            backingChoices: outChannels == 0 ? [] : ChannelChoices.backing(channels: outChannels, current: a).map {
                 AudioBackingChoice(label: $0.label, left: $0.value.left, right: $0.value.right)
             },
-            guitarChoices: ChannelChoices.guitar(channels: inChannels, current: a).map {
+            guitarChoices: inChannels == 0 ? [] : ChannelChoices.guitar(channels: inChannels, current: a).map {
                 AudioGuitarChoice(label: $0.label, channels: $0.value)
             },
+            outputChannelCount: outChannels, inputChannelCount: inChannels,
             rateMismatch: mismatch, calibration: calibration, calibrateBlock: c.deviceBlock?.message,
             calibrateBlockMessage: c.deviceBlock?.coreMessage(prefix: "audio"), calibrateInstructions: calibrateInstructions)
     }

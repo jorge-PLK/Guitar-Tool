@@ -56,6 +56,8 @@
   "guitarIn" : [
     1
   ],
+  "inputChannelCount" : 2,
   "inputDeviceUID" : "sim-in",
+  "outputChannelCount" : 2,
   "workingSampleRate" : 44100
 }

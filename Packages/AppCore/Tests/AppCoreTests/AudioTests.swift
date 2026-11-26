@@ -132,6 +132,81 @@ final class AudioTests: XCTestCase {
         XCTAssertNil(c.session)
     }
 
+    /// M-3a: sin dispositivo presente no hay canales elegibles; con él, el número de canales y las opciones.
+    func testChannelsOnlyOfferedWithPresentDevice() throws {
+        let (c, _) = try makeController()
+        var s = AudioService.settingsResult(c)
+        XCTAssertEqual(s.inputChannelCount, 0, "sin entrada elegida")
+        XCTAssertTrue(s.guitarChoices.isEmpty)
+        XCTAssertEqual(s.outputChannelCount, 2, "sin salida elegida suena la del sistema")
+        try guitarSetup(c)
+        s = AudioService.settingsResult(c)
+        XCTAssertEqual(s.inputChannelCount, 2)
+        XCTAssertFalse(s.guitarChoices.isEmpty)
+        try c.modifyProfile { $0.audio?.inputDeviceUID = "ya-no-esta"; $0.audio?.outputDeviceUID = "ya-no-esta" }
+        s = AudioService.settingsResult(c)
+        XCTAssertEqual(s.inputChannelCount, 0, "elegida pero desconectada")
+        XCTAssertEqual(s.outputChannelCount, 0)
+        XCTAssertTrue(s.guitarChoices.isEmpty)
+        XCTAssertTrue(s.backingChoices.isEmpty)
+    }
+
+    /// M-3a: los canales se recuerdan por dispositivo y se restauran al volver a elegirlo.
+    func testChannelsAreRestoredPerDevice() throws {
+        let (c, store) = try makeController()
+        try guitarSetup(c)
+        try c.updateAudio { $0.setGuitar([2]) }
+        try c.updateAudio { $0.chooseInput("otro") }
+        XCTAssertNil(c.settings?.guitarIn, "dispositivo nuevo: sin asignar")
+        try c.updateAudio { $0.chooseInput(AudioController.simulatedInputUID) }
+        XCTAssertEqual(try store.load().audio?.guitarIn, [2])
+        XCTAssertEqual(try store.load().audio?.guitarByDevice[AudioController.simulatedInputUID], [2])
+    }
+
+    /// M-3c: los pares solo se ofrecen si caben en el dispositivo de entrada.
+    func testGuitarChoicesOnlyOfferPairsThatFit() {
+        let labels = { (n: Int, g: [Int]?) -> [String] in
+            var a = AudioSettings(); a.guitarIn = g
+            return ChannelChoices.guitar(channels: n, current: a).map(\.label)
+        }
+        XCTAssertEqual(labels(1, nil), ["Sin asignar", "Entrada 1"])
+        XCTAssertEqual(labels(2, nil), ["Sin asignar", "Entrada 1", "Entrada 2", "Entradas 1 y 2"])
+        XCTAssertEqual(labels(1, [1, 2]), ["Sin asignar", "Entrada 1"], "el actual [1, 2] no cabe en 1 canal")
+    }
+
+    /// M-3d: una salida de 1 canal solo ofrece «Salida 1 · mono»; con 2 o más, los pares estéreo de siempre.
+    func testBackingChoicesMonoOutput() {
+        let a = AudioSettings()
+        XCTAssertEqual(ChannelChoices.backing(channels: 1, current: a).map(\.label), ["Salida 1 · mono"])
+        XCTAssertEqual(ChannelChoices.backing(channels: 1, current: a).map(\.value), [ChannelPair(left: 1, right: 1)])
+        XCTAssertEqual(ChannelChoices.backing(channels: 2, current: a).map(\.label), ["Salidas 1 y 2 · estéreo"])
+        XCTAssertEqual(ChannelChoices.backing(channels: 4, current: a).map(\.label),
+                       ["Salidas 1 y 2 · estéreo", "Salidas 3 y 4 · estéreo"])
+    }
+
+    /// M-3d: un dispositivo nuevo de 1 canal queda en mono (también un 1-2 recordado), y se recuerda por dispositivo.
+    func testMonoOutputDeviceDefaultsToMono() throws {
+        let mono = AudioDevice(id: 9, uid: "mono-out", name: "Altavoz mono", outputChannels: 1)
+        let provider = SimulatedDeviceProvider(devices: [mono], defaultID: nil)
+        let (c, store) = try makeController(provider: provider)
+        try c.updateAudio { $0.chooseOutput("mono-out") }
+        XCTAssertEqual(c.settings?.backingOut, .mono)
+        XCTAssertEqual(try store.load().audio?.backingByDevice["mono-out"], .mono)
+    }
+
+    /// M-3c: con un dispositivo de 1 canal, una guitarra [1, 2] queda sin asignar (respuesta y perfil).
+    func testGuitarPairIsDroppedOnMonoInput() throws {
+        let mono = AudioDevice(id: 9, uid: "mono", name: "Micro mono", inputChannels: 1)
+        let provider = SimulatedDeviceProvider(devices: [mono], defaultID: nil)
+        let (c, store) = try makeController(provider: provider)
+        try c.updateAudio { $0.chooseInput("mono"); $0.setGuitar([1, 2]) }
+        XCTAssertNil(c.settings?.guitarIn)
+        XCTAssertNil(try store.load().audio?.guitarIn)
+        let s = AudioService.settingsResult(c)
+        XCTAssertNil(s.guitarIn)
+        XCTAssertEqual(s.guitarChoices.map(\.label), ["Sin asignar", "Entrada 1"])
+    }
+
     // MARK: Niveles
 
     func testMeterLevelMapping() {

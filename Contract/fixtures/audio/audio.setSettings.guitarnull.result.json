@@ -58,6 +58,8 @@
       "label" : "Entradas 1 y 2"
     }
   ],
+  "inputChannelCount" : 2,
   "inputDeviceUID" : "sim-in",
+  "outputChannelCount" : 2,
   "workingSampleRate" : 44100
 }

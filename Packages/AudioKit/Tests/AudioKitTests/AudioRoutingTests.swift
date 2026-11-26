@@ -33,6 +33,22 @@ final class AudioRoutingTests: XCTestCase {
         XCTAssertNil(route(SimulatedDeviceProvider(devices: [], defaultID: nil), OutputSelection()))
     }
 
+    /// M-3d: backing mono en una salida de un canal: ruta al dispositivo, sin mapa y sin caer al de por defecto.
+    func testMonoBackingOnOneChannelOutputKeepsDevice() {
+        let mono = AudioDevice(id: 5, uid: "Mono", name: "Mono", outputChannels: 1)
+        let sim = SimulatedDeviceProvider(devices: [builtIn, mono], defaultID: 1)
+        let r = route(sim, OutputSelection(deviceUID: "Mono", left: 1, right: 1))
+        XCTAssertEqual(r, OutputRoute(device: mono, channelMap: nil))
+    }
+
+    /// M-3d: el mezclador mono suma L y R × 0,5.
+    func testBackingMonoMixerSignal() {
+        let l: [Float] = [1, 1, 0, -1], r: [Float] = [0, 1, 0, -1]
+        var out = [Float](repeating: 9, count: 4)
+        BackingMono.mix(left: l, right: r, into: &out, count: 4)
+        XCTAssertEqual(out, [0.5, 1.0, 0, -1.0])
+    }
+
     func testPairOutOfRangeFallsBackToSystemDefault() {
         let sim = SimulatedDeviceProvider(devices: [builtIn, pedal], defaultID: 1)
         XCTAssertTrue(route(sim, OutputSelection(deviceUID: "Pedal", left: 5, right: 6))?.isSystemDefault ?? false)

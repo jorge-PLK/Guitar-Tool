@@ -32,6 +32,39 @@ final class AudioSettingsTests: XCTestCase {
         XCTAssertEqual(p.workingSampleRate, 48000)
     }
 
+    func testChannelsFollowTheDevice() {
+        var a = AudioSettings(outputDeviceUID: "OutA", inputDeviceUID: "InA")
+        a.setBacking(ChannelPair(left: 3, right: 4)); a.setGuitar([2])
+        a.chooseOutput("OutB"); a.chooseInput("InB")
+        XCTAssertEqual(a.backingOut, .default, "salida nueva: 1 y 2")
+        XCTAssertNil(a.guitarIn, "entrada nueva: sin asignar")
+        a.setBacking(ChannelPair(left: 5, right: 6)); a.setGuitar([1, 2])
+        a.chooseOutput("OutA"); a.chooseInput("InA")
+        XCTAssertEqual(a.backingOut, ChannelPair(left: 3, right: 4))
+        XCTAssertEqual(a.guitarIn, [2])
+        a.chooseOutput("OutB"); a.chooseInput("InB")
+        XCTAssertEqual(a.backingOut, ChannelPair(left: 5, right: 6))
+        XCTAssertEqual(a.guitarIn, [1, 2])
+        a.chooseInput(nil)
+        XCTAssertNil(a.guitarIn)
+        a.chooseOutput(nil)
+        XCTAssertEqual(a.backingOut, .default, "la salida del sistema tiene sus propios canales")
+    }
+
+    func testPreM3aProfileKeepsItsChannelsForTheChosenDevice() throws {
+        let old = #"{"outputDeviceUID":"OutA","inputDeviceUID":"InA","backingOut":{"left":3,"right":4},"guitarIn":[2]}"#
+        var a = try ProjectFile.makeDecoder().decode(AudioSettings.self, from: Data(old.utf8))
+        XCTAssertEqual(a.backingOut, ChannelPair(left: 3, right: 4))
+        XCTAssertEqual(a.guitarIn, [2])
+        XCTAssertTrue(a.guitarByDevice.isEmpty)
+        a.chooseOutput("OutB"); a.chooseInput("InB")
+        a.chooseOutput("OutA"); a.chooseInput("InA")
+        XCTAssertEqual(a.backingOut, ChannelPair(left: 3, right: 4), "el valor global de antes era el del dispositivo elegido")
+        XCTAssertEqual(a.guitarIn, [2])
+        let data = try ProjectFile.makeEncoder().encode(a)
+        XCTAssertEqual(try ProjectFile.makeDecoder().decode(AudioSettings.self, from: data), a)
+    }
+
     func testPartialAudioGetsDefaults() throws {
         let a = try ProjectFile.makeDecoder().decode(AudioSettings.self, from: Data(#"{"outputDeviceUID":"X"}"#.utf8))
         XCTAssertEqual(a.backingOut, ChannelPair(left: 1, right: 2))
@@ -71,7 +104,10 @@ final class AudioSettingsTests: XCTestCase {
     func testValidation() throws {
         XCTAssertNoThrow(try AudioSettings().validate())
         XCTAssertNoThrow(try fullAudio().validate())
-        XCTAssertThrowsError(try AudioSettings(backingOut: ChannelPair(left: 2, right: 2)).validate()) {
+        XCTAssertNoThrow(try AudioSettings(backingOut: .mono).validate(), "M-3d: left == right es el backing mono")
+        XCTAssertTrue(ChannelPair.mono.isMono)
+        XCTAssertFalse(ChannelPair.default.isMono)
+        XCTAssertThrowsError(try AudioSettings(backingOut: ChannelPair(left: 0, right: 0)).validate()) {
             XCTAssertEqual($0 as? AudioSettingsError, .invalidBackingPair)
         }
         XCTAssertThrowsError(try AudioSettings(backingOut: ChannelPair(left: 0, right: 1)).validate())

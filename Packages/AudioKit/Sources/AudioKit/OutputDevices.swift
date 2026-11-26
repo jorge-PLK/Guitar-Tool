@@ -99,6 +99,14 @@ public struct OutputRoute: Sendable, Equatable {
 public enum AudioRouting {
     public static func route(selection: OutputSelection, devices: [AudioDevice], defaultDevice: AudioDevice?) -> OutputRoute? {
         if let uid = selection.deviceUID, !uid.isEmpty,
+           let device = devices.first(where: { $0.uid == uid && $0.outputChannels > 0 }) {
+            // Backing mono (M-3d, left == right) en una salida de un canal: sin mapa; CoreAudio mezcla en el reproductor
+            // propio y la sesión alojada suma L+R×0,5 (`BackingMono`).
+            if selection.left == selection.right, selection.left == 1, device.outputChannels == 1 {
+                return OutputRoute(device: device, channelMap: nil)
+            }
+        }
+        if let uid = selection.deviceUID, !uid.isEmpty,
            let device = devices.first(where: { $0.uid == uid && $0.outputChannels > 0 }),
            let map = channelMap(left: selection.left, right: selection.right, channels: device.outputChannels) {
             return OutputRoute(device: device, channelMap: map)

@@ -65,7 +65,9 @@
   "guitarIn" : [
     1
   ],
+  "inputChannelCount" : 2,
   "inputDeviceUID" : "sim-in",
+  "outputChannelCount" : 2,
   "rateMismatch" : {
     "canUseDeviceRate" : true,
     "deviceRate" : 44100,

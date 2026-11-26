@@ -35,32 +35,13 @@
     "label" : "Sin calibrar"
   },
   "guitarChoices" : [
-    {
-      "label" : "Sin asignar"
-    },
-    {
-      "channels" : [
-        1
-      ],
-      "label" : "Entrada 1"
-    },
-    {
-      "channels" : [
-        2
-      ],
-      "label" : "Entrada 2"
-    },
-    {
-      "channels" : [
-        1,
-        2
-      ],
-      "label" : "Entradas 1 y 2"
-    }
+
   ],
   "guitarIn" : [
     1
   ],
+  "inputChannelCount" : 0,
   "inputDeviceUID" : "ya-no-esta",
+  "outputChannelCount" : 2,
   "workingSampleRate" : 44100
 }

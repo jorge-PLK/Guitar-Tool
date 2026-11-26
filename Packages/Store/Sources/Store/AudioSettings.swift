@@ -11,6 +11,9 @@ public struct ChannelPair: Codable, Sendable, Equatable {
     }
 
     public static let `default` = ChannelPair(left: 1, right: 2)
+    /// Backing mono por el canal 1 (`left == right`): lo que se ofrece en una salida de un solo canal.
+    public static let mono = ChannelPair(left: 1, right: 1)
+    public var isMono: Bool { left == right }
 }
 
 /// Clave de una calibración de latencia (mini-spec Fase 3, «Calibración de latencia»): la calibración vale
@@ -139,10 +142,21 @@ public struct AudioSettings: Codable, Sendable, Equatable {
     public var guitarIn: [Int]?
     public var bufferFrames: Int
     public var latency: LatencyCalibration?
+    /// Canales de backing recordados por UID de salida (clave `systemOutputKey` = salida del sistema). `backingOut` es
+    /// el del dispositivo activo; este mapa guarda los de los demás (M-3a: los canales dependen del dispositivo).
+    public var backingByDevice: [String: ChannelPair]
+    /// Canales de guitarra recordados por UID de entrada. `guitarIn` es el del dispositivo activo.
+    public var guitarByDevice: [String: [Int]]
+
+    /// Clave de la salida por defecto del sistema en `backingByDevice` (mismo criterio que los UID vacíos de `CalibrationKey`).
+    public static let systemOutputKey = ""
 
     public init(outputDeviceUID: String? = nil, inputDeviceUID: String? = nil, backingOut: ChannelPair = .default,
                 guitarIn: [Int]? = nil, bufferFrames: Int = AudioSettings.defaultBufferFrames,
-                latency: LatencyCalibration? = nil) {
+                latency: LatencyCalibration? = nil, backingByDevice: [String: ChannelPair] = [:],
+                guitarByDevice: [String: [Int]] = [:]) {
+        self.backingByDevice = backingByDevice
+        self.guitarByDevice = guitarByDevice
         self.outputDeviceUID = outputDeviceUID
         self.inputDeviceUID = inputDeviceUID
         self.backingOut = backingOut
@@ -158,13 +172,35 @@ public struct AudioSettings: Codable, Sendable, Equatable {
                   backingOut: try c.decodeIfPresent(ChannelPair.self, forKey: .backingOut) ?? .default,
                   guitarIn: try c.decodeIfPresent([Int].self, forKey: .guitarIn),
                   bufferFrames: try c.decodeIfPresent(Int.self, forKey: .bufferFrames) ?? Self.defaultBufferFrames,
-                  latency: try c.decodeIfPresent(LatencyCalibration.self, forKey: .latency))
+                  latency: try c.decodeIfPresent(LatencyCalibration.self, forKey: .latency),
+                  // Perfil anterior a M-3a: sin mapas. Los canales globales de entonces son los del dispositivo
+                  // elegido hoy; se guardan en el mapa al cambiar de dispositivo (`chooseOutput`/`chooseInput`).
+                  backingByDevice: try c.decodeIfPresent([String: ChannelPair].self, forKey: .backingByDevice) ?? [:],
+                  guitarByDevice: try c.decodeIfPresent([String: [Int]].self, forKey: .guitarByDevice) ?? [:])
     }
 
-    /// Un canal no puede tener dos papeles: el par de backing son dos canales de salida distintos; la
+    private enum CodingKeys: String, CodingKey {
+        case outputDeviceUID, inputDeviceUID, backingOut, guitarIn, bufferFrames, latency, backingByDevice, guitarByDevice
+    }
+
+    /// Los mapas por dispositivo solo se escriben si tienen algo: un perfil sin cambiar de dispositivo queda como antes.
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encodeIfPresent(outputDeviceUID, forKey: .outputDeviceUID)
+        try c.encodeIfPresent(inputDeviceUID, forKey: .inputDeviceUID)
+        try c.encode(backingOut, forKey: .backingOut)
+        try c.encodeIfPresent(guitarIn, forKey: .guitarIn)
+        try c.encode(bufferFrames, forKey: .bufferFrames)
+        try c.encodeIfPresent(latency, forKey: .latency)
+        if !backingByDevice.isEmpty { try c.encode(backingByDevice, forKey: .backingByDevice) }
+        if !guitarByDevice.isEmpty { try c.encode(guitarByDevice, forKey: .guitarByDevice) }
+    }
+
+    /// Un canal no puede tener dos papeles: el par de backing son dos canales de salida distintos (o `left == right`, el
+    /// backing mono de una salida de un canal, M-3d); la
     /// guitarra, uno o dos de entrada distintos; y el canal de referencia de la calibración no es de la guitarra.
     public func validate() throws {
-        guard backingOut.left >= 1, backingOut.right >= 1, backingOut.left != backingOut.right else {
+        guard backingOut.left >= 1, backingOut.right >= 1 else {
             throw AudioSettingsError.invalidBackingPair
         }
         if let g = guitarIn {
@@ -201,15 +237,32 @@ public struct AudioSettings: Codable, Sendable, Equatable {
         return latency
     }
 
-    /// Al elegir un dispositivo, el backing queda en 1 y 2 y los demás papeles sin asignar.
-    public mutating func chooseOutput(_ uid: String?) {
-        outputDeviceUID = uid
-        backingOut = .default
+    /// Cambia los canales de backing del dispositivo de salida activo y los recuerda para él.
+    public mutating func setBacking(_ pair: ChannelPair) {
+        backingOut = pair
+        backingByDevice[outputDeviceUID ?? Self.systemOutputKey] = pair
     }
 
+    /// Cambia los canales de guitarra del dispositivo de entrada activo y los recuerda para él (nil = sin asignar).
+    /// Sin dispositivo de entrada no hay canales que guardar.
+    public mutating func setGuitar(_ channels: [Int]?) {
+        guitarIn = channels
+        guard let uid = inputDeviceUID else { return }
+        guitarByDevice[uid] = channels
+    }
+
+    /// Al elegir una salida se guardan los canales de la anterior y se restauran los de la nueva, o 1 y 2 si es nueva.
+    public mutating func chooseOutput(_ uid: String?) {
+        backingByDevice[outputDeviceUID ?? Self.systemOutputKey] = backingOut
+        outputDeviceUID = uid
+        backingOut = backingByDevice[uid ?? Self.systemOutputKey] ?? .default
+    }
+
+    /// Igual para la entrada: se restauran los canales de guitarra de ese dispositivo o queda sin asignar.
     public mutating func chooseInput(_ uid: String?) {
+        if let old = inputDeviceUID { guitarByDevice[old] = guitarIn }
         inputDeviceUID = uid
-        guitarIn = nil
+        guitarIn = uid.flatMap { guitarByDevice[$0] }
     }
 }
 

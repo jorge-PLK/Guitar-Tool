@@ -688,8 +688,13 @@ final class PortablePlaybackEngine: @unchecked Sendable {
         while done < n {
             let k = min(maxBlock, n - done)
             renderBlock(k)
-            if let l { (l + done).update(from: outL, count: k) }
-            if let r { (r + done).update(from: outR, count: k) }
+            if let l, l == r {
+                // Backing mono (M-3d): mismo puntero para L y R = suma a mono.
+                BackingMono.mix(left: outL, right: outR, into: l + done, count: k)
+            } else {
+                if let l { (l + done).update(from: outL, count: k) }
+                if let r { (r + done).update(from: outR, count: k) }
+            }
             done += k
         }
         lastStart.store(y, ordering: .relaxed)

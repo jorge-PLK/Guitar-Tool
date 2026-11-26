@@ -336,8 +336,9 @@ public final class AudioSession: @unchecked Sendable {
     var outputLatencyFrames: Double { lock.withLock { (io?.declaredLatencySamples ?? 0) / 2 } }
 
     static func validate(_ s: AudioSetup, inputs: Int, outputs: Int) throws {
-        guard s.backingLeft != s.backingRight, (1...max(outputs, 1)).contains(s.backingLeft),
-              (1...max(outputs, 1)).contains(s.backingRight), outputs >= 2 else {
+        // left == right es el backing mono (M-3d), válido en cualquier salida; el par estéreo pide dos canales distintos.
+        guard (1...max(outputs, 1)).contains(s.backingLeft), (1...max(outputs, 1)).contains(s.backingRight),
+              outputs >= 1, s.backingLeft == s.backingRight || outputs >= 2 else {
             throw AudioSessionError.invalidChannels("backing \(s.backingLeft)-\(s.backingRight) con \(outputs) salidas")
         }
         guard s.guitarIn.count <= 2, Set(s.guitarIn).count == s.guitarIn.count,

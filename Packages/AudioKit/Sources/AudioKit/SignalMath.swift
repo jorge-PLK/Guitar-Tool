@@ -236,3 +236,15 @@ struct SeededNoise: Sendable {
         (-2 * log(uniform())).squareRoot() * cos(2 * .pi * uniform())
     }
 }
+/// Mezcla del backing a mono para una salida de un solo canal (decisión M-3d: «Salida 1 · mono»). El par de backing es
+/// mono cuando `left == right`; entonces se suman L y R con ganancia 0,5 (−6 dB: dos canales a fondo de escala no recortan).
+/// Solo la salida del backing; ni la guitarra ni la calibración pasan por aquí.
+public enum BackingMono {
+    /// Ganancia de cada canal al sumar a mono.
+    public static let gain: Float = 0.5
+
+    /// `out[i] = (left[i] + right[i]) × 0,5`. `out` puede coincidir con `left` o con `right`.
+    public static func mix(left: UnsafePointer<Float>, right: UnsafePointer<Float>, into out: UnsafeMutablePointer<Float>, count: Int) {
+        for i in 0..<count { out[i] = (left[i] + right[i]) * gain }
+    }
+}
