@@ -125,8 +125,10 @@ void main() {
     await openViewer(t, core);
     final g = await t.startGesture(t.getCenter(find.byType(TfSlider)));
     await t.pump(const Duration(milliseconds: 100));
-    await g.moveBy(const Offset(120, 0));
-    await t.pump(const Duration(milliseconds: 200));
+    for (var i = 0; i < 3; i++) {
+      await g.moveBy(const Offset(40, 0));
+      await t.pump(const Duration(milliseconds: 100));
+    }
     final during = count(core, 'takeview.seek');
     expect(during, greaterThanOrEqualTo(2));
     final shown = slider(t).value;

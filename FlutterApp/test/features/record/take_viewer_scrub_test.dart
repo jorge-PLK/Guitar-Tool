@@ -3,11 +3,13 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:toneforge/core/core_providers.dart';
+import 'package:toneforge/core/frame_channel.dart';
+import 'package:toneforge/core/frame_providers.dart';
 import 'package:toneforge/core/mock_core.dart';
 import 'package:toneforge/features/record/take_viewer_scrub.dart';
 import 'package:toneforge/features/record/take_viewer_store.dart';
 
-import 'take_viewer_store_test.dart' show fx, snap, takeId, pos;
+import 'take_viewer_store_test.dart' show snap, takeId, pos;
 
 /// Reloj manual: el tiempo solo avanza con [advance]; dispara los temporizadores vencidos.
 class FakeScrubClock extends ScrubClock {
@@ -58,6 +60,7 @@ void main() {
     final c = ProviderContainer(overrides: [
       coreClientProvider.overrideWithValue(core),
       scrubClockProvider.overrideWithValue(clock),
+      frameChannelProvider(FrameChannelId.take).overrideWithValue(null),
     ]);
     addTearDown(c.dispose);
     c.listen(takeViewerStoreProvider, (_, _) {});
