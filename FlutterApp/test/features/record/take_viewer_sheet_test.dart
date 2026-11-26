@@ -85,6 +85,15 @@ void main() {
     expect(find.text('Backing'), findsOneWidget);
   });
 
+  testWidgets('vídeo rotado: TfVideoSurface recibe la rotación del estado y el frameSize sin girar', (t) async {
+    final core = newCore()
+      ..result('takeview.open', snap('open', {'videoWidth': 1920, 'videoHeight': 1080, 'videoRotation': 90}));
+    await openViewer(t, core);
+    final surface = t.widget<TfVideoSurface>(find.byType(TfVideoSurface));
+    expect(surface.rotation, 90);
+    expect(surface.frameSize, const Size(1920, 1080));
+  });
+
   testWidgets('sin vídeo: «Sin vídeo: solo audio»', (t) async {
     final core = newCore()..result('takeview.open', fx('takeview/takeview.open.no-video.result'));
     await openViewer(t, core);

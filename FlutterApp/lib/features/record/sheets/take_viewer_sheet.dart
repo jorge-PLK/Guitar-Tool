@@ -183,7 +183,7 @@ class _VideoBox extends StatelessWidget {
     final bool spinner = !failed && (s.isLoading || s.phase == TakeViewerPhase.closed || s.video == TakeVideoState.converting);
     final Widget content;
     if (s.hasVideo) {
-      content = TfVideoSurface(textureId: s.textureId, frameSize: s.frameSize);
+      content = TfVideoSurface(textureId: s.textureId, frameSize: s.frameSize, rotation: s.videoRotation);
     } else if (spinner) {
       content = const Center(child: TfSpinner.small());
     } else if (s.isOpen && s.video == TakeVideoState.none) {
