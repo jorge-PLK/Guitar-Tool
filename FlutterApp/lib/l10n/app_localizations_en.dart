@@ -2763,9 +2763,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settings_audio_systemOutput => 'System output';
 
   @override
-  String get settings_audio_unassigned => 'Unassigned';
-
-  @override
   String get settings_audio_uncalibrated => 'Not calibrated';
 
   @override

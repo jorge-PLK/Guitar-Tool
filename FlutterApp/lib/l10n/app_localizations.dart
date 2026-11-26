@@ -4585,12 +4585,6 @@ abstract class AppLocalizations {
   /// **'Salida del sistema'**
   String get settings_audio_systemOutput;
 
-  /// Ajustes Audio: canal sin asignar (AS:59-60).
-  ///
-  /// In es, this message translates to:
-  /// **'Sin asignar'**
-  String get settings_audio_unassigned;
-
   /// Ajustes Audio: latencia sin calibrar (AS:227).
   ///
   /// In es, this message translates to:

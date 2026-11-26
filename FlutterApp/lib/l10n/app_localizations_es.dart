@@ -2777,9 +2777,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settings_audio_systemOutput => 'Salida del sistema';
 
   @override
-  String get settings_audio_unassigned => 'Sin asignar';
-
-  @override
   String get settings_audio_uncalibrated => 'Sin calibrar';
 
   @override
