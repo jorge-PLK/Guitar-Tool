@@ -177,7 +177,7 @@ void main() {
     final p = call(core, 'study.setLoop');
     expect(p['start'], 0);
     expect(p['end'], 6);
-    expect(p['snap'], isNot('beat')); // el núcleo solo admite none/chord/bar
+    expect(p['snap'], 'chord'); // como SwiftUI: sin ⌥ imanta a pulsos
     expect(p['name'], es.backing_loopNameChords);
     expect(core.calls.any((c) => c.method == 'study.seek'), isFalse);
   });

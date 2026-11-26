@@ -174,9 +174,8 @@ class _ChordGridState extends ConsumerState<ChordGrid> {
       r.$1,
       r.$2,
       name: bar ? l.backing_loopNameBars : l.backing_loopNameChords,
-      // El núcleo solo admite none/chord/bar (StudyMethods.swift:317-325): `beat` lo rechaza con bad-params.
-      // Sin ⌥ el rango ya sale ajustado a pulsos de las celdas, así que no hace falta imán.
-      snap: bar ? StudySnap.bar : StudySnap.none,
+      // Sin ⌥ imán a pulsos como la tira y ChordGrid.swift:287-288; con ⌥ a compases.
+      snap: bar ? StudySnap.bar : StudySnap.chord,
     );
   }
 
