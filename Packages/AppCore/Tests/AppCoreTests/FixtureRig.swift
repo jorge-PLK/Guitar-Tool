@@ -119,6 +119,57 @@ struct FixtureRig {
         return String(decoding: data, as: UTF8.self) + "\n"
     }
 
+    /// Los fixtures los vuelca el Mac. En macOS se compara el texto tal cual; en otras plataformas se compara el JSON ya leído
+    /// (corelibs imprime los Double más cortos: 0.4 frente a 0.40000000000000002) y sin lo que depende del sistema
+    /// (`platform`, tamaños en disco, ruta del temporal).
+    static func assertGolden(_ onDisk: String?, _ text: String, _ message: String, file: StaticString, line: UInt) {
+        #if os(macOS)
+        XCTAssertEqual(onDisk, text, message, file: file, line: line)
+        #else
+        func parse(_ s: String) -> Any? {
+            let fixed = shaFixed(s).replacingOccurrences(of: "\"[^\"\n]*?appcore-fixtures-", with: "\"<tmp>/appcore-fixtures-", options: .regularExpression)
+            guard let v = try? JSONSerialization.jsonObject(with: Data(fixed.utf8), options: [.fragmentsAllowed]) else { return nil }
+            return strip(v)
+        }
+        // La suma esperada del mensaje es la del modelo de la plataforma (CoreML en Mac, ONNX en Windows: ModelDescriptor.swift).
+        func shaFixed(_ s: String) -> String {
+            s.replacingOccurrences(of: "esperada [0-9a-f]{12}", with: "esperada <sha>", options: .regularExpression)
+        }
+        func strip(_ v: Any) -> Any {
+            if let d = v as? [String: Any] {
+                return d.filter { !platformKeys.contains($0.key) }.mapValues(strip)
+            }
+            if let a = v as? [Any] { return a.map(strip) }
+            return v
+        }
+        guard let onDisk, let a = parse(onDisk), let b = parse(text) else {
+            XCTFail(message, file: file, line: line)
+            return
+        }
+        XCTAssertTrue(sameJSON(a, b), message + "\n" + text, file: file, line: line)
+        #endif
+    }
+
+    #if !os(macOS)
+    private static func sameJSON(_ a: Any, _ b: Any) -> Bool {
+        switch (a, b) {
+        case let (x as [String: Any], y as [String: Any]):
+            return x.count == y.count && x.allSatisfy { k, v in y[k].map { sameJSON(v, $0) } ?? false }
+        case let (x as [Any], y as [Any]):
+            return x.count == y.count && zip(x, y).allSatisfy { sameJSON($0, $1) }
+        case let (x as String, y as String): return x == y
+        // El lector de corelibs no redondea igual los 17 dígitos del Mac: se compara con tolerancia.
+        case let (x as NSNumber, y as NSNumber): return abs(x.doubleValue - y.doubleValue) <= 1e-9 * max(1, abs(x.doubleValue))
+        case (is NSNull, is NSNull): return true
+        default: return false
+        }
+    }
+    #endif
+
+    /// Claves cuyo valor es del sistema y no del contrato (se ignoran fuera de macOS). `codec(s)`: Windows ofrece solo H.264
+    /// (`SettingsCameraChoices.codecs`, SettingsMethods.swift).
+    static let platformKeys: Set<String> = ["platform", "bytes", "archiveBytes", "codec", "codecs"]
+
     func golden(_ name: String, _ kind: FixtureKind, _ json: String, file: StaticString = #filePath, line: UInt = #line) throws {
         let url = Self.fixturesRoot.appendingPathComponent(area).appendingPathComponent("\(name).\(kind.rawValue).json")
         let text = try canonical(json)
@@ -126,9 +177,9 @@ struct FixtureRig {
             try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
             try text.write(to: url, atomically: true, encoding: .utf8)
         } else {
-            let onDisk = try? String(contentsOf: url, encoding: .utf8)
-            XCTAssertEqual(onDisk, text, "Deriva del contrato en \(area)/\(name).\(kind.rawValue).json (TF_WRITE_FIXTURES=1 para regenerar)",
-                           file: file, line: line)
+            Self.assertGolden(try? String(contentsOf: url, encoding: .utf8), text,
+                              "Deriva del contrato en \(area)/\(name).\(kind.rawValue).json (TF_WRITE_FIXTURES=1 para regenerar)",
+                              file: file, line: line)
         }
     }
 

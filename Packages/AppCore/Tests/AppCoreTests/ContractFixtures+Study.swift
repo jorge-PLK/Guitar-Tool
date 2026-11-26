@@ -34,7 +34,7 @@ extension FixtureRig {
             try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
             try text.write(to: url, atomically: true, encoding: .utf8)
         } else {
-            XCTAssertEqual(try? String(contentsOf: url, encoding: .utf8), text, "Deriva del contrato en \(area)/\(fileName)", file: file, line: line)
+            Self.assertGolden(try? String(contentsOf: url, encoding: .utf8), text, "Deriva del contrato en \(area)/\(fileName)", file: file, line: line)
         }
     }
 

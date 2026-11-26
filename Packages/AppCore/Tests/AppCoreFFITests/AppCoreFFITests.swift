@@ -1,5 +1,7 @@
 import CAppCoreFFI
+#if canImport(CoreVideo)
 import CoreVideo
+#endif
 import Foundation
 import Testing
 @testable import AppCoreFFI
@@ -82,6 +84,7 @@ private func started() throws -> (CoreState, Inbox) {
     }
 }
 
+#if canImport(CoreVideo)  // canal de píxeles de Mac (CVPixelBuffer); en Windows no existe (desvío GR5)
 // Estado global (tabla de texturas y canales): serializado y con la tabla restaurada al salir.
 private nonisolated(unsafe) var availableCalls: [Int64] = []
 private let availableLock = NSLock()
@@ -148,3 +151,4 @@ private func makePixels(_ w: Int, _ h: Int) -> CVPixelBuffer {
         frameChannels.get(1)?.clear()
     }
 }
+#endif

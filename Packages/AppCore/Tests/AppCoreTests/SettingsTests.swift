@@ -154,11 +154,13 @@ final class SettingsTests: XCTestCase {
         // La separación y el análisis van en la cola: esperar a que los stems existan.
         var usage: [String: Any] = [:]
         var previous = -1.0
+        var stable = 0  // lecturas iguales seguidas: en Windows el análisis termina más tarde que la separación
         for _ in 0..<400 {
             usage = await rig.result("library.usage")
             let now = num(usage["regenerableBytes"]) ?? 0
             // Estable en dos lecturas seguidas con los dos temas ya separados.
-            if now > 0, (usage["projects"] as? [Any])?.count == 2, now == previous { break }
+            stable = now == previous ? stable + 1 : 0
+            if now > 0, (usage["projects"] as? [Any])?.count == 2, stable >= 6 { break }
             previous = now
             try await Task.sleep(for: .milliseconds(150))
         }

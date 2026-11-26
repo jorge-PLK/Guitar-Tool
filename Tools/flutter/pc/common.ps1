@@ -23,6 +23,7 @@ New-Item -ItemType Directory -Force $Tmp | Out-Null
 $env:TEMP = $Tmp
 $env:TMP = $Tmp
 # SwiftPM escribe ~\.swiftpm aunque se le pase --security-path: HOME falso en $P9.
+$RealUserProfile = $env:USERPROFILE   # test.ps1 lo restaura para `swift test` (SHGetKnownFolderPath falla con el falso)
 $FakeHome = Join-Path $P9 "home"
 New-Item -ItemType Directory -Force $FakeHome | Out-Null
 $env:USERPROFILE = $FakeHome

@@ -454,6 +454,10 @@ final class ImportTests: XCTestCase {
     #if os(Windows)
     /// B3: en Windows la propuesta es `<KnownFolder Música>\ToneForge`, no `~\Music`.
     func testDefaultProposedFolderUsesKnownMusicFolderOnWindows() throws {
+        // Tools/flutter/pc/common.ps1 pone un USERPROFILE falso (bajo Temp\p9) para SwiftPM y SHGetKnownFolderPath falla con él.
+        if windowsMusicFolder() == nil, ProcessInfo.processInfo.environment["USERPROFILE"]?.contains("\\p9\\") == true {
+            throw XCTSkip("USERPROFILE falso del arnés del PC (Tools/flutter/pc/common.ps1): sin carpeta Música real")
+        }
         let music = try XCTUnwrap(windowsMusicFolder(), "SHGetKnownFolderPath(FOLDERID_Music) falló")
         XCTAssertEqual(Bridge.defaultProposedFolder.standardizedFileURL.path,
                        music.appendingPathComponent("ToneForge", isDirectory: true).standardizedFileURL.path)

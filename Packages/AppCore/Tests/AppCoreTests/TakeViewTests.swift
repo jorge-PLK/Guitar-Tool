@@ -71,6 +71,14 @@ final class TakeViewTests: XCTestCase {
 
     func sleep(_ s: Double) async { try? await Task.sleep(nanoseconds: UInt64(s * 1e9)) }
 
+    /// Espera una condición (hasta `timeout` s) en vez de un tiempo fijo: el primer bloque tarda lo que tarde el hilo del
+    /// reproductor en arrancar y bajo carga (pasada completa en Windows) eso no es acotable.
+    func waitFor(timeout: Double = 5, _ condition: @escaping () -> Bool) async -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while !condition(), Date() < deadline { await sleep(0.01) }
+        return condition()
+    }
+
     func positions(_ r: Rig) -> [[String: Any]] { r.events.all("takeview.position").map(\.payload) }
 
     // MARK: Transporte
@@ -112,12 +120,16 @@ final class TakeViewTests: XCTestCase {
         _ = try await open(r)
         let played = try await result(r, "takeview.play")
         XCTAssertEqual(played["playing"] as? Bool, true)
-        await sleep(0.6)
         let svc = r.bridge.takeViewService
         let session = try XCTUnwrap(svc.current)
-        XCTAssertEqual(session.position, 0.6, accuracy: 0.15, "avanza con el reloj real")
-        let moving = positions(r).filter { ($0["playing"] as? Bool) == true && ($0["rate"] as? Double) == 1 }
-        XCTAssertGreaterThan(moving.count, 10, "≈30 eventos por segundo mientras suena")
+        // Primero a que suene la primera muestra; desde ahí 0,6 s de reloj real son ≈ 0,6 s de posición.
+        let started = await waitFor { session.position > 0.02 }
+        XCTAssertTrue(started, "el reproductor empieza a avanzar")
+        let p0 = session.position
+        await sleep(0.6)
+        XCTAssertEqual(session.position - p0, 0.6, accuracy: 0.15, "avanza con el reloj real")
+        let enoughEvents = await waitFor { self.positions(r).filter { ($0["playing"] as? Bool) == true && ($0["rate"] as? Double) == 1 }.count > 10 }
+        XCTAssertTrue(enoughEvents, "≈30 eventos por segundo mientras suena")
 
         let paused = try await result(r, "takeview.pause")
         XCTAssertEqual(paused["playing"] as? Bool, false)
@@ -136,9 +148,12 @@ final class TakeViewTests: XCTestCase {
         // Búsqueda sonando: sigue sonando desde ahí.
         _ = try await result(r, "takeview.play")
         _ = try await result(r, "takeview.seek", #"{"seconds":0.5}"#)
+        let resumed = await waitFor { session.position > 0.52 }
+        XCTAssertTrue(resumed, "sigue sonando desde la búsqueda")
+        let p1 = session.position
         await sleep(0.3)
         XCTAssertTrue(session.isPlaying)
-        XCTAssertEqual(session.position, 0.8, accuracy: 0.15)
+        XCTAssertEqual(session.position - p1, 0.3, accuracy: 0.15)
         await r.bridge.closeTakeView()
     }
 
@@ -191,8 +206,14 @@ final class TakeViewTests: XCTestCase {
         let r = try makeRig()
         _ = try await open(r)
         _ = try await result(r, "takeview.play")
-        await sleep(1.5)
         let session = try XCTUnwrap(r.bridge.takeViewService.current)
+        // 1,5 s de reloj en marcha (rate 1), no 1,5 s desde play: el reloj no avanza hasta que suena la primera muestra.
+        let ran = await waitFor(timeout: 8) {
+            let ats = self.positions(r).filter { ($0["rate"] as? Double) == 1 && ($0["epoch"] as? Int) == session.epoch }
+                .compactMap { $0["at"] as? Double }
+            return (ats.last ?? 0) - (ats.first ?? 0) >= 1.5
+        }
+        XCTAssertTrue(ran, "el reloj avanza 1,5 s")
         let pts = positions(r).filter { ($0["rate"] as? Double) == 1 && ($0["epoch"] as? Int) == session.epoch }
             .compactMap { e -> (Double, Double)? in
                 guard let s = e["seconds"] as? Double, let at = e["at"] as? Double else { return nil }
@@ -210,7 +231,14 @@ final class TakeViewTests: XCTestCase {
         let maxMs = (res.max() ?? 0) * 1000, meanMs = res.reduce(0, +) / n * 1000
         print("W2-V reloj del núcleo: n=\(steady.count) pendiente=\(String(format: "%.5f", slope)) residuo máx=\(String(format: "%.2f", maxMs)) ms medio=\(String(format: "%.2f", meanMs)) ms")
         XCTAssertEqual(slope, 1, accuracy: 0.01)
-        XCTAssertLessThan(maxMs, 4)
+        #if os(macOS)
+        let maxResidualMs = 4.0
+        #else
+        // El hilo de la salida simulada (`RealtimePump`) duerme 2 ms, que en Windows son ~15,6 ms (sin `timeBeginPeriod`): la
+        // posición cruda llega a saltos de varios bloques y el lazo (ganancia 0,1) los reparte; medido 3 ms en Windows.
+        let maxResidualMs = 8.0
+        #endif
+        XCTAssertLessThan(maxMs, maxResidualMs)
         await r.bridge.closeTakeView()
     }
 

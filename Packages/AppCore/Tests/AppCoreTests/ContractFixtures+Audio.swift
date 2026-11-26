@@ -35,7 +35,7 @@ struct FixtureCalls {
             var out: [String: Any] = [:]
             for (k, v) in dict {
                 let fail = inFailure || k == "failure"
-                if let n = v as? NSNumber, CFGetTypeID(n) != CFBooleanGetTypeID() {
+                if let n = v as? NSNumber, String(cString: n.objCType) != "c" {  // "c" = Bool (sin CoreFoundation: en Windows no hay CFBooleanGetTypeID)
                     switch k {
                     case "latencyMS", "latencySamples": out[k] = (n.doubleValue * 100).rounded() / 100
                     case "spreadMS", "spreadSamples": out[k] = fail ? spreadFailure : spreadSuccess

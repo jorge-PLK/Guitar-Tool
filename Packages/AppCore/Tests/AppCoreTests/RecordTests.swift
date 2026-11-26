@@ -686,6 +686,7 @@ final class RecordTests: XCTestCase {
                                  return JPEGFrame(data: Data([0xFF, 0xD8, 0xFF, 0xD9]), width: 64, height: 36) },
                        emit: { _, _ in events.bump() })
         }
+        let flowStart = DispatchTime.now().uptimeNanoseconds
         _ = try await openRecord(r)
         let c = try XCTUnwrap(r.svc.controller)
         let relay = try XCTUnwrap(r.svc.cameraRelay, "Grabar abierta -> relevo de cámara")
@@ -710,7 +711,11 @@ final class RecordTests: XCTestCase {
         XCTAssertGreaterThan(d.count, 40, "≈30 fps durante ~2 s")
         XCTAssertLessThan(worst, Self.maxHookMs, "el gancho de la captura no espera al codificador")
         XCTAssertGreaterThan(stats.droppedBusy, 10, "el codificador estuvo ocupado de verdad")
-        XCTAssertLessThanOrEqual(encodes.value, 16, "≤ 1 cada 200 ms")
+        // ≤ 1 cada 200 ms durante todo el tiempo que fluyeron fotogramas (de abrir Grabar a aquí). Se mide el tiempo real y no
+        // una cuenta fija: en Windows el paso a «ajustando» tarda más y la ventana es más larga, pero el ritmo es el mismo.
+        let flowSeconds = Double(DispatchTime.now().uptimeNanoseconds - flowStart) / 1e9
+        let maxEncodes = Int(flowSeconds / Self.slowEncodeSeconds) + 1
+        XCTAssertLessThanOrEqual(encodes.value, maxEncodes, "≤ 1 cada 200 ms (\(flowSeconds) s de fotogramas)")
         XCTAssertGreaterThan(report.framesWritten, 35, "1,5 s a 30 fps: el escritor no pierde fotogramas")
         XCTAssertEqual(report.framesRejected, 0)
         if let lag = report.arrivalLag { XCTAssertLessThan(lag.max, 0.05, "ningún fotograma llega tarde al escritor") }

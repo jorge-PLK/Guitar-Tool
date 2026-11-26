@@ -36,6 +36,9 @@ final class BlockMessageTests: XCTestCase {
         let back = try JSONDecoder().decode(CoreMessage.self, from: JSONEncoder().encode(withArgs))
         // 44100.0 viaja como `44100` y vuelve como entero: se compara lo que se vuelve a codificar.
         XCTAssertEqual(back.code, withArgs.code)
-        XCTAssertEqual(try JSONEncoder().encode(back.args), try JSONEncoder().encode(withArgs.args))
+        // `args` es un diccionario: sin `sortedKeys` el orden de las claves cambia de un proceso a otro.
+        let sorted = JSONEncoder()
+        sorted.outputFormatting = .sortedKeys
+        XCTAssertEqual(try sorted.encode(back.args), try sorted.encode(withArgs.args))
     }
 }

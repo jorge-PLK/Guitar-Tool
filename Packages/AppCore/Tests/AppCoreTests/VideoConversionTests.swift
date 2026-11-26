@@ -181,7 +181,8 @@ final class VideoConversionTests: XCTestCase {
         let r = try makeRig()
         XCTAssertEqual(try codec(r.video), .hevc)
         XCTAssertEqual(start(r), .converting(nil))
-        XCTAssertEqual(start(r), .converting(nil), "una segunda petición no encola otro trabajo")
+        // La segunda petición no encola otro trabajo: sigue `converting` (con progreso ya, si el motor es rápido, como en Windows).
+        if case .converting = start(r) {} else { XCTFail("una segunda petición no encola otro trabajo") }
         await r.engine.wait(takeId: r.takeId)
         XCTAssertEqual(r.engine.currentState(takeId: r.takeId), .ready)
         let after = try XCTUnwrap(TakeVideoProbe.read(r.video))

@@ -85,6 +85,9 @@ final class ContractFixturesModelsTests: XCTestCase {
     /// Modelo ya instalado en disco (manifest + paquete compilado con tamaño fijo en el manifest): `installed` con `bytes`,
     /// y `models.download` sobre él cierra enseguida con `models.changed` sin `error`.
     func testModelsInstalled() async throws {
+        #if !os(macOS)
+        throw XCTSkip("El modelo instalado de Windows es un .onnx, no el paquete CoreML compilado que monta este test (ModelDescriptor.swift)")
+        #endif
         let rig = try FixtureRig(area: "models")
         defer { rig.cleanup() }
         let support = rig.dir.appendingPathComponent("Support", isDirectory: true)
