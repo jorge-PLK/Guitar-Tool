@@ -14,7 +14,7 @@ Cerrada 25/11/2026 con visto bueno de Jorge tras su prueba a mano. Pendiente de 
 - [x] **Ola 2 · Estudio:** Backing (mezclador, rejilla de acordes, secciones, bucle, metrónomo) y Tablatura (WebView de alphaTab, edición, Songsterr, exportar `.gp`) (`pantallas/backing.md`, `pantallas/tablatura.md`).
 - [x] **Ola 3 · Grabación:** Grabar, Ver toma, Ajustar desfase, Ajustes · Audio (calibración) y Ajustes · Cámara y vídeo (`pantallas/grabar.md`, `pantallas/ajustes.md`).
 
-Cerrada 26/11/2026 con visto bueno de Jorge; su prueba a mano contra el núcleo real, con las olas 1, 2 y 3 juntas, queda para una sesión aparte. Desvíos GR11-GR19 en `docs/flutter/desvios.md` (GR15 abierto: rotación del fotograma, se verifica con hardware).
+Cerrada 26/11/2026 con visto bueno de Jorge; su prueba a mano contra el núcleo real, con las olas 1, 2 y 3 juntas, queda para una sesión aparte. Desvíos GR11-GR19 en `docs/flutter/desvios.md` (GR15 resuelto: Flutter gira el fotograma, validado por Jorge).
 - [ ] **Ola 4 · Montaje:** Montaje y hoja «Encuadre» (`pantallas/montaje.md`).
 - [ ] **Ola 5 · Cierre:** empaquetado de Mac y de Windows (recursos, DLL), mensajes del núcleo por código en todas las áreas que falten, pasada única en el PC x64 al final (tras validar todas las olas en el Mac), borrado de `App/`, `WinApp/Web`, `Tools/webdev` y `FrameRelay` en JPEG, CODEMAP y `CLAUDE.md`.
 
@@ -26,6 +26,12 @@ Pendiente de Windows para la pasada del PC (se acumula aquí):
 - *Ola 1 (L2):* comprobar que borrar un tema abierto en Backing no falla por bloqueo NTFS.
 - *Ola 1:* `URL.path` devuelve `/` en `proposedProjectsFolder` (Known Folder Music\ToneForge); comprobar la ruta que ve Dart.
 - *Ola 1:* `displayPath` no abrevia HOME en Windows.
+- *Prueba a mano 26/11, W-1:* los helpers (yt-dlp, Deno, ffmpeg) salen «no disponible»: no están junto al exe (falta el empaquetado).
+- *Prueba a mano 26/11, W-2:* la webcam se ve en Ajustes pero Grabar no la reconoce; tarda en conectar.
+- *Prueba a mano 26/11, W-3:* Songsterr `load` en Windows responde `unsupported`: falta montar un host WebView2.
+- *Prueba a mano 26/11, GR5:* sin vídeo de toma en Windows (ola 5).
+- *Prueba a mano 26/11:* fixtures T1/Platero ausentes en el PC: 8 saltos en `pc.sh models`.
+- *Prueba a mano 26/11:* tests de AppCore en Windows: falta repetir dos pasadas completas en el PC tras cc137db (tolerancias de reloj de `RecordTests` y `TakeViewTests`).
 
 Orden acordado (24/11/2026): Ola 0 sola → olas 1, 2 y 3 en paralelo (una sesión y un worktree por ola) → ola 4 → ola 5 → pasada del PC. Commits pequeños y frecuentes con push a `fase-7f`, sin preguntar, uno por parte integrada.
 

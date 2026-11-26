@@ -128,7 +128,7 @@ Equivalencias con lo que hace AVFoundation hoy (VS:146-174):
 
 **`TfVideoSurface` en el visor** (TV:322, OS:135-149): `AVPlayerLayer` con `videoGravity = .resizeAspect` (fit), llena la caja (`autoresizingMask` ancho y alto). Diferencias con la cámara:
 - **Relación de aspecto**: la del lienzo del plan, `canvas: .landscape` (TV:79), que es 16:9; el reproductor entrega ya la composición renderizada con `MontageBuilder.renderSize(canvas, maxDimension: previewMaxDimension)`. La imagen coincide con la caja: casi no hay barras. Si el vídeo de la toma es vertical, el montaje lo encaja dentro del 16:9 (barras negras laterales); lo hace el núcleo, no el widget.
-- **Rotación**: la aplica el plan (`rotation: VideoRotation(degrees: take.videoRotation ?? 0)`, TV:50) antes de entregar el fotograma; `TfVideoSurface` **no gira** nada en el visor.
+- **Rotación**: en SwiftUI la aplica el plan (`rotation: VideoRotation(degrees: take.videoRotation ?? 0)`, TV:50) antes de entregar el fotograma. En Flutter el núcleo entrega el fotograma sin rotar y `TfVideoSurface` aplica `videoRotation` de `takeview` (`take_viewer_sheet.dart:185`); ver GR15 en `docs/flutter/desvios.md`.
 - **Espejo**: ninguno (composición, no capa de captura).
 - **Origen del fotograma**: textura alimentada por el núcleo con el reloj del audio como maestro (`takeview.position`, `grabar-contrato.md`); la hoja no tiene reproductor propio en Flutter.
 
