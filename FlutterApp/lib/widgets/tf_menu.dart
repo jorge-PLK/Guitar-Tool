@@ -75,8 +75,8 @@ class _TfContextMenuState extends State<TfContextMenu> {
   Widget build(BuildContext context) {
     return TfPopover(
       controller: _controller,
-      anchorAlignment: Alignment.topLeft,
-      offset: _at,
+      offset: Offset.zero,
+      pointAnchor: _at,
       popoverBuilder: (BuildContext c) =>
           TfMenuPanel(entries: widget.entries, onClose: _controller.hide),
       child: GestureDetector(

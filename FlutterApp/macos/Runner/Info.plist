@@ -34,5 +34,10 @@
 	<string>Para grabar tu guitarra desde la pedalera.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Para conectar con el Remote Editor de la Flex Prime por Wi-Fi.</string>
+	<!-- Impeller desactivado en macOS: cae en impeller::Canvas::SetupRenderPass al componer platform views
+	     (flutter/flutter#185394, arreglado en master cf75578, sin estable que lo traiga en 3.44.5).
+	     Quitar cuando la versión estable lo incluya. -->
+	<key>FLTEnableImpeller</key>
+	<false/>
 </dict>
 </plist>
