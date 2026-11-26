@@ -97,7 +97,14 @@ public final class TakeVideoPlayer: @unchecked Sendable {
     private var pausedDeadline = 0.0
     private var pausedStart = 0.0
     private var pausedDisplay: Double?
+    private var pausedDisplays: [Double] = []
     private var pollCount = 0
+    /// Seeks en pausa coalescidos: destino más reciente por lanzar, seek en vuelo, serie del último lanzado y ficha que se
+    /// invalida al cambiar de item o pasar a marcha.
+    private var pendingSeek: Double?
+    private var seekInFlight = false
+    private var seekSerial = 0
+    private var pauseToken = 0
     /// Tiempo (s) del primer fotograma de la composición (los anteriores son edición vacía).
     private var firstImageTime = 0.0
 
@@ -151,6 +158,7 @@ public final class TakeVideoPlayer: @unchecked Sendable {
         it.add(out)
         lock.lock()
         item = it; output = out; ready = false; applied = nil; gen += 1; firstImageTime = firstImage
+        pendingSeek = nil; seekInFlight = false; pauseToken += 1; pausedTarget = nil
         let g = gen
         lock.unlock()
         player.replaceCurrentItem(with: it)
@@ -224,21 +232,14 @@ public final class TakeVideoPlayer: @unchecked Sendable {
             player.pause()
             // Un seek dentro de la edición vacía inicial deja al decodificador sin fotograma: se salta al primero.
             let target = max(0, c.position(at: now), first)
-            // Sin reproducción nadie pide fotogramas: tras el seek se pide el de la nueva posición (`pollPaused` en el tick).
-            player.seek(to: cm(target), toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] finished in
-                guard finished, let self else { TakeTrace.log("seek pausa descartado (finished=\(finished)) gen=\(mine)"); return }
-                lock.lock()
-                TakeTrace.log("seek pausa completado gen=\(mine) vigente=\(mine == gen && !closed) target=\(target)")
-                if mine == gen && !closed {
-                    pausedTarget = target
-                    pausedDeadline = hostNow() + TakeVideoConstants.pausedFrameTimeoutSeconds
-                    pausedStart = hostNow()
-                }
-                lock.unlock()
-            }
+            // Arrastre del timeline (ola 3.3.AV): «el último gana». Un seek en vuelo no se cancela (con tolerancia cero en HEVC
+            // 1920 cada seek cancelaba al anterior antes de decodificar y no salía ningún fotograma hasta soltar): se guarda solo
+            // el destino más reciente y se lanza cuando el anterior haya entregado su fotograma.
+            lock.lock(); pendingSeek = target; lock.unlock()
+            kickPausedSeek()
             return
         }
-        lock.lock(); pausedTarget = nil; lock.unlock()
+        lock.lock(); pausedTarget = nil; pendingSeek = nil; seekInFlight = false; pauseToken += 1; lock.unlock()
         player.seek(to: cm(c.position(at: now)), toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] finished in
             guard finished, let self else { return }
             lock.lock()
@@ -250,6 +251,34 @@ public final class TakeVideoPlayer: @unchecked Sendable {
             lock.unlock()
             if stale { return }
             player.setRate(Float(rate), time: cm(p), atHostTime: CMTime(seconds: h, preferredTimescale: 1_000_000_000))
+        }
+    }
+
+    /// Lanza el seek pendiente de pausa si no hay otro en vuelo ni un fotograma por recoger (el seek exacto es el que entrega).
+    private func kickPausedSeek() {
+        lock.lock()
+        guard !closed, !seekInFlight, pausedTarget == nil, let target = pendingSeek else { lock.unlock(); return }
+        pendingSeek = nil
+        seekInFlight = true
+        seekSerial += 1
+        let serial = seekSerial, token = pauseToken
+        let started = hostNow()
+        lock.unlock()
+        let t = CMTime(seconds: max(0, target), preferredTimescale: 600_000)
+        // Sin reproducción nadie pide fotogramas: tras el seek se pide el de la nueva posición (`pollPaused` en el tick).
+        player.seek(to: t, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] finished in
+            guard let self else { return }
+            lock.lock()
+            let mine = serial == seekSerial
+            if mine { seekInFlight = false }
+            let valid = finished && mine && token == pauseToken && !closed
+            TakeTrace.log("seek pausa \(valid ? "completado" : "descartado (finished=\(finished))") target=\(target) ms=\((hostNow() - started) * 1000)")
+            if valid {
+                pausedTarget = target
+                pausedDeadline = hostNow() + TakeVideoConstants.pausedFrameTimeoutSeconds
+                pausedStart = hostNow()
+            }
+            lock.unlock()
         }
     }
 
@@ -266,7 +295,7 @@ public final class TakeVideoPlayer: @unchecked Sendable {
             let d = player.currentTime().seconds - c.position(at: now)
             if abs(d) > TakeVideoConstants.halfFrame { resync(reason: "drift", drift: true) }
         }
-        if !c.moving { pollPaused(now: now) }
+        if !c.moving { pollPaused(now: now); kickPausedSeek() }
         guard !already, let out else { return }
         guard c.moving else { return }
         let it = out.itemTime(forHostTime: now)
@@ -310,6 +339,7 @@ public final class TakeVideoPlayer: @unchecked Sendable {
         TakeTrace.log("pollPaused entrega pts=\(display.seconds) closure=\(_onFrame != nil)")
         last = b
         pausedDisplay = display.isValid ? display.seconds : nil
+        if let d = pausedDisplay, pausedDisplays.count < 10_000 { pausedDisplays.append(d) }
         deliveries += 1
         frameSize = (CVPixelBufferGetWidth(b), CVPixelBufferGetHeight(b))
         notified = true
@@ -355,6 +385,9 @@ public final class TakeVideoPlayer: @unchecked Sendable {
 
     /// Tests: PTS (s) del último fotograma entregado en pausa.
     var lastDisplaySeconds: Double? { lock.lock(); defer { lock.unlock() }; return pausedDisplay }
+
+    /// Tests: PTS (s) de todos los fotogramas entregados en pausa, en orden.
+    var pausedDeliveredSeconds: [Double] { lock.lock(); defer { lock.unlock() }; return pausedDisplays }
 
     /// Tests: espera a que el reproductor esté listo.
     var isReady: Bool { lock.lock(); defer { lock.unlock() }; return ready }

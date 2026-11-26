@@ -160,6 +160,62 @@ final class TakeVideoPlayerTests: XCTestCase {
         XCTAssertNotNil(p.copyFrame())
     }
 
+    // MARK: arrastre del timeline en pausa (ola 3.3.AV)
+
+    /// Primera toma con vídeo y audio de un proyecto de `val-projects` cuyo nombre contiene `name` (según `project.json`).
+    private func makePlayer(project name: String) async throws -> TakeVideoPlayer {
+        let src = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Temp/flutter/val-projects")
+        let fm = FileManager.default
+        guard let names = try? fm.contentsOfDirectory(atPath: src.path) else { throw XCTSkip("sin val-projects") }
+        for n in names.sorted() where n.contains(name) {
+            let folder = src.appendingPathComponent(n)
+            guard let data = try? Data(contentsOf: folder.appendingPathComponent("project.json")),
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let takes = json["takes"] as? [[String: Any]] else { continue }
+            for t in takes {
+                guard let v = t["videoFile"] as? String, let a = t["processedFile"] as? String, let s = t["songStart"] as? Double,
+                      fm.fileExists(atPath: folder.appendingPathComponent(v).path),
+                      fm.fileExists(atPath: folder.appendingPathComponent(a).path) else { continue }
+                let preview = try await TakePreview.load(audioURL: folder.appendingPathComponent(a), songStart: s,
+                                                         videoURL: folder.appendingPathComponent(v), punches: [])
+                return try TakeVideoPlayer(preview: preview, offset: 0)
+            }
+        }
+        throw XCTSkip("sin toma con vídeo en «\(name)»")
+    }
+
+    /// ~20 seeks en pausa cada 50 ms recorriendo la toma: llegan fotogramas intermedios distintos y el último es el del último destino.
+    private func scrubBurst(project: String) async throws {
+        let p = try await makePlayer(project: project)
+        defer { p.close() }
+        let c = Counter()
+        p.onFrameAvailable = { c.bump() }
+        try await waitReady(p)
+        try await waitCount(c, above: 0, timeout: 3)
+        let base = p.pausedDeliveredSeconds.count
+        var epoch = 1
+        let targets = (1...20).map { 0.4 * Double($0) }
+        for target in targets {
+            epoch += 1
+            p.apply(event(target, playing: false, at: HostClock.nowSeconds, epoch: epoch))
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
+        let burst = Array(p.pausedDeliveredSeconds.dropFirst(base))
+        let intermediates = Set(burst.map { ($0 * 1000).rounded() }).count
+        let t0 = HostClock.nowSeconds
+        while (p.lastDisplaySeconds ?? -1) < targets.last! - TakeVideoConstants.frameDuration, HostClock.nowSeconds - t0 < 5 {
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        let all = Array(p.pausedDeliveredSeconds.dropFirst(base))
+        print("TF_SCRUB \(project) durante la ráfaga=\(burst.count) distintos=\(intermediates) total=\(all.count) pts=\(all.map { String(format: "%.2f", $0) })")
+        XCTAssertGreaterThanOrEqual(intermediates, 3, "fotogramas intermedios durante la ráfaga: \(burst)")
+        XCTAssertEqual(p.lastDisplaySeconds ?? -1, targets.last!, accuracy: TakeVideoConstants.frameDuration, "último fotograma")
+    }
+
+    func testScrubBurstInPause1920() async throws { try await scrubBurst(project: "El roce") }
+    func testScrubBurstInPause640() async throws { try await scrubBurst(project: "Megadeth") }
+
     // MARK: medida opt-in (P9: |mediana| y |p95| ≤ medio fotograma; seek < 300 ms)
 
     private func median(_ v: [Double]) -> Double { let s = v.sorted(); return s.isEmpty ? .nan : s[s.count / 2] }
