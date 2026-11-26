@@ -39,8 +39,37 @@ private final class TabFakePages: HostServices, @unchecked Sendable {
     }
 }
 
+/// Compuerta de la búsqueda simulada: mientras está cerrada, `data(from:)` espera sin depender del tiempo.
+private final class TabSearchGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var closed = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+    func close() { lock.withLock { closed = true } }
+    func open() {
+        let pending = lock.withLock { () -> [CheckedContinuation<Void, Never>] in
+            closed = false
+            defer { waiters = [] }
+            return waiters
+        }
+        pending.forEach { $0.resume() }
+    }
+    func pass() async {
+        await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in
+            let wait = lock.withLock { () -> Bool in
+                if closed { waiters.append(c) }
+                return closed
+            }
+            if !wait { c.resume() }
+        }
+    }
+}
+
 private struct TabFetcher: HTTPFetching {
-    func data(from url: URL, headers: [String: String]) async throws -> Data { Data(tabSearchJSON.utf8) }
+    var gate: TabSearchGate?
+    func data(from url: URL, headers: [String: String]) async throws -> Data {
+        await gate?.pass()
+        return Data(tabSearchJSON.utf8)
+    }
 }
 
 private func phase(_ s: [String: Any]) -> String? { (s["search"] as? [String: Any])?["phase"] as? String }
@@ -204,10 +233,12 @@ final class ContractFixturesTabTests: XCTestCase {
 
     func testTabSongsterr() async throws {
         let pages = TabFakePages()
+        let gate = TabSearchGate()
+        defer { gate.open() }
         pages.results["https://www.songsterr.com/a/wsa/song-tab-s7"] = .success(HiddenPage(status: 200, html: tabPage(7)))
         pages.results["https://www.songsterr.com/a/wsa/song-tab-s8"] = .success(HiddenPage(status: 200, html: tabPage(8)))
         let songsterr = SongsterrServices { loader in
-            SongsterrTestBackend(client: SongsterrClient(loader: HiddenPageSongsterrLoader(pages: loader), fetcher: TabFetcher(),
+            SongsterrTestBackend(client: SongsterrClient(loader: HiddenPageSongsterrLoader(pages: loader), fetcher: TabFetcher(gate: gate),
                                                          retryDelay: .milliseconds(1)),
                                  prepareError: nil, inputs: .init())
         }
@@ -257,7 +288,10 @@ final class ContractFixturesTabTests: XCTestCase {
         try await rig.run("tab.songsterr.retryImport")
         _ = try await sheet(rig) { ($0["stage"] as? String) == "pairing" }
         try await rig.run("tab.songsterr.accept")
+        // La búsqueda que arranca `review` queda retenida: el result es «searching» por construcción, no por carrera de tiempos.
+        gate.close()
         try await rig.run("tab.songsterr.review")
+        gate.open()
         _ = try await sheet(rig) { ($0["stage"] as? String) == "pairing" }
         try await rig.run("tab.songsterr.close")
         try await rig.run("tab.songsterr.automatic")
