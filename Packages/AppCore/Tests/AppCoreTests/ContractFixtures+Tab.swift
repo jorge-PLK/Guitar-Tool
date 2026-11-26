@@ -267,7 +267,10 @@ final class ContractFixturesTabTests: XCTestCase {
         _ = try await sheet(rig) { ($0["canUse"] as? Bool) == true }
         try await rig.run("tab.songsterr.link", params: "{\"link\":\"https://www.songsterr.com/a/wsa/song-tab-s8\"}")
         _ = try await sheet(rig) { ($0["busy"] as? Bool) == false }
+        // La respuesta de `search` es el estado tras un solo `yield`: se retiene la búsqueda para que sea «searching» por construcción.
+        gate.close()
         try await rig.run("tab.songsterr.search")
+        gate.open()
         _ = try await sheet(rig) { phase($0) == "results" && ($0["busy"] as? Bool) == false }
         try await rig.run("tab.songsterr.retry")
         _ = try await sheet(rig) { phase($0) == "results" && ($0["busy"] as? Bool) == false }
