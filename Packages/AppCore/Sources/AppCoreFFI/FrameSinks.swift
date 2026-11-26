@@ -28,10 +28,11 @@ func installFrameSinks(on bridge: Bridge) {
 /// Canal de la toma: el reproductor nativo entrega por demanda (`copyFrame` en cada `tf_frame_copy`) y avisa al runner
 /// cuando hay fotograma nuevo. Con nil (visor cerrado) se quita el productor y se suelta el último fotograma.
 let takeVideoSink: @Sendable (TakeVideoPlayer?) -> Void = { player in
+    TakeTrace.log("takeVideoSink player=\(player != nil ? "sí" : "nil")")
     guard let channel = frameChannels.channel(Int32(TF_CHANNEL_TAKE), textures: frameTextures) else { return }
     if let player {
         channel.setPull { player.copyFrame() }
-        player.onFrameAvailable = { channel.signal() }
+        player.onFrameAvailable = { TakeTrace.log("onFrameAvailable -> signal"); channel.signal() }
     } else {
         channel.setPull(nil)
         channel.clear()

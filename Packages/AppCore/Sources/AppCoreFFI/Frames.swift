@@ -1,4 +1,5 @@
 #if canImport(CoreVideo)
+import AppCore
 import CAppCoreFFI
 import CoreVideo
 import Foundation
@@ -36,6 +37,7 @@ final class FrameChannel: @unchecked Sendable {
 
     /// Avisa al runner de que hay fotograma nuevo sin publicarlo (el productor por demanda lo da en la copia).
     func signal() {
+        TakeTrace.log("signal canal=\(channel) id=\(textures.id(for: channel).map(String.init) ?? "nil") host=\(textures.host?.frame_available != nil)")
         if let id = textures.id(for: channel) { textures.host?.frame_available?(id) }
     }
 
@@ -45,6 +47,7 @@ final class FrameChannel: @unchecked Sendable {
         let p = pull
         lock.unlock()
         let fresh = p?()
+        if channel == 2 { TakeTrace.log("copyForTexture take pull=\(p != nil ? "sí" : "nil") fresh=\(fresh != nil)") }
         lock.lock(); defer { lock.unlock() }
         if let fresh { last = fresh }
         guard let last else { return nil }

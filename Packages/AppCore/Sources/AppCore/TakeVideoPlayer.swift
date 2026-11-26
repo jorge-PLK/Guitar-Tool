@@ -65,6 +65,7 @@ enum TakeVideoConstants {
     static let pausedForceAfterSeconds = 0.3
 }
 
+
 private func hostNow() -> Double { CMClockGetTime(CMClockGetHostTimeClock()).seconds }
 
 public final class TakeVideoPlayer: @unchecked Sendable {
@@ -96,6 +97,9 @@ public final class TakeVideoPlayer: @unchecked Sendable {
     private var pausedDeadline = 0.0
     private var pausedStart = 0.0
     private var pausedDisplay: Double?
+    private var pollCount = 0
+    /// Tiempo (s) del primer fotograma de la composición (los anteriores son edición vacía).
+    private var firstImageTime = 0.0
 
     // Medidas (bajo lock), para tests y diagnóstico.
     private(set) var deliveries = 0
@@ -115,6 +119,7 @@ public final class TakeVideoPlayer: @unchecked Sendable {
         player.isMuted = true
         try install(offset: offset)
         let t = DispatchSource.makeTimerSource(flags: .strict, queue: queue)
+        TakeTrace.log("TakeVideoPlayer init offset=\(offset)")
         t.schedule(deadline: .now(), repeating: .nanoseconds(Int(TakeVideoConstants.tickSeconds * 1e9)), leeway: .nanoseconds(0))
         t.setEventHandler { [weak self] in self?.tick() }
         timer = t
@@ -127,6 +132,15 @@ public final class TakeVideoPlayer: @unchecked Sendable {
         let comp = try preview.composition(videoOffset: off)
         // El audio suena en el núcleo: sin pista de audio el reproductor no arrastra la latencia del tiempo-tono a rate ≠ 1.
         for a in comp.tracks(withMediaType: .audio) { comp.removeTrack(a) }
+        if TakeTrace.enabled {
+            for v in comp.tracks(withMediaType: .video) {
+                TakeTrace.log("composición vídeo range=\(v.timeRange.start.seconds)+\(v.timeRange.duration.seconds) segmentos=\(v.segments?.map { "\($0.isEmpty ? "vacío" : "img") \($0.timeMapping.target.start.seconds)+\($0.timeMapping.target.duration.seconds)" } ?? [])")
+            }
+        }
+        // El vídeo puede empezar unos ms después del 0 de la toma (edición vacía inicial): a ese instante no hay fotograma, y
+        // en pausa el visor tiene que enseñar el primero.
+        let firstImage = comp.tracks(withMediaType: .video).flatMap { $0.segments ?? [] }
+            .filter { !$0.isEmpty }.map { $0.timeMapping.target.start.seconds }.min() ?? 0
         let it = AVPlayerItem(asset: comp)
         let attrs: [String: Any] = [
             kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
@@ -136,7 +150,7 @@ public final class TakeVideoPlayer: @unchecked Sendable {
         let out = AVPlayerItemVideoOutput(pixelBufferAttributes: attrs)
         it.add(out)
         lock.lock()
-        item = it; output = out; ready = false; applied = nil; gen += 1
+        item = it; output = out; ready = false; applied = nil; gen += 1; firstImageTime = firstImage
         let g = gen
         lock.unlock()
         player.replaceCurrentItem(with: it)
@@ -144,7 +158,9 @@ public final class TakeVideoPlayer: @unchecked Sendable {
             let deadline = Date().addingTimeInterval(TakeVideoConstants.readyTimeoutSeconds)
             while it.status == .unknown, Date() < deadline { try? await Task.sleep(nanoseconds: 10_000_000) }
             guard let self else { return }
-            if markReady(generation: g, item: it) { resync(reason: "ready", drift: false) }
+            let ok = markReady(generation: g, item: it)
+            TakeTrace.log("player listo gen=\(g) ok=\(ok) status=\(it.status.rawValue) error=\(String(describing: it.error))")
+            if ok { resync(reason: "ready", drift: false) }
         }
     }
 
@@ -199,16 +215,20 @@ public final class TakeVideoPlayer: @unchecked Sendable {
         let now = hostNow()
         events.append((now, reason))
         let c = clock
+        let first = firstImageTime
         graceUntil = now + TakeVideoConstants.driftGraceSeconds
         lock.unlock()
         let cm: (Double) -> CMTime = { CMTime(seconds: max(0, $0), preferredTimescale: 600_000) }
+        TakeTrace.log("resync reason=\(reason) rama=\(c.moving ? "marcha" : "pausa") target=\(c.position(at: now)) gen=\(mine)")
         guard c.moving else {
             player.pause()
-            let target = max(0, c.position(at: now))
+            // Un seek dentro de la edición vacía inicial deja al decodificador sin fotograma: se salta al primero.
+            let target = max(0, c.position(at: now), first)
             // Sin reproducción nadie pide fotogramas: tras el seek se pide el de la nueva posición (`pollPaused` en el tick).
             player.seek(to: cm(target), toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] finished in
-                guard finished, let self else { return }
+                guard finished, let self else { TakeTrace.log("seek pausa descartado (finished=\(finished)) gen=\(mine)"); return }
                 lock.lock()
+                TakeTrace.log("seek pausa completado gen=\(mine) vigente=\(mine == gen && !closed) target=\(target)")
                 if mine == gen && !closed {
                     pausedTarget = target
                     pausedDeadline = hostNow() + TakeVideoConstants.pausedFrameTimeoutSeconds
@@ -260,7 +280,8 @@ public final class TakeVideoPlayer: @unchecked Sendable {
     /// lo tiene), lo guarda en `last` y avisa. Acotado por `pausedFrameTimeoutSeconds`.
     private func pollPaused(now: Double) {
         lock.lock()
-        guard let target = pausedTarget, let out = output, !closed else { lock.unlock(); return }
+        guard let wanted = pausedTarget, let out = output, !closed else { lock.unlock(); return }
+        let target = max(wanted, firstImageTime)
         let deadline = pausedDeadline, started = pausedStart
         lock.unlock()
         let t = CMTime(seconds: target, preferredTimescale: 600_000)
@@ -271,6 +292,10 @@ public final class TakeVideoPlayer: @unchecked Sendable {
             buf = out.copyPixelBuffer(forItemTime: t, itemTimeForDisplay: &display)
         }
         let timedOut = now > deadline
+        pollCount += 1
+        if TakeTrace.enabled, pollCount <= 5 || pollCount % 50 == 0 {
+            TakeTrace.log("pollPaused intento=\(pollCount) pts=\(display.isValid ? "\(display.seconds)" : "nil") buf=\(buf != nil) target=\(target) timedOut=\(timedOut)")
+        }
         guard let b = buf else {
             if timedOut { lock.lock(); pausedTarget = nil; lock.unlock() }
             return
@@ -279,8 +304,10 @@ public final class TakeVideoPlayer: @unchecked Sendable {
         let near = display.isValid && display.seconds <= target + 1e-4 && target - display.seconds < TakeVideoConstants.frameDuration + 1e-4
         guard near || timedOut else { return }
         lock.lock()
-        guard pausedTarget == target, !closed else { lock.unlock(); return }
+        guard pausedTarget == wanted, !closed else { lock.unlock(); return }
         pausedTarget = nil
+        pollCount = 0
+        TakeTrace.log("pollPaused entrega pts=\(display.seconds) closure=\(_onFrame != nil)")
         last = b
         pausedDisplay = display.isValid ? display.seconds : nil
         deliveries += 1
@@ -296,6 +323,7 @@ public final class TakeVideoPlayer: @unchecked Sendable {
     /// `tf_frame_copy`: el fotograma de «ahora»; si no hay nuevo, el último. nil mientras no haya ninguno.
     public func copyFrame() -> CVPixelBuffer? {
         let now = hostNow()
+        defer { TakeTrace.log("copyFrame moving=\(clock.moving) last=\(last != nil)") }
         lock.lock()
         // En pausa el fotograma lo fija `pollPaused` (el reloj del host no dice nada de la posición).
         let out = clock.moving ? output : nil

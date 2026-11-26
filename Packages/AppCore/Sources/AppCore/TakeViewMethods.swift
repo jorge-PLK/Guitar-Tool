@@ -278,11 +278,13 @@ final class TakeViewService {
     /// Arma el reproductor de vídeo; un fallo no impide abrir el visor (el audio sigue).
     private func startVideo(audioURL: URL, songStart: Double, videoURL: URL?, punches: [PreviewPunch], offset: Double,
                             live: (@MainActor @Sendable () -> Double?)?) async {
+        TakeTrace.log("startVideo url=\(videoURL?.lastPathComponent ?? "nil") punches=\(punches.count) offset=\(offset)")
         guard videoURL != nil || punches.contains(where: { $0.videoURL != nil }) else { return }
         guard let preview = try? await TakePreview.load(audioURL: audioURL, songStart: songStart, videoURL: videoURL, punches: punches),
               let p = try? TakeVideoPlayer(preview: preview, offset: offset) else { return }
         videoPlayer = p
         liveOffset = live
+        TakeTrace.log("startVideo: sink=\(takeVideoSink != nil)")
         takeVideoSink?(p)
     }
     #endif
@@ -565,8 +567,11 @@ final class TakeViewService {
         }
     }
 
+    private var tickTraces = 0
     func tick() {
         guard let s = current else { return }
+        tickTraces += 1
+        if tickTraces <= 3 || tickTraces % 150 == 0 { TakeTrace.log("tick #\(tickTraces) playing=\(s.isPlaying)") }
         #if canImport(AVFoundation)
         if let off = liveOffset?() { videoPlayer?.setOffset(off) }
         #endif
@@ -620,6 +625,7 @@ final class TakeViewService {
         // En pausa solo se repite si cambió algo (el `at` no cuenta).
         if !force, !e.playing, let last = lastPosition, !last.playing, last.epoch == e.epoch, last.seconds == e.seconds { return }
         lastPosition = e
+        TakeTrace.log("publish playing=\(e.playing) rate=\(e.rate) seconds=\(e.seconds) epoch=\(e.epoch) player=\(videoPlayer != nil)")
         #if canImport(AVFoundation)
         videoPlayer?.apply(e)
         #endif

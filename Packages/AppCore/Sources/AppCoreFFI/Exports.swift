@@ -1,3 +1,4 @@
+import AppCore
 import CAppCoreFFI
 import Foundation
 
@@ -50,6 +51,7 @@ public func ffiTextureCreate(_ channel: Int32) -> Int64 {
     #if canImport(CoreVideo) || os(Windows)
     guard let reg = frameTextures.host?.register_texture else { return -1 }
     let id = reg(channel)
+    TakeTrace.log("tf_texture_create canal=\(channel) id=\(id)")
     frameTextures.setID(id, for: channel)
     // El productor pudo dejar fotograma antes de que existiera la textura (la toma abre en pausa y Dart crea la
     // textura tras `takeview.open`): sin este aviso el runner no lo pide hasta el siguiente, y en pausa no hay otro.
