@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:toneforge/contract/tab.dart';
 import 'package:toneforge/core/mock_core.dart';
+import 'package:toneforge/features/tab/tab_key_map.dart';
 import 'package:toneforge/features/tab/tab_shortcuts.dart';
 import 'package:toneforge/features/tab/tab_store.dart';
 import 'package:toneforge/shell/selected_project.dart';
@@ -16,19 +20,34 @@ late MockCore core;
 final FocusNode _fieldFocus = FocusNode();
 final TextEditingController _fieldText = TextEditingController();
 late String _platform;
+late ProviderContainer _c;
+
+/// Tecla que llega de la página alphaTab (WebView con el foco).
+Future<void> _web(WidgetTester tester, String key, {String code = '', bool shift = false, bool meta = false}) async {
+  _c.read(tabWebKeysProvider).add(WebKey(key: key, code: code, shift: shift, meta: meta));
+  await tester.runAsync(settle);
+  await tester.pump();
+}
 
 Future<void> _boot(
   WidgetTester tester, {
   bool editMode = true,
   Map<String, Object?> extra = const {},
   TargetPlatform platform = TargetPlatform.macOS,
+  bool keyMap = true,
 }) async {
   debugDefaultTargetPlatformOverride = platform;
   addTearDown(() => debugDefaultTargetPlatformOverride = null);
   _platform = platform == TargetPlatform.macOS ? 'macos' : 'windows';
   setTestSurface(tester, const Size(600, 400));
   core = (await tester.runAsync(loadCore))!;
-  final c = makeContainer(core);
+  final c = makeContainer(
+    core,
+    overrides: [
+      if (!keyMap) tabKeyMapProvider.overrideWith((ref) => Completer<TabKeyMapResult>().future),
+    ],
+  );
+  _c = c;
   c.listen(tabStoreProvider, (_, _) {});
   c.read(selectedProjectProvider.notifier).select(projectId);
   await tester.pumpWidget(
@@ -194,6 +213,39 @@ void main() {
     expect(core.calls.length, before);
   });
 
+  testWidgets('teclas de la página (WebView con foco): Espacio play, flechas y letras van al núcleo', (tester) async {
+    await _boot(tester);
+    await _web(tester, ' ', code: 'Space');
+    expect(_methods.where((m) => m == 'study.play').length, 1);
+    await _web(tester, ' ', code: 'Space', meta: true); // ⌘Espacio: no
+    expect(_methods.where((m) => m == 'study.play').length, 1);
+    await _web(tester, 'ArrowLeft', code: 'ArrowLeft', shift: true);
+    await _web(tester, '5', code: 'Digit5');
+    await _web(tester, 'z', code: 'KeyZ', meta: true);
+    await _web(tester, 'q', code: 'KeyQ'); // fuera del mapa
+    expect([for (final e in _edits) e['key']], ['ArrowLeft', '5', 'z']);
+    expect(_edits[0]['shift'], isTrue);
+    expect(_edits[2]['ctrl'], isTrue);
+  });
+
+  testWidgets('la misma tecla por Flutter y por la página no se cuenta dos veces', (tester) async {
+    await _boot(tester);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.space, platform: _platform);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.space, platform: _platform);
+    await _web(tester, ' ', code: 'Space');
+    expect(_methods.where((m) => m == 'study.play').length, 1);
+  });
+
+  testWidgets('con un campo de texto enfocado las teclas de la página tampoco se mandan', (tester) async {
+    await _boot(tester);
+    _fieldFocus.requestFocus();
+    await tester.pump();
+    await _web(tester, ' ', code: 'Space');
+    await _web(tester, 'ArrowUp', code: 'ArrowUp');
+    expect(_methods, isNot(contains('study.play')));
+    expect(_methods, isNot(contains('tab.edit')));
+  });
+
   testWidgets('Espacio funciona también en lectura', (tester) async {
     await _boot(tester, editMode: false);
     await _press(tester, LogicalKeyboardKey.space);
@@ -230,5 +282,50 @@ void main() {
     }
     await _press(tester, LogicalKeyboardKey.keyA, ch: 'a', mods: [LogicalKeyboardKey.controlLeft]);
     expect(_methods, isNot(contains('tab.edit')));
+  });
+
+  testWidgets('sin mapa cargado no se reclama nada (ni Escape con tramo)', (tester) async {
+    await _boot(
+      tester,
+      keyMap: false,
+      extra: {
+        'span': {'startTick': 0, 'endTick': 960},
+      },
+    );
+    await _press(tester, LogicalKeyboardKey.arrowUp);
+    await _press(tester, LogicalKeyboardKey.escape);
+    expect(_methods, isNot(contains('tab.edit')));
+  });
+
+  testWidgets('el mapa se pide una sola vez al montar', (tester) async {
+    await _boot(tester);
+    await _press(tester, LogicalKeyboardKey.arrowUp);
+    await _press(tester, LogicalKeyboardKey.arrowDown);
+    expect(_methods.where((m) => m == 'tab.keyMap').length, 1);
+  });
+
+  testWidgets('tecla fuera del mapa se ignora aunque sea imprimible', (tester) async {
+    await _boot(tester);
+    await _press(tester, LogicalKeyboardKey.keyQ, ch: 'q');
+    await _press(tester, LogicalKeyboardKey.keyK, ch: '€');
+    expect(_methods, isNot(contains('tab.edit')));
+  });
+
+  testWidgets('b: según el mapa, depende del tipo de la pista seleccionada', (tester) async {
+    final map = TabKeyMapResult.fromJson(fixture('tab.keyMap.result.json'));
+    final raw = {...fixture('tab.open.result.json'), 'editMode': true};
+    bool claimed(String kind, {bool shift = false}) {
+      final tracks = [
+        for (final t in (raw['tracks']! as List).cast<Map<String, Object?>>())
+          t['id'] == raw['selectedTrack'] ? {...t, 'kind': kind} : t,
+      ];
+      final tab = TabState.fromJson({...raw, 'tracks': tracks});
+      return claims(map, key: shift ? 'B' : 'b', shift: shift, ctrl: false, alt: false, tab: tab, hasRange: false);
+    }
+
+    final rules = [for (final r in map.rules) if (r.key == 'b') r.when];
+    expect(claimed('drums'), rules.any((w) => w == TabKeyWhen.edit || w == TabKeyWhen.editDrums));
+    expect(claimed('guitar'), rules.any((w) => w == TabKeyWhen.edit || w == TabKeyWhen.editNotDrums));
+    expect(claimed('guitar', shift: true) || claimed('guitar'), isTrue);
   });
 }

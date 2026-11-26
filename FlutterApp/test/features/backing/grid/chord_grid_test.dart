@@ -146,6 +146,27 @@ void main() {
     expect(call(core, 'study.seek')['seconds'], 2);
   });
 
+  testWidgets('clic o arrastre en la cabecera de una sección no hace seek ni bucle; en filas sin sección sí', (tester) async {
+    final (core, _) = await pumpGrid(tester, tweak: (o) {
+      withBeats(o);
+      final first = ((o['sections']! as List).first as Map).cast<String, Object?>();
+      first['start'] = 0.0;
+      first['end'] = 4.0;
+      ((o['sections']! as List)..removeRange(1, (o['sections']! as List).length));
+    });
+    await tester.tapAt(at(tester, cx(0, 2), 6));
+    await settleFrames(tester);
+    final g = await tester.startGesture(at(tester, cx(0, 0), 6));
+    await g.moveTo(at(tester, cx(0, 3), 6));
+    await g.up();
+    await settleFrames(tester);
+    expect(core.calls.any((c) => c.method == 'study.seek' || c.method == 'study.setLoop'), isFalse);
+    // Misma franja sobre el compás 1, fuera de la sección: seek normal.
+    await tester.tapAt(at(tester, cx(1, 2), 6));
+    await settleFrames(tester);
+    expect(call(core, 'study.seek')['seconds'], 6);
+  });
+
   testWidgets('arrastre: bucle con imán al pulso', (tester) async {
     final (core, _) = await pumpGrid(tester, tweak: withBeats);
     final g = await tester.startGesture(at(tester, cx(0, 0), cy));
@@ -156,7 +177,7 @@ void main() {
     final p = call(core, 'study.setLoop');
     expect(p['start'], 0);
     expect(p['end'], 6);
-    expect(p['snap'], 'beat');
+    expect(p['snap'], 'chord'); // como SwiftUI: sin ⌥ imanta a pulsos
     expect(p['name'], es.backing_loopNameChords);
     expect(core.calls.any((c) => c.method == 'study.seek'), isFalse);
   });

@@ -1,0 +1,382 @@
+{
+  "rules" : [
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "Escape",
+      "shift" : false,
+      "when" : "span"
+    },
+    {
+      "alt" : false,
+      "ctrl" : true,
+      "key" : "z",
+      "shift" : null,
+      "when" : "edit"
+    },
+    {
+      "alt" : false,
+      "ctrl" : true,
+      "key" : "Z",
+      "shift" : null,
+      "when" : "edit"
+    },
+    {
+      "alt" : true,
+      "ctrl" : false,
+      "key" : "y",
+      "shift" : false,
+      "when" : "editNotDrums"
+    },
+    {
+      "alt" : true,
+      "ctrl" : false,
+      "key" : "Y",
+      "shift" : false,
+      "when" : "editNotDrums"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "ArrowUp",
+      "shift" : null,
+      "when" : "edit"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "ArrowDown",
+      "shift" : null,
+      "when" : "edit"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "ArrowLeft",
+      "shift" : null,
+      "when" : "edit"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "ArrowRight",
+      "shift" : null,
+      "when" : "edit"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "Backspace",
+      "shift" : null,
+      "when" : "edit"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "Delete",
+      "shift" : null,
+      "when" : "edit"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "Escape",
+      "shift" : null,
+      "when" : "edit"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "0",
+      "shift" : false,
+      "when" : "edit"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "1",
+      "shift" : false,
+      "when" : "edit"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "2",
+      "shift" : false,
+      "when" : "edit"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "3",
+      "shift" : false,
+      "when" : "edit"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "4",
+      "shift" : false,
+      "when" : "edit"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "5",
+      "shift" : false,
+      "when" : "edit"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "6",
+      "shift" : false,
+      "when" : "edit"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "7",
+      "shift" : false,
+      "when" : "edit"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "8",
+      "shift" : false,
+      "when" : "edit"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "9",
+      "shift" : false,
+      "when" : "edit"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "+",
+      "shift" : null,
+      "when" : "edit"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "=",
+      "shift" : null,
+      "when" : "edit"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "-",
+      "shift" : null,
+      "when" : "edit"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "b",
+      "shift" : false,
+      "when" : "editDrums"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "B",
+      "shift" : false,
+      "when" : "editDrums"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "c",
+      "shift" : false,
+      "when" : "editDrums"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "C",
+      "shift" : false,
+      "when" : "editDrums"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "h",
+      "shift" : false,
+      "when" : "editDrums"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "H",
+      "shift" : false,
+      "when" : "editDrums"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "t",
+      "shift" : false,
+      "when" : "editDrums"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "T",
+      "shift" : false,
+      "when" : "editDrums"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "p",
+      "shift" : false,
+      "when" : "editDrums"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "P",
+      "shift" : false,
+      "when" : "editDrums"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "!",
+      "shift" : null,
+      "when" : "editNotDrums"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : ")",
+      "shift" : null,
+      "when" : "editNotDrums"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : ":",
+      "shift" : null,
+      "when" : "edit"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : ";",
+      "shift" : null,
+      "when" : "edit"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "D",
+      "shift" : null,
+      "when" : "editNotDrums"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "U",
+      "shift" : null,
+      "when" : "editNotDrums"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "b",
+      "shift" : false,
+      "when" : "editNotDrums"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "f",
+      "shift" : false,
+      "when" : "editDrums"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "g",
+      "shift" : false,
+      "when" : "editNotDrums"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "h",
+      "shift" : false,
+      "when" : "editNotDrums"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "i",
+      "shift" : false,
+      "when" : "editNotDrums"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "l",
+      "shift" : false,
+      "when" : "editNotDrums"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "o",
+      "shift" : false,
+      "when" : "edit"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "p",
+      "shift" : false,
+      "when" : "editNotDrums"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "s",
+      "shift" : false,
+      "when" : "editNotDrums"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "v",
+      "shift" : false,
+      "when" : "editNotDrums"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "w",
+      "shift" : false,
+      "when" : "editNotDrums"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "x",
+      "shift" : false,
+      "when" : "editNotDrums"
+    },
+    {
+      "alt" : false,
+      "ctrl" : false,
+      "key" : "y",
+      "shift" : false,
+      "when" : "editNotDrums"
+    }
+  ]
+}

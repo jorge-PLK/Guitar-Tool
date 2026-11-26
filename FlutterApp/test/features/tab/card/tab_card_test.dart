@@ -36,6 +36,15 @@ void main() {
       expect(find.text('4/4 · 120 BPM'), findsOneWidget);
     });
 
+    testWidgets('nada se pinta en primer plano sobre la zona del lienzo (WKWebView)', (tester) async {
+      await pumpCard(tester, const SizedBox(height: 560, child: TabCard(stage: SizedBox(key: Key('stage')))), tab: tabState(const []));
+      final boxes = tester.widgetList<DecoratedBox>(
+        find.ancestor(of: find.byKey(const Key('stage')), matching: find.byType(DecoratedBox)),
+      );
+      expect(boxes, isNotEmpty);
+      expect(boxes.where((b) => b.position == DecorationPosition.foreground), isEmpty);
+    });
+
     testWidgets('sin pistas no hay selector Oír ni controles', (tester) async {
       await pumpCard(tester, const SizedBox(height: 560, child: TabCard(stage: SizedBox())), tab: tabState(const []));
       expect(find.byType(TabListenSelector), findsNothing);

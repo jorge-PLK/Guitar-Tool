@@ -362,7 +362,12 @@ final class TabService {
             guard let i = a.trackIDs.firstIndex(of: track) else { throw RPCError(code: "bad-params", message: "Pista desconocida: \(track).") }
             index = i
         }
-        return TabScoreResult(json: a.json, trackIndex: index, trackIDs: a.trackIDs, revision: revision)
+        return TabScoreResult(json: a.json, trackIndex: index, trackIDs: a.trackIDs, revision: revision, timing: timingInfo())
+    }
+
+    func timingInfo() -> TabTimingInfo? {
+        guard let score = editor?.score, !score.beats.isEmpty else { return nil }
+        return TabTimingInfo(beats: score.beats.map(\.time), beatsPerBar: score.bars.map(\.beatCount), end: score.endTime)
     }
 
     func selectTrack(_ id: String) throws -> TabState {
@@ -954,39 +959,32 @@ final class TabService {
     func handleKey(_ ch: String, shift: Bool, ctrl: Bool, alt: Bool) -> Bool {
         guard phase == .ready else { return false }
         let plain = !shift && !ctrl && !alt
-        if ch == "Escape", plain, span != nil { clearSpan(); return true }
+        let drums = selectedTrack?.kind == .drums
+        // Misma tabla que `tab.keyMap` (TabKeyMap.swift): la primera regla que casa decide y da la acción.
+        let action = Self.keyEntries.first {
+            $0.rule.matches(key: ch, shift: shift, ctrl: ctrl, alt: alt, span: span != nil, edit: editMode, drums: drums)
+        }?.action
+        if action == .clearSpan { clearSpan(); return true }
         guard editMode else { return false }
         if graceMode, !(ch == "Backspace" || ch == "Delete" || ch.lowercased() == "g" || (plain && Int(ch) != nil)) { graceMode = false }
-        if ctrl, !alt, ch.lowercased() == "z" { if shift { redo() } else { undo() }; return true }
-        if alt, !ctrl, !shift, ch.lowercased() == "y", selectedTrack?.kind != .drums { toggleOrnament(.artificialHarmonic); return true }
-        guard !ctrl, !alt else { return false }
-        switch ch {
-        case "ArrowUp": moveString(up: true); return true
-        case "ArrowDown": moveString(up: false); return true
-        case "ArrowLeft": if shift { extendSpan(forward: false) } else { moveSelection(forward: false) }; return true
-        case "ArrowRight": if shift { extendSpan(forward: true) } else { moveSelection(forward: true) }; return true
-        case "Backspace", "Delete": deleteSelection(); return true
-        case "Escape": selection = nil; return true
-        default: break
+        guard let action else { return false }
+        switch action {
+        case .clearSpan: break
+        case .undoRedo: if shift { redo() } else { undo() }
+        case .artificialHarmonic: toggleOrnament(.artificialHarmonic)
+        case .arrowUp: moveString(up: true)
+        case .arrowDown: moveString(up: false)
+        case .arrowLeft: if shift { extendSpan(forward: false) } else { moveSelection(forward: false) }
+        case .arrowRight: if shift { extendSpan(forward: true) } else { moveSelection(forward: true) }
+        case .delete: deleteSelection()
+        case .deselect: selection = nil
+        case .digit: if let d = Int(ch) { typeDigit(d) }
+        case .durationUp: changeDuration(by: 1)
+        case .durationDown: changeDuration(by: -1)
+        case .hit(let piece): toggleHit(piece)
+        case .ornament(let o): toggleOrnament(o)
         }
-        if !shift, ch.count == 1, let d = Int(ch) { typeDigit(d); return true }
-        switch ch {
-        case "+", "=": changeDuration(by: 1); return true
-        case "-": changeDuration(by: -1); return true
-        default: break
-        }
-        if !shift, selectedTrack?.kind == .drums {
-            switch ch.lowercased() {
-            case "b": toggleHit(.kick); return true
-            case "c": toggleHit(.snare); return true
-            case "h": toggleHit(.hiHat); return true
-            case "t": toggleHit(.tom); return true
-            case "p": toggleHit(.crash); return true
-            default: break
-            }
-        }
-        if let o = Self.ornament(forKey: ch, shift: shift, drums: selectedTrack?.kind == .drums) { toggleOrnament(o); return true }
-        return false
+        return true
     }
 
     func edit(_ p: TabEditParams) throws -> TabState {

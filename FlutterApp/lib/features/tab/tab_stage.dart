@@ -4,6 +4,7 @@ import 'package:toneforge/contract/tab.dart';
 import 'package:toneforge/features/tab/tab_phase_overlay.dart';
 import 'package:toneforge/features/tab/tab_store.dart';
 import 'package:toneforge/features/tab/tab_track_strip.dart';
+import 'package:toneforge/theme/tokens.dart';
 
 /// Zona del lienzo (`TabScreen.swift:191-198`): el lienzo alphaTab y, encima, el overlay de fase.
 /// El fondo, el radio y el alto mínimo los pone `TabCard`.
@@ -27,7 +28,12 @@ class TabStage extends ConsumerWidget {
           ignoring: !visible,
           child: Opacity(key: const ValueKey<String>('stage-canvas-opacity'), opacity: visible ? 1 : 0, child: canvas),
         ),
-        TabPhaseOverlay(webError: webError),
+        // El recorte de esquinas solo cubre el overlay; el lienzo nativo no puede ir bajo un recorte.
+        ClipRRect(
+          key: const ValueKey<String>('stage-overlay-clip'),
+          borderRadius: BorderRadius.circular(TfRadius.control),
+          child: TabPhaseOverlay(webError: webError),
+        ),
       ],
     );
   }

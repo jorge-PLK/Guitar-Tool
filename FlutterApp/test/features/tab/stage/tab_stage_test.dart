@@ -195,6 +195,22 @@ void main() {
     expect(find.byKey(const ValueKey<String>('phase-box')), findsNothing);
   });
 
+  testWidgets('ready: el lienzo no está bajo ningún recorte ni absorbe el puntero (WKWebView recibe el ratón)',
+      (tester) async {
+    await pump(tester, stateOf(TabPhase.ready));
+    final canvas = find.byKey(_canvasKey);
+    final stage = find.byType(TabStage);
+    // Solo cuenta lo que cuelga del escenario (el MaterialApp de prueba trae sus propios recortes).
+    for (final type in <Type>[ClipRRect, ClipRect, ClipPath, AbsorbPointer, BackdropFilter]) {
+      final inside = find.descendant(of: stage, matching: find.byType(type));
+      expect(find.descendant(of: inside, matching: canvas), findsNothing, reason: '$type envuelve al lienzo');
+    }
+    final ignore = tester.widget<IgnorePointer>(
+        find.descendant(of: stage, matching: find.byType(IgnorePointer)).first);
+    expect(ignore.ignoring, isFalse);
+    expect(find.byKey(const ValueKey<String>('phase-box')), findsNothing);
+  });
+
   testWidgets('ready con webError: genérico y detalle en danger, sin caja', (tester) async {
     await pump(tester, stateOf(TabPhase.ready), webError: 'font load failed');
     expect(find.text('No se pudo mostrar la tablatura.'), findsOneWidget);

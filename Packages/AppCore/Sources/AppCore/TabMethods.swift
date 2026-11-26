@@ -40,6 +40,8 @@ extension TabService {
             await dismissNotices()
             return await state()
         }
+        // Estático: no exige proyecto ni tablatura abierta.
+        router.register("tab.keyMap") { [self] (_: Empty) -> TabKeyMapResult in await keyMap() }
         router.register("tab.toggleMute") { [self] (p: TabTrackParams) -> TabState in
             guard let t = p.track else { throw RPCError(code: "bad-params", message: "Falta «track».") }
             try await toggleMute(trackID: t)

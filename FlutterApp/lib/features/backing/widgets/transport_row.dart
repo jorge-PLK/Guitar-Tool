@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:toneforge/features/backing/smooth_position.dart';
 import 'package:toneforge/features/backing/study_position.dart';
 import 'package:toneforge/features/backing/study_store.dart';
 import 'package:toneforge/features/backing/widgets/loop_marking.dart';
@@ -53,7 +54,8 @@ class TransportRow extends ConsumerWidget {
                 max: 200,
                 step: 5,
                 width: TfSize.transportTempoSlider,
-                onChanged: (double v) => store.setRate(v / 100),
+                onChanged: (double v) => store.dragRate(v / 100),
+                onChangeEnd: (double v) => store.commitRate(v / 100),
               ),
               const SizedBox(width: TfSpace.s10),
               SizedBox(
@@ -121,15 +123,16 @@ class _Clock extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final double t = ref.watch(studyPositionProvider.select((e) => e.seconds));
-    return Text.rich(
-      TextSpan(children: <InlineSpan>[
-        TextSpan(text: TfFmt.clock(t), style: const TextStyle(color: TfColors.text)),
-        TextSpan(text: ' / ${TfFmt.clock(duration)}', style: const TextStyle(color: TfColors.muted)),
-      ]),
-      maxLines: 1,
-      softWrap: false,
-      style: TfText.display(20).copyWith(fontFeatures: _tabular),
+    return SmoothPositionBuilder(
+      builder: (BuildContext context, double t) => Text.rich(
+        TextSpan(children: <InlineSpan>[
+          TextSpan(text: TfFmt.clock(t), style: const TextStyle(color: TfColors.text)),
+          TextSpan(text: ' / ${TfFmt.clock(duration)}', style: const TextStyle(color: TfColors.muted)),
+        ]),
+        maxLines: 1,
+        softWrap: false,
+        style: TfText.display(20).copyWith(fontFeatures: _tabular),
+      ),
     );
   }
 }

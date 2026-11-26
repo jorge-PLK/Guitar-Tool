@@ -1,12 +1,15 @@
 part of 'study_store.dart';
 
 const String _masterKey = '\u0000master';
+const String _fineKey = '\u0000fine';
+const String _rateKey = '\u0000rate';
 
 /// Faders en arrastre: valor local mostrado, última posición pendiente y canales con llamada en vuelo.
 final class _GainQueue {
   final Map<String, double> local = <String, double>{};
   final Map<String, double> pending = <String, double>{};
   final Set<String> inFlight = <String>{};
+  double? rateBase;
 }
 
 /// Intenciones de transporte, análisis, secciones y guitarras (misma API que el resto del store).
@@ -20,9 +23,48 @@ extension StudyStoreSections on StudyStore {
   Future<void> setRate(double rate) =>
       _transportCall('study.setRate', StudyRateParams(rate: rate).toJson());
 
-  /// Envía solo lo que cambie el control (`semitones` o `fineCents`).
-  Future<void> setTranspose({int? semitones, double? fineCents}) => _transportCall(
-      'study.setTranspose', StudyTransposeParams(semitones: semitones, fineCents: fineCents).toJson());
+  /// Arrastre del tempo: solo valor local (el núcleo reinicia la pasada con cada `setRate`).
+  void dragRate(double rate) {
+    final g = _gain;
+    if (!g.local.containsKey(_rateKey)) g.rateBase = _cur.transport?.rate;
+    g.local[_rateKey] = rate;
+    _showLocalGain();
+  }
+
+  /// Al soltar: un único `setRate` si el valor difiere del que tenía el núcleo al empezar.
+  Future<void> commitRate(double rate) async {
+    final g = _gain;
+    final base = g.rateBase ?? _cur.transport?.rate;
+    g.rateBase = null;
+    if (base == null || (base - rate).abs() < 1e-9) {
+      if (base != null) {
+        g.local[_rateKey] = base;
+        _showLocalGain();
+      }
+      g.local.remove(_rateKey);
+      return;
+    }
+    g.local[_rateKey] = rate;
+    _showLocalGain();
+    try {
+      await setRate(rate);
+    } finally {
+      g.local.remove(_rateKey);
+      final t = _cur.transport;
+      if (_isOpen && t != null) _cur = _cur.copyWith(study: _withTransport(_cur.study!, _overlayGain(t)));
+    }
+  }
+
+  /// Envía solo lo que cambie el control (`semitones` o `fineCents`). `fineCents` solo: una llamada
+  /// en vuelo, la última gana, valor local mientras tanto.
+  Future<void> setTranspose({int? semitones, double? fineCents}) {
+    if (fineCents != null && semitones == null) {
+      return _dragGain(_fineKey, fineCents, 'study.setTranspose',
+          (v) => StudyTransposeParams(fineCents: v).toJson());
+    }
+    return _transportCall(
+        'study.setTranspose', StudyTransposeParams(semitones: semitones, fineCents: fineCents).toJson());
+  }
   Future<void> setCapo(int capo) => _transportCall('study.setCapo', StudyCapoParams(capo: capo).toJson());
 
   /// El imán (`snap`) lo aplica el núcleo.
@@ -83,9 +125,9 @@ extension StudyStoreSections on StudyStore {
       playing: t.playing,
       position: t.position,
       duration: t.duration,
-      rate: t.rate,
+      rate: l[_rateKey] ?? t.rate,
       transpose: t.transpose,
-      fineCents: t.fineCents,
+      fineCents: l[_fineKey] ?? t.fineCents,
       capo: t.capo,
       metronome: t.metronome,
       loop: t.loop,

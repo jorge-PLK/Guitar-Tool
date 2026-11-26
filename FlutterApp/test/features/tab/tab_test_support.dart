@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:toneforge/core/core_providers.dart';
 import 'package:toneforge/core/mock_core.dart';
@@ -34,8 +35,9 @@ class StudyProjectProbe extends Notifier<String?> {
   void set(String? id) => state = id;
 }
 
-ProviderContainer makeContainer(MockCore core, {String? project = projectId}) {
+ProviderContainer makeContainer(MockCore core, {String? project = projectId, List<Override> overrides = const []}) {
   final c = ProviderContainer(overrides: [
+    ...overrides,
     coreClientProvider.overrideWithValue(core),
     tabStudyProjectProvider.overrideWith((ref) => ref.watch(studyProjectProbe)),
   ]);

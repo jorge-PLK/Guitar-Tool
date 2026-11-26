@@ -77,78 +77,86 @@ class _ChordEditorState extends ConsumerState<ChordEditor> {
     final double? beat = _splitBeat(study?.analysis.beats ?? const <double>[], seconds);
     final bool hasOverride = (study?.chordOverrides ?? const <StudyOverrideInfo>[])
         .any((StudyOverrideInfo o) => o.start < widget.end && o.end > widget.start);
+    // Ancho natural del panel = ancho de la rejilla de 6 columnas (como el VStack de BackingTimeline.swift:513).
+    const double gridWidth = TfSize.controlLg * 6 + TfSpace.s6 * 5;
     return Padding(
       padding: const EdgeInsets.all(TfSpace.s16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(l.backing_chordSheetTitle, style: TfText.display(16).copyWith(color: TfColors.text)),
-          const SizedBox(height: TfSpace.s12),
-          ChordEditorGrid(
-            cell: TfSize.controlLg,
-            columns: 6,
-            children: <Widget>[
-              for (int r = 0; r < vocab.roots.length; r++)
-                ChordEditorChip(
-                  text: vocab.roots[r],
-                  on: _root == r,
-                  onTap: () {
-                    setState(() => _root = r);
-                    _commit();
-                  },
-                ),
-            ],
-          ),
-          const SizedBox(height: TfSpace.s12),
-          ChordEditorGrid(
-            cell: TfSize.chordQualityCellWidth,
-            columns: 4,
-            children: <Widget>[
-              for (int q = 0; q < vocab.qualities.length; q++)
-                ChordEditorChip(
-                  text: vocab.qualities[q].isEmpty ? l.backing_chordMajor : vocab.qualities[q],
-                  on: _quality == q,
-                  onTap: () {
-                    setState(() => _quality = q);
-                    _commit();
-                  },
-                ),
-            ],
-          ),
-          const SizedBox(height: TfSpace.s12),
-          ChordEditorChip(
-            text: l.backing_chordNone,
-            on: vocab.noChordIndex >= 0 && _initialIndex == vocab.noChordIndex,
-            onTap: vocab.noChordIndex < 0
-                ? () {}
-                : () => _store.setChord(widget.start, widget.end, index: vocab.noChordIndex),
-          ),
-          const SizedBox(height: TfSpace.s12),
-          const SizedBox(width: TfSize.controlLg * 6 + TfSpace.s6 * 5, child: TfDivider()),
-          const SizedBox(height: TfSpace.s12),
-          SizedBox(
-            width: TfSize.controlLg * 6 + TfSpace.s6 * 5,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: SizedBox(
+        width: gridWidth,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(l.backing_chordSheetTitle, style: TfText.display(16).copyWith(color: TfColors.text)),
+            const SizedBox(height: TfSpace.s12),
+            ChordEditorGrid(
+              cell: TfSize.controlLg,
+              columns: 6,
               children: <Widget>[
-                TfTooltip(
-                  message: l.backing_chordSplitTooltip,
-                  child: TfSecondaryButton(
-                    label: l.backing_chordSplit,
-                    height: TfSize.controlMd,
-                    onPressed: beat == null ? null : () => _store.splitChord(beat),
+                for (int r = 0; r < vocab.roots.length; r++)
+                  ChordEditorChip(
+                    text: vocab.roots[r],
+                    on: _root == r,
+                    onTap: () {
+                      setState(() => _root = r);
+                      _commit();
+                    },
                   ),
-                ),
-                TfSecondaryButton(
-                  label: l.backing_chordRemoveOverride,
-                  height: TfSize.controlMd,
-                  onPressed: hasOverride ? () => _store.removeChordOverrides(widget.start, widget.end) : null,
-                ),
               ],
             ),
-          ),
-        ],
+            const SizedBox(height: TfSpace.s12),
+            ChordEditorGrid(
+              cell: TfSize.chordQualityCellWidth,
+              columns: 4,
+              children: <Widget>[
+                for (int q = 0; q < vocab.qualities.length; q++)
+                  ChordEditorChip(
+                    text: vocab.qualities[q].isEmpty ? l.backing_chordMajor : vocab.qualities[q],
+                    on: _quality == q,
+                    onTap: () {
+                      setState(() => _quality = q);
+                      _commit();
+                    },
+                  ),
+              ],
+            ),
+            const SizedBox(height: TfSpace.s12),
+            SizedBox(
+              width: gridWidth,
+              child: ChordEditorChip(
+                text: l.backing_chordNone,
+                on: vocab.noChordIndex >= 0 && _initialIndex == vocab.noChordIndex,
+                onTap: vocab.noChordIndex < 0
+                    ? () {}
+                    : () => _store.setChord(widget.start, widget.end, index: vocab.noChordIndex),
+              ),
+            ),
+            const SizedBox(height: TfSpace.s12),
+            const SizedBox(width: gridWidth, child: TfDivider()),
+            const SizedBox(height: TfSpace.s12),
+            SizedBox(
+              width: gridWidth,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: <Widget>[
+                  TfTooltip(
+                    message: l.backing_chordSplitTooltip,
+                    child: TfSecondaryButton(
+                      label: l.backing_chordSplit,
+                      height: TfSize.controlMd,
+                      onPressed: beat == null ? null : () => _store.splitChord(beat),
+                    ),
+                  ),
+                  TfSecondaryButton(
+                    label: l.backing_chordRemoveOverride,
+                    height: TfSize.controlMd,
+                    onPressed: hasOverride ? () => _store.removeChordOverrides(widget.start, widget.end) : null,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

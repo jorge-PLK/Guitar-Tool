@@ -536,12 +536,24 @@
       rangeEls.forEach(function (el) { el.style.display = 'none'; });
       if (sb < 0 || !api || !api.boundsLookup) return;
       const host = document.getElementById('alphaTab');
-      let n = 0;
+      // Divergencia con la copia de SwiftUI (Flutter): un solo rectangulo por sistema (linea de pentagrama), no uno
+      // por compas. Los compases consecutivos de la misma linea se funden; si el tramo salta de linea, otro rectangulo.
+      const rows = [];
       for (let bar = sb; bar <= eb; bar++) {
         const a = locate(bar, bar === sb ? sf : 0);
         const b = locate(bar, bar === eb ? ef : 1);
         if (!a || !b) continue;
-        let el = rangeEls[n++];
+        const row = rows.length ? rows[rows.length - 1] : null;
+        if (row && Math.abs(row.top - a.y) < 4) {
+          row.right = Math.max(row.right, b.x);
+          row.bottom = Math.max(row.bottom, a.y + a.h);
+          row.top = Math.min(row.top, a.y);
+        } else {
+          rows.push({ left: a.x, right: b.x, top: a.y, bottom: a.y + a.h });
+        }
+      }
+      rows.forEach(function (r, n) {
+        let el = rangeEls[n];
         if (!el) {
           el = document.createElement('div');
           el.style.cssText = 'position:absolute;pointer-events:none;z-index:8;border-radius:3px;' +
@@ -549,12 +561,12 @@
           host.appendChild(el);
           rangeEls.push(el);
         }
-        el.style.left = a.x + 'px';
-        el.style.width = Math.max(2, b.x - a.x) + 'px';
-        el.style.top = a.y + 'px';
-        el.style.height = a.h + 'px';
+        el.style.left = r.left + 'px';
+        el.style.width = Math.max(2, r.right - r.left) + 'px';
+        el.style.top = r.top + 'px';
+        el.style.height = (r.bottom - r.top) + 'px';
         el.style.display = 'block';
-      }
+      });
     }
 
     function setCursorTime(seconds, follow) {

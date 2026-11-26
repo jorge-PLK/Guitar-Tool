@@ -9,6 +9,7 @@ import 'package:toneforge/features/backing/study_store.dart';
 import 'package:toneforge/features/backing/widgets/chord_editor.dart';
 import 'package:toneforge/features/backing/widgets/chord_grid_geometry.dart';
 import 'package:toneforge/features/backing/widgets/chord_grid_painter.dart';
+import 'package:toneforge/features/backing/widgets/section_boxes_geometry.dart';
 import 'package:toneforge/l10n/app_localizations.dart';
 import 'package:toneforge/theme/tokens.dart';
 import 'package:toneforge/theme/typography.dart';
@@ -115,8 +116,18 @@ class _ChordGridState extends ConsumerState<ChordGrid> {
     return (lo.time, hi.end);
   }
 
-  void _onDown(PointerDownEvent e) {
+  void _onDown(PointerDownEvent e, ChordGridGeometry g) {
     if ((e.buttons & kPrimaryButton) == 0) return;
+    // Las cabeceras de sección tienen clic, pulsación larga y menú propios: sin seek ni bucle desde ahí
+    // (misma geometría que la capa de cajas; solo sobre una caja de sección, como la tira).
+    final List<StudySectionInfo> sections =
+        ref.read(studyStoreProvider).study?.sections ?? const <StudySectionInfo>[];
+    for (final SectionPlacement p in SectionBoxesGeometry.grid(sections, _rows, g)) {
+      if (p.rect.contains(e.localPosition) && e.localPosition.dy < p.rect.top + p.headerHeight) {
+        _down = null;
+        return;
+      }
+    }
     _down = e.localPosition;
     _moved = false;
   }
@@ -163,7 +174,8 @@ class _ChordGridState extends ConsumerState<ChordGrid> {
       r.$1,
       r.$2,
       name: bar ? l.backing_loopNameBars : l.backing_loopNameChords,
-      snap: bar ? StudySnap.bar : StudySnap.beat,
+      // Sin ⌥ imán a pulsos como la tira y ChordGrid.swift:287-288; con ⌥ a compases.
+      snap: bar ? StudySnap.bar : StudySnap.chord,
     );
   }
 
@@ -207,7 +219,7 @@ class _ChordGridState extends ConsumerState<ChordGrid> {
             controller: _scroll,
             child: Listener(
               behavior: HitTestBehavior.opaque,
-              onPointerDown: _onDown,
+              onPointerDown: (PointerDownEvent e) => _onDown(e, g),
               onPointerMove: (PointerMoveEvent e) => _onMove(e, g, edit),
               onPointerUp: (PointerUpEvent e) => _onUp(e, g, edit, l),
               onPointerCancel: _onCancel,

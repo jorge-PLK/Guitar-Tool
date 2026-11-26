@@ -67,6 +67,8 @@ Vienen del apartado 9 de las fichas de `pantallas/`. La clase sigue [decisiones-
 | K-TAB | Tablatura | `tab.dismissNotices {}` (Dart ya no oculta avisos por texto) y `tab.span {action:clear, keepAnchor:true}`; fixtures Songsterr `working`, `failed` y `searchFailed`; hecho, ola 2 | hueco claro (resuelto) | 2 | t |
 | K-CH | Backing | `study.chordVocabulary` (raíces y calidades mostradas, transpuestas), `analysis.chords[].shown`; `study.setChord` acepta `shown:{root,quality}` y destranspone; hecho, ola 2 | hueco claro (resuelto) | 2 | k |
 | K-TS | Tablatura | Cabecera y resumen de selección por código: `header {code: meterBpm\|meter, bar, bpm}`, `selection.summary {code: note\|noNote\|drums\|drumsNoHits, bar, beat, string, fret, pieces[]}`; hecho, ola 2 | hueco claro (resuelto) | 2 | t |
+| K-KEY | Tablatura | `tab.keyMap {}` → `rules[{key, shift?, ctrl, alt, when: span\|edit\|editDrums\|editNotDrums}]`, la misma tabla que usa `handleKey` en `AppCore`, con test que recorre el mapa y fixtures `tab.keyMap.*`. Flutter debe reclamar teclas de forma síncrona y `tab.key` es asíncrono; antes Dart duplicaba la lista (`tabKeyMapProvider` cacheado, `tab_shortcuts` consulta el mapa); hecho, ola 2 | hueco claro (resuelto) | 2 | t (804ecf1, 8a16efa) |
+| K-BT | Tablatura | `tab.score` expone `timing {beats, beatsPerBar, end}` (tiempos de pulso de la partitura). El cursor se colocaba lineal por compás (`TabGrid.swift`, SwiftUI igual) y se desfasaba con pulsos no uniformes. Dart: `TabTiming`, `tab_timing_map.dart` (segundo → `{bar, fraction}`) y `setCursor(bar, fraction)` en el controlador; hecho, ola 2 | hueco claro (resuelto) | 2 | t (7faff28, 7e66155) |
 | GR1 | Grabar | `record.setPunch {enabled:true}` debe elegir la mejor toma si no hay toma elegida | hueco claro | 3 | g:G1 |
 | GR2 | Grabar | Nivel de guitarra: Dart lo lee de `audio.levels` y llama a `audio.setMeters` al entrar y salir | interfaz en Dart | 3 | g:G2 |
 | GR5 | Grabar, visor | Reproductor de vídeo de Flutter en Windows: HEVC y `playbackRate` fino; mensaje de HEVC en Dart | se mide (P9) | 3 | g:G5 |
@@ -139,3 +141,14 @@ Montaje D9 (M1) no se repite: ver la fila M1 de los heredados.
 | GR13 | Artista: Grabar lo toma de `library.list`, porque el snapshot de `record` no lo trae. `snapshot.projectId` no se compara con el proyecto pedido (el fixture trae `…0004`) | interfaz en Dart |
 | GR14 | `frameChannelProvider(FrameChannelId.x)` es una family en `core` (`123c855` y `6e5ace4` en `fase-7f`); con `--mock` devuelve `null` y no hay fotograma | interfaz en Dart |
 | GR15 | El visor de toma pinta con `rotation: 0` aunque `takeview` trae `videoRotation` 90. Falta confirmar si el fotograma ya llega rotado del núcleo | pregunta abierta: se verifica con hardware en la prueba de Jorge |
+
+## Notas de plataforma
+
+Anfitrión de la 7f en macOS; no son desvíos de núcleo.
+
+- **Snap de rejilla y tira (ola 2):** solo mandan `none`, `chord` o `bar`; el núcleo rechaza `beat` con `bad-params`. La rejilla sin ⌥ ajusta a acorde y con ⌥ a compás, como SwiftUI (f60c6df, 0cf1ad9). `MockCore` acepta parámetros inválidos: los tests de widgets no validan el contrato.
+- **Impeller desactivado en macOS** (`FLTEnableImpeller=false`, 7367f34, ffe5b26) hasta que salga el arreglo del crash SIGSEGV en `io.flutter.raster`, `impeller::Canvas::SetupRenderPass` desde `EmbedderExternalViewEmbedder` con platform views (Flutter 3.44.5). Revisar al subir Flutter.
+- **`DropTarget` de `desktop_drop`:** `MainFlutterWindow` lo oculta durante los eventos de ratón; su `NSView` tapaba la ventana en `hitTest` y el `WKWebView` no recibía clics (de896fc, 6f23a00).
+- **Nada pintado por Flutter encima de un platform view** (bordes de `TfCard` en primer plano, `ClipRRect`): `FlutterMutatorView` mete ese rect en `_hitTestIgnoreRegion` y macOS no entrega el ratón al WebView. Regla: bordes de fondo (`DecoratedBox`) alrededor de los WebViews (529c803, 665ebf9).
+- **Teclas dentro del WebView de la partitura:** se reenvían a los atajos con un shim `keydown` (e5611f0, 41b17d2).
+- **`tab.html` con `html{overflow-y:scroll}`:** si la barra vertical aparece tras el primer render, el ancho baja y alphaTab vuelve a renderizar encima sin limpiar (partitura doble al arrancar directo en Tablatura) (5ff9ecd).

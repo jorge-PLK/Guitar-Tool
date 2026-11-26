@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:toneforge/contract/study.dart';
 import 'package:toneforge/features/backing/study_store.dart';
+import 'package:toneforge/features/backing/widgets/chords_expanded.dart';
 import 'package:toneforge/shell/selected_project.dart';
 
 /// Id de la sección cuya hoja «Sección / Solo» está abierta (`selection.popover`, SectionBoxes.swift).
@@ -14,6 +15,7 @@ class SectionPopoverNotifier extends Notifier<String?> {
   @override
   String? build() {
     ref.listen<String?>(selectedProjectProvider, (_, _) => state = null);
+    ref.listen<bool>(chordsExpandedProvider, (_, _) => state = null);
     ref.listen<bool>(studyStoreProvider.select((s) => s.editMode), (_, _) => state = null);
     ref.listen<List<StudySectionInfo>?>(
       studyStoreProvider.select((s) => s.study?.sections),

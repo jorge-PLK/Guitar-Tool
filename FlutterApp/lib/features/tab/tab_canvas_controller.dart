@@ -7,7 +7,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:toneforge/contract/study.dart';
 import 'package:toneforge/contract/tab.dart';
 import 'package:toneforge/features/backing/study_position.dart';
+import 'package:toneforge/features/tab/tab_shortcuts.dart' show WebKey, tabWebKeysProvider;
 import 'package:toneforge/features/tab/tab_store.dart';
+import 'package:toneforge/features/tab/tab_timing_map.dart';
 import 'package:toneforge/widgets/tf_web_view.dart';
 
 /// Ruta absoluta de `tab.html` dentro de `flutter_assets` del paquete (Mac: `.app/Contents/Frameworks/App.framework`;
@@ -66,6 +68,7 @@ class TabCanvasController extends Notifier<TabCanvasState> {
   Duration _lastElapsed = Duration.zero;
   bool _playing = false;
   double? _lastCursor;
+  TabTimingMap? _timingMap;
 
   TabStore get _store => ref.read(tabStoreProvider.notifier);
 
@@ -129,6 +132,16 @@ class TabCanvasController extends Notifier<TabCanvasState> {
         if (json['shift'] == true) return;
         unawaited(_store.noteClick(TabClickParams(
             track: i('track'), bar: i('bar'), beat: i('beat'), string: i('string'), shift: false)));
+      case 'key':
+        // Teclado con el foco dentro del WebView: mismo manejador que cuando lo tiene Flutter.
+        ref.read(tabWebKeysProvider).add(WebKey(
+              key: '${json['key'] ?? ''}',
+              code: '${json['code'] ?? ''}',
+              shift: json['shift'] == true,
+              ctrl: json['ctrl'] == true,
+              meta: json['meta'] == true,
+              alt: json['alt'] == true,
+            ));
       case 'error':
         _fail('${json['message'] ?? ''}');
       default: // `cursor` y desconocidos: se ignoran
@@ -181,6 +194,8 @@ class TabCanvasController extends Notifier<TabCanvasState> {
     final r = await _store.score(track: selected);
     if (r == null || gen != _loadGen || !ref.mounted) return;
     _loadedKey = key;
+    final t = r.timing;
+    _timingMap = t == null ? null : TabTimingMap(t);
     state = state.copyWith(rendered: false);
     _lastCursor = null;
     _js('TF.load(${jsonEncode(r.json)}, ${r.trackIndex});');
@@ -231,6 +246,12 @@ class TabCanvasController extends Notifier<TabCanvasState> {
   void _pushCursor(double seconds) {
     if (!state.rendered || seconds == _lastCursor) return;
     _lastCursor = seconds;
+    final m = _timingMap;
+    if (m != null) {
+      final p = m.at(seconds);
+      _js('TF.setCursor(${p.bar}, ${p.fraction}, true);');
+      return;
+    }
     _js('TF.setCursorTime($seconds, true);');
   }
 

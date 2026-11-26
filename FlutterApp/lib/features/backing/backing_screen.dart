@@ -47,24 +47,32 @@ class _BackingContent extends ConsumerWidget {
       final st = s.study;
       return st == null || st.transport.channels.isNotEmpty || st.emptyStems.isNotEmpty;
     }));
+    final expanded = ref.watch(chordsExpandedProvider);
     return LayoutBuilder(
       builder: (context, box) {
         final low = box.maxHeight < _lowHeight;
         return SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: TfSpace.s36, vertical: _verticalPadding),
           child: separated
-              ? FillLastLayout(
-                  available: box.maxHeight - 2 * _verticalPadding,
-                  spacing: TfSpace.s14,
-                  lastMinHeight: low ? MixerCard.minHeightLow : MixerCard.minHeight,
-                  lastIdealHeight: MixerCard.idealHeight,
-                  children: [
-                    const BackingHeader(),
-                    const LoadErrorBanner(),
-                    const AnalysisBanner(),
-                    const TimelineCard(),
-                    _Mixer(low: low),
-                  ],
+              ? TweenAnimationBuilder<double>(
+                  tween: Tween<double>(end: expanded ? 1 : 0),
+                  duration: TfMotion.expand,
+                  curve: Curves.easeInOut,
+                  builder: (context, blend, _) => FillLastLayout(
+                    available: box.maxHeight - 2 * _verticalPadding,
+                    spacing: TfSpace.s14,
+                    lastMinHeight: low ? MixerCard.minHeightLow : MixerCard.minHeight,
+                    lastIdealHeight: MixerCard.idealHeight,
+                    // Expandido el mezclador es compacto: alto natural (BackingView.swift:205-212).
+                    naturalBlend: blend,
+                    children: [
+                      const BackingHeader(),
+                      const LoadErrorBanner(),
+                      const AnalysisBanner(),
+                      const TimelineCard(),
+                      MixerCard(compact: expanded, lowHeight: low),
+                    ],
+                  ),
                 )
               : const Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -74,19 +82,6 @@ class _BackingContent extends ConsumerWidget {
         );
       },
     );
-  }
-}
-
-/// Mezclador: último hijo, recibe alto fijo entre su mínimo y su ideal; compacto con la rejilla expandida.
-class _Mixer extends ConsumerWidget {
-  const _Mixer({required this.low});
-
-  final bool low;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final expanded = ref.watch(chordsExpandedProvider);
-    return MixerCard(compact: expanded, lowHeight: low);
   }
 }
 

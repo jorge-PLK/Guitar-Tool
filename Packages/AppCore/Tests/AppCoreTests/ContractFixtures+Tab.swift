@@ -103,6 +103,7 @@ final class ContractFixturesTabTests: XCTestCase {
 
         // Sin tablatura abierta.
         try await rig.run("tab.state", paramsOnly: true)
+        try await rig.run("tab.keyMap")   // estático: vale con la tablatura cerrada
         try await rig.runExpectingError("tab.state", params: "{}")
 
         let opened = try await rig.run("tab.open", params: openParams(p))

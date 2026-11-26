@@ -59,6 +59,7 @@ class ChordsArea extends ConsumerWidget {
     final Widget body;
     if (expanded) {
       body = Row(
+        key: const ValueKey<String>('chords-grid'),
         crossAxisAlignment: CrossAxisAlignment.start,
         spacing: TfSpace.s12,
         children: <Widget>[
@@ -69,6 +70,7 @@ class ChordsArea extends ConsumerWidget {
       );
     } else {
       body = Row(
+        key: const ValueKey<String>('chords-strip'),
         spacing: TfSpace.s12,
         children: <Widget>[
           Expanded(
@@ -119,7 +121,22 @@ class ChordsArea extends ConsumerWidget {
           width: (TfStroke.hairline + TfStroke.thick) / 2,
         ),
       ),
-      child: body,
+      child: AnimatedSize(
+        duration: TfMotion.expand,
+        curve: Curves.easeInOut,
+        alignment: Alignment.topCenter,
+        child: AnimatedSwitcher(
+          duration: TfMotion.expand,
+          switchInCurve: Curves.easeInOut,
+          switchOutCurve: Curves.easeInOut,
+          transitionBuilder: (Widget w, Animation<double> a) => FadeTransition(opacity: a, child: w),
+          layoutBuilder: (Widget? current, List<Widget> previous) => Stack(
+            alignment: Alignment.topCenter,
+            children: <Widget>[...previous, ?current],
+          ),
+          child: body,
+        ),
+      ),
     );
   }
 }
