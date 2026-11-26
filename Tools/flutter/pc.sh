@@ -1,12 +1,16 @@
 #!/bin/bash
-# Pasa la rama fase-7f al PC x64 por ssh: pull, compila AppCoreFFI y la app Windows, ejecuta tests y trae capturas.
+# Pasa la rama fase-7f al PC x64 por ssh: clon propio, compila AppCoreFFI y la app Windows, ejecuta tests y trae capturas.
 #   Tools/flutter/pc.sh [pasos]      pasos: sync core app test fetch (por defecto, todos en ese orden)
-#   Tools/flutter/pc.sh app --shot "<args de la app>"   ademas lanza la app con ventana y trae la captura
-# Turno compartido: `pcq acquire "<tarea>" --wait` al empezar y `pcq release` al acabar (trap), tambien si falla.
-# En el PC solo se escribe dentro del checkout (PC_REPO) y su Temp/ (ignorado por git). La app nunca usa carpetas reales:
-# --projects-folder y --support-dir van a Temp\flutter del PC.
+#   Tools/flutter/pc.sh models       tests con modelo ONNX real, CPU y DirectML (no forma parte del orden por defecto)
+#   Tools/flutter/pc.sh app fetch --shot "<args de la app>"   ademas lanza la app en el escritorio de Jorge y trae las capturas
+#   Tools/flutter/pc.sh selftest     paso que falla a proposito (comprueba que el codigo de salida llega: debe dar 1)
+# Los scripts remotos son Tools/flutter/pc/*.ps1: se suben por scp a <P9>\pc1 y se ejecutan con powershell -File (sin
+# cadenas entre comillas que bash expanda). El codigo de salida de cada .ps1 es el del paso.
+# En el PC todo vive bajo D:\Personal\Guitar-Tool\Temp\p9 (regla de Jorge): scripts en pc1\, clon de la rama en f7\ (git clone
+# propio; el checkout de la 7c, D:\Personal\Guitar-Tool, no se toca), Flutter 3.50.1 y caches de P9. La app nunca usa carpetas
+# reales: --projects-folder y --support-dir van a f7\Temp\flutter\shot-* del PC y se recrean vacias en cada --shot.
 # Salida resumida; log completo en Temp/logs/flutter-pc.log. Codigos: 0 bien, 1 fallo de un paso, 2 sin conexion.
-# NOTA: el PC no se usa hasta el final de la fase 7f; los pasos remotos no estan probados (solo bash -n).
+# Turno compartido: pcq acquire al empezar y pcq release al acabar (trap), tambien si falla.
 set -uo pipefail
 export LC_ALL=C
 root="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -17,17 +21,18 @@ log="Temp/logs/flutter-pc.log"
 
 PC_HOST="${PC_HOST:-pc}"
 PC_BRANCH="${PC_BRANCH:-fase-7f}"
-PC_REPO="${PC_REPO:-/d/Personal/Guitar-Tool}"            # ruta para el shell del PC (Git Bash)
-PC_REPO_SCP="${PC_REPO_SCP:-/D:/Personal/Guitar-Tool}"   # scp no entiende /d/...
-PC_REPO_WIN="${PC_REPO_WIN:-D:\\Personal\\Guitar-Tool}"
+PC_P9_WIN="${PC_P9_WIN:-D:/Personal/Guitar-Tool/Temp/p9}"   # rutas con / : valen para powershell -File y scp
 SSH=(ssh -o BatchMode=yes -o ConnectTimeout=10 "$PC_HOST")
 
-steps=(); shot_args=""
+steps=(); shot_args=""; models_args=""
 while [ $# -gt 0 ]; do
   case "$1" in
-    sync|core|app|test|fetch) steps+=("$1"); shift ;;
+    sync|core|app|test|fetch|selftest|models) steps+=("$1"); shift ;;
     --shot) shot_args="${2:-}"; shift 2 ;;
-    *) echo "uso: pc.sh [sync|core|app|test|fetch ...] [--shot \"<args de la app>\"]"; exit 1 ;;
+    --provider) models_args+=" -Provider ${2:-both}"; shift 2 ;;
+    --only) models_args+=" -Only ${2:-}"; shift 2 ;;
+    --timeout) models_args+=" -TimeoutSec ${2:-1500}"; shift 2 ;;
+    *) echo "uso: pc.sh [sync|core|app|test|fetch|models ...] [--shot \"<args de la app>\"] [--provider cpu|dml|both] [--only <test>] [--timeout <s>]"; exit 1 ;;
   esac
 done
 [ "${#steps[@]}" -eq 0 ] && steps=(sync core app test fetch)
@@ -38,43 +43,50 @@ held=0
 cleanup() { [ "$held" = 1 ] && pcq release >>"$log" 2>&1; held=0; }
 trap cleanup EXIT
 trap 'exit 130' INT TERM
-pcq acquire "flutter pc.sh ${steps[*]}" --wait >>"$log" 2>&1 || { echo "pcq acquire fallo (ver $log)"; exit 2; }
+eta=30; for s in "${steps[@]}"; do [ "$s" = models ] && eta=120; done
+pcq acquire "flutter pc.sh ${steps[*]}" --eta "$eta" --wait >>"$log" 2>&1 || { echo "pcq acquire fallo (ver $log)"; exit 2; }
 held=1
 
-# Powershell remoto con el entorno de Swift de Tools/win/remote/common.ps1 (Get-SwiftArgs).
-ps() { "${SSH[@]}" "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Set-Location '$PC_REPO_WIN'; . .\\Tools\\win\\remote\\common.ps1; $1\"" 2>&1 | tr -d '\r' >>"$log"; return "${PIPESTATUS[0]}"; }
 fail() { echo "paso $1: fallo (log: $log)"; tail -8 "$log"; exit 1; }
 
-step_sync() {
-  "${SSH[@]}" "cd $PC_REPO && git fetch -q origin $PC_BRANCH && git checkout -q $PC_BRANCH && git pull -q --ff-only origin $PC_BRANCH && git log --oneline -1" >>"$log" 2>&1 || return 1
-  echo "sync: $(tail -1 "$log")"
+# Sube los .ps1 (sin esto el PC no tiene los scripts de la rama aun sin commit).
+"${SSH[@]}" "mkdir -p /d/Personal/Guitar-Tool/Temp/p9/pc1" >>"$log" 2>&1 || fail upload
+scp -q -o BatchMode=yes Tools/flutter/pc/*.ps1 "$PC_HOST:$PC_P9_WIN/pc1/" >>"$log" 2>&1 || fail upload
+
+# rps <script.ps1> [args]: ejecuta el script en el PC; salida al log (sin CR) y las lineas TF: a $last; devuelve su codigo.
+last="$(mktemp)"
+trap 'rm -f "$last"; cleanup' EXIT
+rps() {
+  local script="$1"; shift
+  echo "=== $script $*" >>"$log"
+  "${SSH[@]}" "powershell -NoProfile -ExecutionPolicy Bypass -File $PC_P9_WIN/pc1/$script $*" 2>&1 | tr -d '\r' | tee -a "$log" | grep '^TF:' > "$last"
+  return "${PIPESTATUS[0]}"
 }
-step_core() {
-  ps '$a = @(Get-SwiftArgs); swift build --package-path Packages/AppCore --product AppCoreFFI @a; exit $LASTEXITCODE' || return 1
-  echo "core: AppCoreFFI compilado"
-}
+summary() { sed 's/^TF:/  /' "$last"; }
+
+step_sync() { rps sync.ps1 -Branch "$PC_BRANCH" || return 1; echo "sync:"; summary; }
+step_core() { rps core.ps1 || return 1; echo "core:"; grep -v '^TF:swift' "$last" | sed 's/^TF:/  /'; }
 step_app() {
-  # Compila la app y junta junto al .exe el AppCoreFFI.dll con sus DLL del runtime de Swift (mismo cierre que Probes/P9-flutter/win/core.ps1).
-  ps 'Set-Location FlutterApp; fvm flutter build windows --release; exit $LASTEXITCODE' || return 1
-  echo "app: flutter build windows --release correcto"
+  rps app.ps1 || return 1
+  echo "app:"; summary
   if [ -n "$shot_args" ]; then
-    local snap="$PC_REPO_WIN\\Temp\\flutter\\pc-shot.png"
-    ps "Remove-Item '$snap' -ErrorAction SilentlyContinue; New-Item -ItemType Directory -Force '$PC_REPO_WIN\\Temp\\flutter\\projects','$PC_REPO_WIN\\Temp\\flutter\\support' | Out-Null; \$exe = Get-ChildItem 'FlutterApp\\build\\windows\\x64\\runner\\Release\\*.exe' | Select-Object -First 1; \$p = Start-Process \$exe.FullName -ArgumentList '--projects-folder','$PC_REPO_WIN\\Temp\\flutter\\projects','--support-dir','$PC_REPO_WIN\\Temp\\flutter\\support','--snapshot','$snap',$(printf "'%s'," $shot_args | sed 's/,$//') -PassThru; \$p.WaitForExit(60000) | Out-Null; if (-not \$p.HasExited) { \$p.Kill() }; if (Test-Path '$snap') { exit 0 } else { exit 1 }" || return 1
-    echo "app: captura generada en el PC"
+    local b64; b64="$(printf '%s' "$shot_args" | base64 | tr -d '\n')"
+    rps shot.ps1 -ArgsB64 "'$b64'" || { summary; return 1; }
+    echo "app --shot:"; summary
   fi
 }
-step_test() {
-  ps 'Set-Location FlutterApp; fvm flutter analyze; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; fvm flutter test; exit $LASTEXITCODE' || return 1
-  echo "test: flutter analyze + test correctos"
-  ps '$a = @(Get-SwiftArgs); swift test --package-path Packages/AppCore @a; exit $LASTEXITCODE' || return 1
-  echo "test: swift test AppCore correcto"
-}
+step_test() { rps test.ps1 || return 1; echo "test:"; summary; }
+# models: tests con inferencia real (TF_MODEL_TESTS=1) sobre el clon f7, CPU y DirectML, de uno en uno (PC-3).
+#   pc.sh models [--provider cpu|dml|both] [--only <subcadena del test>] [--timeout <s por test>]
+step_models() { rps models.ps1 $models_args || { summary; return 1; }; echo "models:"; summary; }
+step_selftest() { rps selftest.ps1 -Code "${PC_SELFTEST_CODE:-1}" || return 1; }
 step_fetch() {
   local n=0 f
-  for f in $("${SSH[@]}" "cd $PC_REPO/Temp/flutter && ls *.png 2>/dev/null" | tr -d '\r'); do
-    scp -q -o BatchMode=yes "$PC_HOST:$PC_REPO_SCP/Temp/flutter/$f" "Temp/flutter/pc/$f" >>"$log" 2>&1 && n=$((n + 1))
+  for f in desktop.png app-snapshot.png; do
+    scp -q -o BatchMode=yes "$PC_HOST:$PC_P9_WIN/f7/Temp/flutter/$f" "Temp/flutter/pc/$f" >>"$log" 2>&1 && n=$((n + 1))
   done
   echo "fetch: $n capturas en Temp/flutter/pc/"
+  [ "$n" -gt 0 ]
 }
 
 for s in "${steps[@]}"; do
