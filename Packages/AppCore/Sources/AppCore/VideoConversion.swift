@@ -167,6 +167,8 @@ final class VideoConversionEngine: @unchecked Sendable {
     private var running: [UUID: Job] = [:]
     private var swaps: [UUID: (title: String, files: [Swap])] = [:]
     private var applying: Set<UUID> = []
+    /// Trabajo que ya salió de `running` y aún aplica la sustitución (para que `wait` también lo espere).
+    private var settling: [UUID: Task<Void, Never>] = [:]
     private var failures: [UUID: String] = [:]
     private var releasers: [Releaser] = []
     private var observers: [Observer] = []
@@ -310,7 +312,8 @@ final class VideoConversionEngine: @unchecked Sendable {
     var runningCount: Int { lock.withLock { running.count } }
 
     /// Espera a que acabe el trabajo de la toma, si hay (tests).
-    func wait(takeId: UUID) async { await lock.withLock({ running[takeId]?.task })?.value }
+    /// Incluye la aplicación de la sustitución (si no, `wait` volvía en el hueco entre convertir y sustituir).
+    func wait(takeId: UUID) async { await lock.withLock({ running[takeId]?.task ?? settling[takeId] })?.value }
 
     // MARK: Cola
 
@@ -367,10 +370,12 @@ final class VideoConversionEngine: @unchecked Sendable {
             // De «convirtiendo» a «pendiente de sustituir» sin hueco en el que `state` encolaría otra vez; la sustitución se
             // aplica ya, con el visor abierto o no (opción b'), y solo se queda pendiente si el original sigue en uso.
             lock.withLock {
+                settling[takeId] = running[takeId]?.task
                 running[takeId] = nil
                 swaps[takeId] = (title, made)
             }
             await applyPendingSoon(takeId: takeId)
+            lock.withLock { settling[takeId] = nil }
         } catch let error where Self.isCancellation(error) {
             for s in made { try? FileManager.default.removeItem(at: s.converted) }
             jobs.update(key, title: title, stage: stage, state: "cancelled", text: "Conversión cancelada")
