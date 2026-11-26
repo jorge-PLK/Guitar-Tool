@@ -62,17 +62,21 @@ class PlatformHostServices implements HostServices {
         return {'paths': [for (final f in fs) f.path]};
       case 'pickFolder':
         final initial = params['initial'];
+        // b10: el selector de macOS deja crear carpetas.
         final d = await getDirectoryPath(
-            initialDirectory: initial is String && initial.isNotEmpty ? initial : null);
+            initialDirectory: initial is String && initial.isNotEmpty ? initial : null,
+            canCreateDirectories: true);
         return {'path': d};
       case 'projectsFolderChanged':
         // Flutter abre los medios por ruta de fichero: no hay origen que volver a servir.
         return {'ok': true};
       case 'saveFile':
         final name = params['suggestedName'];
+        // b10: el selector de macOS deja crear carpetas.
         final loc = await getSaveLocation(
             suggestedName: name is String ? name : null,
-            acceptedTypeGroups: _groups(params));
+            acceptedTypeGroups: _groups(params),
+            canCreateDirectories: true);
         return {'path': loc?.path};
       case 'openURL':
         final url = params['url'];
