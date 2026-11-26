@@ -47,9 +47,7 @@ class _CalibrationSheetState extends ConsumerState<CalibrationSheet> {
   void dispose() {
     final AudioStore s = _store;
     // Fuera del desmontaje: el store notifica a los widgets.
-    Future<void>.microtask(() {
-      if (s.ref.mounted) unawaited(s.closeCalibration());
-    });
+    unawaited(Future<void>.microtask(s.closeCalibrationIfMounted));
     super.dispose();
   }
 

@@ -164,6 +164,12 @@ class RecordStore extends Notifier<RecordState> {
 
   CameraPoller? _poller;
 
+  /// Duración de un fotograma del desfase abierto (0 sin hoja); lo usa `setOffset` al fundir pasos.
+  num get offsetFrameMs => state.snapshot?.offset?.frameMs ?? 0;
+
+  /// El notifier sigue vivo (para las extensiones, que no pueden leer `ref`).
+  bool get isMounted => ref.mounted;
+
   void Function(Object, StackTrace) _badEvent(String name) =>
       (Object e, StackTrace st) => debugPrint('Evento $name ignorado (mal formado): $e');
 

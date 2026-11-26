@@ -252,6 +252,11 @@ class AudioStore extends Notifier<AudioStoreState> {
   /// Solo si la hoja se destruye con la medida en marcha: `audio.cancelCalibration`.
   Future<void> cancelCalibration() => _calCall('audio.cancelCalibration');
 
+  /// Cierre de la hoja al destruirse: como [closeCalibration] pero solo si el notifier sigue vivo.
+  Future<void> closeCalibrationIfMounted() async {
+    if (ref.mounted) await closeCalibration();
+  }
+
   /// Cierre de la hoja: cancela si mide, si no descarta el resultado.
   Future<void> closeCalibration() =>
       state.calibrationRunning ? cancelCalibration() : dismissCalibration();

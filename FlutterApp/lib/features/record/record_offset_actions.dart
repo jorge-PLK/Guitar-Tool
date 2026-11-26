@@ -38,13 +38,13 @@ extension RecordOffsetActions on RecordStore {
     final _Pending next = _Pending(valueMs: valueMs, deltaMs: deltaMs, frames: frames);
     final _Pending? p = q.pending;
     if (q.inFlight) {
-      q.pending = p == null ? next : _merge(p, next, state.offset?.frameMs ?? 0);
+      q.pending = p == null ? next : _merge(p, next, offsetFrameMs);
       return;
     }
     q.inFlight = true;
     _Pending? cur = next;
     try {
-      while (cur != null && ref.mounted) {
+      while (cur != null && isMounted) {
         await act('record.setOffset', RecordOffsetParams(valueMs: cur.valueMs, deltaMs: cur.deltaMs, frames: cur.frames).toJson());
         cur = q.pending;
         q.pending = null;
