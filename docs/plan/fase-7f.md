@@ -11,7 +11,7 @@ Cerrada 24/11/2026 con visto bueno de Jorge (suite 20:51, Flutter 328 tests); la
 - [x] **Ola 1 · Biblioteca:** Biblioteca, detalle de tema, grabaciones del tema, importación por fichero y por enlace, listas y álbumes, cola de trabajos, primer arranque, Ajustes · Biblioteca y selector de idioma (`pantallas/biblioteca.md`, `pantallas/ajustes.md`).
 
 Cerrada 25/11/2026 con visto bueno de Jorge tras su prueba a mano. Pendiente de Windows en «Pendiente de Windows»; desvíos L14-L16 abiertos para la ola 5 (`docs/flutter/desvios.md`).
-- [ ] **Ola 2 · Estudio:** Backing (mezclador, rejilla de acordes, secciones, bucle, metrónomo) y Tablatura (WebView de alphaTab, edición, Songsterr, exportar `.gp`) (`pantallas/backing.md`, `pantallas/tablatura.md`).
+- [x] **Ola 2 · Estudio:** Backing (mezclador, rejilla de acordes, secciones, bucle, metrónomo) y Tablatura (WebView de alphaTab, edición, Songsterr, exportar `.gp`) (`pantallas/backing.md`, `pantallas/tablatura.md`).
 - [ ] **Ola 3 · Grabación:** Grabar, Ver toma, Ajustar desfase, Ajustes · Audio (calibración) y Ajustes · Cámara y vídeo (`pantallas/grabar.md`, `pantallas/ajustes.md`).
 - [ ] **Ola 4 · Montaje:** Montaje y hoja «Encuadre» (`pantallas/montaje.md`).
 - [ ] **Ola 5 · Cierre:** empaquetado de Mac y de Windows (recursos, DLL), mensajes del núcleo por código en todas las áreas que falten, pasada única en el PC x64 al final (tras validar todas las olas en el Mac), borrado de `App/`, `WinApp/Web`, `Tools/webdev` y `FrameRelay` en JPEG, CODEMAP y `CLAUDE.md`.
