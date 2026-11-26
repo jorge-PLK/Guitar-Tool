@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="color-scheme" content="light dark">
 <style>
+  /* Barra vertical siempre presente: si aparece al crecer la partitura, el ancho útil baja y alphaTab re-renderiza
+     encima del primer render sin terminar (partitura doble). Con la barra fija el ancho no cambia tras pintar. */
+  html { overflow-y: scroll; }
   html, body { margin: 0; padding: 0; background: transparent; overflow-x: hidden; }
   #alphaTab { padding: 8px; box-sizing: border-box; }
 </style>
