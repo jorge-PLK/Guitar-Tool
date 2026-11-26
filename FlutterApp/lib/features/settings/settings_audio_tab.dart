@@ -39,6 +39,8 @@ class SettingsAudioTab extends ConsumerWidget {
     final AudioRateMismatch? mm = cfg.rateMismatch;
     final int bi = backingIndex(cfg);
     final int gi = guitarIndex(cfg);
+    final bool showOut = cfg.outputChannelCount > 0;
+    final bool showIn = cfg.inputChannelCount > 0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -92,45 +94,48 @@ class SettingsAudioTab extends ConsumerWidget {
               ),
           ],
         ),
-        TfSettingsGroup(
-          title: l.settings_audio_channelsTitle,
-          note: l.settings_audio_channelsNote,
-          children: <Widget>[
-            TfInfoRow(
-              label: l.settings_audio_backingOut,
-              trailing: TfDropdown<int>(
-                items: <TfDropdownItem<int>>[
-                  for (int i = 0; i < cfg.backingChoices.length; i++)
-                    TfDropdownItem<int>(value: i, label: backingLabel(l, cfg.backingChoices[i])),
-                ],
-                value: bi < 0 ? null : bi,
-                onChanged: (int i) =>
-                    store.setBackingOut(cfg.backingChoices[i].left, cfg.backingChoices[i].right),
-              ),
-            ),
-            TfInfoRow(
-              label: l.settings_audio_guitarIn,
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                spacing: TfSpace.s12,
-                children: <Widget>[
-                  TfInputMeters(levels: levels),
-                  TfDropdown<int>(
+        if (showOut || showIn)
+          TfSettingsGroup(
+            title: l.settings_audio_channelsTitle,
+            note: l.settings_audio_channelsNote,
+            children: <Widget>[
+              if (showOut)
+                TfInfoRow(
+                  label: l.settings_audio_backingOut,
+                  trailing: TfDropdown<int>(
                     items: <TfDropdownItem<int>>[
-                      for (int i = 0; i < cfg.guitarChoices.length; i++)
-                        TfDropdownItem<int>(value: i, label: guitarLabel(l, cfg.guitarChoices[i])),
+                      for (int i = 0; i < cfg.backingChoices.length; i++)
+                        TfDropdownItem<int>(value: i, label: backingLabel(l, cfg.backingChoices[i])),
                     ],
-                    value: gi < 0 ? null : gi,
-                    placeholder: l.settings_audio_unassigned,
-                    onChanged: noInput
-                        ? null
-                        : (int i) => store.setGuitarIn(cfg.guitarChoices[i].channels),
+                    value: bi < 0 ? null : bi,
+                    onChanged: (int i) =>
+                        store.setBackingOut(cfg.backingChoices[i].left, cfg.backingChoices[i].right),
                   ),
-                ],
-              ),
-            ),
-          ],
-        ),
+                ),
+              if (showIn)
+                TfInfoRow(
+                  label: l.settings_audio_guitarIn,
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    spacing: TfSpace.s12,
+                    children: <Widget>[
+                      TfInputMeters(levels: levels),
+                      TfDropdown<int>(
+                        items: <TfDropdownItem<int>>[
+                          for (int i = 0; i < cfg.guitarChoices.length; i++)
+                            TfDropdownItem<int>(value: i, label: guitarLabel(l, cfg.guitarChoices[i])),
+                        ],
+                        value: gi < 0 ? null : gi,
+                        placeholder: l.settings_audio_unassigned,
+                        onChanged: noInput
+                            ? null
+                            : (int i) => store.setGuitarIn(cfg.guitarChoices[i].channels),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
         TfSettingsGroup(
           title: l.settings_audio_calTitle,
           note: l.settings_audio_calNote,

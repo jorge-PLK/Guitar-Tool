@@ -117,6 +117,23 @@ void main() {
     expect(t.c.read(audioStoreProvider).devices, isNotNull);
   });
 
+  test('expone los contadores de canales y los vuelve a leer en devicesChanged', () async {
+    final t = await setup();
+    var s = t.c.read(audioStoreProvider).settings!;
+    expect((s.outputChannelCount, s.inputChannelCount), (2, 2));
+    final j = s.toJson()
+      ..['outputChannelCount'] = 0
+      ..['inputChannelCount'] = 0
+      ..['backingChoices'] = <Object?>[]
+      ..['guitarChoices'] = <Object?>[];
+    t.core.result('audio.settings', j);
+    t.core.emitFixture('audio.devicesChanged');
+    await settle();
+    s = t.c.read(audioStoreProvider).settings!;
+    expect((s.outputChannelCount, s.inputChannelCount), (0, 0));
+    expect(s.backingChoices, isEmpty);
+  });
+
   test('al salir de la pestaña se vacían los medidores', () async {
     final t = await setup();
     t.core.emitFixture('audio.levels');

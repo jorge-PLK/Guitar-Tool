@@ -50,6 +50,12 @@ void main() {
     ]) {
       _result(n, (j) => AudioSettings.fromJson(j).toJson());
     }
+    test('contadores de canales del dispositivo', () async {
+      final ok = AudioSettings.fromJson(await _load('audio/audio.settings.result.json'));
+      expect((ok.outputChannelCount, ok.inputChannelCount), (2, 2));
+      final noIn = AudioSettings.fromJson(await _load('audio/audio.settings.noinput.result.json'));
+      expect((noIn.outputChannelCount, noIn.inputChannelCount), (2, 0));
+    });
   });
 
   group('AudioState', () {

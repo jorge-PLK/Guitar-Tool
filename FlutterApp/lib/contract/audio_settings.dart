@@ -134,6 +134,8 @@ class AudioSettings {
     required this.guitarChoices,
     required this.calibration,
     required this.calibrateInstructions,
+    required this.outputChannelCount,
+    required this.inputChannelCount,
     this.outputDeviceUID,
     this.inputDeviceUID,
     this.guitarIn,
@@ -160,6 +162,8 @@ class AudioSettings {
             ? null
             : CoreMessage.fromJson(j['calibrateBlockMessage'] as Json),
         calibrateInstructions: (j['calibrateInstructions'] as List).cast<String>(),
+        outputChannelCount: j['outputChannelCount'] as int,
+        inputChannelCount: j['inputChannelCount'] as int,
       );
 
   final String? outputDeviceUID;
@@ -176,6 +180,10 @@ class AudioSettings {
   final CoreMessage? calibrateBlockMessage;
   final List<String> calibrateInstructions;
 
+  /// Canales del dispositivo elegido; 0 si no hay dispositivo o está desconectado.
+  final int outputChannelCount;
+  final int inputChannelCount;
+
   Json toJson() => {
         'outputDeviceUID': outputDeviceUID,
         'inputDeviceUID': inputDeviceUID,
@@ -190,5 +198,7 @@ class AudioSettings {
         'calibrateBlock': calibrateBlock,
         'calibrateBlockMessage': calibrateBlockMessage?.toJson(),
         'calibrateInstructions': calibrateInstructions,
+        'outputChannelCount': outputChannelCount,
+        'inputChannelCount': inputChannelCount,
       }..removeWhere((_, v) => v == null);
 }

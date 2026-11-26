@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -15,6 +17,11 @@ import '../../support/harness.dart';
 
 Future<MockCore> _core(WidgetTester tester, {String? state}) async =>
     (await tester.runAsync(() => _load(state)))!;
+
+Future<Map<String, Object?>> _fixture(String rel) async {
+  final src = await DirectoryFixtureSource.find();
+  return jsonDecode(await src!.read(rel)) as Map<String, Object?>;
+}
 
 Future<MockCore> _load(String? state) async {
   final src = await DirectoryFixtureSource.find();
@@ -56,6 +63,8 @@ void main() {
     await _open(tester, await _core(tester));
     expect(find.text('Dispositivo'), findsOneWidget);
     expect(find.text('Canales'), findsOneWidget);
+    expect(find.text('Salida del backing'), findsOneWidget);
+    expect(find.text('Entrada de guitarra'), findsOneWidget);
     expect(find.text('Calibración'), findsOneWidget);
     expect(find.byType(TfDropdown<String?>), findsNWidgets(2));
     expect(find.text('Dispositivo de salida'), findsOneWidget);
@@ -69,8 +78,27 @@ void main() {
     expect(find.text('Elige un dispositivo de entrada en Ajustes · Audio.'), findsOneWidget);
     expect(_calButton(tester).onPressed, isNull);
     expect(find.text('Ninguna'), findsWidgets);
-    final dd = tester.widget<TfDropdown<int>>(find.byType(TfDropdown<int>).last);
-    expect(dd.onChanged, isNull);
+    // Sin canales de entrada no hay fila de guitarra; la de salida sigue.
+    expect(find.text('Entrada de guitarra'), findsNothing);
+    expect(find.text('Salida del backing'), findsOneWidget);
+    expect(find.text('Canales'), findsOneWidget);
+  });
+
+  testWidgets('sin ningún canal: el grupo «Canales» desaparece entero', (tester) async {
+    final core = await _core(tester);
+    final j = Map<String, Object?>.from(
+        (await tester.runAsync(() => _fixture('audio/audio.settings.disconnected.result.json')))!);
+    j['outputChannelCount'] = 0;
+    j['inputChannelCount'] = 0;
+    j['backingChoices'] = <Object?>[];
+    j['guitarChoices'] = <Object?>[];
+    core.result('audio.settings', j);
+    await _open(tester, core);
+    expect(find.text('Dispositivo'), findsOneWidget);
+    expect(find.text('Canales'), findsNothing);
+    expect(find.text('Salida del backing'), findsNothing);
+    expect(find.text('Entrada de guitarra'), findsNothing);
+    expect(find.text('Calibración'), findsOneWidget);
   });
 
   testWidgets('desajuste de frecuencia: aviso y «Usar la del dispositivo»', (tester) async {
