@@ -77,16 +77,16 @@ String backingLabel(AppLocalizations l, AudioBacking b) =>
 
 String guitarLabel(AppLocalizations l, AudioGuitarChoice g) {
   final List<int>? c = g.channels;
-  if (c == null || c.isEmpty) return l.settings_audio_unassigned;
+  if (c == null || c.isEmpty) return g.label;
   if (c.length == 1) return l.settings_audio_inputN(c[0]);
   return l.settings_audio_inputsNM(c[0], c[1]);
 }
 
 int guitarIndex(AudioSettings s) {
-  final int i = s.guitarChoices.indexWhere((AudioGuitarChoice g) =>
-      ((g.channels?.isEmpty ?? true) && (s.guitarIn?.isEmpty ?? true)) ||
-      listEquals(g.channels, s.guitarIn));
-  return i;
+  final int i = s.guitarChoices
+      .indexWhere((AudioGuitarChoice g) => g.channels != null && listEquals(g.channels, s.guitarIn));
+  // Sin «Sin asignar» (M-7): si el valor no está en las opciones, se muestra la primera.
+  return i >= 0 || s.guitarChoices.isEmpty ? i : 0;
 }
 
 int backingIndex(AudioSettings s) => s.backingChoices

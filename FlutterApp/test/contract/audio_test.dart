@@ -45,7 +45,6 @@ void main() {
       'audio.settings.disconnected.result',
       'audio.setSettings.result',
       'audio.setSettings.guitarabsent.result',
-      'audio.setSettings.guitarnull.result',
       'audio.setSettings.outputnull.result',
     ]) {
       _result(n, (j) => AudioSettings.fromJson(j).toJson());
@@ -68,7 +67,6 @@ void main() {
       'audio.state.ratemismatch.result',
       'audio.setMeters.result',
       'audio.setMeters.hidden.result',
-      'audio.setMeters.visibleforerror.result',
     ]) {
       _result(n, (j) => AudioState.fromJson(j).toJson());
     }
@@ -90,12 +88,10 @@ void main() {
     for (final n in [
       'audio.calibrate.result',
       'audio.calibrate.failure.result',
-      'audio.calibrate.error.result',
       'audio.calibration.idle.event',
       'audio.calibration.running.event',
       'audio.calibration.success.event',
       'audio.calibration.failure.event',
-      'audio.calibration.error.event',
       'audio.cancelCalibration.result',
       'audio.dismissCalibration.result',
     ]) {
@@ -121,11 +117,15 @@ void main() {
     expect(state.calibrateBlockMessage?.code, 'audio-block-no-input-device');
   });
 
+  test('guitarnull.error: bad-params (guitarIn no admite null)', () async {
+    final e = await _load('audio/audio.setSettings.guitarnull.error.json');
+    expect(e['code'], 'bad-params');
+  });
+
   group('AudioSetMetersParams', () {
     for (final n in [
       'audio.setMeters.params',
       'audio.setMeters.hidden.params',
-      'audio.setMeters.visibleforerror.params',
     ]) {
       _params(n, (j) => AudioSetMetersParams.fromJson(j).toJson());
     }

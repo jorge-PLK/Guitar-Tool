@@ -164,13 +164,24 @@ enum ChannelChoices {
 
     static let monoLabel = "Salida 1 · mono"
 
-    static func guitar(channels: Int, current: AudioSettings) -> [ChannelChoice<[Int]?>] {
+    /// Sin «Sin asignar» (M-7): con dispositivo de entrada siempre hay un canal de guitarra asignado.
+    static func guitar(channels: Int, current: AudioSettings) -> [ChannelChoice<[Int]>] {
         var options: [[Int]] = (1...max(channels, 1)).map { [$0] }
         options += stride(from: 1, to: channels, by: 2).map { [$0, $0 + 1] }
         if let g = current.guitarIn, !options.contains(g), fits(g, channels: channels) { options.append(g) }
         let valid = options.filter { g in var a = current; a.guitarIn = g; return a.isValid }
-        return [ChannelChoice<[Int]?>(label: "Sin asignar", value: nil)]
-            + valid.map { ChannelChoice<[Int]?>(label: $0.count == 1 ? "Entrada \($0[0])" : "Entradas \($0[0]) y \($0[1])", value: $0) }
+        return valid.map { ChannelChoice<[Int]>(label: $0.count == 1 ? "Entrada \($0[0])" : "Entradas \($0[0]) y \($0[1])", value: $0) }
+    }
+
+    /// Guitarra efectiva (M-7): con dispositivo de entrada nunca nil. Lo guardado si cabe en `inputChannels` (nil = dispositivo
+    /// ausente, no se puede comprobar); si no, la primera opción válida («Entrada 1»). Sin dispositivo de entrada, tal cual.
+    static func resolvedGuitar(_ a: AudioSettings, inputChannels: Int?) -> [Int]? {
+        guard a.inputDeviceUID != nil else { return a.guitarIn }
+        if let g = a.guitarIn, inputChannels.map({ fits(g, channels: $0) }) ?? true { return g }
+        guard let n = inputChannels, n > 0 else { return a.guitarIn ?? [1] }
+        var base = a
+        base.guitarIn = nil
+        return guitar(channels: n, current: base).first?.value ?? [1]
     }
 }
 
@@ -211,7 +222,13 @@ final class AudioController {
     var onHostingEnded: (() -> Void)?
 
     private(set) var profile = EquipmentProfile() { didSet { onStateChange?() } }
-    var settings: AudioSettings? { profile.audio }
+    /// Ajustes con la guitarra resuelta (M-7): ajustes antiguos con `guitarIn` nil se resuelven aquí con la opción por omisión.
+    var settings: AudioSettings? {
+        guard var a = profile.audio else { return nil }
+        let channels = a.inputDeviceUID.flatMap { uid in devices.inputs.first { $0.uid == uid }?.inputChannels }
+        a.guitarIn = ChannelChoices.resolvedGuitar(a, inputChannels: channels)
+        return a
+    }
     var workingRate: Double { profile.workingSampleRate }
     private(set) var session: AudioSession?
     private(set) var sessionError: String? { didSet { if sessionError != oldValue { onStateChange?() } } }
@@ -264,6 +281,10 @@ final class AudioController {
         devices.onChange = { [weak self] in self?.devicesChanged() }
     }
 
+    /// Al soltarse el controlador (nadie lo cierra a mano: p. ej. un núcleo descartado) se cierra la sesión, que para la E/S
+    /// y con ella el hilo de bombeo simulado (PC7).
+    isolated deinit { session?.close() }
+
     /// Lee el perfil y abre la sesión si toca. Se llama una vez, al primer uso (`audio.*` o abrir un tema); las demás veces no hace nada.
     func start() {
         guard !started else { return }
@@ -306,10 +327,10 @@ final class AudioController {
     func updateAudio(workingRate: Double? = nil, _ change: (inout AudioSettings) -> Void) throws {
         var a = settings ?? AudioSettings()
         change(&a)
-        // Una guitarra que no cabe en el dispositivo de entrada elegido (p. ej. [1, 2] en uno de 1 canal) queda «Sin asignar».
-        if let g = a.guitarIn, let uid = a.inputDeviceUID, let d = devices.inputs.first(where: { $0.uid == uid }),
-           !ChannelChoices.fits(g, channels: d.inputChannels) {
-            a.guitarIn = nil
+        // Una guitarra que no cabe en el dispositivo de entrada (p. ej. [1, 2] en uno de 1 canal) o ausente pasa a «Entrada 1» (M-7).
+        if a.inputDeviceUID != nil {
+            let channels = a.inputDeviceUID.flatMap { uid in devices.inputs.first { $0.uid == uid }?.inputChannels }
+            if let g = ChannelChoices.resolvedGuitar(a, inputChannels: channels), g != a.guitarIn { a.setGuitar(g) }
         }
         // Una salida de un canal solo admite el backing mono (M-3d); vale también como valor por defecto de un dispositivo nuevo.
         if let uid = a.outputDeviceUID, let d = devices.outputs.first(where: { $0.uid == uid }), d.outputChannels == 1,

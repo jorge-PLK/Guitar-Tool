@@ -38,7 +38,7 @@ struct AudioBackingChoice: Codable, Sendable, Equatable {
 
 struct AudioGuitarChoice: Codable, Sendable, Equatable {
     var label: String
-    /// nil = «Sin asignar».
+    /// Siempre con valor desde M-7 (no existe «Sin asignar»).
     var channels: [Int]?
 }
 
@@ -151,7 +151,7 @@ struct AudioLevelsEvent: Codable, Sendable, Equatable {
 }
 
 struct AudioSetSettingsParams: Decodable, Sendable {
-    /// Doble opcional: `nil` = ausente (no se toca), `.some(nil)` = `null` (salida del sistema / sin entrada / sin asignar).
+    /// Doble opcional: `nil` = ausente (no se toca), `.some(nil)` = `null` (salida del sistema / sin entrada); `guitarIn: null` se rechaza (M-7).
     var outputDeviceUID: String??
     var inputDeviceUID: String??
     var backingOut: AudioChannelPair?
@@ -311,12 +311,16 @@ final class AudioService {
         if let b = p.backingOut, b.left < 1 || b.right < 1 {
             throw RPCError(code: "bad-params", message: "«backingOut» numera los canales desde 1.")
         }
+        // M-7: no existe «Sin asignar»; `guitarIn: null` explícito es un error de parámetros.
+        if let g = p.guitarIn, g == nil {
+            throw RPCError(code: "bad-params", message: "«guitarIn» no admite null: con entrada siempre hay un canal de guitarra.")
+        }
         do {
             try c.updateAudio(workingRate: p.workingSampleRate) { a in
                 if let o = p.outputDeviceUID { a.chooseOutput(o) }
                 if let i = p.inputDeviceUID { a.chooseInput(i) }
                 if let b = p.backingOut { a.setBacking(ChannelPair(left: b.left, right: b.right)) }
-                if let g = p.guitarIn { a.setGuitar(g) }
+                if let g = p.guitarIn, let g { a.setGuitar(g) }
             }
         } catch is AudioSettingsError {
             throw RPCError(code: "bad-params", message: RecordBlock.invalidChannels.message)

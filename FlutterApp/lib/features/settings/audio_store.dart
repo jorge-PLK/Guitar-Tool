@@ -206,9 +206,9 @@ class AudioStore extends Notifier<AudioStoreState> {
   Future<void> setInput(String? uid) => _setSettings(AudioSetSettingsParams(
       inputDeviceUID: uid == null ? const Patch.nullValue() : Patch.of(uid)));
 
-  /// `null` = «Sin asignar».
-  Future<void> setGuitarIn(List<int>? channels) => _setSettings(AudioSetSettingsParams(
-      guitarIn: channels == null ? const Patch.nullValue() : Patch.of(channels)));
+  /// Nunca null: el núcleo rechaza `guitarIn: null` (`bad-params`).
+  Future<void> setGuitarIn(List<int> channels) =>
+      _setSettings(AudioSetSettingsParams(guitarIn: Patch.of(channels)));
 
   Future<void> setBackingOut(int left, int right) =>
       _setSettings(AudioSetSettingsParams(backingOut: AudioBacking(left: left, right: right)));

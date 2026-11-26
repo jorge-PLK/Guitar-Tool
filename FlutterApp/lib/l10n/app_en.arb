@@ -1293,8 +1293,6 @@
   "@settings_audio_rateMismatchHint": {"description":"Ajustes Audio: pista de frecuencias distintas (AS:168)."},
   "settings_audio_systemOutput": "System output",
   "@settings_audio_systemOutput": {"description":"Ajustes Audio: salida del sistema (AS:119)."},
-  "settings_audio_unassigned": "Unassigned",
-  "@settings_audio_unassigned": {"description":"Ajustes Audio: canal sin asignar (AS:59-60)."},
   "settings_audio_uncalibrated": "Not calibrated",
   "@settings_audio_uncalibrated": {"description":"Ajustes Audio: latencia sin calibrar (AS:227)."},
   "settings_audio_useRate": "Use {rate} as working rate",

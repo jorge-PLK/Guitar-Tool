@@ -20,11 +20,6 @@
     "left" : 1,
     "right" : 2
   },
-  "calibrateBlock" : "Asigna la entrada de guitarra en Ajustes · Audio.",
-  "calibrateBlockMessage" : {
-    "code" : "audio-block-no-guitar-input",
-    "message" : "Asigna la entrada de guitarra en Ajustes · Audio."
-  },
   "calibrateInstructions" : [
     "Conecta con un cable una salida del dispositivo a su entrada de guitarra.",
     "Con una pedalera, carga un rig vacío y baja el volumen de salida: el bucle realimenta (entrada, rig, salida, cable, entrada).",
@@ -35,9 +30,6 @@
     "label" : "Sin calibrar"
   },
   "guitarChoices" : [
-    {
-      "label" : "Sin asignar"
-    },
     {
       "channels" : [
         1
@@ -57,6 +49,9 @@
       ],
       "label" : "Entradas 1 y 2"
     }
+  ],
+  "guitarIn" : [
+    1
   ],
   "inputChannelCount" : 2,
   "inputDeviceUID" : "sim-in",

@@ -58,12 +58,11 @@ void main() {
     expect(t.core.calls, isEmpty);
   });
 
-  test('setSettings envía null explícito para salida, entrada y guitarra, y solo lo que cambia', () async {
+  test('setSettings envía null explícito para salida y entrada, y solo lo que cambia', () async {
     final t = await setup();
     final n = t.c.read(audioStoreProvider.notifier);
     await n.setOutput(null);
     await n.setInput(null);
-    await n.setGuitarIn(null);
     await n.setGuitarIn([1]);
     await n.setOutput('abc');
     await n.setBackingOut(2, 3);
@@ -72,11 +71,10 @@ void main() {
     expect(p[0], {'outputDeviceUID': null});
     expect(p[0].containsKey('inputDeviceUID'), isFalse);
     expect(p[1], {'inputDeviceUID': null});
-    expect(p[2], {'guitarIn': null});
-    expect(p[3], {'guitarIn': [1]});
-    expect(p[4], {'outputDeviceUID': 'abc'});
-    expect(p[5], {'backingOut': {'left': 2, 'right': 3}});
-    expect(p[6], {'workingSampleRate': 44100});
+    expect(p[2], {'guitarIn': [1]});
+    expect(p[3], {'outputDeviceUID': 'abc'});
+    expect(p[4], {'backingOut': {'left': 2, 'right': 3}});
+    expect(p[5], {'workingSampleRate': 44100});
     expect(t.c.read(audioStoreProvider).settings, isNotNull);
   });
 

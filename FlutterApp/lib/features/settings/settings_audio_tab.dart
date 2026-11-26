@@ -126,10 +126,12 @@ class SettingsAudioTab extends ConsumerWidget {
                             TfDropdownItem<int>(value: i, label: guitarLabel(l, cfg.guitarChoices[i])),
                         ],
                         value: gi < 0 ? null : gi,
-                        placeholder: l.settings_audio_unassigned,
                         onChanged: noInput
                             ? null
-                            : (int i) => store.setGuitarIn(cfg.guitarChoices[i].channels),
+                            : (int i) {
+                                final List<int>? ch = cfg.guitarChoices[i].channels;
+                                if (ch != null) store.setGuitarIn(ch);
+                              },
                       ),
                     ],
                   ),

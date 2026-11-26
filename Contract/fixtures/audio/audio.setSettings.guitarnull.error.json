@@ -1,0 +1,4 @@
+{
+  "code" : "bad-params",
+  "message" : "«guitarIn» no admite null: con entrada siempre hay un canal de guitarra."
+}

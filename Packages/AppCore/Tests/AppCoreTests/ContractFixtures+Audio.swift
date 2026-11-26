@@ -121,7 +121,7 @@ final class ContractFixturesAudioTests: XCTestCase {
             _ = c
         }
 
-        // Sin calibrar, con guitarra asignada; setSettings con tres estados de `guitarIn`.
+        // Sin calibrar, con guitarra asignada; setSettings con `guitarIn` ausente y null (rechazado, M-7).
         do {
             let (f, c, _, _) = try make(rig)
             try await f.call("audio.setSettings", params: "{\"inputDeviceUID\":\"sim-in\",\"guitarIn\":[1]}")
@@ -155,16 +155,6 @@ final class ContractFixturesAudioTests: XCTestCase {
             try guitar(c)
             try await f.call("audio.calibrate", variant: "failure")
             try f.event("audio.calibration", variant: "failure", AudioService.calibrationState(c.calibrationPhase))
-        }
-
-        // Error: sesión abierta sin guitarra asignada.
-        do {
-            let (f, c, _, _) = try make(rig)
-            try c.updateAudio { $0.chooseInput(AudioController.simulatedInputUID) }
-            try await f.call("audio.setMeters", variant: "visibleforerror", params: "{\"visible\":true}")
-            try await f.call("audio.calibrate", variant: "error")
-            try f.event("audio.calibration", variant: "error", AudioService.calibrationState(c.calibrationPhase))
-            c.metersVisible = false
         }
 
         // Frecuencia distinta: el dispositivo de entrada no cambia de frecuencia y el perfil trabaja a 48 kHz.

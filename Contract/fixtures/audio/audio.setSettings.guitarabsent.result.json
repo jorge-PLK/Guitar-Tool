@@ -31,9 +31,6 @@
   },
   "guitarChoices" : [
     {
-      "label" : "Sin asignar"
-    },
-    {
       "channels" : [
         1
       ],

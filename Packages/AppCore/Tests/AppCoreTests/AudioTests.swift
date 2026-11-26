@@ -18,6 +18,21 @@ final class AudioTests: XCTestCase {
         func all(_ name: String) -> [[String: Any]] { lock.withLock { items.filter { $0.name == name }.map(\.payload) } }
     }
 
+    /// PC7: parar la E/S simulada (cierre de sesión) termina su hilo de bombeo; no quedan hilos vivos que carguen la CPU.
+    nonisolated func testPumpThreadEndsWhenSimulatedIOStops() throws {
+        let io = SimulatedAudioIO(sampleRate: 48_000, inputs: [SimulatedInput(source: nil)], latencySamples: 2_000,
+                                  declaredLatencySamples: 1_000)
+        let pump = RealtimePump(io: io, sampleRate: 48_000, block: 512)
+        try io.start(render: { _ in }, capture: { _ in })
+        pump.start()
+        Thread.sleep(forTimeInterval: 0.05)   // el hilo ve la E/S en marcha antes de pararla
+        XCTAssertTrue(pump.isAlive)
+        io.stop()
+        let deadline = Date().addingTimeInterval(2)
+        while pump.isAlive, Date() < deadline { Thread.sleep(forTimeInterval: 0.01) }
+        XCTAssertFalse(pump.isAlive)
+    }
+
     func tempDir() throws -> URL {
         let d = FileManager.default.temporaryDirectory.appendingPathComponent("audio-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
@@ -90,12 +105,11 @@ final class AudioTests: XCTestCase {
         XCTAssertNil(c.sessionError)
         XCTAssertEqual(try store.load().audio?.guitarIn, [1], "se guarda en el perfil")
         XCTAssertNil(c.deviceBlock)
-        try c.updateAudio { $0.guitarIn = nil }
-        XCTAssertNil(c.session, "sin guitarra y sin medidores la sesión se cierra")
-        c.metersVisible = true
-        XCTAssertEqual(c.session?.isOpen, true, "con los medidores a la vista se abre sin guitarra")
-        c.metersVisible = false
-        XCTAssertNil(c.session)
+        try c.updateAudio { $0.chooseInput(nil) }
+        XCTAssertNil(c.session, "sin entrada la sesión se cierra")
+        try c.updateAudio { $0.chooseInput(AudioController.simulatedInputUID) }
+        XCTAssertEqual(c.session?.isOpen, true)
+        XCTAssertEqual(c.settings?.guitarIn, [1], "se restaura la guitarra recordada del dispositivo")
     }
 
     func testSettingsChangeReopensAtNewRate() throws {
@@ -157,7 +171,7 @@ final class AudioTests: XCTestCase {
         try guitarSetup(c)
         try c.updateAudio { $0.setGuitar([2]) }
         try c.updateAudio { $0.chooseInput("otro") }
-        XCTAssertNil(c.settings?.guitarIn, "dispositivo nuevo: sin asignar")
+        XCTAssertEqual(c.settings?.guitarIn, [1], "dispositivo nuevo: Entrada 1 por omisión (M-7)")
         try c.updateAudio { $0.chooseInput(AudioController.simulatedInputUID) }
         XCTAssertEqual(try store.load().audio?.guitarIn, [2])
         XCTAssertEqual(try store.load().audio?.guitarByDevice[AudioController.simulatedInputUID], [2])
@@ -169,9 +183,9 @@ final class AudioTests: XCTestCase {
             var a = AudioSettings(); a.guitarIn = g
             return ChannelChoices.guitar(channels: n, current: a).map(\.label)
         }
-        XCTAssertEqual(labels(1, nil), ["Sin asignar", "Entrada 1"])
-        XCTAssertEqual(labels(2, nil), ["Sin asignar", "Entrada 1", "Entrada 2", "Entradas 1 y 2"])
-        XCTAssertEqual(labels(1, [1, 2]), ["Sin asignar", "Entrada 1"], "el actual [1, 2] no cabe en 1 canal")
+        XCTAssertEqual(labels(1, nil), ["Entrada 1"])
+        XCTAssertEqual(labels(2, nil), ["Entrada 1", "Entrada 2", "Entradas 1 y 2"])
+        XCTAssertEqual(labels(1, [1, 2]), ["Entrada 1"], "el actual [1, 2] no cabe en 1 canal")
     }
 
     /// M-3d: una salida de 1 canal solo ofrece «Salida 1 · mono»; con 2 o más, los pares estéreo de siempre.
@@ -194,17 +208,31 @@ final class AudioTests: XCTestCase {
         XCTAssertEqual(try store.load().audio?.backingByDevice["mono-out"], .mono)
     }
 
-    /// M-3c: con un dispositivo de 1 canal, una guitarra [1, 2] queda sin asignar (respuesta y perfil).
+    /// M-7: con entrada nunca hay «Sin asignar»; un dispositivo nuevo queda en Entrada 1.
+    func testNewInputDeviceDefaultsToInput1() throws {
+        let dev = AudioDevice(id: 9, uid: "nuevo", name: "Interfaz", inputChannels: 2)
+        let (c, store) = try makeController(provider: SimulatedDeviceProvider(devices: [dev], defaultID: nil))
+        try c.updateAudio { $0.chooseInput("nuevo") }
+        XCTAssertEqual(c.settings?.guitarIn, [1])
+        XCTAssertEqual(try store.load().audio?.guitarIn, [1])
+        XCTAssertEqual(try store.load().audio?.guitarByDevice["nuevo"], [1])
+        // Ajustes antiguos con guitarIn nil se resuelven al leerlos.
+        try c.modifyProfile { $0.audio?.guitarIn = nil; $0.audio?.guitarByDevice = [:] }
+        XCTAssertEqual(c.settings?.guitarIn, [1])
+        XCTAssertEqual(AudioService.settingsResult(c).guitarIn, [1])
+    }
+
+    /// M-3c/M-7: con un dispositivo de 1 canal, una guitarra [1, 2] pasa a [1] (respuesta y perfil).
     func testGuitarPairIsDroppedOnMonoInput() throws {
         let mono = AudioDevice(id: 9, uid: "mono", name: "Micro mono", inputChannels: 1)
         let provider = SimulatedDeviceProvider(devices: [mono], defaultID: nil)
         let (c, store) = try makeController(provider: provider)
         try c.updateAudio { $0.chooseInput("mono"); $0.setGuitar([1, 2]) }
-        XCTAssertNil(c.settings?.guitarIn)
-        XCTAssertNil(try store.load().audio?.guitarIn)
+        XCTAssertEqual(c.settings?.guitarIn, [1])
+        XCTAssertEqual(try store.load().audio?.guitarIn, [1])
         let s = AudioService.settingsResult(c)
-        XCTAssertNil(s.guitarIn)
-        XCTAssertEqual(s.guitarChoices.map(\.label), ["Sin asignar", "Entrada 1"])
+        XCTAssertEqual(s.guitarIn, [1])
+        XCTAssertEqual(s.guitarChoices.map(\.label), ["Entrada 1"])
     }
 
     // MARK: Niveles
@@ -257,9 +285,9 @@ final class AudioTests: XCTestCase {
         XCTAssertEqual(state.success?.rows.first?.label, "Latencia")
         XCTAssertTrue(AudioService.settingsResult(c).calibration.label.hasPrefix("Calibrada · 50,0"))
         // Reabrir la sesión reaplica la calibración guardada.
-        try c.updateAudio { $0.guitarIn = nil }
+        try c.updateAudio { $0.chooseInput(nil) }
         XCTAssertNil(c.session)
-        try c.updateAudio { $0.guitarIn = [1] }
+        try c.updateAudio { $0.chooseInput(AudioController.simulatedInputUID) }
         XCTAssertEqual(c.session?.isCalibrated, true)
         c.dismissCalibration()
         XCTAssertEqual(c.calibrationPhase, .idle)
@@ -305,8 +333,8 @@ final class AudioTests: XCTestCase {
         XCTAssertTrue(c.calibrationValid)
 
         func reopen() throws {
-            try c.updateAudio { $0.guitarIn = nil }
-            try c.updateAudio { $0.guitarIn = [1] }
+            try c.updateAudio { $0.chooseInput(nil) }
+            try c.updateAudio { $0.chooseInput(AudioController.simulatedInputUID) }
         }
         c.wasapiMode = .exclusive
         try reopen()
@@ -365,8 +393,8 @@ final class AudioTests: XCTestCase {
         XCTAssertTrue(AudioService.settingsResult(c).calibration.label.hasPrefix("Calibrada · "))
 
         // Reabrir (o relanzar la app) reaplica la calibración y sigue valiendo.
-        try c.updateAudio { $0.guitarIn = nil }
-        try c.updateAudio { $0.guitarIn = [1, 2] }
+        try c.updateAudio { $0.chooseInput(nil) }
+        try c.updateAudio { $0.chooseInput(AudioController.simulatedInputUID) }
         XCTAssertEqual(c.session?.isCalibrated, true)
         XCTAssertTrue(c.calibrationValid)
 
@@ -395,16 +423,6 @@ final class AudioTests: XCTestCase {
         let st = AudioService.calibrationState(c.calibrationPhase)
         XCTAssertEqual(st.failure?.title, "No llegó la señal de prueba")
         XCTAssertNil(try store.load().audio?.latency)
-    }
-
-    func testCalibrationBlockedShowsMessage() async throws {
-        let (c, _) = try makeController()
-        try c.updateAudio { $0.chooseInput(AudioController.simulatedInputUID) }
-        c.metersVisible = true   // sesión abierta sin guitarra asignada
-        await c.calibrate()
-        guard case .finished(.error(let m)) = c.calibrationPhase else { return XCTFail("\(c.calibrationPhase)") }
-        XCTAssertEqual(m, "Asigna la entrada de guitarra en Ajustes · Audio.")
-        c.metersVisible = false
     }
 
     func testCancelledCalibrationIsDiscarded() async throws {
@@ -488,13 +506,15 @@ final class AudioTests: XCTestCase {
         XCTAssertEqual(s["inputDeviceUID"] as? String, "sim-in")
         XCTAssertEqual(s["guitarIn"] as? [Int], [1, 2])
         let labels = (s["guitarChoices"] as? [[String: Any]])?.compactMap { $0["label"] as? String }
-        XCTAssertEqual(labels, ["Sin asignar", "Entrada 1", "Entrada 2", "Entradas 1 y 2"])
+        XCTAssertEqual(labels, ["Entrada 1", "Entrada 2", "Entradas 1 y 2"])
         let profile = try ProfileStore(url: r.support.appendingPathComponent("profile.json")).load()
         XCTAssertEqual(profile.audio?.guitarIn, [1, 2])
 
-        // `null` explícito = sin asignar; ausente = no se toca.
-        s = try await res(r, "audio.setSettings", "{\"guitarIn\":null}")
-        XCTAssertNil(s["guitarIn"] as? [Int])
+        // M-7: `guitarIn: null` se rechaza (no existe «Sin asignar»); ausente = no se toca.
+        let nul = await call(r, "audio.setSettings", "{\"guitarIn\":null}")
+        XCTAssertEqual((nul["error"] as? [String: Any])?["code"] as? String, "bad-params")
+        s = try await res(r, "audio.settings")
+        XCTAssertEqual(s["guitarIn"] as? [Int], [1, 2])
         XCTAssertEqual(s["inputDeviceUID"] as? String, "sim-in")
 
         let bad = await call(r, "audio.setSettings", "{\"guitarIn\":[1,1]}")
@@ -503,8 +523,8 @@ final class AudioTests: XCTestCase {
         XCTAssertEqual((badRate["error"] as? [String: Any])?["code"] as? String, "bad-params")
 
         let st = try await res(r, "audio.state")
-        XCTAssertEqual(st["sessionOpen"] as? Bool, false)
-        XCTAssertEqual(st["calibrateBlock"] as? String, "Asigna la entrada de guitarra en Ajustes · Audio.")
+        XCTAssertEqual(st["sessionOpen"] as? Bool, true, "con entrada siempre hay guitarra (M-7)")
+        XCTAssertNil(st["calibrateBlock"] as? String)
     }
 
     func testBridgeEvents() async throws {
@@ -551,8 +571,8 @@ final class AudioTests: XCTestCase {
         let t = try await res(r, "study.pause")
         XCTAssertGreaterThan(t["position"] as? Double ?? 0, 0.1, "avanza alojado en la sesión")
 
-        // Sin guitarra asignada la sesión se cierra y el reproductor vuelve a su salida propia.
-        _ = await call(r, "audio.setSettings", "{\"guitarIn\":null}")
+        // Sin entrada la sesión se cierra y el reproductor vuelve a su salida propia.
+        _ = await call(r, "audio.setSettings", "{\"inputDeviceUID\":null}")
         XCTAssertNil(controller.session)
         XCTAssertFalse(controller.isHostingPlayer)
         XCTAssertTrue(r.bridge.studyService.current?.controller.player.isHosted == true, "simulado: salida simulada propia")
@@ -562,8 +582,8 @@ final class AudioTests: XCTestCase {
         XCTAssertGreaterThan(r.bridge.studyService.current?.controller.player.currentTime ?? 0, p0 + 0.1)
         _ = await call(r, "study.pause")
 
-        // Y vuelve a engancharse al reasignar la guitarra.
-        _ = await call(r, "audio.setSettings", "{\"guitarIn\":[1]}")
+        // Y vuelve a engancharse al elegir la entrada (guitarra recordada).
+        _ = await call(r, "audio.setSettings", "{\"inputDeviceUID\":\"sim-in\"}")
         XCTAssertTrue(controller.isHostingPlayer)
 
         _ = await call(r, "study.close")
