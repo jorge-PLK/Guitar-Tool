@@ -23,6 +23,11 @@ final class FrameChannel: @unchecked Sendable {
         if let id = textures.id(for: channel) { textures.host?.frame_available?(id) }
     }
 
+    /// Avisa al runner de que hay fotograma nuevo sin publicarlo.
+    func signal() {
+        if let id = textures.id(for: channel) { textures.host?.frame_available?(id) }
+    }
+
     func clear() {
         lock.lock(); uploaded = false; lock.unlock()
     }

@@ -625,9 +625,11 @@ final class TakeViewService {
         // En pausa solo se repite si cambió algo (el `at` no cuenta).
         if !force, !e.playing, let last = lastPosition, !last.playing, last.epoch == e.epoch, last.seconds == e.seconds { return }
         lastPosition = e
-        TakeTrace.log("publish playing=\(e.playing) rate=\(e.rate) seconds=\(e.seconds) epoch=\(e.epoch) player=\(videoPlayer != nil)")
         #if canImport(AVFoundation)
+        TakeTrace.log("publish playing=\(e.playing) rate=\(e.rate) seconds=\(e.seconds) epoch=\(e.epoch) player=\(videoPlayer != nil)")
         videoPlayer?.apply(e)
+        #else
+        TakeTrace.log("publish playing=\(e.playing) rate=\(e.rate) seconds=\(e.seconds) epoch=\(e.epoch) player=n/a")
         #endif
         emit("takeview.position", e)
     }
