@@ -3098,6 +3098,312 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get montageAddCut => 'Add cut';
+
+  @override
+  String get montageAddCutHelp => 'Creates a cut at the preview position';
+
+  @override
+  String montageAudioOnlyParts(String parts) {
+    return 'No video (audio only, no frame): $parts.';
+  }
+
+  @override
+  String montageAutoPart(String part) {
+    return 'Automatic ($part)';
+  }
+
+  @override
+  String get montageBand => 'Video section';
+
+  @override
+  String get montageCaption => 'Label with title and artist';
+
+  @override
+  String montageClipped(String file) {
+    return '$file: clipped';
+  }
+
+  @override
+  String get montageClose => 'Close';
+
+  @override
+  String get montageCodecH264 => 'H.264';
+
+  @override
+  String get montageCodecHevc => 'HEVC';
+
+  @override
+  String get montageContainer => 'Container';
+
+  @override
+  String get montageContainerMov => 'MOV';
+
+  @override
+  String get montageContainerMp4 => 'MP4';
+
+  @override
+  String get montageCutDelete => 'Delete cut';
+
+  @override
+  String montageCutFrom(String t) {
+    return 'Take priority from $t';
+  }
+
+  @override
+  String get montageCutGapsToggle => 'Cut gaps without takes';
+
+  @override
+  String montageCutNoTake(String t) {
+    return 'No take at $t';
+  }
+
+  @override
+  String get montageCutPartFallback => 'The part';
+
+  @override
+  String montageCutUncovered(String t, String part) {
+    return '$t · $part has no take here: the automatic one is shown';
+  }
+
+  @override
+  String get montageEmptyNoSongs =>
+      'No songs with recorded takes yet. Record a part with video in Record.';
+
+  @override
+  String montageErrExport(String error) {
+    return 'Could not export the video ($error)';
+  }
+
+  @override
+  String get montageErrNoTakes => 'There are no takes with video to edit.';
+
+  @override
+  String get montageExport => 'Export video';
+
+  @override
+  String get montageExportCancel => 'Cancel export';
+
+  @override
+  String montageExportDone(String path) {
+    return 'Video exported: $path';
+  }
+
+  @override
+  String get montageExportSection => 'Export';
+
+  @override
+  String montageExportStage(String stage) {
+    return '$stage…';
+  }
+
+  @override
+  String get montageExportWait => 'Wait for the framing analysis to finish';
+
+  @override
+  String get montageFormat => 'Format';
+
+  @override
+  String montageFpsLabel(double n) {
+    final intl.NumberFormat nNumberFormat = intl.NumberFormat.decimalPattern(
+      localeName,
+    );
+    final String nString = nNumberFormat.format(n);
+
+    return '$nString fps';
+  }
+
+  @override
+  String get montageFrames => 'Frames';
+
+  @override
+  String get montageFramingDone => 'Done';
+
+  @override
+  String get montageFramingFixedHelp =>
+      'Automatic crop: drag it to move; the corner handle scales it.';
+
+  @override
+  String get montageFramingFixedHelpManual =>
+      'Manual adjustment: drag the box to move it; the corner handle scales it.';
+
+  @override
+  String get montageFramingFollow => 'Follow the guitar';
+
+  @override
+  String get montageFramingFollowHelp =>
+      'The crop follows the guitar\'s path; drag over the frame to pan it.';
+
+  @override
+  String get montageFramingInstant => 'Instant';
+
+  @override
+  String get montageFramingNoImage => 'No image at this moment';
+
+  @override
+  String get montageFramingReanalyze => 'Reanalyze';
+
+  @override
+  String get montageFramingReset => 'Reset';
+
+  @override
+  String montageFramingOffsetX(String v) {
+    return 'X offset, value $v';
+  }
+
+  @override
+  String montageFramingOffsetY(String v) {
+    return 'Y offset, value $v';
+  }
+
+  @override
+  String montageFramingTitle(String part) {
+    return 'Framing · $part';
+  }
+
+  @override
+  String montageFramingZoom(String z) {
+    return 'Zoom, value ×$z';
+  }
+
+  @override
+  String get montageKeepAspect => 'Keep video aspect ratio';
+
+  @override
+  String get montageKeepAspectHelp => 'Only in stacked and single-shot layouts';
+
+  @override
+  String get montageLayout => 'Layout';
+
+  @override
+  String montageLegend(String anticipation) {
+    return 'Filled bar = on screen; dashed outline = recorded; striped = cut gaps. The lead appears only in the solo, and its entry starts $anticipation before the first note. Click to move the preview.';
+  }
+
+  @override
+  String get montageLegendCuts =>
+      ' In the Plane lane, click to add a cut (snaps to the beat), click a mark to choose the guitar, and drag to move it.';
+
+  @override
+  String get montageLimiter => 'Limiter';
+
+  @override
+  String montageLimiterApplied(double db) {
+    final intl.NumberFormat dbNumberFormat = intl.NumberFormat.decimalPattern(
+      localeName,
+    );
+    final String dbString = dbNumberFormat.format(db);
+
+    return ' · limiter −$dbString dB';
+  }
+
+  @override
+  String montageLoudness(double lufs, double tp, String suffix) {
+    final intl.NumberFormat lufsNumberFormat = intl.NumberFormat.decimalPattern(
+      localeName,
+    );
+    final String lufsString = lufsNumberFormat.format(lufs);
+    final intl.NumberFormat tpNumberFormat = intl.NumberFormat.decimalPattern(
+      localeName,
+    );
+    final String tpString = tpNumberFormat.format(tp);
+
+    return 'Final loudness: $lufsString LUFS · true peak $tpString dBTP$suffix';
+  }
+
+  @override
+  String get montageLimiterBoth =>
+      'The limiter could not reach −14 LUFS and −1 dBTP at the same time: the mix stays at the values shown.';
+
+  @override
+  String get montageLimiterIdle => ' · limiter not active';
+
+  @override
+  String get montageLimiterPeak =>
+      'Gain was limited to avoid exceeding −1 dBTP: the mix stays below −14 LUFS.';
+
+  @override
+  String get montageNoTake => 'No take';
+
+  @override
+  String get montageNoVideoBody =>
+      'The edit uses the best take of each part. Record some parts with the camera and come back.';
+
+  @override
+  String get montageNoVideoTitle => 'No takes with video yet';
+
+  @override
+  String get montageNormalize => 'Normalize volume to -14 LUFS';
+
+  @override
+  String get montageNotNormalized => '(not normalized)';
+
+  @override
+  String get montagePartNames => 'Name of each part';
+
+  @override
+  String get montagePickSong => 'Pick a song';
+
+  @override
+  String get montagePlane => 'Plane';
+
+  @override
+  String montagePreviewTitle(String canvas) {
+    return 'Preview · $canvas';
+  }
+
+  @override
+  String get montageResolution => 'Resolution';
+
+  @override
+  String montageResolutionCustom(int width, int height) {
+    return '$width×$height';
+  }
+
+  @override
+  String get montageResolutionLabel720 => '720p';
+
+  @override
+  String get montageResolutionLabel1080 => '1080p';
+
+  @override
+  String get montageResolutionLabel4K => '4K';
+
+  @override
+  String get montageRevealExplorer => 'Show in File Explorer';
+
+  @override
+  String get montageRevealFinder => 'Show in Finder';
+
+  @override
+  String get montageSingleRhythm => 'Single-shot rhythm';
+
+  @override
+  String montageTakesCount(int n) {
+    String _temp0 = intl.Intl.pluralLogic(
+      n,
+      locale: localeName,
+      other: '$n takes',
+      one: '1 take',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get montageTitle => 'Edit';
+
+  @override
+  String get montageTrackWAVs => 'WAV of each track';
+
+  @override
+  String montageTracksDir(String path) {
+    return 'WAV per track in $path';
+  }
+
+  @override
+  String get montageTransitions => 'Transitions';
+
+  @override
   String get errorAnchor => '';
 
   @override

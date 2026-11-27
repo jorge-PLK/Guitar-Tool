@@ -5167,6 +5167,468 @@ abstract class AppLocalizations {
   /// **'Ya tienes la última versión ({version}).'**
   String settings_tools_upToDate(String version);
 
+  /// No description provided for @montageAddCut.
+  ///
+  /// In es, this message translates to:
+  /// **'Añadir corte'**
+  String get montageAddCut;
+
+  /// No description provided for @montageAddCutHelp.
+  ///
+  /// In es, this message translates to:
+  /// **'Crea un corte en la posición de la vista previa'**
+  String get montageAddCutHelp;
+
+  /// No description provided for @montageAudioOnlyParts.
+  ///
+  /// In es, this message translates to:
+  /// **'Sin vídeo (solo audio, sin recuadro): {parts}.'**
+  String montageAudioOnlyParts(String parts);
+
+  /// No description provided for @montageAutoPart.
+  ///
+  /// In es, this message translates to:
+  /// **'Automática ({part})'**
+  String montageAutoPart(String part);
+
+  /// No description provided for @montageBand.
+  ///
+  /// In es, this message translates to:
+  /// **'Tramo del vídeo'**
+  String get montageBand;
+
+  /// No description provided for @montageCaption.
+  ///
+  /// In es, this message translates to:
+  /// **'Rótulo con título y artista'**
+  String get montageCaption;
+
+  /// No description provided for @montageClipped.
+  ///
+  /// In es, this message translates to:
+  /// **'{file}: recortado'**
+  String montageClipped(String file);
+
+  /// No description provided for @montageClose.
+  ///
+  /// In es, this message translates to:
+  /// **'Cerrar'**
+  String get montageClose;
+
+  /// No description provided for @montageCodecH264.
+  ///
+  /// In es, this message translates to:
+  /// **'H.264'**
+  String get montageCodecH264;
+
+  /// No description provided for @montageCodecHevc.
+  ///
+  /// In es, this message translates to:
+  /// **'HEVC'**
+  String get montageCodecHevc;
+
+  /// No description provided for @montageContainer.
+  ///
+  /// In es, this message translates to:
+  /// **'Contenedor'**
+  String get montageContainer;
+
+  /// No description provided for @montageContainerMov.
+  ///
+  /// In es, this message translates to:
+  /// **'MOV'**
+  String get montageContainerMov;
+
+  /// No description provided for @montageContainerMp4.
+  ///
+  /// In es, this message translates to:
+  /// **'MP4'**
+  String get montageContainerMp4;
+
+  /// No description provided for @montageCutDelete.
+  ///
+  /// In es, this message translates to:
+  /// **'Eliminar corte'**
+  String get montageCutDelete;
+
+  /// No description provided for @montageCutFrom.
+  ///
+  /// In es, this message translates to:
+  /// **'Desde {t} manda'**
+  String montageCutFrom(String t);
+
+  /// No description provided for @montageCutGapsToggle.
+  ///
+  /// In es, this message translates to:
+  /// **'Cortar huecos sin tomas'**
+  String get montageCutGapsToggle;
+
+  /// No description provided for @montageCutNoTake.
+  ///
+  /// In es, this message translates to:
+  /// **'Sin toma en {t}'**
+  String montageCutNoTake(String t);
+
+  /// No description provided for @montageCutPartFallback.
+  ///
+  /// In es, this message translates to:
+  /// **'La parte'**
+  String get montageCutPartFallback;
+
+  /// No description provided for @montageCutUncovered.
+  ///
+  /// In es, this message translates to:
+  /// **'{t} · {part} no tiene toma aquí: se ve el automático'**
+  String montageCutUncovered(String t, String part);
+
+  /// No description provided for @montageEmptyNoSongs.
+  ///
+  /// In es, this message translates to:
+  /// **'Aún no hay temas con tomas grabadas. Graba alguna parte con vídeo en Grabar.'**
+  String get montageEmptyNoSongs;
+
+  /// No description provided for @montageErrExport.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo exportar el vídeo ({error})'**
+  String montageErrExport(String error);
+
+  /// No description provided for @montageErrNoTakes.
+  ///
+  /// In es, this message translates to:
+  /// **'No hay tomas con vídeo que montar.'**
+  String get montageErrNoTakes;
+
+  /// No description provided for @montageExport.
+  ///
+  /// In es, this message translates to:
+  /// **'Exportar vídeo'**
+  String get montageExport;
+
+  /// No description provided for @montageExportCancel.
+  ///
+  /// In es, this message translates to:
+  /// **'Cancelar exportación'**
+  String get montageExportCancel;
+
+  /// No description provided for @montageExportDone.
+  ///
+  /// In es, this message translates to:
+  /// **'Vídeo exportado: {path}'**
+  String montageExportDone(String path);
+
+  /// No description provided for @montageExportSection.
+  ///
+  /// In es, this message translates to:
+  /// **'Exportación'**
+  String get montageExportSection;
+
+  /// No description provided for @montageExportStage.
+  ///
+  /// In es, this message translates to:
+  /// **'{stage}…'**
+  String montageExportStage(String stage);
+
+  /// No description provided for @montageExportWait.
+  ///
+  /// In es, this message translates to:
+  /// **'Espera a que termine el análisis del encuadre'**
+  String get montageExportWait;
+
+  /// No description provided for @montageFormat.
+  ///
+  /// In es, this message translates to:
+  /// **'Formato'**
+  String get montageFormat;
+
+  /// No description provided for @montageFpsLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'{n} fps'**
+  String montageFpsLabel(double n);
+
+  /// No description provided for @montageFrames.
+  ///
+  /// In es, this message translates to:
+  /// **'Fotogramas'**
+  String get montageFrames;
+
+  /// No description provided for @montageFramingDone.
+  ///
+  /// In es, this message translates to:
+  /// **'Hecho'**
+  String get montageFramingDone;
+
+  /// No description provided for @montageFramingFixedHelp.
+  ///
+  /// In es, this message translates to:
+  /// **'Caja automática: arrástrala para moverla; el punto de la esquina la escala.'**
+  String get montageFramingFixedHelp;
+
+  /// No description provided for @montageFramingFixedHelpManual.
+  ///
+  /// In es, this message translates to:
+  /// **'Ajuste manual: arrastra la caja para moverla; el punto de la esquina la escala.'**
+  String get montageFramingFixedHelpManual;
+
+  /// No description provided for @montageFramingFollow.
+  ///
+  /// In es, this message translates to:
+  /// **'Seguir la guitarra'**
+  String get montageFramingFollow;
+
+  /// No description provided for @montageFramingFollowHelp.
+  ///
+  /// In es, this message translates to:
+  /// **'El recorte sigue la trayectoria de la guitarra; arrastra sobre el fotograma para desplazarlo.'**
+  String get montageFramingFollowHelp;
+
+  /// No description provided for @montageFramingInstant.
+  ///
+  /// In es, this message translates to:
+  /// **'Instante'**
+  String get montageFramingInstant;
+
+  /// No description provided for @montageFramingNoImage.
+  ///
+  /// In es, this message translates to:
+  /// **'Sin imagen en este instante'**
+  String get montageFramingNoImage;
+
+  /// No description provided for @montageFramingReanalyze.
+  ///
+  /// In es, this message translates to:
+  /// **'Reanalizar'**
+  String get montageFramingReanalyze;
+
+  /// No description provided for @montageFramingReset.
+  ///
+  /// In es, this message translates to:
+  /// **'Restablecer'**
+  String get montageFramingReset;
+
+  /// No description provided for @montageFramingOffsetX.
+  ///
+  /// In es, this message translates to:
+  /// **'Desplazamiento X, con valor {v}'**
+  String montageFramingOffsetX(String v);
+
+  /// No description provided for @montageFramingOffsetY.
+  ///
+  /// In es, this message translates to:
+  /// **'Desplazamiento Y, con valor {v}'**
+  String montageFramingOffsetY(String v);
+
+  /// No description provided for @montageFramingTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Encuadre · {part}'**
+  String montageFramingTitle(String part);
+
+  /// No description provided for @montageFramingZoom.
+  ///
+  /// In es, this message translates to:
+  /// **'Zoom, con valor ×{z}'**
+  String montageFramingZoom(String z);
+
+  /// No description provided for @montageKeepAspect.
+  ///
+  /// In es, this message translates to:
+  /// **'Mantener aspect ratio de vídeo'**
+  String get montageKeepAspect;
+
+  /// No description provided for @montageKeepAspectHelp.
+  ///
+  /// In es, this message translates to:
+  /// **'Solo en apilado y plano único'**
+  String get montageKeepAspectHelp;
+
+  /// No description provided for @montageLayout.
+  ///
+  /// In es, this message translates to:
+  /// **'Layout'**
+  String get montageLayout;
+
+  /// No description provided for @montageLegend.
+  ///
+  /// In es, this message translates to:
+  /// **'Barra llena = en pantalla; el contorno discontinuo es lo grabado; lo rayado son huecos cortados. La solista solo aparece en el solo y su entrada empieza {anticipation} antes de la primera nota. Clic para mover la vista previa.'**
+  String montageLegend(String anticipation);
+
+  /// No description provided for @montageLegendCuts.
+  ///
+  /// In es, this message translates to:
+  /// **' En el carril Plano, clic para añadir un corte (se ajusta al pulso), clic en una marca para elegir la guitarra y arrastra para moverla.'**
+  String get montageLegendCuts;
+
+  /// No description provided for @montageLimiter.
+  ///
+  /// In es, this message translates to:
+  /// **'Limitador'**
+  String get montageLimiter;
+
+  /// No description provided for @montageLimiterApplied.
+  ///
+  /// In es, this message translates to:
+  /// **' · limitador −{db} dB'**
+  String montageLimiterApplied(double db);
+
+  /// No description provided for @montageLoudness.
+  ///
+  /// In es, this message translates to:
+  /// **'Sonoridad final: {lufs} LUFS · pico real {tp} dBTP{suffix}'**
+  String montageLoudness(double lufs, double tp, String suffix);
+
+  /// No description provided for @montageLimiterBoth.
+  ///
+  /// In es, this message translates to:
+  /// **'El limitador no llegó a −14 LUFS y −1 dBTP a la vez: la mezcla queda en los valores mostrados.'**
+  String get montageLimiterBoth;
+
+  /// No description provided for @montageLimiterIdle.
+  ///
+  /// In es, this message translates to:
+  /// **' · limitador sin actuar'**
+  String get montageLimiterIdle;
+
+  /// No description provided for @montageLimiterPeak.
+  ///
+  /// In es, this message translates to:
+  /// **'Se limitó la ganancia para no pasar de −1 dBTP: la mezcla queda por debajo de −14 LUFS.'**
+  String get montageLimiterPeak;
+
+  /// No description provided for @montageNoTake.
+  ///
+  /// In es, this message translates to:
+  /// **'Sin toma'**
+  String get montageNoTake;
+
+  /// No description provided for @montageNoVideoBody.
+  ///
+  /// In es, this message translates to:
+  /// **'El montaje usa la mejor toma de cada parte. Graba alguna parte con la cámara y vuelve.'**
+  String get montageNoVideoBody;
+
+  /// No description provided for @montageNoVideoTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Aún no hay tomas con vídeo'**
+  String get montageNoVideoTitle;
+
+  /// No description provided for @montageNormalize.
+  ///
+  /// In es, this message translates to:
+  /// **'Volumen normalizado a -14 LUFS'**
+  String get montageNormalize;
+
+  /// No description provided for @montageNotNormalized.
+  ///
+  /// In es, this message translates to:
+  /// **'(sin normalizar)'**
+  String get montageNotNormalized;
+
+  /// No description provided for @montagePartNames.
+  ///
+  /// In es, this message translates to:
+  /// **'Nombre de cada parte'**
+  String get montagePartNames;
+
+  /// No description provided for @montagePickSong.
+  ///
+  /// In es, this message translates to:
+  /// **'Elige un tema'**
+  String get montagePickSong;
+
+  /// No description provided for @montagePlane.
+  ///
+  /// In es, this message translates to:
+  /// **'Plano'**
+  String get montagePlane;
+
+  /// No description provided for @montagePreviewTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Vista previa · {canvas}'**
+  String montagePreviewTitle(String canvas);
+
+  /// No description provided for @montageResolution.
+  ///
+  /// In es, this message translates to:
+  /// **'Resolución'**
+  String get montageResolution;
+
+  /// No description provided for @montageResolutionCustom.
+  ///
+  /// In es, this message translates to:
+  /// **'{width}×{height}'**
+  String montageResolutionCustom(int width, int height);
+
+  /// No description provided for @montageResolutionLabel720.
+  ///
+  /// In es, this message translates to:
+  /// **'720p'**
+  String get montageResolutionLabel720;
+
+  /// No description provided for @montageResolutionLabel1080.
+  ///
+  /// In es, this message translates to:
+  /// **'1080p'**
+  String get montageResolutionLabel1080;
+
+  /// No description provided for @montageResolutionLabel4K.
+  ///
+  /// In es, this message translates to:
+  /// **'4K'**
+  String get montageResolutionLabel4K;
+
+  /// No description provided for @montageRevealExplorer.
+  ///
+  /// In es, this message translates to:
+  /// **'Mostrar en el Explorador de archivos'**
+  String get montageRevealExplorer;
+
+  /// No description provided for @montageRevealFinder.
+  ///
+  /// In es, this message translates to:
+  /// **'Mostrar en Finder'**
+  String get montageRevealFinder;
+
+  /// No description provided for @montageSingleRhythm.
+  ///
+  /// In es, this message translates to:
+  /// **'Rítmica del plano único'**
+  String get montageSingleRhythm;
+
+  /// No description provided for @montageTakesCount.
+  ///
+  /// In es, this message translates to:
+  /// **'{n, plural, =1{1 toma} other{{n} tomas}}'**
+  String montageTakesCount(int n);
+
+  /// No description provided for @montageTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Montaje'**
+  String get montageTitle;
+
+  /// No description provided for @montageTrackWAVs.
+  ///
+  /// In es, this message translates to:
+  /// **'WAV de cada pista'**
+  String get montageTrackWAVs;
+
+  /// No description provided for @montageTracksDir.
+  ///
+  /// In es, this message translates to:
+  /// **'WAV por pista en {path}'**
+  String montageTracksDir(String path);
+
+  /// No description provided for @montageTransitions.
+  ///
+  /// In es, this message translates to:
+  /// **'Transiciones'**
+  String get montageTransitions;
+
   /// Ancla del bloque error: añade las claves del área debajo, en orden alfabético; no edites otros bloques.
   ///
   /// In es, this message translates to:
