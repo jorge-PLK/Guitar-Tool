@@ -247,7 +247,9 @@ class MontageTimelinePainter extends CustomPainter {
     final r = g.bandRect;
     final rr = _rr(r, TfRadius.r3);
     canvas.drawRRect(rr, Paint()..color = TfColors.accent.withValues(alpha: _bandFill));
-    final fade = math.max(2.0, g.timeToX(data.barDuration) - g.timeToX(0));
+    // MV:796,800: el ancho es x(bar) en coordenadas del eje (no una duración), así que
+    // con el tramo lejos del origen queda en el mínimo de 2 px (marca fina en el extremo).
+    final fade = math.max(2.0, g.timeToX(data.barDuration));
     void gradient(Rect fr, List<Color> colors) {
       canvas.save();
       canvas.clipRRect(_rr(fr, TfRadius.r3));
