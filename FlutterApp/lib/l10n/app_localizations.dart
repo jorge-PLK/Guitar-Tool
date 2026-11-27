@@ -5629,6 +5629,216 @@ abstract class AppLocalizations {
   /// **'Transiciones'**
   String get montageTransitions;
 
+  /// No description provided for @montageCutAuto.
+  ///
+  /// In es, this message translates to:
+  /// **'Automático'**
+  String get montageCutAuto;
+
+  /// No description provided for @montageCutsClear.
+  ///
+  /// In es, this message translates to:
+  /// **'Quitar cortes'**
+  String get montageCutsClear;
+
+  /// No description provided for @montageFramingOffsetXLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Desplazamiento X'**
+  String get montageFramingOffsetXLabel;
+
+  /// No description provided for @montageFramingOffsetYLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Desplazamiento Y'**
+  String get montageFramingOffsetYLabel;
+
+  /// No description provided for @montageFramingStatusAnalyzing.
+  ///
+  /// In es, this message translates to:
+  /// **'Analizando la guitarra… {percent} %'**
+  String montageFramingStatusAnalyzing(int percent);
+
+  /// No description provided for @montageFramingStatusDetected.
+  ///
+  /// In es, this message translates to:
+  /// **'Guitarra detectada en {detected} de {samples} muestras.'**
+  String montageFramingStatusDetected(int detected, int samples);
+
+  /// No description provided for @montageFramingStatusFailed.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo analizar la toma ({message}).'**
+  String montageFramingStatusFailed(String message);
+
+  /// No description provided for @montageFramingStatusNoDetection.
+  ///
+  /// In es, this message translates to:
+  /// **'Sin detección: se usa el fotograma entero, centrado. Puedes colocar la caja a mano.'**
+  String get montageFramingStatusNoDetection;
+
+  /// No description provided for @montageFramingStatusQueued.
+  ///
+  /// In es, this message translates to:
+  /// **'En cola para analizar la guitarra…'**
+  String get montageFramingStatusQueued;
+
+  /// No description provided for @montageFramingZoomLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Zoom'**
+  String get montageFramingZoomLabel;
+
+  /// No description provided for @montageLaneAudioOnly.
+  ///
+  /// In es, this message translates to:
+  /// **'Solo audio'**
+  String get montageLaneAudioOnly;
+
+  /// No description provided for @montageLaneDragHelp.
+  ///
+  /// In es, this message translates to:
+  /// **'Arrastra para reordenar los recuadros'**
+  String get montageLaneDragHelp;
+
+  /// No description provided for @montageLaneFraming.
+  ///
+  /// In es, this message translates to:
+  /// **'Encuadre'**
+  String get montageLaneFraming;
+
+  /// No description provided for @montageLaneNoSolos.
+  ///
+  /// In es, this message translates to:
+  /// **'Sin solos marcados'**
+  String get montageLaneNoSolos;
+
+  /// No description provided for @montageLayoutGridDesc.
+  ///
+  /// In es, this message translates to:
+  /// **'Landscape · 3 o 4 tomas'**
+  String get montageLayoutGridDesc;
+
+  /// No description provided for @montageLayoutGridName.
+  ///
+  /// In es, this message translates to:
+  /// **'Rejilla'**
+  String get montageLayoutGridName;
+
+  /// No description provided for @montageLayoutSideDesc.
+  ///
+  /// In es, this message translates to:
+  /// **'Landscape · 1920 × 1080'**
+  String get montageLayoutSideDesc;
+
+  /// No description provided for @montageLayoutSideName.
+  ///
+  /// In es, this message translates to:
+  /// **'Lado a lado'**
+  String get montageLayoutSideName;
+
+  /// No description provided for @montageLayoutSingleLandscapeDesc.
+  ///
+  /// In es, this message translates to:
+  /// **'Landscape · rítmica y solista'**
+  String get montageLayoutSingleLandscapeDesc;
+
+  /// No description provided for @montageLayoutSinglePortraitDesc.
+  ///
+  /// In es, this message translates to:
+  /// **'Portrait · rítmica y solista'**
+  String get montageLayoutSinglePortraitDesc;
+
+  /// No description provided for @montageLayoutSingleName.
+  ///
+  /// In es, this message translates to:
+  /// **'Plano único'**
+  String get montageLayoutSingleName;
+
+  /// No description provided for @montageLayoutStackDesc.
+  ///
+  /// In es, this message translates to:
+  /// **'Portrait · 1080 × 1920'**
+  String get montageLayoutStackDesc;
+
+  /// No description provided for @montageLayoutStackName.
+  ///
+  /// In es, this message translates to:
+  /// **'Apilado'**
+  String get montageLayoutStackName;
+
+  /// No description provided for @montageRetry.
+  ///
+  /// In es, this message translates to:
+  /// **'Reintentar'**
+  String get montageRetry;
+
+  /// No description provided for @montageTransitionAnticipation.
+  ///
+  /// In es, this message translates to:
+  /// **'Anticipación al solo'**
+  String get montageTransitionAnticipation;
+
+  /// No description provided for @montageTransitionAudioFade.
+  ///
+  /// In es, this message translates to:
+  /// **'Fundido de audio'**
+  String get montageTransitionAudioFade;
+
+  /// No description provided for @montageTransitionAudioFadeValue.
+  ///
+  /// In es, this message translates to:
+  /// **'80 ms'**
+  String get montageTransitionAudioFadeValue;
+
+  /// No description provided for @montageTransitionCorners.
+  ///
+  /// In es, this message translates to:
+  /// **'Esquinas'**
+  String get montageTransitionCorners;
+
+  /// No description provided for @montageTransitionCornersValue.
+  ///
+  /// In es, this message translates to:
+  /// **'Redondeadas + sombra'**
+  String get montageTransitionCornersValue;
+
+  /// No description provided for @montageTransitionEdgeFade.
+  ///
+  /// In es, this message translates to:
+  /// **'Fundido de entrada y salida'**
+  String get montageTransitionEdgeFade;
+
+  /// No description provided for @montageTransitionEdgeFadeValue.
+  ///
+  /// In es, this message translates to:
+  /// **'1 compás'**
+  String get montageTransitionEdgeFadeValue;
+
+  /// No description provided for @montageTransitionEntry.
+  ///
+  /// In es, this message translates to:
+  /// **'Entrada'**
+  String get montageTransitionEntry;
+
+  /// No description provided for @montageTransitionEntryValue.
+  ///
+  /// In es, this message translates to:
+  /// **'Escala 92→100 % + nitidez'**
+  String get montageTransitionEntryValue;
+
+  /// No description provided for @montageTransitionRelocate.
+  ///
+  /// In es, this message translates to:
+  /// **'Recolocación'**
+  String get montageTransitionRelocate;
+
+  /// No description provided for @montageTransitionRelocateValue.
+  ///
+  /// In es, this message translates to:
+  /// **'Muelle · 0,5 s'**
+  String get montageTransitionRelocateValue;
+
   /// Ancla del bloque error: añade las claves del área debajo, en orden alfabético; no edites otros bloques.
   ///
   /// In es, this message translates to:

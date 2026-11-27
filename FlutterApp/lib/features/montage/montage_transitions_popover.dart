@@ -53,17 +53,6 @@ class MontageTransitionsContent extends StatelessWidget {
 
   final String anticipation;
 
-  // TODO(l10n): sin claves ARB para estas filas informativas (mini-spec Fase 7, «Transiciones»).
-  static const List<(String, String)> _fixed = <(String, String)>[
-    ('Recolocación', 'Muelle · 0,5 s'),
-    ('Entrada', 'Escala 92→100 % + nitidez'),
-  ];
-  static const List<(String, String)> _fixedTail = <(String, String)>[
-    ('Fundido de audio', '80 ms'),
-    ('Fundido de entrada y salida', '1 compás'),
-    ('Esquinas', 'Redondeadas + sombra'),
-  ];
-
   Widget _row(String k, String v) {
     final TextStyle base = TfText.body(13).copyWith(decoration: TextDecoration.none);
     return Padding(
@@ -81,11 +70,13 @@ class MontageTransitionsContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final AppLocalizations l = AppLocalizations.of(context);
-    // TODO(l10n): «Anticipación al solo» sin clave ARB.
     final List<(String, String)> rows = <(String, String)>[
-      ..._fixed,
-      ('Anticipación al solo', anticipation),
-      ..._fixedTail,
+      (l.montageTransitionRelocate, l.montageTransitionRelocateValue),
+      (l.montageTransitionEntry, l.montageTransitionEntryValue),
+      (l.montageTransitionAnticipation, anticipation),
+      (l.montageTransitionAudioFade, l.montageTransitionAudioFadeValue),
+      (l.montageTransitionEdgeFade, l.montageTransitionEdgeFadeValue),
+      (l.montageTransitionCorners, l.montageTransitionCornersValue),
     ];
     return SizedBox(
       width: 340,

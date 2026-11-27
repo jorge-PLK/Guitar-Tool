@@ -3419,6 +3419,119 @@ class AppLocalizationsEs extends AppLocalizations {
   String get montageTransitions => 'Transiciones';
 
   @override
+  String get montageCutAuto => 'Automático';
+
+  @override
+  String get montageCutsClear => 'Quitar cortes';
+
+  @override
+  String get montageFramingOffsetXLabel => 'Desplazamiento X';
+
+  @override
+  String get montageFramingOffsetYLabel => 'Desplazamiento Y';
+
+  @override
+  String montageFramingStatusAnalyzing(int percent) {
+    return 'Analizando la guitarra… $percent %';
+  }
+
+  @override
+  String montageFramingStatusDetected(int detected, int samples) {
+    return 'Guitarra detectada en $detected de $samples muestras.';
+  }
+
+  @override
+  String montageFramingStatusFailed(String message) {
+    return 'No se pudo analizar la toma ($message).';
+  }
+
+  @override
+  String get montageFramingStatusNoDetection =>
+      'Sin detección: se usa el fotograma entero, centrado. Puedes colocar la caja a mano.';
+
+  @override
+  String get montageFramingStatusQueued => 'En cola para analizar la guitarra…';
+
+  @override
+  String get montageFramingZoomLabel => 'Zoom';
+
+  @override
+  String get montageLaneAudioOnly => 'Solo audio';
+
+  @override
+  String get montageLaneDragHelp => 'Arrastra para reordenar los recuadros';
+
+  @override
+  String get montageLaneFraming => 'Encuadre';
+
+  @override
+  String get montageLaneNoSolos => 'Sin solos marcados';
+
+  @override
+  String get montageLayoutGridDesc => 'Landscape · 3 o 4 tomas';
+
+  @override
+  String get montageLayoutGridName => 'Rejilla';
+
+  @override
+  String get montageLayoutSideDesc => 'Landscape · 1920 × 1080';
+
+  @override
+  String get montageLayoutSideName => 'Lado a lado';
+
+  @override
+  String get montageLayoutSingleLandscapeDesc =>
+      'Landscape · rítmica y solista';
+
+  @override
+  String get montageLayoutSinglePortraitDesc => 'Portrait · rítmica y solista';
+
+  @override
+  String get montageLayoutSingleName => 'Plano único';
+
+  @override
+  String get montageLayoutStackDesc => 'Portrait · 1080 × 1920';
+
+  @override
+  String get montageLayoutStackName => 'Apilado';
+
+  @override
+  String get montageRetry => 'Reintentar';
+
+  @override
+  String get montageTransitionAnticipation => 'Anticipación al solo';
+
+  @override
+  String get montageTransitionAudioFade => 'Fundido de audio';
+
+  @override
+  String get montageTransitionAudioFadeValue => '80 ms';
+
+  @override
+  String get montageTransitionCorners => 'Esquinas';
+
+  @override
+  String get montageTransitionCornersValue => 'Redondeadas + sombra';
+
+  @override
+  String get montageTransitionEdgeFade => 'Fundido de entrada y salida';
+
+  @override
+  String get montageTransitionEdgeFadeValue => '1 compás';
+
+  @override
+  String get montageTransitionEntry => 'Entrada';
+
+  @override
+  String get montageTransitionEntryValue => 'Escala 92→100 % + nitidez';
+
+  @override
+  String get montageTransitionRelocate => 'Recolocación';
+
+  @override
+  String get montageTransitionRelocateValue => 'Muelle · 0,5 s';
+
+  @override
   String get errorAnchor => '';
 
   @override

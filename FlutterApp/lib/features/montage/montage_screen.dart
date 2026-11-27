@@ -86,14 +86,14 @@ class _LoadError extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final AppLocalizations l = AppLocalizations.of(context);
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         spacing: TfSpace.s12,
         children: <Widget>[
           Text(message, style: TfText.body().copyWith(color: TfColors.danger)),
-          // TODO(l10n): clave ARB para «Reintentar».
-          TfSecondaryButton(label: 'Reintentar', onPressed: onRetry),
+          TfSecondaryButton(label: l.montageRetry, onPressed: onRetry),
         ],
       ),
     );

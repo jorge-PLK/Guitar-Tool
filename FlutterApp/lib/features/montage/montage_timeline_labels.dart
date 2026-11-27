@@ -103,19 +103,20 @@ class _LabelsState extends State<MontageTimelineLabels> {
     final row = SizedBox(
       height: _lane,
       child: Row(spacing: TfSpace.s6, children: [
-        // TODO(l10n): ayuda «Arrastra para reordenar los recuadros».
-        const TfIconView(TfIcon.line3Horizontal, size: TfSize.font12, color: TfColors.muted),
+        TfTooltip(
+          message: l10n.montageLaneDragHelp,
+          child: const TfIconView(TfIcon.line3Horizontal, size: TfSize.font12, color: TfColors.muted),
+        ),
         Flexible(child: Text(lane.partName, style: name, maxLines: 1, overflow: TextOverflow.ellipsis)),
         const Spacer(),
-        // TODO(l10n): «Sin solos marcados», «Encuadre» y «Solo audio» sin clave en los ARB.
         if (lane.presence.isEmpty)
-          Text('Sin solos marcados', style: small)
+          Text(l10n.montageLaneNoSolos, style: small)
         else if (lane.hasVideo) ...[
           if (widget.analyzing.contains(lane.takeId)) const TfSpinner.mini(),
           _PillButton(
             key: ValueKey('montage-framing-${lane.takeId}'),
             onTap: () => widget.onOpenFraming(lane.takeId),
-            child: Text('Encuadre', style: TfText.body(TfSize.font12, TfWeight.medium).copyWith(color: TfColors.text)),
+            child: Text(l10n.montageLaneFraming, style: TfText.body(TfSize.font12, TfWeight.medium).copyWith(color: TfColors.text)),
           ),
           TfTooltip(
             message: l10n.record_rotateDegrees(lane.rotation),
@@ -127,7 +128,7 @@ class _LabelsState extends State<MontageTimelineLabels> {
             ),
           ),
         ] else
-          Text('Solo audio', style: small),
+          Text(l10n.montageLaneAudioOnly, style: small),
       ]),
     );
     return DragTarget<String>(

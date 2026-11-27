@@ -27,14 +27,13 @@ class _LayoutDef {
   final String desc;
 }
 
-// TODO(l10n): sin claves ARB para nombres y descripciones de layout (MV:244-250); literales de la ficha.
-const List<_LayoutDef> _layouts = <_LayoutDef>[
-  _LayoutDef('side', _Shape.side, 'Lado a lado', 'Landscape · 1920 × 1080'),
-  _LayoutDef('grid', _Shape.grid, 'Rejilla', 'Landscape · 3 o 4 tomas'),
-  _LayoutDef('stack', _Shape.stack, 'Apilado', 'Portrait · 1080 × 1920'),
-  _LayoutDef('single', _Shape.single, 'Plano único', 'Portrait · rítmica y solista'),
-  _LayoutDef('single-landscape', _Shape.singleLandscape, 'Plano único', 'Landscape · rítmica y solista'),
-];
+List<_LayoutDef> _layouts(AppLocalizations l) => <_LayoutDef>[
+      _LayoutDef('side', _Shape.side, l.montageLayoutSideName, l.montageLayoutSideDesc),
+      _LayoutDef('grid', _Shape.grid, l.montageLayoutGridName, l.montageLayoutGridDesc),
+      _LayoutDef('stack', _Shape.stack, l.montageLayoutStackName, l.montageLayoutStackDesc),
+      _LayoutDef('single', _Shape.single, l.montageLayoutSingleName, l.montageLayoutSinglePortraitDesc),
+      _LayoutDef('single-landscape', _Shape.singleLandscape, l.montageLayoutSingleName, l.montageLayoutSingleLandscapeDesc),
+    ];
 
 /// Columna «Layout» de Montaje (MV:241-295).
 class MontageLayoutColumn extends ConsumerWidget {
@@ -54,7 +53,7 @@ class MontageLayoutColumn extends ConsumerWidget {
           spacing: TfSpace.s8,
           children: <Widget>[
             Text(l.montageLayout, style: TfText.display(TfSize.font18).copyWith(color: TfColors.text)),
-            for (final _LayoutDef d in _layouts)
+            for (final _LayoutDef d in _layouts(l))
               _LayoutButton(def: d, on: snapshot.layout == d.id, onTap: () => store.setLayout(d.id)),
             if (snapshot.isSingleShot) _RhythmPicker(snapshot: snapshot, onChanged: store.setSingleRhythm),
           ],

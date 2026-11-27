@@ -61,8 +61,7 @@ class MontageCutMenu extends StatelessWidget {
                     ),
                   ),
                 ),
-              // TODO(l10n): clave «Automático» (montageCutAuto) pendiente en los ARB.
-              _Choice(key: const ValueKey('montage-cut-auto'), title: 'Automático', selected: selectedPartId == null, onTap: () => onSelectPart(null)),
+              _Choice(key: const ValueKey('montage-cut-auto'), title: l10n.montageCutAuto, selected: selectedPartId == null, onTap: () => onSelectPart(null)),
               const SizedBox(height: TfStroke.hairline, child: ColoredBox(color: TfColors.line)),
               GestureDetector(
                 key: const ValueKey('montage-cut-delete'),

@@ -51,8 +51,7 @@ class MontageTimeline extends ConsumerWidget {
             if (s.isSingleShot && s.cuts.isNotEmpty)
               GestureDetector(
                 onTap: store.clearCuts,
-                // TODO(l10n): «Quitar cortes» sin clave en los ARB.
-                child: Text('Quitar cortes', style: TfText.body(TfSize.font12).copyWith(color: TfColors.muted, decoration: TextDecoration.underline)),
+                child: Text(l10n.montageCutsClear, style: TfText.body(TfSize.font12).copyWith(color: TfColors.muted, decoration: TextDecoration.underline)),
               ),
           ]),
         ]),

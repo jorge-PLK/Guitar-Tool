@@ -3404,6 +3404,118 @@ class AppLocalizationsEn extends AppLocalizations {
   String get montageTransitions => 'Transitions';
 
   @override
+  String get montageCutAuto => 'Automatic';
+
+  @override
+  String get montageCutsClear => 'Clear cuts';
+
+  @override
+  String get montageFramingOffsetXLabel => 'Offset X';
+
+  @override
+  String get montageFramingOffsetYLabel => 'Offset Y';
+
+  @override
+  String montageFramingStatusAnalyzing(int percent) {
+    return 'Analyzing the guitar… $percent%';
+  }
+
+  @override
+  String montageFramingStatusDetected(int detected, int samples) {
+    return 'Guitar detected in $detected of $samples samples.';
+  }
+
+  @override
+  String montageFramingStatusFailed(String message) {
+    return 'Could not analyze the take ($message).';
+  }
+
+  @override
+  String get montageFramingStatusNoDetection =>
+      'No detection: the whole frame is used, centered. You can place the box by hand.';
+
+  @override
+  String get montageFramingStatusQueued => 'Queued to analyze the guitar…';
+
+  @override
+  String get montageFramingZoomLabel => 'Zoom';
+
+  @override
+  String get montageLaneAudioOnly => 'Audio only';
+
+  @override
+  String get montageLaneDragHelp => 'Drag to reorder the boxes';
+
+  @override
+  String get montageLaneFraming => 'Framing';
+
+  @override
+  String get montageLaneNoSolos => 'No solos marked';
+
+  @override
+  String get montageLayoutGridDesc => 'Landscape · 3 or 4 takes';
+
+  @override
+  String get montageLayoutGridName => 'Grid';
+
+  @override
+  String get montageLayoutSideDesc => 'Landscape · 1920 × 1080';
+
+  @override
+  String get montageLayoutSideName => 'Side by side';
+
+  @override
+  String get montageLayoutSingleLandscapeDesc => 'Landscape · rhythm and solo';
+
+  @override
+  String get montageLayoutSinglePortraitDesc => 'Portrait · rhythm and solo';
+
+  @override
+  String get montageLayoutSingleName => 'Single shot';
+
+  @override
+  String get montageLayoutStackDesc => 'Portrait · 1080 × 1920';
+
+  @override
+  String get montageLayoutStackName => 'Stacked';
+
+  @override
+  String get montageRetry => 'Retry';
+
+  @override
+  String get montageTransitionAnticipation => 'Solo lead-in';
+
+  @override
+  String get montageTransitionAudioFade => 'Audio fade';
+
+  @override
+  String get montageTransitionAudioFadeValue => '80 ms';
+
+  @override
+  String get montageTransitionCorners => 'Corners';
+
+  @override
+  String get montageTransitionCornersValue => 'Rounded + shadow';
+
+  @override
+  String get montageTransitionEdgeFade => 'Fade in and out';
+
+  @override
+  String get montageTransitionEdgeFadeValue => '1 bar';
+
+  @override
+  String get montageTransitionEntry => 'Entrance';
+
+  @override
+  String get montageTransitionEntryValue => 'Scale 92→100% + sharpness';
+
+  @override
+  String get montageTransitionRelocate => 'Relocation';
+
+  @override
+  String get montageTransitionRelocateValue => 'Spring · 0.5 s';
+
+  @override
   String get errorAnchor => '';
 
   @override
