@@ -1,0 +1,20 @@
+{
+  "phase" : "done",
+  "progress" : 1,
+  "result" : {
+    "clippedFiles" : [
+      "Guitarra.wav"
+    ],
+    "codec" : "hevc",
+    "finalLUFS" : -14,
+    "finalTruePeakDB" : -1,
+    "limitedByPeak" : true,
+    "limiterApplied" : true,
+    "limiterEnabled" : true,
+    "limiterMaxReductionDB" : 2.5,
+    "limiterOutOfTolerance" : false,
+    "normalized" : true,
+    "path" : "/private/<dir>/Projects/Banda - Tema/video/Banda - Tema-side.mp4",
+    "tracksDirectory" : "/private/<dir>/Projects/Banda - Tema/video/Banda - Tema-side-pistas"
+  }
+}

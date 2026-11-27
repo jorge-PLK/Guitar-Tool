@@ -7,13 +7,29 @@
   "autoPartId" : "00000000-0000-0000-0000-000000000001",
   "barDuration" : 2,
   "canvasLabel" : "1080 × 1920",
-  "caption" : false,
+  "caption" : true,
   "cutCandidates" : [
     "00000000-0000-0000-0000-000000000001"
   ],
   "cutGaps" : false,
   "cuts" : [
+    {
+      "covered" : true,
+      "eligible" : [
+        "00000000-0000-0000-0000-000000000001"
+      ],
+      "id" : "00000000-0000-0000-0000-000000000002",
+      "partId" : "00000000-0000-0000-0000-000000000001",
+      "time" : 3
+    },
+    {
+      "covered" : true,
+      "eligible" : [
 
+      ],
+      "id" : "00000000-0000-0000-0000-000000000003",
+      "time" : 5
+    }
   ],
   "export" : {
     "canExport" : true,
@@ -80,7 +96,7 @@
       "progress" : 1,
       "samples" : 40,
       "status" : "ready",
-      "takeId" : "00000000-0000-0000-0000-000000000002"
+      "takeId" : "00000000-0000-0000-0000-000000000004"
     }
   ],
   "hasPlan" : true,
@@ -89,7 +105,7 @@
   "isPortrait" : true,
   "isSingleShot" : true,
   "keepAspectApplies" : true,
-  "keepVideoAspect" : true,
+  "keepVideoAspect" : false,
   "lanes" : [
     {
       "hasVideo" : true,
@@ -107,7 +123,7 @@
         "end" : 5,
         "start" : 2
       },
-      "takeId" : "00000000-0000-0000-0000-000000000002"
+      "takeId" : "00000000-0000-0000-0000-000000000004"
     }
   ],
   "layout" : "single",
@@ -143,11 +159,11 @@
     ],
     "width" : 360
   },
-  "projectId" : "00000000-0000-0000-0000-000000000003",
+  "projectId" : "00000000-0000-0000-0000-000000000005",
   "sections" : [
     {
       "end" : 2,
-      "id" : "00000000-0000-0000-0000-000000000004",
+      "id" : "00000000-0000-0000-0000-000000000006",
       "name" : "Estrofa",
       "solo" : false,
       "start" : 0.5
@@ -161,11 +177,10 @@
       "start" : 2
     }
   ],
-  "showPartLabels" : false,
+  "showPartLabels" : true,
   "singleRhythmCandidates" : [
     "00000000-0000-0000-0000-000000000001"
   ],
-  "singleRhythmPartId" : "00000000-0000-0000-0000-000000000001",
   "songDuration" : 8,
   "span" : {
     "end" : 5,
