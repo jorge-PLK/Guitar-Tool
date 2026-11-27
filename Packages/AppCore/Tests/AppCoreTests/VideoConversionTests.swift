@@ -110,8 +110,9 @@ final class VideoConversionTests: XCTestCase {    // MARK: MP4 sintéticos
                          })
     }
 
-    static func hooks(_ runner: ScriptedProcessRunner, busy: BusyOriginal? = nil) -> VideoConversionEngine.Hooks {
+    static func hooks(_ runner: ScriptedProcessRunner, busy: BusyOriginal? = nil, limit: Int? = nil) -> VideoConversionEngine.Hooks {
         var h = VideoConversionEngine.Hooks(ffmpeg: { URL(fileURLWithPath: "ffmpeg.exe") }, runner: runner, needsConversion: { $0.codec == .hevc })
+        if let limit { h.maxConcurrent = limit }
         if let busy {
             h.replace = { original, converted in
                 busy.attempts.value += 1
@@ -125,7 +126,7 @@ final class VideoConversionTests: XCTestCase {    // MARK: MP4 sintéticos
         return h
     }
 
-    func makeRig(rules: [(String, ScriptedResponse)] = [("h264_nvenc", ffmpegRule())]) throws -> Rig {
+    func makeRig(rules: [(String, ScriptedResponse)] = [("h264_nvenc", ffmpegRule())], limit: Int? = nil) throws -> Rig {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("videoconv-\(UUID().uuidString)", isDirectory: true)
         let takeId = UUID()
         let takeDir = dir.appendingPathComponent("takes/\(takeId.uuidString)", isDirectory: true)
@@ -140,7 +141,7 @@ final class VideoConversionTests: XCTestCase {    // MARK: MP4 sintéticos
         let jobs = Box<[JobInfo]>([])
         jobEngine.setSinks(job: { j in jobs.value.append(j) }, changed: {})
         let busy = BusyOriginal()
-        let engine = VideoConversionEngine(jobs: jobEngine, hooks: Self.hooks(runner, busy: busy))
+        let engine = VideoConversionEngine(jobs: jobEngine, hooks: Self.hooks(runner, busy: busy, limit: limit))
         engine.releaseRetries = Self.testRetries
         engine.releaseRetryDelay = Self.testRetryDelay
         let seen = Box<[TakeVideoState]>([])
@@ -211,9 +212,113 @@ final class VideoConversionTests: XCTestCase {    // MARK: MP4 sintéticos
         _ = start(r)
         await r.engine.wait(takeId: r.takeId)
         XCTAssertEqual(r.engine.currentState(takeId: r.takeId), .ready)
-        XCTAssertEqual(r.runner.requests.map { $0.arguments.contains("h264_nvenc") }, [true, false])
-        XCTAssertTrue(r.runner.requests[1].arguments.contains("h264_mf"))
+        // NVENC con GPU, NVENC con CPU y, al fallar también, Media Foundation.
+        XCTAssertEqual(r.runner.requests.map { $0.arguments.contains("h264_nvenc") }, [true, true, false])
+        XCTAssertTrue(r.runner.requests[2].arguments.contains("h264_mf"))
+        XCTAssertFalse(r.runner.requests[2].arguments.contains("-hwaccel"))
         XCTAssertEqual(try codec(r.video), .h264)
+    }
+
+    /// Argumentos de la receta rápida: decodificación en GPU antes de `-i` y sin `-pix_fmt`; en CPU con `-pix_fmt`; el
+    /// preajuste solo con NVENC. En todos, mismos PTS y sin B.
+    func testHardwareDecodeArguments() {
+        let i = URL(fileURLWithPath: "/t/video.mov"), o = URL(fileURLWithPath: "/t/.converting-video.mov")
+        let gpu = TakeVideoTranscode.ffmpegArguments(input: i, output: o, encoder: "h264_nvenc", bitrate: 2_000_000, gop: 30, hwDecode: true)
+        XCTAssertEqual(Array(gpu[gpu.firstIndex(of: "-hwaccel")!...].prefix(4)), ["-hwaccel", "cuda", "-hwaccel_output_format", "cuda"])
+        XCTAssertLessThan(gpu.firstIndex(of: "-hwaccel")!, gpu.firstIndex(of: "-i")!)
+        XCTAssertFalse(gpu.contains("-pix_fmt"))
+        XCTAssertEqual(gpu[gpu.firstIndex(of: "-preset")! + 1], TakeVideoTranscode.nvencPreset)
+        let cpu = TakeVideoTranscode.ffmpegArguments(input: i, output: o, encoder: "h264_nvenc", bitrate: 2_000_000, gop: 30)
+        XCTAssertFalse(cpu.contains("-hwaccel"))
+        XCTAssertEqual(cpu[cpu.firstIndex(of: "-pix_fmt")! + 1], "yuv420p")
+        let mf = TakeVideoTranscode.ffmpegArguments(input: i, output: o, encoder: "h264_mf", bitrate: 2_000_000, gop: 30)
+        XCTAssertFalse(mf.contains("-preset"))
+        for a in [gpu, cpu, mf] {
+            XCTAssertEqual(a[a.firstIndex(of: "-bf")! + 1], "0")
+            XCTAssertEqual(a[a.firstIndex(of: "-fps_mode")! + 1], "passthrough")
+            XCTAssertEqual(a[a.firstIndex(of: "-enc_time_base")! + 1], "demux")
+            XCTAssertTrue(a.contains("-an"))
+        }
+        XCTAssertEqual(TakeVideoTranscode.attempts.map(\.hwDecode), [true, false, false])
+    }
+
+    /// Si la decodificación en GPU falla (sin NVDEC, fuente que no admite), se repite sin ella y se convierte igual.
+    func testFallsBackToCPUDecodeWhenGPUFails() async throws {
+        let r = try makeRig(rules: [("-hwaccel", ScriptedResponse(stderr: "CUDA_ERROR_NO_DEVICE", status: 1)),
+                                    ("h264_nvenc", Self.ffmpegRule())])
+        _ = start(r)
+        await r.engine.wait(takeId: r.takeId)
+        XCTAssertEqual(r.engine.currentState(takeId: r.takeId), .ready)
+        XCTAssertEqual(r.runner.requests.map { $0.arguments.contains("-hwaccel") }, [true, false])
+        XCTAssertTrue(r.runner.requests[1].arguments.contains("h264_nvenc"))
+        XCTAssertEqual(try codec(r.video), .h264)
+    }
+
+    /// Dos conversiones a la vez (`maxConcurrent`): la tercera espera a que acabe una; con límite 1, una tras otra.
+    func testRunsTwoConversionsAtOnceAndQueuesTheThird() async throws {
+        let hold = DispatchSemaphore(value: 0)
+        let r = try makeRig(rules: [("h264_nvenc", Self.ffmpegRule(gate: hold))])
+        let extra = try (0..<2).map { _ in try addTake(r) }
+        let all = [(r.takeId, r.video)] + extra
+        for (id, v) in all { _ = r.engine.state(takeId: id, files: [v], title: "t") }
+        let two = await waitUntil { r.runner.requests.count == 2 }
+        XCTAssertTrue(two, "dos trabajos solapan")
+        try await Task.sleep(nanoseconds: 150_000_000)
+        XCTAssertEqual(r.runner.requests.count, 2, "el tercero espera")
+        XCTAssertEqual(r.engine.runningCount, 3)
+        hold.signal()
+        let third = await waitUntil { r.runner.requests.count == 3 }
+        XCTAssertTrue(third, "al acabar uno entra el tercero")
+        hold.signal(); hold.signal()
+        for (id, _) in all { await r.engine.wait(takeId: id) }
+        for (id, v) in all {
+            XCTAssertEqual(r.engine.currentState(takeId: id), .ready)
+            XCTAssertEqual(try codec(v), .h264)
+        }
+    }
+
+    func testLimitOneRunsInSeries() async throws {
+        let hold = DispatchSemaphore(value: 0)
+        let r = try makeRig(rules: [("h264_nvenc", Self.ffmpegRule(gate: hold))], limit: 1)
+        let extra = try addTake(r)
+        _ = r.engine.state(takeId: r.takeId, files: [r.video], title: "t")
+        _ = r.engine.state(takeId: extra.0, files: [extra.1], title: "t")
+        let first = await waitUntil { r.runner.requests.count == 1 }
+        XCTAssertTrue(first)
+        try await Task.sleep(nanoseconds: 150_000_000)
+        XCTAssertEqual(r.runner.requests.count, 1)
+        hold.signal(); hold.signal()
+        await r.engine.wait(takeId: r.takeId)
+        await r.engine.wait(takeId: extra.0)
+        XCTAssertEqual(r.runner.requests.count, 2)
+    }
+
+    /// Una toma que espera su turno se puede cancelar sin haber arrancado ffmpeg, y no bloquea el sitio.
+    func testCancellingQueuedConversionFreesItsPlace() async throws {
+        let hold = DispatchSemaphore(value: 0)
+        let r = try makeRig(rules: [("h264_nvenc", Self.ffmpegRule(gate: hold))], limit: 1)
+        let extra = try addTake(r)
+        _ = r.engine.state(takeId: r.takeId, files: [r.video], title: "t")
+        _ = r.engine.state(takeId: extra.0, files: [extra.1], title: "t")
+        let first = await waitUntil { r.runner.requests.count == 1 }
+        XCTAssertTrue(first)
+        XCTAssertTrue(r.engine.cancel(takeId: extra.0))
+        await r.engine.wait(takeId: extra.0)
+        hold.signal()
+        await r.engine.wait(takeId: r.takeId)
+        XCTAssertEqual(r.runner.requests.count, 1)
+        XCTAssertEqual(try codec(r.video), .h264)
+        XCTAssertEqual(try codec(extra.1), .hevc)
+    }
+
+    /// Otra toma HEVC en el directorio del rig.
+    func addTake(_ r: Rig) throws -> (UUID, URL) {
+        let id = UUID()
+        let dir = r.dir.appendingPathComponent("takes/\(id.uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let v = dir.appendingPathComponent("video.mov")
+        try MP4.macTake(v)
+        return (id, v)
     }
 
     /// La conversión que no pasa la verificación (le faltan fotogramas) deja el original, sin temporal; el fallo se recuerda

@@ -38,6 +38,8 @@ enum VideoConversionConstants {
     /// propia), al terminar la conversión y al cerrar el visor. Agotados, queda para la siguiente petición del vídeo.
     static let releaseRetries = 4
     static let releaseRetryDelay: TimeInterval = 0.5
+    /// Conversiones simultáneas por omisión (medido en el PC de pruebas; decisión propia, ver `Hooks.maxConcurrent`).
+    static let maxConcurrent = 2
     /// Códigos para la página (montaje, encuadre y visor).
     static let convertingCode = "video-converting"
     static let failedCode = "video-failed"
@@ -116,7 +118,40 @@ enum VideoConversionError: Error, Equatable, CustomStringConvertible {
     }
 }
 
-/// Cola de conversiones (como `LinkEngine`: en serie con `tail`, cancelación por clave, `cancelAll` al cerrar).
+/// Límite de trabajos a la vez, por orden de llegada; esperar en la cola es cancelable.
+actor ConversionGate {
+    private let limit: Int
+    private var active = 0
+    private var waiters: [(id: UUID, continuation: CheckedContinuation<Void, Error>)] = []
+
+    init(limit: Int) { self.limit = max(1, limit) }
+
+    func acquire() async throws {
+        try Task.checkCancellation()
+        if active < limit { active += 1; return }
+        let id = UUID()
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, Error>) in
+                if Task.isCancelled { c.resume(throwing: CancellationError()); return }
+                waiters.append((id, c))
+            }
+        } onCancel: {
+            Task { await self.cancelWaiter(id) }
+        }
+    }
+
+    /// Libera el sitio: pasa al siguiente que espera (conserva el contador) o lo devuelve.
+    func release() {
+        if waiters.isEmpty { active = max(0, active - 1) } else { waiters.removeFirst().continuation.resume() }
+    }
+
+    private func cancelWaiter(_ id: UUID) {
+        guard let i = waiters.firstIndex(where: { $0.id == id }) else { return }
+        waiters.remove(at: i).continuation.resume(throwing: CancellationError())
+    }
+}
+
+/// Cola de conversiones (como `LinkEngine`: cancelación por clave, `cancelAll` al cerrar; hasta `maxConcurrent` a la vez).
 final class VideoConversionEngine: @unchecked Sendable {
     /// Lo que depende del sistema; los tests ponen un `ScriptedProcessRunner` y la política.
     struct Hooks: Sendable {
@@ -131,6 +166,14 @@ final class VideoConversionEngine: @unchecked Sendable {
         /// ¿Y si el sondeo falla o no hay pista de vídeo? Windows: sí se intenta convertir (ffmpeg lee más que el parser de
         /// `moov`, y un fallo allí es visible); Mac: no (lee de serie, quien lo lea dará su error).
         var assumeNeedsWhenUnprobed: Bool = platformAssumeNeedsWhenUnprobed
+
+        /// Conversiones a la vez (el resto espera en cola, por orden). Medido en una RTX 3060 con dos tomas de 7500
+        /// fotogramas: dos a la vez 19,6 s frente a 21,6 s en serie (NVENC ya va al 80-95 % con una); en CPU sola no gana
+        /// nada. Con 2 se solapan además el sondeo, el tramo vacío y la verificación de una con la codificación de otra.
+        var maxConcurrent: Int = VideoConversionConstants.maxConcurrent
+
+        /// Intentos por orden (codificador y decodificación en GPU); los tests los sustituyen.
+        var attempts: [TakeVideoTranscode.Attempt] = TakeVideoTranscode.attempts
 
         static var platformAssumeNeedsWhenUnprobed: Bool {
             #if os(Windows)
@@ -172,7 +215,7 @@ final class VideoConversionEngine: @unchecked Sendable {
     let jobs: JobEngine
     private let hooks: Hooks
     private let lock = NSLock()
-    private var tail: Task<Void, Never>?
+    private let gate: ConversionGate
     private struct Job { var task: Task<Void, Never>?; var fraction: Double? }
     /// Original y convertido verificado que espera a sustituirlo.
     struct Swap: Equatable, Sendable { var original: URL; var converted: URL }
@@ -193,6 +236,7 @@ final class VideoConversionEngine: @unchecked Sendable {
     init(jobs: JobEngine, hooks: Hooks) {
         self.jobs = jobs
         self.hooks = hooks
+        gate = ConversionGate(limit: hooks.maxConcurrent)
     }
 
     func addReleaser(_ r: @escaping Releaser) { lock.withLock { releasers.append(r) } }
@@ -350,9 +394,7 @@ final class VideoConversionEngine: @unchecked Sendable {
         guard created else { return currentState(takeId: takeId) }
         jobs.update(key, title: title, stage: VideoConversionConstants.stage, state: "queued", text: VideoConversionConstants.queuedText)
         lock.withLock {
-            let previous = tail
-            let task = Task { [self] in await run(takeId: takeId, files: files, title: title, after: previous) }
-            tail = task
+            let task = Task { [self] in await run(takeId: takeId, files: files, title: title) }
             running[takeId]?.task = task
         }
         return .converting(nil)
@@ -377,11 +419,13 @@ final class VideoConversionEngine: @unchecked Sendable {
         notify(takeId, state)
     }
 
-    private func run(takeId: UUID, files: [URL], title: String, after previous: Task<Void, Never>?) async {
-        await previous?.value
+    private func run(takeId: UUID, files: [URL], title: String) async {
         let key = Self.key(takeId), stage = VideoConversionConstants.stage
         var made: [Swap] = []
+        var holdsSlot = false
         do {
+            try await gate.acquire()
+            holdsSlot = true
             try Task.checkCancellation()
             setFraction(takeId, 0, title: title)
             let ffmpeg = try await hooks.ffmpeg()
@@ -389,6 +433,8 @@ final class VideoConversionEngine: @unchecked Sendable {
                 let temp = try await convert(url, ffmpeg: ffmpeg, takeId: takeId, part: i, of: files.count, title: title)
                 made.append(Swap(original: url, converted: temp))
             }
+            await gate.release()
+            holdsSlot = false
             try Task.checkCancellation()
             // De «convirtiendo» a «pendiente de sustituir» sin hueco en el que `state` encolaría otra vez; la sustitución se
             // aplica ya, con el visor abierto o no (opción b'), y solo se queda pendiente si el original sigue en uso.
@@ -400,10 +446,12 @@ final class VideoConversionEngine: @unchecked Sendable {
             await applyPendingSoon(takeId: takeId)
             lock.withLock { settling[takeId] = nil }
         } catch let error where Self.isCancellation(error) {
+            if holdsSlot { await gate.release() }
             for s in made { try? FileManager.default.removeItem(at: s.converted) }
             jobs.update(key, title: title, stage: stage, state: "cancelled", text: "Conversión cancelada")
             finish(takeId, .failed("conversión cancelada"), remember: false)
         } catch {
+            if holdsSlot { await gate.release() }
             for s in made { try? FileManager.default.removeItem(at: s.converted) }
             let message = (error as? VideoConversionError)?.description ?? JobEngine.describe(error)
             jobs.update(key, title: title, stage: stage, state: "failed", error: message, text: "No se pudo convertir el vídeo")
@@ -433,10 +481,11 @@ final class VideoConversionEngine: @unchecked Sendable {
         let duration = max(original.duration, 1e-3)
         var problems: [String] = []
         var converted = false
-        for encoder in TakeVideoTranscode.encoders {
+        for attempt in hooks.attempts {
             try Task.checkCancellation()
             try? fm.removeItem(at: temp)
-            let args = TakeVideoTranscode.ffmpegArguments(input: url, output: temp, encoder: encoder, bitrate: bitrate, gop: gop)
+            let args = TakeVideoTranscode.ffmpegArguments(input: url, output: temp, encoder: attempt.encoder, bitrate: bitrate, gop: gop,
+                                                          hwDecode: attempt.hwDecode)
             let onLine: @Sendable (String) -> Void = { [weak self] line in
                 guard let us = TakeVideoTranscode.progressMicroseconds(line) else { return }
                 let within = min(max(Double(us) / 1e6 / duration, 0), 1)
@@ -449,7 +498,7 @@ final class VideoConversionEngine: @unchecked Sendable {
             } catch let error where Self.isCancellation(error) {
                 throw CancellationError()
             } catch {
-                problems.append("\(encoder): \(error)")
+                problems.append("\(attempt.label): \(error)")
                 continue
             }
             if result.status == 0, fm.fileExists(atPath: temp.path) {
@@ -457,7 +506,7 @@ final class VideoConversionEngine: @unchecked Sendable {
                 break
             }
             let last = result.stderr.split(whereSeparator: \.isNewline).last.map(String.init) ?? ""
-            problems.append("\(encoder): \(last.isEmpty ? "código \(result.status)" : last)")
+            problems.append("\(attempt.label): \(last.isEmpty ? "código \(result.status)" : last)")
         }
         guard converted else { throw VideoConversionError.ffmpeg(problems.joined(separator: "; ")) }
         let after: TakeVideoProbe

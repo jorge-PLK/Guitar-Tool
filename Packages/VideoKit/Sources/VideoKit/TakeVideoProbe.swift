@@ -131,14 +131,40 @@ public enum TakeVideoTranscode {
     /// (el fichero queda como los de `VideoTakeWriter`: el tramo de medios empieza en 0) y SIN `+faststart` (`TakeVideoFile.open` y `rewrite` quieren
     /// `moov` al final). MPEG-4 aunque la extensión sea `.mov`, como el escritor de Windows. Progreso por stdout
     /// (`-progress pipe:1 -nostats`: `ProcessRunning.onLine` solo recibe stdout).
-    public static func ffmpegArguments(input: URL, output: URL, encoder: String, bitrate: Int, gop: Int) -> [String] {
-        ["-hide_banner", "-nostdin", "-y", "-v", "error", "-progress", "pipe:1", "-nostats",
+    ///
+    /// Velocidad (medida en una RTX 3060, HEVC 1080p30, 7500 fotogramas: 19,8 s → 10,9 s): con NVENC, preajuste `p2`
+    /// (`nvencPreset`; el `p4` por omisión deja el codificador al 90 % y no deja ir más deprisa) y, con `hwDecode`,
+    /// decodificación en la GPU (`-hwaccel cuda -hwaccel_output_format cuda`: los fotogramas pasan de NVDEC a NVENC sin
+    /// bajar a memoria, de ahí que no lleve `-pix_fmt`). Mismos PTS, mismos fotogramas y sin B que la ruta de CPU.
+    public static func ffmpegArguments(input: URL, output: URL, encoder: String, bitrate: Int, gop: Int, hwDecode: Bool = false) -> [String] {
+        let isNvenc = encoder == nvencEncoder
+        let hardware = hwDecode ? ["-hwaccel", "cuda", "-hwaccel_output_format", "cuda"] : []
+        return ["-hide_banner", "-nostdin", "-y", "-v", "error", "-progress", "pipe:1", "-nostats"] + hardware + [
          "-i", input.path,
          "-map", "0:v:0", "-an", "-sn", "-dn",
-         "-c:v", encoder, "-b:v", String(bitrate), "-bf", "0", "-g", String(gop), "-pix_fmt", "yuv420p",
+         "-c:v", encoder] + (isNvenc ? ["-preset", nvencPreset] : []) + [
+         "-b:v", String(bitrate), "-bf", "0", "-g", String(gop)] + (hwDecode ? [] : ["-pix_fmt", "yuv420p"]) + [
          "-fps_mode", "passthrough", "-enc_time_base", "demux", "-video_track_timescale", String(timescale), "-movie_timescale", String(timescale),
          "-f", "mp4", output.path]
     }
+
+    public static let nvencEncoder = "h264_nvenc"
+    /// Preajuste de NVENC (medido: p1 y p2 igual de rápidos con decodificación en GPU; p2 conserva más calidad).
+    public static let nvencPreset = "p2"
+
+    /// Un intento de conversión: codificador y si decodifica en la GPU.
+    public struct Attempt: Equatable, Sendable {
+        public var encoder: String
+        public var hwDecode: Bool
+        public init(encoder: String, hwDecode: Bool) { self.encoder = encoder; self.hwDecode = hwDecode }
+        public var label: String { hwDecode ? "\(encoder) + decodificación GPU" : encoder }
+    }
+
+    /// Intentos por orden: NVENC con NVDEC; NVENC con decodificación en CPU (sin NVDEC, p. ej. una fuente de 10 bits que
+    /// H.264 no admite en GPU); Media Foundation en CPU (sin NVIDIA). `-hwaccel auto` no se usa: en la prueba cerró ffmpeg
+    /// con un fallo de segmentación al no poder crear el dispositivo Direct3D.
+    public static let attempts = [Attempt(encoder: nvencEncoder, hwDecode: true), Attempt(encoder: nvencEncoder, hwDecode: false),
+                                  Attempt(encoder: "h264_mf", hwDecode: false)]
 
     /// Microsegundos de la línea `out_time_us=` del progreso de ffmpeg (nil en las demás o con `N/A`).
     public static func progressMicroseconds(_ line: String) -> Int64? {
