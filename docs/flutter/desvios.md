@@ -161,9 +161,9 @@ Montaje D9 (M1) no se repite: ver la fila M1 de los heredados.
 | --- | --- | --- |
 | MO2, MO7 | Resueltos en código en `833541c` (`MontageSnapshot.autoPartId`; `reveal` selecciona el fichero). Constan en la tabla de arriba | resuelto (`833541c`) |
 | MO9 | `montage.seek` no aplica el snapshot de la respuesta: la posición llega por `montage.position` y el cursor no reconstruye el snapshot (envío cada 120 ms más uno final) | interfaz en Dart |
-| MO10 | Arrastre de una marca de corte sin ajuste al pulso en vivo: `AppCore` no ofrece `draggedCutTime`, así que el ajuste se aplica al soltar con `moveCut` | abierto (hueco de núcleo: falta un cálculo en vivo; decide Jorge si se añade) |
-| MO11 | Modo «seguir» de la hoja «Encuadre» sin caja en vivo: no se dibuja la caja durante el seguimiento | abierto |
-| MO12 | Opciones de fps y de resolución de la exportación: las ofrece el núcleo (`export.options`); la interfaz no añade las suyas. Detalle por concretar: `Temp/flutter/ola4-estado.md` solo lo nombra | abierto |
+| MO10 | Arrastre de una marca de corte sin ajuste al pulso en vivo: `AppCore` no ofrece `draggedCutTime`, así que el ajuste se aplica al soltar con `moveCut` | resuelto en 8cc6eb1: `AppCore` tiene `montage.snapCut` (solo lectura, = `draggedCutTime`); el timeline lo pide durante el arrastre con una sola petición en vuelo y se aplica la última (`montage_live_query.dart`); al soltar, `moveCut` como antes |
+| MO11 | Modo «seguir» de la hoja «Encuadre» sin caja en vivo: no se dibuja la caja durante el seguimiento | resuelto en 8cc6eb1: `AppCore` tiene `montage.framingBox` (solo lectura: caja efectiva con overrides de modo, caja manual, zoom y desplazamiento, sin guardar); la hoja lo pide en follow mientras se arrastra el desplazamiento o se mueve el zoom; el análisis simulado (`MontageSimulation.swift`) trae una trayectoria de 4 claves |
+| MO12 | Opciones de fps y de resolución de la exportación: las ofrece el núcleo (`export.options`); la interfaz no añade las suyas. Detalle por concretar: `Temp/flutter/ola4-estado.md` solo lo nombra | aceptado, sin hueco: Flutter usa `export.options` del núcleo (720p, 1080p y 4K; 24, 25, 30, 50 y 60 fps más el valor actual); las dos diferencias con SwiftUI van a favor de Flutter: enseña la resolución guardada aunque no sea de la lista y en Windows solo ofrece H.264 |
 | MO13 | `MontagePreviewColumn` y la lista de temas siguen el orden de Biblioteca (título), no el de SwiftUI (`createdAt` descendente). Ver `ref/montaje/DIFERENCIAS.md` | aceptado |
 
 ## Notas de plataforma
