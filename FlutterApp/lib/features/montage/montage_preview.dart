@@ -76,12 +76,15 @@ class MontagePreviewColumn extends StatelessWidget {
                     borderRadius: BorderRadius.circular(TfRadius.card),
                     border: Border.all(color: TfColors.fieldLine, width: TfStroke.hairline),
                   ),
-                  child: ColoredBox(
-                    color: TfColors.videoBg,
-                    child: TfVideoSurface(
-                      textureId: ready ? textureId : null,
-                      frameSize: frameSize,
-                      radius: TfRadius.card,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(TfRadius.card - TfStroke.hairline),
+                    child: ColoredBox(
+                      color: TfColors.videoBg,
+                      child: TfVideoSurface(
+                        textureId: ready ? textureId : null,
+                        frameSize: frameSize,
+                        radius: TfRadius.card,
+                      ),
                     ),
                   ),
                 ),

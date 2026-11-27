@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:toneforge/features/montage/montage_preview.dart';
 import 'package:toneforge/l10n/app_localizations.dart';
+import 'package:toneforge/theme/tokens.dart';
 import 'package:toneforge/widgets/tf_slider.dart';
 
 Future<void> pump(
@@ -113,6 +114,19 @@ void main() {
     await pump(tester, position: const Duration(seconds: 2), duration: const Duration(seconds: 5));
     expect(find.text('0:02 · Estrofa'), findsOneWidget);
     expect(find.textContaining('0:02 / 0:05', findRichText: true), findsOneWidget);
+  });
+
+  testWidgets('el relleno del vídeo va recortado al radio del marco menos el borde', (tester) async {
+    await pump(tester);
+    final Finder fill = find.byWidgetPredicate((Widget w) => w is ColoredBox && w.color == TfColors.videoBg);
+    expect(fill, findsOneWidget);
+    final Finder clip = find.ancestor(
+      of: fill,
+      matching: find.byWidgetPredicate(
+        (Widget w) => w is ClipRRect && w.borderRadius == BorderRadius.circular(TfRadius.card - TfStroke.hairline),
+      ),
+    );
+    expect(clip, findsOneWidget);
   });
 
   testWidgets('columna estrecha: cabecera en dos líneas', (tester) async {
