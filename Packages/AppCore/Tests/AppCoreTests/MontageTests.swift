@@ -761,7 +761,7 @@ final class MontageTests: XCTestCase {
         try FileManager.default.createDirectory(at: support, withIntermediateDirectories: true)
         let js = JobServices(importer: EditsImporter(), separator: EditsSeparator(), levelMeter: nil, analyzer: nil, guitarSplitter: nil)
         let bridge = try Bridge(options: LaunchOptions(projectsFolder: rig.root, supportDir: support, audio: .simulated),
-                                mediaBase: "https://tf.media/", reveal: reveal, services: js)
+                                mediaBase: "https://tf.media/", reveal: reveal, services: js, videoHooks: RecordFixtureWorld.noConversionHooks)
         let events = Events()
         bridge.send = { events.add($0) }
         bridge.montageService.services = services

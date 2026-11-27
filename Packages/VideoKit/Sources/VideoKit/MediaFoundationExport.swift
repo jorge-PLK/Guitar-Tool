@@ -97,7 +97,16 @@ extension MontageExporter {
             }()
             defer { muxer = nil }
             var audioDone = 0   // muestras del PCM ya escritas
-            let total = frames.frameCount
+            // Solo con TF_EXPORT_PROFILE: TF_EXPORT_FRAMES limita los fotogramas (medición corta) y se imprime la tabla por fase.
+            let total = ExportProfile.enabled ? min(frames.frameCount, Int(ProcessInfo.processInfo.environment["TF_EXPORT_FRAMES"] ?? "") ?? .max)
+                                              : frames.frameCount
+            let started = DispatchTime.now().uptimeNanoseconds
+            defer {
+                if ExportProfile.enabled {
+                    let s = Double(DispatchTime.now().uptimeNanoseconds &- started) / 1e9
+                    FileHandle.standardError.write(Data("PROFILE total \(total) fotogramas en \(String(format: "%.2f", s)) s (\(String(format: "%.2f", s * 1000 / Double(max(1, total)))) ms/fotograma)\n\(ExportProfile.report())\n".utf8))
+                }
+            }
             for i in 0..<total {
                 if isCancelled { throw CancellationError() }
                 let pb: FramePixelBuffer

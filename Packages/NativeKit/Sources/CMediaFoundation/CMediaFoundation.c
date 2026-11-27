@@ -58,8 +58,8 @@ static HRESULT get_pair(IMFAttributes *t, const GUID *key, UINT32 *a, UINT32 *b)
 // BT.709 de rango limitado, en coma fija de 16 bits (coeficientes · 219/255 para Y y · 224/255 para Cb y Cr).
 static inline uint8_t clamp8(int v) { return (uint8_t)(v < 0 ? 0 : v > 255 ? 255 : v); }
 
-void tfmf_bgra_to_nv12(const uint8_t *bgra, int32_t bgraStride, int32_t width, int32_t height,
-                       uint8_t *y, int32_t yStride, uint8_t *uv, int32_t uvStride) {
+static void bgra_to_nv12_scalar(const uint8_t *bgra, int32_t bgraStride, int32_t width, int32_t height,
+                                uint8_t *y, int32_t yStride, uint8_t *uv, int32_t uvStride) {
     for (int32_t r = 0; r < height; r++) {
         const uint8_t *s = bgra + (size_t)r * bgraStride;
         uint8_t *d = y + (size_t)r * yStride;
@@ -82,8 +82,8 @@ void tfmf_bgra_to_nv12(const uint8_t *bgra, int32_t bgraStride, int32_t width, i
     }
 }
 
-void tfmf_nv12_to_bgra(const uint8_t *y, int32_t yStride, const uint8_t *uv, int32_t uvStride, int32_t width, int32_t height,
-                       uint8_t *bgra, int32_t bgraStride) {
+static void nv12_to_bgra_scalar(const uint8_t *y, int32_t yStride, const uint8_t *uv, int32_t uvStride, int32_t width, int32_t height,
+                                uint8_t *bgra, int32_t bgraStride) {
     for (int32_t r = 0; r < height; r++) {
         const uint8_t *ys = y + (size_t)r * yStride, *cs = uv + (size_t)(r / 2) * uvStride;
         uint8_t *d = bgra + (size_t)r * bgraStride;
@@ -95,6 +95,156 @@ void tfmf_nv12_to_bgra(const uint8_t *y, int32_t yStride, const uint8_t *uv, int
             d[3] = 255;
         }
     }
+}
+
+// --- Conversión de color con AVX2 ------------------------------------------------------------------------------------
+// Mismas cuentas enteras de 32 bits que el escalar (mullo, desplazamiento aritmético, min/max), por eso los bytes salen
+// idénticos. Las colas (ancho no múltiplo de 8, anchos y alturas impares) las resuelve el propio escalar.
+#if defined(__x86_64__) || defined(_M_X64)
+#include <immintrin.h>
+#define TF_AVX2 __attribute__((target("avx2")))
+#define TF_HAVE_AVX2_CODE 1
+
+static int tf_cpu_has_avx2(void) {
+    int info[4] = {0, 0, 0, 0};
+    __asm__ volatile("cpuid" : "=a"(info[0]), "=b"(info[1]), "=c"(info[2]), "=d"(info[3]) : "a"(0), "c"(0));
+    if (info[0] < 7) return 0;
+    __asm__ volatile("cpuid" : "=a"(info[0]), "=b"(info[1]), "=c"(info[2]), "=d"(info[3]) : "a"(1), "c"(0));
+    int osxsave = (info[2] >> 27) & 1, avx = (info[2] >> 28) & 1;
+    if (!osxsave || !avx) return 0;
+    unsigned lo, hi;
+    __asm__ volatile("xgetbv" : "=a"(lo), "=d"(hi) : "c"(0));
+    if ((lo & 6) != 6) return 0;   // el sistema guarda los registros XMM e YMM
+    __asm__ volatile("cpuid" : "=a"(info[0]), "=b"(info[1]), "=c"(info[2]), "=d"(info[3]) : "a"(7), "c"(0));
+    return (info[1] >> 5) & 1;
+}
+
+TF_AVX2 static void nv12_to_bgra_avx2(const uint8_t *y, int32_t yStride, const uint8_t *uv, int32_t uvStride, int32_t width, int32_t height,
+                                      uint8_t *bgra, int32_t bgraStride) {
+    const __m256i k16 = _mm256_set1_epi32(16), k128 = _mm256_set1_epi32(128), kY = _mm256_set1_epi32(76309),
+                  kBU = _mm256_set1_epi32(138438), kGU = _mm256_set1_epi32(-13975), kGV = _mm256_set1_epi32(-34925),
+                  kRV = _mm256_set1_epi32(117489), kRound = _mm256_set1_epi32(32768), zero = _mm256_setzero_si256(),
+                  k255 = _mm256_set1_epi32(255), alpha = _mm256_set1_epi32((int)0xff000000u);
+    const __m256i evenIdx = _mm256_setr_epi32(0, 0, 2, 2, 4, 4, 6, 6), oddIdx = _mm256_setr_epi32(1, 1, 3, 3, 5, 5, 7, 7);
+    for (int32_t r = 0; r < height; r++) {
+        const uint8_t *ys = y + (size_t)r * yStride, *cs = uv + (size_t)(r / 2) * uvStride;
+        uint8_t *d = bgra + (size_t)r * bgraStride;
+        int32_t x = 0;
+        for (; x + 8 <= width; x += 8) {
+            __m256i Y = _mm256_mullo_epi32(_mm256_sub_epi32(_mm256_cvtepu8_epi32(_mm_loadl_epi64((const __m128i *)(ys + x))), k16), kY);
+            __m256i c = _mm256_sub_epi32(_mm256_cvtepu8_epi32(_mm_loadl_epi64((const __m128i *)(cs + x))), k128);
+            __m256i U = _mm256_permutevar8x32_epi32(c, evenIdx), V = _mm256_permutevar8x32_epi32(c, oddIdx);
+            __m256i b = _mm256_srai_epi32(_mm256_add_epi32(_mm256_add_epi32(Y, _mm256_mullo_epi32(U, kBU)), kRound), 16);
+            __m256i g = _mm256_srai_epi32(_mm256_add_epi32(_mm256_add_epi32(_mm256_add_epi32(Y, _mm256_mullo_epi32(U, kGU)),
+                                                                            _mm256_mullo_epi32(V, kGV)), kRound), 16);
+            __m256i rr = _mm256_srai_epi32(_mm256_add_epi32(_mm256_add_epi32(Y, _mm256_mullo_epi32(V, kRV)), kRound), 16);
+            b = _mm256_min_epi32(_mm256_max_epi32(b, zero), k255);
+            g = _mm256_min_epi32(_mm256_max_epi32(g, zero), k255);
+            rr = _mm256_min_epi32(_mm256_max_epi32(rr, zero), k255);
+            __m256i px = _mm256_or_si256(_mm256_or_si256(b, _mm256_slli_epi32(g, 8)), _mm256_or_si256(_mm256_slli_epi32(rr, 16), alpha));
+            _mm256_storeu_si256((__m256i *)(d + 4 * x), px);
+        }
+        for (; x < width; x++) {
+            int Y = 76309 * (ys[x] - 16), U = cs[(x & ~1)] - 128, V = cs[(x & ~1) + 1] - 128;
+            uint8_t *p = d + 4 * x;
+            p[0] = clamp8((Y + 138438 * U + 32768) >> 16);
+            p[1] = clamp8((Y - 13975 * U - 34925 * V + 32768) >> 16);
+            p[2] = clamp8((Y + 117489 * V + 32768) >> 16);
+            p[3] = 255;
+        }
+    }
+}
+
+TF_AVX2 static void bgra_to_nv12_avx2(const uint8_t *bgra, int32_t bgraStride, int32_t width, int32_t height,
+                                      uint8_t *y, int32_t yStride, uint8_t *uv, int32_t uvStride) {
+    const __m256i kR = _mm256_set1_epi32(11966), kG = _mm256_set1_epi32(40254), kB = _mm256_set1_epi32(4064),
+                  kRound = _mm256_set1_epi32(32768), k16 = _mm256_set1_epi32(16), zero = _mm256_setzero_si256(),
+                  k255 = _mm256_set1_epi32(255), mask = _mm256_set1_epi32(255), pick = _mm256_setr_epi32(0, 4, 0, 4, 0, 4, 0, 4);
+    for (int32_t r = 0; r < height; r++) {
+        const uint8_t *s = bgra + (size_t)r * bgraStride;
+        uint8_t *d = y + (size_t)r * yStride;
+        int32_t x = 0;
+        for (; x + 8 <= width; x += 8) {
+            __m256i p = _mm256_loadu_si256((const __m256i *)(s + 4 * x));
+            __m256i B = _mm256_and_si256(p, mask), G = _mm256_and_si256(_mm256_srli_epi32(p, 8), mask),
+                    R = _mm256_and_si256(_mm256_srli_epi32(p, 16), mask);
+            __m256i v = _mm256_add_epi32(_mm256_add_epi32(_mm256_mullo_epi32(R, kR), _mm256_mullo_epi32(G, kG)),
+                                         _mm256_add_epi32(_mm256_mullo_epi32(B, kB), kRound));
+            v = _mm256_add_epi32(k16, _mm256_srai_epi32(v, 16));
+            v = _mm256_min_epi32(_mm256_max_epi32(v, zero), k255);
+            __m256i w = _mm256_packus_epi16(_mm256_packus_epi32(v, v), _mm256_setzero_si256());
+            w = _mm256_permutevar8x32_epi32(w, pick);
+            _mm_storel_epi64((__m128i *)(d + x), _mm256_castsi256_si128(w));
+        }
+        for (; x < width; x++) {
+            const uint8_t *q = s + 4 * x;
+            d[x] = clamp8(16 + ((11966 * q[2] + 40254 * q[1] + 4064 * q[0] + 32768) >> 16));
+        }
+    }
+    const __m128i cUR = _mm_set1_epi32(-6598), cUG = _mm_set1_epi32(-22187), cUB = _mm_set1_epi32(28784),
+                  cVR = _mm_set1_epi32(28784), cVG = _mm_set1_epi32(-26148), cVB = _mm_set1_epi32(-2637),
+                  rnd = _mm_set1_epi32(1 << 17), k128 = _mm_set1_epi32(128), z = _mm_setzero_si128(), m255 = _mm_set1_epi32(255);
+    for (int32_t r = 0; r < (height + 1) / 2; r++) {
+        const uint8_t *s0 = bgra + (size_t)(2 * r) * bgraStride, *s1 = (2 * r + 1 < height) ? s0 + bgraStride : s0;
+        uint8_t *d = uv + (size_t)r * uvStride;
+        int32_t x = 0;   // columna de croma
+        for (; 2 * x + 8 <= width; x += 4) {
+            __m256i a = _mm256_loadu_si256((const __m256i *)(s0 + 8 * x)), b = _mm256_loadu_si256((const __m256i *)(s1 + 8 * x));
+            __m256i Bs = _mm256_add_epi32(_mm256_and_si256(a, mask), _mm256_and_si256(b, mask));
+            __m256i Gs = _mm256_add_epi32(_mm256_and_si256(_mm256_srli_epi32(a, 8), mask), _mm256_and_si256(_mm256_srli_epi32(b, 8), mask));
+            __m256i Rs = _mm256_add_epi32(_mm256_and_si256(_mm256_srli_epi32(a, 16), mask), _mm256_and_si256(_mm256_srli_epi32(b, 16), mask));
+            // Suma horizontal de pares: [s01 s23 s45 s67] en los 128 bits bajos.
+            __m128i B = _mm256_castsi256_si128(_mm256_permute4x64_epi64(_mm256_hadd_epi32(Bs, Bs), 0x08));
+            __m128i G = _mm256_castsi256_si128(_mm256_permute4x64_epi64(_mm256_hadd_epi32(Gs, Gs), 0x08));
+            __m128i R = _mm256_castsi256_si128(_mm256_permute4x64_epi64(_mm256_hadd_epi32(Rs, Rs), 0x08));
+            __m128i U = _mm_add_epi32(_mm_srai_epi32(_mm_add_epi32(_mm_add_epi32(_mm_mullo_epi32(R, cUR), _mm_mullo_epi32(G, cUG)),
+                                                                   _mm_add_epi32(_mm_mullo_epi32(B, cUB), rnd)), 18), k128);
+            __m128i V = _mm_add_epi32(_mm_srai_epi32(_mm_add_epi32(_mm_add_epi32(_mm_mullo_epi32(R, cVR), _mm_mullo_epi32(G, cVG)),
+                                                                   _mm_add_epi32(_mm_mullo_epi32(B, cVB), rnd)), 18), k128);
+            U = _mm_min_epi32(_mm_max_epi32(U, z), m255);
+            V = _mm_min_epi32(_mm_max_epi32(V, z), m255);
+            __m128i w = _mm_packus_epi16(_mm_packus_epi32(_mm_unpacklo_epi32(U, V), _mm_unpackhi_epi32(U, V)), z);
+            _mm_storel_epi64((__m128i *)(d + 2 * x), w);
+        }
+        for (; x < (width + 1) / 2; x++) {
+            int o = (2 * x + 1 < width) ? 4 : 0;
+            const uint8_t *a = s0 + 8 * x, *b = s1 + 8 * x;
+            int B = a[0] + a[o] + b[0] + b[o], G = a[1] + a[o + 1] + b[1] + b[o + 1], R = a[2] + a[o + 2] + b[2] + b[o + 2];
+            d[2 * x] = clamp8(128 + ((-6598 * R - 22187 * G + 28784 * B + (1 << 17)) >> 18));
+            d[2 * x + 1] = clamp8(128 + ((28784 * R - 26148 * G - 2637 * B + (1 << 17)) >> 18));
+        }
+    }
+}
+#endif
+
+static int tf_simd_state = -1;   // -1 sin detectar, 0 no, 1 sí
+static volatile int tf_force_scalar = 0;
+
+int32_t tfmf_color_simd_available(void) {
+#ifdef TF_HAVE_AVX2_CODE
+    if (tf_simd_state < 0) tf_simd_state = tf_cpu_has_avx2();
+    return tf_simd_state;
+#else
+    return 0;
+#endif
+}
+
+void tfmf_color_force_scalar(int32_t force) { tf_force_scalar = force != 0; }
+
+void tfmf_bgra_to_nv12(const uint8_t *bgra, int32_t bgraStride, int32_t width, int32_t height,
+                       uint8_t *y, int32_t yStride, uint8_t *uv, int32_t uvStride) {
+#ifdef TF_HAVE_AVX2_CODE
+    if (!tf_force_scalar && tfmf_color_simd_available()) { bgra_to_nv12_avx2(bgra, bgraStride, width, height, y, yStride, uv, uvStride); return; }
+#endif
+    bgra_to_nv12_scalar(bgra, bgraStride, width, height, y, yStride, uv, uvStride);
+}
+
+void tfmf_nv12_to_bgra(const uint8_t *y, int32_t yStride, const uint8_t *uv, int32_t uvStride, int32_t width, int32_t height,
+                       uint8_t *bgra, int32_t bgraStride) {
+#ifdef TF_HAVE_AVX2_CODE
+    if (!tf_force_scalar && tfmf_color_simd_available()) { nv12_to_bgra_avx2(y, yStride, uv, uvStride, width, height, bgra, bgraStride); return; }
+#endif
+    nv12_to_bgra_scalar(y, yStride, uv, uvStride, width, height, bgra, bgraStride);
 }
 
 // --- Codificadores ---------------------------------------------------------------------------------------------------

@@ -1,5 +1,6 @@
 import AudioKit
 import Foundation
+import SourceKit
 import Store
 import VideoKit
 import XCTest
@@ -123,8 +124,16 @@ final class RecordFixtureWorld {
         let services = JobServices(importer: FixtureImporter(), separator: FixtureSeparator(gate: FixtureGate()),
                                    levelMeter: nil, analyzer: nil, guitarSplitter: nil)
         bridge = try Bridge(options: LaunchOptions(projectsFolder: root, supportDir: support, audio: .simulated),
-                            mediaBase: "https://tf.media/", reveal: nil, services: services)
+                            mediaBase: "https://tf.media/", reveal: nil, services: services, videoHooks: Self.noConversionHooks)
     }
+
+    /// Motor de conversión de vídeo que nunca convierte: los fixtures son iguales en Mac y en Windows (donde la política
+    /// real convierte lo que no sea H.264 o no se pueda sondear, y sin ffmpeg el estado de la toma sería «fallida»).
+    static let noConversionHooks: VideoConversionEngine.Hooks = {
+        var h = VideoConversionEngine.Hooks(ffmpeg: { throw CancellationError() }, runner: SystemProcessRunner(), needsConversion: { _ in false })
+        h.assumeNeedsWhenUnprobed = false
+        return h
+    }()
 
     /// Asigna la guitarra y abre el tema en Backing (requisito de `record.open`).
     func openStudy() async throws {

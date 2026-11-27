@@ -158,15 +158,18 @@ final class TakeFrameReader: @unchecked Sendable {
         guard !eos else { return nil }
         var f = TFMFVideoFrame()
         var end: Int32 = 0
-        try MF.check(tfmf_reader_video(reader, &f, &end), "leer vídeo \(file.url.lastPathComponent)")
+        let reader = reader
+        try ExportProfile.measure(.decode) { try MF.check(tfmf_reader_video(reader, &f, &end), "leer vídeo \(file.url.lastPathComponent)") }
         if end != 0 { eos = true; return nil }
         let pb = FramePixelBuffer(pixelFormat: .nv12, width: Int(f.width), height: Int(f.height))
-        for y in 0..<pb.height {
-            (pb.baseAddress + y * pb.bytesPerRow).copyMemory(from: f.y + y * Int(f.yStride), byteCount: pb.width)
-        }
-        let uv = pb.planeBaseAddress(1)
-        for y in 0..<pb.planeHeight(1) {
-            (uv + y * pb.bytesPerRow).copyMemory(from: f.uv + y * Int(f.uvStride), byteCount: 2 * ((pb.width + 1) / 2))
+        ExportProfile.measure(.copy) {
+            for y in 0..<pb.height {
+                (pb.baseAddress + y * pb.bytesPerRow).copyMemory(from: f.y + y * Int(f.yStride), byteCount: pb.width)
+            }
+            let uv = pb.planeBaseAddress(1)
+            for y in 0..<pb.planeHeight(1) {
+                (uv + y * pb.bytesPerRow).copyMemory(from: f.uv + y * Int(f.uvStride), byteCount: 2 * ((pb.width + 1) / 2))
+            }
         }
         return (Double(f.time100ns) / 1e7 + file.shift, pb)
     }
@@ -188,7 +191,8 @@ final class TakeFrameReader: @unchecked Sendable {
         }
         guard let c = current else { return nil }
         if let done = currentBGRA { return done }
-        let bgra = rotation.apply(c.nv12.converted(to: .bgra))
+        let plain = ExportProfile.measure(.toBGRA) { c.nv12.converted(to: .bgra) }
+        let bgra = ExportProfile.measure(.rotate) { rotation.apply(plain) }
         currentBGRA = bgra
         return bgra
     }
@@ -486,7 +490,7 @@ public final class MontagePreview: MontagePreviewing, MontageFrameSource, @unche
                 if let pb = try readers[box.partIndex][r.source].frame(at: r.sourceTime(at: videoTime)) { sources[box.partIndex] = pb }
             }
             let out = FramePixelBuffer(pixelFormat: .bgra, width: Int(renderSize.width), height: Int(renderSize.height))
-            try renderer.render(state, timeline: timeline, caption: caption, into: out) { sources[$0] }
+            try ExportProfile.measure(.compose) { try renderer.render(state, timeline: timeline, caption: caption, into: out) { sources[$0] } }
             return out
         }
     }

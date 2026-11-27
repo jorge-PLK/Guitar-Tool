@@ -185,10 +185,40 @@ extension VideoRotation {
         let out = FramePixelBuffer(pixelFormat: .bgra, width: swapsSize ? h : w, height: swapsSize ? w : h)
         let s = src.baseAddress.assumingMemoryBound(to: UInt32.self), d = out.baseAddress.assumingMemoryBound(to: UInt32.self)
         let sr = src.bytesPerRow / 4, dr = out.bytesPerRow / 4
+        let ow = out.width, oh = out.height
+        // Píxel de salida (x, y) ← fuente: 90° horario lleva la esquina superior izquierda a la superior derecha.
+        // Un bucle por giro (sin `switch` por píxel); cada uno avanza el puntero de fuente con un paso fijo.
+        switch self {
+        case .none:
+            break
+        case .clockwise90:   // fuente (y, h-1-x): sube por la columna y de la fuente al avanzar x
+            for y in 0..<oh {
+                var sp = s + (h - 1) * sr + y, dp = d + y * dr
+                for _ in 0..<ow { dp.pointee = sp.pointee; dp += 1; sp -= sr }
+            }
+        case .upsideDown:   // fuente (w-1-x, h-1-y)
+            for y in 0..<oh {
+                var sp = s + (h - 1 - y) * sr + (w - 1), dp = d + y * dr
+                for _ in 0..<ow { dp.pointee = sp.pointee; dp += 1; sp -= 1 }
+            }
+        case .clockwise270:   // fuente (w-1-y, x): baja por la columna w-1-y
+            for y in 0..<oh {
+                var sp = s + (w - 1 - y), dp = d + y * dr
+                for _ in 0..<ow { dp.pointee = sp.pointee; dp += 1; sp += sr }
+            }
+        }
+        return out
+    }
+
+    /// Giro por píxel con `switch` dentro del bucle (la versión anterior), referencia de las pruebas.
+    static func applyReference(_ rotation: VideoRotation, _ src: FramePixelBuffer) -> FramePixelBuffer {
+        let w = src.width, h = src.height, swaps = rotation.swapsSize
+        let out = FramePixelBuffer(pixelFormat: .bgra, width: swaps ? h : w, height: swaps ? w : h)
+        let s = src.baseAddress.assumingMemoryBound(to: UInt32.self), d = out.baseAddress.assumingMemoryBound(to: UInt32.self)
+        let sr = src.bytesPerRow / 4, dr = out.bytesPerRow / 4
         for y in 0..<out.height {
             for x in 0..<out.width {
-                // Píxel de salida (x, y) ← fuente: 90° horario lleva la esquina superior izquierda a la superior derecha.
-                let (sx, sy): (Int, Int) = switch self {
+                let (sx, sy): (Int, Int) = switch rotation {
                 case .none: (x, y)
                 case .clockwise90: (y, h - 1 - x)
                 case .upsideDown: (w - 1 - x, h - 1 - y)

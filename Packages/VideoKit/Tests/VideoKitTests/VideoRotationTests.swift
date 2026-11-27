@@ -131,6 +131,26 @@ final class VideoRotationTests: XCTestCase {
         return line.joined(separator: ", ")
     }
 
+    /// El giro por punteros coincide píxel a píxel con la referencia (un `switch` por píxel).
+    func testApplyMatchesReference() {
+        var rng = SystemRandomNumberGenerator()
+        for (w, h) in [(37, 21), (64, 48), (1, 5), (5, 1)] {
+            let src = FramePixelBuffer(pixelFormat: .bgra, width: w, height: h)
+            let p = src.baseAddress.assumingMemoryBound(to: UInt32.self)
+            let stride = src.bytesPerRow / 4
+            for y in 0..<h { for x in 0..<w { p[y * stride + x] = rng.next() } }
+            for rot in [VideoRotation.clockwise90, .upsideDown, .clockwise270] {
+                let a = rot.apply(src), b = VideoRotation.applyReference(rot, src)
+                XCTAssertEqual([a.width, a.height], [b.width, b.height], "\(rot) \(w)x\(h)")
+                let pa = a.baseAddress.assumingMemoryBound(to: UInt32.self), pb = b.baseAddress.assumingMemoryBound(to: UInt32.self)
+                let sa = a.bytesPerRow / 4, sb = b.bytesPerRow / 4
+                var same = true
+                for y in 0..<a.height { for x in 0..<a.width where pa[y * sa + x] != pb[y * sb + x] { same = false } }
+                XCTAssertTrue(same, "\(rot) \(w)x\(h)")
+            }
+        }
+    }
+
     func testRotated90TakeReadsPortraitWithMarkTopRight() async throws {
         XCTAssertEqual(VideoRotation(degrees: 450), .clockwise90)
         XCTAssertEqual(VideoRotation.clockwise270.next, .none)

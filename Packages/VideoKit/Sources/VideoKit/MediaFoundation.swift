@@ -268,9 +268,13 @@ final class MediaFoundationMuxer {
 
     func writeVideo(_ pb: FramePixelBuffer, time: Int64, duration: Int64) throws {
         precondition(pb.width == config.width && pb.height == config.height, "MediaFoundationMuxer: tamaño distinto del configurado")
+        // Con el perfilado activo la conversión se hace aquí para medirla aparte (mismo resultado que la del shim).
+        let pb = ExportProfile.enabled && pb.pixelFormat == .bgra ? ExportProfile.measure(.toNV12) { pb.converted(to: .nv12) } : pb
         let fmt = pb.pixelFormat == .bgra ? Int32(TFMF_PIXEL_BGRA) : Int32(TFMF_PIXEL_NV12)
-        try MF.check(tfmf_writer_video(handle, fmt, pb.baseAddress.assumingMemoryBound(to: UInt8.self), Int32(pb.bytesPerRow), time, duration),
-                     "escribir vídeo")
+        try ExportProfile.measure(.encode) {
+            try MF.check(tfmf_writer_video(handle, fmt, pb.baseAddress.assumingMemoryBound(to: UInt8.self), Int32(pb.bytesPerRow), time, duration),
+                         "escribir vídeo")
+        }
     }
 
     /// PCM de 16 bits entrelazado.

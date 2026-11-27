@@ -127,7 +127,7 @@ struct FixtureRig {
         XCTAssertEqual(onDisk, text, message, file: file, line: line)
         #else
         func parse(_ s: String) -> Any? {
-            let fixed = shaFixed(s).replacingOccurrences(of: "\"[^\"\n]*?appcore-fixtures-", with: "\"<tmp>/appcore-fixtures-", options: .regularExpression)
+            let fixed = shaFixed(s).replacingOccurrences(of: "\"/private/<dir>/", with: "\"/<dir>/").replacingOccurrences(of: "\"[^\"\n]*?appcore-fixtures-", with: "\"<tmp>/appcore-fixtures-", options: .regularExpression)
             guard let v = try? JSONSerialization.jsonObject(with: Data(fixed.utf8), options: [.fragmentsAllowed]) else { return nil }
             return strip(v)
         }
@@ -167,8 +167,8 @@ struct FixtureRig {
     #endif
 
     /// Claves cuyo valor es del sistema y no del contrato (se ignoran fuera de macOS). `codec(s)`: Windows ofrece solo H.264
-    /// (`SettingsCameraChoices.codecs`, SettingsMethods.swift).
-    static let platformKeys: Set<String> = ["platform", "bytes", "archiveBytes", "codec", "codecs"]
+    /// (`SettingsCameraChoices.codecs`, SettingsMethods.swift); `effectiveCodec` sigue a `codecs`, `anticipationLabel` usa la coma decimal del idioma del sistema.
+    static let platformKeys: Set<String> = ["platform", "bytes", "archiveBytes", "codec", "codecs", "effectiveCodec", "anticipationLabel"]
 
     func golden(_ name: String, _ kind: FixtureKind, _ json: String, file: StaticString = #filePath, line: UInt = #line) throws {
         let url = Self.fixturesRoot.appendingPathComponent(area).appendingPathComponent("\(name).\(kind.rawValue).json")

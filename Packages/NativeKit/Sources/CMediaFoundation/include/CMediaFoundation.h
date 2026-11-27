@@ -58,6 +58,11 @@ void tfmf_bgra_to_nv12(const uint8_t *bgra, int32_t bgraStride, int32_t width, i
                        uint8_t *y, int32_t yStride, uint8_t *uv, int32_t uvStride);
 void tfmf_nv12_to_bgra(const uint8_t *y, int32_t yStride, const uint8_t *uv, int32_t uvStride, int32_t width, int32_t height,
                        uint8_t *bgra, int32_t bgraStride);
+// Las dos conversiones usan AVX2 si la CPU y el sistema lo ofrecen (detección en tiempo de ejecución) y, si no, el
+// bucle escalar; ambos dan bytes idénticos. `tfmf_color_simd_available` dice si hay AVX2; `tfmf_color_force_scalar(1)`
+// obliga al escalar (pruebas) y `(0)` devuelve a la detección.
+int32_t tfmf_color_simd_available(void);
+void tfmf_color_force_scalar(int32_t force);
 
 // --- Lector ----------------------------------------------------------------------------------------------------------
 typedef struct TFMFReaderInfo {
