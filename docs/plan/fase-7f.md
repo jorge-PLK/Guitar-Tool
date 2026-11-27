@@ -27,7 +27,7 @@ Pendiente de Windows para la pasada del PC (se acumula aquí):
 - *Ola 1:* `URL.path` devuelve `/` en `proposedProjectsFolder` (Known Folder Music\ToneForge); comprobar la ruta que ve Dart.
 - *Ola 1:* `displayPath` no abrevia HOME en Windows.
 - [x] *Prueba a mano 26/11, W-1:* los helpers (yt-dlp, Deno, ffmpeg) salían «no disponible». Hecho en 2b624b1 (se buscan junto al exe anfitrión; test `ExternalSourcesHelpersTests`); validado por Jorge en el PC el 27/11/2026.
-- *Prueba a mano 26/11, W-2:* la webcam se ve en Ajustes pero Grabar no la reconoce; tarda en conectar.
+- [x] *Prueba a mano 26/11, W-2:* la webcam se veía en Ajustes pero Grabar no la reconocía y tardaba en conectar. Hecho en c562ec5 (`FormatCache` e `identities()` en `MediaFoundationCamera.swift`; tests `testCameraOpenTimingAndIdsDiagnostic` y `testSystemCameraOpensInRecordDiagnostic`; `record.open`→live de 2,2-4,1 s a 0,09-0,68 s con la C925e); validado por Jorge en el PC el 27/11/2026.
 - [x] *Prueba a mano 26/11, W-3:* Songsterr `load` en Windows respondía `unsupported`. Hecho en e0997b2 (`TfWebView` invisible en el `Overlay` raíz; desvío W3); validado por Jorge en el PC el 27/11/2026.
 - *Prueba a mano 26/11, GR5:* sin vídeo de toma en Windows (ola 5).
 - *Prueba a mano 26/11:* fixtures T1/Platero ausentes en el PC: 8 saltos en `pc.sh models`.
