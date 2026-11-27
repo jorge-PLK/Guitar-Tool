@@ -15,6 +15,9 @@ const double _kLandscapeH = 30;
 const double _kPortraitW = 24;
 const double _kPortraitH = 40;
 const double _kRowMinHeight = 52;
+const double _kMinScale = 0.8;
+// Ancho del picker de rítmica tal como lo dibuja SwiftUI (vertical.png).
+const double _kRhythmW = 204;
 
 /// Distribución de la miniatura de losetas.
 enum _Shape { side, grid, stack, single, singleLandscape }
@@ -101,7 +104,7 @@ class _LayoutButton extends StatelessWidget {
                     spacing: TfSpace.s2,
                     children: <Widget>[
                       Text(def.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TfText.body(TfSize.font14, TfWeight.semibold).copyWith(color: TfColors.text)),
-                      Text(def.desc, maxLines: 1, overflow: TextOverflow.ellipsis, style: TfText.body(TfSize.font11).copyWith(color: TfColors.muted)),
+                      _ScaledLine(def.desc, TfText.body(TfSize.font11).copyWith(color: TfColors.muted)),
                     ],
                   ),
                 ),
@@ -110,6 +113,36 @@ class _LayoutButton extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Una línea que se encoge hasta el 80 % antes de truncar: `minimumScaleFactor(0.8)` (MV:263).
+class _ScaledLine extends StatelessWidget {
+  const _ScaledLine(this.text, this.style);
+
+  final String text;
+  final TextStyle style;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints c) {
+        final TextPainter p = TextPainter(
+          text: TextSpan(text: text, style: style),
+          textDirection: TextDirection.ltr,
+          maxLines: 1,
+        )..layout();
+        final double natural = p.width;
+        p.dispose();
+        final double k = natural <= c.maxWidth ? 1 : (c.maxWidth / natural).clamp(_kMinScale, 1.0);
+        return Text(
+          text,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: style.copyWith(fontSize: (style.fontSize ?? TfSize.font11) * k),
+        );
+      },
     );
   }
 }
@@ -186,6 +219,7 @@ class _RhythmPicker extends StatelessWidget {
       children: <Widget>[
         Text(l.montageSingleRhythm, style: TfText.body(TfSize.font12).copyWith(color: TfColors.muted)),
         TfDropdown<String?>(
+          width: _kRhythmW,
           items: <TfDropdownItem<String?>>[
             TfDropdownItem<String?>(
               value: null,

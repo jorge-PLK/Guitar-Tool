@@ -1533,6 +1533,7 @@
   "montageFormat": "Format",
   "montageFpsLabel": "{n} fps",
   "@montageFpsLabel": {"placeholders":{"n":{"type":"double","format":"decimalPattern","optionalParameters":{"maximumFractionDigits":2}}}},
+  "montageGoRecord": "Go to Record",
   "montageFrames": "Frames",
   "montageFramingDone": "Done",
   "montageFramingFixedHelp": "Automatic crop: drag it to move; the corner handle scales it.",

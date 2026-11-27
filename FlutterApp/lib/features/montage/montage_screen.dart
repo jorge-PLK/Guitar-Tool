@@ -16,6 +16,8 @@ import 'package:toneforge/features/montage/montage_store.dart';
 import 'package:toneforge/features/montage/montage_timeline.dart';
 import 'package:toneforge/l10n/app_localizations.dart';
 import 'package:toneforge/shell/selected_project.dart';
+import 'package:toneforge/shell/shell_providers.dart';
+import 'package:toneforge/shell/shell_route.dart';
 import 'package:toneforge/theme/tokens.dart';
 import 'package:toneforge/theme/typography.dart';
 import 'package:toneforge/widgets/tf_buttons.dart';
@@ -70,18 +72,20 @@ class _MontageScreenState extends ConsumerState<MontageScreen> {
     super.dispose();
   }
 
+  void _goRecord() => ref.read(shellRouteProvider.notifier).select(ShellRoute.record);
+
   @override
   Widget build(BuildContext context) {
     final MontageState state = ref.watch(montageStoreProvider);
     switch (state.status) {
       case MontageStatus.noSong:
-        return MontageSongPicker(songs: ref.watch(montageSongsProvider), onPick: _store.selectSong);
+        return MontageSongPicker(songs: ref.watch(montageSongsProvider), onPick: _store.selectSong, onGoRecord: _goRecord);
       case MontageStatus.loading:
         return const Center(child: TfSpinner.small());
       case MontageStatus.error:
         return _LoadError(message: state.loadError!.message, onRetry: _store.retry);
       case MontageStatus.ready:
-        return _Content(state: state);
+        return _Content(state: state, onGoRecord: _goRecord);
     }
   }
 }
@@ -109,9 +113,10 @@ class _LoadError extends StatelessWidget {
 }
 
 class _Content extends ConsumerWidget {
-  const _Content({required this.state});
+  const _Content({required this.state, required this.onGoRecord});
 
   final MontageState state;
+  final VoidCallback onGoRecord;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -134,10 +139,11 @@ class _Content extends ConsumerWidget {
                 padding: const EdgeInsets.all(TfSpace.s20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  spacing: TfSpace.s6,
+                  spacing: TfSpace.s12,
                   children: <Widget>[
-                    Text(l.montageNoVideoTitle, style: TfText.body(TfSize.font15, TfWeight.semibold).copyWith(color: TfColors.text)),
+                    Text(l.montageNoVideoTitle, style: TfText.display(TfSize.font18).copyWith(color: TfColors.text)),
                     Text(l.montageNoVideoBody, style: TfText.body().copyWith(color: TfColors.muted)),
+                    TfSecondaryButton(label: l.montageGoRecord, onPressed: onGoRecord),
                   ],
                 ),
               ),

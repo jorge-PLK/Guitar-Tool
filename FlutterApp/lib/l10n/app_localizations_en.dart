@@ -3214,6 +3214,9 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get montageGoRecord => 'Go to Record';
+
+  @override
   String get montageFrames => 'Frames';
 
   @override

@@ -8,7 +8,6 @@ import 'package:toneforge/contract/montage.dart';
 import 'package:toneforge/contract/montage_params.dart';
 import 'package:toneforge/core/core_client.dart';
 import 'package:toneforge/core/core_providers.dart';
-import 'package:toneforge/features/library/library_logic.dart';
 import 'package:toneforge/features/library/library_store.dart';
 
 import 'montage_models.dart';
@@ -29,10 +28,10 @@ final montagePositionProvider = NotifierProvider<MontagePositionNotifier, Montag
   MontagePositionNotifier.new,
 );
 
-/// Temas con tomas (de `libraryStoreProvider`, orden por título) para el selector sin tema elegido.
+/// Temas con tomas (de `libraryStoreProvider`, en el orden de `entries` como `model.entries` de MV:28) para el selector sin tema elegido.
 final montageSongsProvider = Provider<List<ProjectSummary>>((ref) {
   final entries = ref.watch(libraryStoreProvider.select((s) => s.entries));
-  return sortByTitle(entries.where((p) => p.takeCount > 0));
+  return [for (final p in entries) if (p.takeCount > 0) p];
 });
 
 class MontagePositionNotifier extends Notifier<MontagePositionEvent> {

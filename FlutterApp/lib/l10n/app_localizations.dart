@@ -5347,6 +5347,12 @@ abstract class AppLocalizations {
   /// **'{n} fps'**
   String montageFpsLabel(double n);
 
+  /// No description provided for @montageGoRecord.
+  ///
+  /// In es, this message translates to:
+  /// **'Ir a Grabar'**
+  String get montageGoRecord;
+
   /// No description provided for @montageFrames.
   ///
   /// In es, this message translates to:

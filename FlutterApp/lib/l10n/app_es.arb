@@ -1533,6 +1533,7 @@
   "montageFormat": "Formato",
   "montageFpsLabel": "{n} fps",
   "@montageFpsLabel": {"placeholders":{"n":{"type":"double","format":"decimalPattern","optionalParameters":{"maximumFractionDigits":2}}}},
+  "montageGoRecord": "Ir a Grabar",
   "montageFrames": "Fotogramas",
   "montageFramingDone": "Hecho",
   "montageFramingFixedHelp": "Caja automática: arrástrala para moverla; el punto de la esquina la escala.",
