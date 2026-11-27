@@ -1,6 +1,9 @@
 import XCTest
 import Foundation
 @testable import AppCore
+#if os(Windows)
+import CMediaFoundation
+#endif
 
 /// Medición de la exportación de montaje con una copia de proyectos real (se salta sin las variables). Pensada para el PC:
 /// `TF_EXPORT_BENCH_PROJECTS`, `TF_EXPORT_BENCH_SUPPORT` y `TF_EXPORT_BENCH_PROJECT` (id). Con `TF_EXPORT_PROFILE=1` la
@@ -11,6 +14,10 @@ final class MontageExportBenchTests: XCTestCase {
         let env = ProcessInfo.processInfo.environment
         guard let projects = env["TF_EXPORT_BENCH_PROJECTS"], let support = env["TF_EXPORT_BENCH_SUPPORT"],
               let pid = env["TF_EXPORT_BENCH_PROJECT"] else { throw XCTSkip("sin TF_EXPORT_BENCH_*") }
+        #if os(Windows)
+        // TF_EXPORT_SCALAR=1 fuerza el bucle escalar de color (comparar con AVX2).
+        if env["TF_EXPORT_SCALAR"] == "1" { tfmf_color_force_scalar(1) }
+        #endif
         let bridge = try Bridge(options: LaunchOptions(projectsFolder: URL(fileURLWithPath: projects), supportDir: URL(fileURLWithPath: support), audio: .simulated),
                                 mediaBase: "m", reveal: nil, videoHooks: RecordFixtureWorld.noConversionHooks)
         let open = await bridge.router.handle("{\"id\":1,\"method\":\"montage.open\",\"params\":{\"projectId\":\"\(pid)\"}}")

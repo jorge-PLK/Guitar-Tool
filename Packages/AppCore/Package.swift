@@ -37,6 +37,8 @@ let package = Package(
         // W2-E2: los tests usan VideoKit y AudioKit directamente (FrameRelayTests, RecordTests): declarados, no transitivos.
         // B1: ModelKit y StemKit para GuitarSplitterTests (catálogo de prueba y separador simulado).
         .testTarget(name: "AppCoreTests", dependencies: ["AppCore", "Store", "SourceKit", "StudyKit", "TabKit", "VideoKit", "AudioKit",
-                                                         "ModelKit", "StemKit"])
+                                                         "ModelKit", "StemKit",
+                                                         // Banco de exportación: interruptor escalar (TF_EXPORT_SCALAR).
+                                                         .product(name: "CMediaFoundation", package: "NativeKit", condition: .when(platforms: [.windows]))])
     ]
 )
