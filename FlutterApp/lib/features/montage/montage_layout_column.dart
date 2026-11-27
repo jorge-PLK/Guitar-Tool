@@ -140,7 +140,7 @@ class _ScaledLine extends StatelessWidget {
           text,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: style.copyWith(fontSize: (style.fontSize ?? TfSize.font11) * k),
+          style: style.apply(fontSizeFactor: k),
         );
       },
     );

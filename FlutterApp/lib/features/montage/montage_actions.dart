@@ -24,24 +24,6 @@ extension MontageActions on MontageStore {
 
   Future<bool> moveLane(String id, String to) => act('montage.moveLane', MontageMoveLaneParams(id: id, to: to).toJson());
 
-  /// Devuelve el `cutId` del corte nuevo (para abrir su menú) o `null` si falló.
-  Future<String?> addCut(double time, {String? partId, bool? exact}) async {
-    try {
-      final r = await _core.call(
-        'montage.addCut',
-        MontageAddCutParams(time: time, partId: partId, exact: exact).toJson(),
-        MontageAddCutResult.fromJson,
-      );
-      if (!ref.mounted) return null;
-      applySnapshot(r.snapshot);
-      state = state.copyWith(actionError: null);
-      return r.cutId;
-    } catch (e) {
-      _fail(e);
-      return null;
-    }
-  }
-
   Future<bool> moveCut(String id, double time) => act('montage.moveCut', MontageCutMoveParams(id: id, time: time).toJson());
 
   Future<bool> setCutPart(String id, String? partId) =>
@@ -73,8 +55,6 @@ extension MontageActions on MontageStore {
         ).toJson(),
       );
 
-  /// No arranca con un análisis en curso ni con otra exportación en marcha (`exportEnabled`).
-  Future<bool> startExport() async => state.exportEnabled ? _empty('montage.startExport') : false;
   Future<bool> cancelExport() => _empty('montage.cancelExport');
   Future<bool> dismissExport() => _empty('montage.dismissExport');
 
@@ -116,18 +96,6 @@ extension MontageActions on MontageStore {
 
   /// `montage.setPreviewFps` (1...60).
   Future<bool> setPreviewFps(double fps) => act('montage.setPreviewFps', MontageFPSParams(fps: fps).toJson());
-
-  /// Carpeta del tema abierto (`projectsFolder/folderName` de Biblioteca); nula si aún no se conoce.
-  String? get themeFolder {
-    final id = state.projectId;
-    final lib = ref.read(libraryStoreProvider);
-    final base = lib.projectsFolder;
-    if (id == null || base == null) return null;
-    for (final p in lib.entries) {
-      if (p.id == id) return joinPath(base, p.folderName, windows: Platform.isWindows);
-    }
-    return null;
-  }
 
   /// Fotograma de la hoja de encuadre. `path` llega relativa a la carpeta del tema (MO6): se resuelve aquí.
   Future<MontageFrame?> framingFrame(String takeId, double time) async {

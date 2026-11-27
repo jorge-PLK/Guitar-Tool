@@ -201,4 +201,38 @@ class MontageStore extends Notifier<MontageState> {
       _core.call('montage.seek', MontageSeekParams(seconds: v).toJson(), MontageSnapshot.fromJson).then<void>((_) {}, onError: _fail),
     );
   }
+
+  /// Devuelve el `cutId` del corte nuevo (para abrir su menú) o `null` si falló.
+  Future<String?> addCut(double time, {String? partId, bool? exact}) async {
+    try {
+      final r = await _core.call(
+        'montage.addCut',
+        MontageAddCutParams(time: time, partId: partId, exact: exact).toJson(),
+        MontageAddCutResult.fromJson,
+      );
+      if (!ref.mounted) return null;
+      applySnapshot(r.snapshot);
+      state = state.copyWith(actionError: null);
+      return r.cutId;
+    } catch (e) {
+      _fail(e);
+      return null;
+    }
+  }
+
+  /// No arranca con un análisis en curso ni con otra exportación en marcha (`exportEnabled`).
+  Future<bool> startExport() async =>
+      state.exportEnabled ? act('montage.startExport', const MontageEmptyParams().toJson()) : false;
+
+  /// Carpeta del tema abierto (`projectsFolder/folderName` de Biblioteca); nula si aún no se conoce.
+  String? get themeFolder {
+    final id = state.projectId;
+    final lib = ref.read(libraryStoreProvider);
+    final base = lib.projectsFolder;
+    if (id == null || base == null) return null;
+    for (final p in lib.entries) {
+      if (p.id == id) return joinPath(base, p.folderName, windows: Platform.isWindows);
+    }
+    return null;
+  }
 }
