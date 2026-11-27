@@ -118,6 +118,24 @@ enum VideoConversionError: Error, Equatable, CustomStringConvertible {
     }
 }
 
+/// Traza con tiempos por fase de la conversión (diagnóstico): apagada salvo `TF_TRACE_CONVERSION=1`; escribe en stderr
+/// `TRACE <t desde el arranque> <toma> <fase> <duración>`.
+enum ConversionTrace {
+    static let enabled = ProcessInfo.processInfo.environment["TF_TRACE_CONVERSION"] == "1"
+    private static let t0 = Date()
+    static func log(_ label: String, _ what: String, since start: Date? = nil) {
+        guard enabled else { return }
+        let now = Date()
+        let dur = start.map { String(format: " dur=%.2fs", now.timeIntervalSince($0)) } ?? ""
+        FileHandle.standardError.write(Data(String(format: "TRACE t=%.2f %@ %@%@\n", now.timeIntervalSince(t0), label, what, dur).utf8))
+    }
+    static func timed<T>(_ label: String, _ what: String, _ body: () throws -> T) rethrows -> T {
+        let s = Date()
+        defer { log(label, what, since: s) }
+        return try body()
+    }
+}
+
 /// Límite de trabajos a la vez, por orden de llegada; esperar en la cola es cancelable.
 actor ConversionGate {
     private let limit: Int
@@ -272,6 +290,8 @@ final class VideoConversionEngine: @unchecked Sendable {
     func forget(takeIds: [UUID]) { lock.withLock { for t in takeIds { failures[t] = nil } } }
 
     func needsConversion(_ url: URL) -> Bool {
+        let traceStart = Date()
+        defer { ConversionTrace.log(url.deletingLastPathComponent().lastPathComponent.prefix(8).description, "needsConversion", since: traceStart) }
         let a = try? FileManager.default.attributesOfItem(atPath: url.path)
         // Sin tamaño legible no se descarta el vídeo: se sondea igual (y sin caché).
         let size = (a?[.size] as? NSNumber)?.int64Value
@@ -423,8 +443,13 @@ final class VideoConversionEngine: @unchecked Sendable {
         let key = Self.key(takeId), stage = VideoConversionConstants.stage
         var made: [Swap] = []
         var holdsSlot = false
+        let label = String(takeId.uuidString.prefix(8))
+        let started = Date()
+        defer { ConversionTrace.log(label, "TOTAL-run", since: started) }
         do {
+            let queued = Date()
             try await gate.acquire()
+            ConversionTrace.log(label, "gate-wait", since: queued)
             holdsSlot = true
             try Task.checkCancellation()
             setFraction(takeId, 0, title: title)
@@ -443,7 +468,9 @@ final class VideoConversionEngine: @unchecked Sendable {
                 running[takeId] = nil
                 swaps[takeId] = (title, made)
             }
+            let swapStart = Date()
             await applyPendingSoon(takeId: takeId)
+            ConversionTrace.log(label, "swap", since: swapStart)
             lock.withLock { settling[takeId] = nil }
         } catch let error where Self.isCancellation(error) {
             if holdsSlot { await gate.release() }
@@ -470,8 +497,9 @@ final class VideoConversionEngine: @unchecked Sendable {
     private func convert(_ url: URL, ffmpeg: URL, takeId: UUID, part: Int, of count: Int, title: String) async throws -> URL {
         let fm = FileManager.default
         let original: TakeVideoProbe
+        let label = String(takeId.uuidString.prefix(8))
         do {
-            guard let p = try TakeVideoProbe.read(url) else { throw VideoConversionError.unreadable("\(url.lastPathComponent) sin pista de vídeo") }
+            guard let p = try ConversionTrace.timed(label, "probe-original", { try TakeVideoProbe.read(url) }) else { throw VideoConversionError.unreadable("\(url.lastPathComponent) sin pista de vídeo") }
             original = p
         } catch let e as VideoConversionError { throw e } catch { throw VideoConversionError.unreadable("\(url.lastPathComponent): \(error)") }
         let temp = url.deletingLastPathComponent().appendingPathComponent(Library.videoConversionPrefix + url.lastPathComponent)
@@ -492,6 +520,8 @@ final class VideoConversionEngine: @unchecked Sendable {
                 self?.setFraction(takeId, (Double(part) + within) / Double(count), title: title)
             }
             let result: ProcessResult
+            let ffStart = Date()
+            defer { ConversionTrace.log(label, "ffmpeg[\(attempt.label)]", since: ffStart) }
             do {
                 result = try await hooks.runner.run(ProcessRequest(executable: ffmpeg, arguments: args,
                                                                    timeout: .idle(VideoConversionConstants.idleTimeout)), onLine: onLine)
@@ -511,11 +541,11 @@ final class VideoConversionEngine: @unchecked Sendable {
         guard converted else { throw VideoConversionError.ffmpeg(problems.joined(separator: "; ")) }
         let after: TakeVideoProbe
         do {
-            try TakeVideoTranscode.alignStart(temp, firstFrameTime: original.firstFrameTime)
-            guard let p = try TakeVideoProbe.read(temp) else { throw VideoConversionError.verification("el fichero convertido no tiene vídeo") }
+            try ConversionTrace.timed(label, "alignStart") { try TakeVideoTranscode.alignStart(temp, firstFrameTime: original.firstFrameTime) }
+            guard let p = try ConversionTrace.timed(label, "probe-converted", { try TakeVideoProbe.read(temp) }) else { throw VideoConversionError.verification("el fichero convertido no tiene vídeo") }
             after = p
         } catch let e as VideoConversionError { throw e } catch { throw VideoConversionError.verification("\(error)") }
-        if let why = TakeVideoTranscode.verify(original: original, converted: after) { throw VideoConversionError.verification(why) }
+        if let why = ConversionTrace.timed(label, "verify", { TakeVideoTranscode.verify(original: original, converted: after) }) { throw VideoConversionError.verification(why) }
         try Task.checkCancellation()
         keep = true
         return temp
