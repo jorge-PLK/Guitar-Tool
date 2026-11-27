@@ -45,6 +45,30 @@ final class MacMontageComposerTests: XCTestCase {
         return sum / 25
     }
 
+    /// «Vista previa en negro»: el búfer debe ser IOSurface + Metal para que Flutter lo pase a una textura.
+    func testBGRABufferIsIOSurfaceBackedAndKeepsContent() throws {
+        let w = 64, h = 48
+        let ctx = try XCTUnwrap(CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0,
+                                          space: CGColorSpaceCreateDeviceRGB(),
+                                          bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue))
+        ctx.setFillColor(CGColor(colorSpace: CGColorSpaceCreateDeviceRGB(), components: [200 / 255, 100 / 255, 50 / 255, 1])!)
+        ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
+        let image = try XCTUnwrap(ctx.makeImage())
+        // Dos veces seguidas (la segunda sale del pool) y con otro tamaño (pool nuevo).
+        for _ in 0..<2 {
+            let pb = try MacMontageComposer.bgra(image)
+            XCTAssertNotNil(CVPixelBufferGetIOSurface(pb))
+            XCTAssertEqual(CVPixelBufferGetPixelFormatType(pb), kCVPixelFormatType_32BGRA)
+            CVPixelBufferLockBaseAddress(pb, .readOnly)
+            let p = CVPixelBufferGetBaseAddress(pb)!.assumingMemoryBound(to: UInt8.self)
+            let o = (h / 2) * CVPixelBufferGetBytesPerRow(pb) + (w / 2) * 4
+            XCTAssertEqual([p[o], p[o + 1], p[o + 2], p[o + 3]], [50, 100, 200, 255])
+            CVPixelBufferUnlockBaseAddress(pb, .readOnly)
+        }
+        let solid = try XCTUnwrap(MontageFrameImage.solid(width: 32, height: 18, b: 1, g: 2, r: 3))
+        XCTAssertNotNil(CVPixelBufferGetIOSurface(solid))
+    }
+
     func testFrameAtEachSideOfFrameBoundary() async throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("mac-composer-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

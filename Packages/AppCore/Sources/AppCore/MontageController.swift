@@ -186,6 +186,9 @@ final class MontageController {
     private var closed = true
     private var dirty = false
     private var framingImageVersion = 0
+    private var frameFailures = 0
+    private var framesFailed = false
+    private var loggedFrameFailures = Set<String>()
 
     init(session: StudySession, video: VideoSettings?, store: any MontageStoring, services: MontageServices = .production,
          audio: any MontageAudioPlaying, timing: Timing = Timing()) {
@@ -539,9 +542,12 @@ final class MontageController {
 
     /// Pregunta por todas las tomas con vídeo del plan; `nil` si todas están listas, si no el motivo de la espera.
     private func videosBlocking() -> TakeVideoState? {
-        let ids = Set(videoLanes.map(\.takeID))
+        // Todas las partes con vídeo del plan, también las de presencia vacía (p. ej. un solo sin sección «Solo»): el
+        // compositor abre su fichero igualmente, y un HEVC sin convertir allí rompe la vista previa y el export.
+        let lanes = lanes.filter(\.hasVideo)
+        let ids = Set(lanes.map(\.takeID))
         videoStates = videoStates.filter { ids.contains($0.key) }
-        let states = videoLanes.map { videoState($0) }
+        let states = lanes.map { videoState($0) }
         if let failed = states.first(where: { if case .failed = $0 { return true }; return false }) { return failed }
         return states.first { $0 != .ready }
     }
@@ -879,15 +885,45 @@ final class MontageController {
         guard let composer else { return }
         let t = min(max(0, v), composer.duration)
         let started = ProcessInfo.processInfo.systemUptime
-        let result: MontageFrameBox? = await Task.detached(priority: .userInitiated) {
-            (try? composer.frame(atVideoTime: t)).map { MontageFrameBox(pixels: $0) }
+        let outcome: Result<MontageFrameBox, Error> = await Task.detached(priority: .userInitiated) {
+            Result { MontageFrameBox(pixels: try composer.frame(atVideoTime: t)) }
         }.value
-        guard let result, !Task.isCancelled else { return }
+        guard !Task.isCancelled else { return }
+        let result: MontageFrameBox
+        switch outcome {
+        case .failure(let error):
+            noteFrameFailure(error, videoTime: t)
+            return
+        case .success(let box):
+            result = box
+            frameFailures = 0
+            if framesFailed {
+                framesFailed = false
+                if previewPhase == .error { setPreview(.ready) }
+            }
+        }
         if isStill && isPlaying { return }
         let ms = (ProcessInfo.processInfo.systemUptime - started) * 1000
         previewStats.record(ms)
         onPreviewFrame?(result.pixels, t * 1000)
     }
+
+    /// El compositor falló al dar un fotograma: un registro por causa distinta y, si persiste, `preview.error` (la vista
+    /// previa no se queda muda sin explicación).
+    private func noteFrameFailure(_ error: Error, videoTime t: Double) {
+        let text = String(reflecting: error)
+        if loggedFrameFailures.insert(text).inserted {
+            FileHandle.standardError.write(Data(String(format: "[montage] fotograma de la vista previa en %.3f s: %@\n", t, text).utf8))
+        }
+        frameFailures += 1
+        guard frameFailures >= Self.frameFailureLimit, !framesFailed else { return }
+        framesFailed = true
+        previewError = "No se pudo componer la vista previa (\(error))."
+        setPreview(.error, error: previewError)
+    }
+
+    /// Fallos seguidos del compositor a partir de los cuales se avisa en `preview.error`.
+    static let frameFailureLimit = 3
 
     // MARK: Fotograma de la hoja «Encuadre»
 
@@ -1047,7 +1083,7 @@ final class MontageController {
             }
             // La carpeta `-pistas` se crea antes de mezclar: si se cancela durante la mezcla (sin `mixResult`) queda vacía.
             if out.trackWAVs, (try? fm.contentsOfDirectory(atPath: tracksDir.path))?.isEmpty == true { try? fm.removeItem(at: tracksDir) }
-            setExport(Task.isCancelled || error is CancellationError ? .cancelled : .failed("No se pudo exportar el vídeo (\(error))."))
+            setExport(Task.isCancelled || error is CancellationError ? .cancelled : .failed("\(error)"))
         }
     }
 

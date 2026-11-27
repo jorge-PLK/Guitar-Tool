@@ -141,8 +141,8 @@ final class MacMontageComposer: MontageComposing, @unchecked Sendable {
     /// CGImage -> `CVPixelBuffer` BGRA del mismo tamaño.
     static func bgra(_ image: CGImage) throws -> CVPixelBuffer {
         let w = image.width, h = image.height
-        var out: CVPixelBuffer?
-        guard CVPixelBufferCreate(nil, w, h, kCVPixelFormatType_32BGRA, nil, &out) == kCVReturnSuccess, let pb = out else {
+        // IOSurface + Metal: el runner de macOS entrega este búfer a una textura de Flutter.
+        guard let pb = TextureBufferPool.shared.make(width: w, height: h) else {
             throw MontageError.composition("sin búfer de \(w)×\(h)")
         }
         CVPixelBufferLockBaseAddress(pb, [])
@@ -152,6 +152,7 @@ final class MacMontageComposer: MontageComposing, @unchecked Sendable {
                                   bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue) else {
             throw MontageError.composition("sin contexto de dibujo")
         }
+        ctx.clear(CGRect(x: 0, y: 0, width: w, height: h))   // el pool reutiliza búferes
         ctx.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
         return pb
     }

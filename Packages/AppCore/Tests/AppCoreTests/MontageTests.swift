@@ -456,6 +456,60 @@ final class MontageTests: XCTestCase {
         XCTAssertFalse(c.previewReady)
     }
 
+    /// Compositor cuyo `frame` falla mientras `failing` sea cierto (si no, delega en el simulado).
+    final class FlakyComposer: MontageComposing, @unchecked Sendable {
+        struct Boom: Error, CustomStringConvertible { var description: String { "sin pista de vídeo en 1.0 s" } }
+        let inner: SimulatedMontageComposer
+        private let lock = NSLock()
+        private var _failing = true
+        var failing: Bool { get { lock.withLock { _failing } } set { lock.withLock { _failing = newValue } } }
+        init(_ inner: SimulatedMontageComposer) { self.inner = inner }
+        var duration: Double { inner.duration }
+        func songTime(videoTime: Double) -> Double { inner.songTime(videoTime: videoTime) }
+        func videoTime(songTime: Double) -> Double { inner.videoTime(songTime: songTime) }
+        func frame(atVideoTime t: Double) throws -> MontageFramePixels {
+            if failing { throw Boom() }
+            return try inner.frame(atVideoTime: t)
+        }
+    }
+
+    func testPersistentFrameFailureSurfacesAsPreviewErrorAndRecovers() async throws {
+        let rig = try makeRig()
+        let box = SimulatedComposerBox()
+        var services = MontageServices.simulated(composerBox: box)
+        let base = services.makeComposer
+        let flaky = FlakyComposerBox()
+        services.makeComposer = { plan, dim in
+            _ = try await base(plan, dim)
+            let c = FlakyComposer(try XCTUnwrap(box.composer))
+            flaky.set(c)
+            return c
+        }
+        let frames = FrameLog()
+        let c = try makeController(rig, services: services, frames: frames)
+        await openReady(c)
+        XCTAssertEqual(c.previewPhase, .ready)   // un fallo suelto no tumba la vista previa
+        try c.play()
+        await waitUntil { c.previewPhase == .error }
+        XCTAssertEqual(c.previewPhase, .error)
+        XCTAssertEqual(c.previewError, "No se pudo componer la vista previa (sin pista de vídeo en 1.0 s).")
+        XCTAssertEqual(frames.count, 0)
+        flaky.composer?.failing = false
+        await waitUntil { c.previewPhase == .ready }
+        XCTAssertEqual(c.previewPhase, .ready)
+        XCTAssertNil(c.previewError)
+        await waitUntil { frames.count > 0 }
+        XCTAssertGreaterThan(frames.count, 0)
+        c.close()
+    }
+
+    final class FlakyComposerBox: @unchecked Sendable {
+        private let lock = NSLock()
+        private var _c: FlakyComposer?
+        var composer: FlakyComposer? { lock.withLock { _c } }
+        func set(_ c: FlakyComposer) { lock.withLock { _c = c } }
+    }
+
     // MARK: Vista previa: transporte y bucle de fotogramas
 
     func testFrameLoopKeepsTargetRateWithFastCompositor() async throws {
@@ -666,7 +720,7 @@ final class MontageTests: XCTestCase {
         await openReady(c)
         c.updateExport { $0.trackWAVs = false }
         await c.exportAndWait()
-        XCTAssertEqual(c.exportPhase, .failed("No se pudo exportar el vídeo (disco lleno)."))
+        XCTAssertEqual(c.exportPhase, .failed("disco lleno"))
         c.close()
     }
 

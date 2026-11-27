@@ -17,6 +17,48 @@ struct MontageFrameBox: @unchecked Sendable {
     var pixels: MontageFramePixels
 }
 
+#if canImport(CoreVideo)
+/// Búferes BGRA que pueden acabar en una textura de Flutter (runner de macOS: `copyPixelBuffer` -> `CVMetalTextureCache`),
+/// lo que exige respaldo IOSurface y compatibilidad con Metal. Un `CVPixelBufferPool` por tamaño (se recrea si cambia
+/// w×h); el pool respeta la retención, así que no reutiliza un búfer que Flutter aún tiene.
+final class TextureBufferPool: @unchecked Sendable {
+    static let shared = TextureBufferPool()
+
+    nonisolated(unsafe) static let bufferAttributes: CFDictionary = [
+        kCVPixelBufferPixelFormatTypeKey: kCVPixelFormatType_32BGRA,
+        kCVPixelBufferIOSurfacePropertiesKey: [:] as CFDictionary,
+        kCVPixelBufferMetalCompatibilityKey: true,
+        kCVPixelBufferCGImageCompatibilityKey: true,
+        kCVPixelBufferCGBitmapContextCompatibilityKey: true,
+    ] as CFDictionary
+
+    private let lock = NSLock()
+    private var pool: CVPixelBufferPool?
+    private var size = (w: 0, h: 0)
+
+    /// Búfer BGRA con IOSurface de `width`×`height` (contenido sin definir).
+    func make(width: Int, height: Int) -> CVPixelBuffer? {
+        lock.lock()
+        defer { lock.unlock() }
+        if pool == nil || size != (width, height) {
+            var p: CVPixelBufferPool?
+            let attrs = [kCVPixelBufferWidthKey: width, kCVPixelBufferHeightKey: height].merging(
+                Self.bufferAttributes as! [CFString: Any]) { a, _ in a }
+            guard CVPixelBufferPoolCreate(nil, nil, attrs as CFDictionary, &p) == kCVReturnSuccess, let p else { return nil }
+            pool = p
+            size = (width, height)
+        }
+        var out: CVPixelBuffer?
+        if let pool, CVPixelBufferPoolCreatePixelBuffer(nil, pool, &out) == kCVReturnSuccess, let out { return out }
+        // Sin pool (o agotado): búfer suelto con los mismos atributos.
+        var plain: CVPixelBuffer?
+        let attrs = Self.bufferAttributes
+        guard CVPixelBufferCreate(nil, width, height, kCVPixelFormatType_32BGRA, attrs, &plain) == kCVReturnSuccess else { return nil }
+        return plain
+    }
+}
+#endif
+
 /// Copia en memoria de un fotograma BGRA y escritura de PNG sin compresión (hoja «Encuadre»: la página lo carga como
 /// imagen desde `cache/montage/`; no hace falta un codificador ni zlib).
 enum MontageFrameImage {
@@ -49,8 +91,7 @@ enum MontageFrameImage {
     /// Fotograma BGRA liso (tests y simulación).
     static func solid(width: Int, height: Int, b: UInt8, g: UInt8, r: UInt8) -> MontageFramePixels? {
         #if canImport(CoreVideo)
-        var out: CVPixelBuffer?
-        guard CVPixelBufferCreate(nil, width, height, kCVPixelFormatType_32BGRA, nil, &out) == kCVReturnSuccess, let p = out else { return nil }
+        guard let p = TextureBufferPool.shared.make(width: width, height: height) else { return nil }
         CVPixelBufferLockBaseAddress(p, [])
         defer { CVPixelBufferUnlockBaseAddress(p, []) }
         guard let base = CVPixelBufferGetBaseAddress(p) else { return nil }
