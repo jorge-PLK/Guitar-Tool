@@ -108,7 +108,7 @@ public final class Bridge: @unchecked Sendable {
         self.tabService = TabService(studyService: studyService, services: { tab ?? TabServices.production(supportDir: supportDir) },
                                      store: QueueTabStore(jobs: queue))
         self.montageService = MontageService(options: options, root: folder, storeFactory: { _ in QueueMontageStore(jobs: queue) },
-                                             reveal: { try (reveal ?? Bridge.openFolder)($0) },
+                                             reveal: { try (reveal ?? Bridge.revealItem)($0) },
                                              pauseOthers: { [study = self.studyService] in study.current?.controller.stop() })
         self.takeViewService = TakeViewService(options: options, root: folder,
                                                pauseOthers: { [study = self.studyService] in study.current?.controller.stop() })
@@ -207,6 +207,26 @@ public final class Bridge: @unchecked Sendable {
         p.arguments = [url.path]
         do { try p.run() } catch {
             throw RPCError(code: "internal", message: "No se pudo abrir la carpeta: \(error)")
+        }
+    }
+
+    /// Muestra un fichero SELECCIONADO en el gestor de archivos (`montage.reveal`): macOS `open -R`, Windows `explorer /select,`.
+    /// Una carpeta (o una ruta que ya no existe) se abre con `openFolder`. Sustituible en tests.
+    static func revealItem(_ url: URL) throws {
+        var isDir: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), !isDir.boolValue else {
+            return try openFolder(url)
+        }
+        let p = Process()
+        #if os(Windows)
+        p.executableURL = URL(fileURLWithPath: "C:\\Windows\\explorer.exe")
+        p.arguments = ["/select,\(url.path.replacingOccurrences(of: "/", with: "\\"))"]
+        #else
+        p.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+        p.arguments = ["-R", url.path]
+        #endif
+        do { try p.run() } catch {
+            throw RPCError(code: "internal", message: "No se pudo mostrar el fichero: \(error)")
         }
     }
 

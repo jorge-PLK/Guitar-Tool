@@ -695,12 +695,19 @@ final class MontageTests: XCTestCase {
         func all(_ name: String) -> [(time: Double, name: String, payload: [String: Any])] { lock.withLock { items.filter { $0.name == name } } }
     }
 
-    func makeBridge(_ rig: Rig, services: MontageServices = .simulated()) throws -> (Bridge, Events) {
+    final class Revealed: @unchecked Sendable {
+        private let lock = NSLock()
+        private var urls: [URL] = []
+        func add(_ u: URL) { lock.withLock { urls.append(u) } }
+        var all: [URL] { lock.withLock { urls } }
+    }
+
+    func makeBridge(_ rig: Rig, services: MontageServices = .simulated(), reveal: (@Sendable (URL) throws -> Void)? = nil) throws -> (Bridge, Events) {
         let support = rig.base.appendingPathComponent("support", isDirectory: true)
         try FileManager.default.createDirectory(at: support, withIntermediateDirectories: true)
         let js = JobServices(importer: EditsImporter(), separator: EditsSeparator(), levelMeter: nil, analyzer: nil, guitarSplitter: nil)
         let bridge = try Bridge(options: LaunchOptions(projectsFolder: rig.root, supportDir: support, audio: .simulated),
-                                mediaBase: "https://tf.media/", reveal: nil, services: js)
+                                mediaBase: "https://tf.media/", reveal: reveal, services: js)
         let events = Events()
         bridge.send = { events.add($0) }
         bridge.montageService.services = services
@@ -874,6 +881,46 @@ final class MontageTests: XCTestCase {
         XCTAssertEqual(saved.montage?.export.fps, 25)
         XCTAssertEqual(saved.montage?.export.container, .mp4)
         XCTAssertEqual(saved.montage?.export.resolution, .hd720)
+    }
+
+    /// MO7: `autoPartId` solo con plano único; es una parte candidata a la rítmica; sin plano único la clave no sale.
+    func testSnapshotAutoPartIdOnlyWithSingleLayout() async throws {
+        let rig = try makeRig()
+        let (b, _) = try makeBridge(rig)
+        let r = await call(b, "montage.open", "{\"projectId\":\"\(rig.project.id.uuidString)\"}")
+        XCTAssertNil((r["result"] as? [String: Any])?["autoPartId"], "side: sin autoPartId")
+        for layout in ["single", "single-landscape"] {
+            let s = await call(b, "montage.setLayout", "{\"layout\":\"\(layout)\"}")
+            let res = try XCTUnwrap(s["result"] as? [String: Any], "\(s)")
+            let auto = try XCTUnwrap(res["autoPartId"] as? String, layout)
+            XCTAssertTrue((res["singleRhythmCandidates"] as? [String] ?? []).contains(auto), "\(auto)")
+        }
+        let g = await call(b, "montage.setLayout", "{\"layout\":\"grid\"}")
+        XCTAssertNil((g["result"] as? [String: Any])?["autoPartId"], "grid: sin autoPartId")
+        await b.closeMontage()
+    }
+
+    /// MO2: tras exportar, `montage.reveal` pide seleccionar el fichero exportado (no la carpeta).
+    func testRevealSelectsExportedFile() async throws {
+        let rig = try makeRig()
+        let revealed = Revealed()
+        let (b, events) = try makeBridge(rig, reveal: { revealed.add($0) })
+        _ = await call(b, "montage.open", "{\"projectId\":\"\(rig.project.id.uuidString)\"}")
+        await waitUntil { b.montageService.current?.canExport == true && b.montageService.current?.previewPhase == .ready }
+        _ = await call(b, "montage.setExport", "{\"container\":\"mp4\",\"trackWAVs\":false}")
+        _ = await call(b, "montage.startExport")
+        await waitUntil { events.all("montage.export").contains { $0.payload["phase"] as? String == "done" } }
+        let path = try XCTUnwrap(((events.all("montage.export").last?.payload["result"]) as? [String: Any])?["path"] as? String)
+        let ok = await call(b, "montage.reveal")
+        XCTAssertEqual((ok["result"] as? [String: Any])?["revealed"] as? Bool, true, "\(ok)")
+        XCTAssertEqual(revealed.all.map(\.path), [path])
+        XCTAssertFalse(path.isEmpty)
+        // Sin exportación terminada, abre la carpeta de vídeo.
+        _ = await call(b, "montage.dismissExport")
+        _ = await call(b, "montage.reveal")
+        XCTAssertEqual(revealed.all.count, 2)
+        XCTAssertNotEqual(revealed.all.last?.path, path)
+        await b.closeMontage()
     }
 
     func testBridgeCancelExport() async throws {

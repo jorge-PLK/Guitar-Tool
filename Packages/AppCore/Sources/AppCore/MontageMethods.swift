@@ -218,6 +218,9 @@ struct MontageSnapshot: Codable, Sendable, Equatable {
     var singleRhythmPartId: String?
     /// Partes que pueden ocupar el plano único (rítmicas con vídeo y presencia).
     var singleRhythmCandidates: [String]
+    /// MO7: parte que el núcleo pone en el plano único cuando no hay elección manual válida (la primera no solista del plan;
+    /// como `MontageTimeline.singleAppearances`). Solo con layout de plano único y plan; nil (clave omitida) en el resto.
+    var autoPartId: String?
     /// Hay un plan de montaje (al menos una parte con toma y vídeo).
     var hasPlan: Bool
     var hasVideo: Bool
@@ -522,8 +525,13 @@ final class MontageService {
                                          box: c.effectiveBox(takeID: take, at: p.time).map(Self.box))
     }
 
+    /// Con una exportación terminada y el fichero en disco, lo SELECCIONA en el gestor de archivos (MO2); si no, abre la carpeta de vídeo.
     private func revealVideoFolder() throws -> MontageRevealResult {
         guard let c = current else { throw Self.notOpen }
+        if case .done(let r) = c.exportPhase, FileManager.default.fileExists(atPath: r.url.path) {
+            try reveal(r.url)
+            return MontageRevealResult(revealed: true)
+        }
         let folder = c.session.layout.videoDir
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         try reveal(folder)
@@ -619,7 +627,9 @@ final class MontageService {
             isPortrait: c.isPortrait, isSingleShot: c.isSingleShot, canvasLabel: c.canvasLabel, keepAspectApplies: c.keepAspectApplies,
             caption: c.state.caption, showPartLabels: c.state.showPartLabels, keepVideoAspect: c.state.keepVideoAspect,
             cutGaps: c.state.cutGaps, singleRhythmPartId: c.state.singleRhythmPartID?.uuidString,
-            singleRhythmCandidates: c.singleRhythmCandidates.map { $0.id.uuidString }, hasPlan: c.draft != nil,
+            singleRhythmCandidates: c.singleRhythmCandidates.map { $0.id.uuidString },
+            autoPartId: c.isSingleShot ? c.draft.flatMap { d in (d.plan.parts.first { !$0.isSolo } ?? d.plan.parts.first)?.id } : nil,
+            hasPlan: c.draft != nil,
             hasVideo: !c.videoLanes.isEmpty, span: MontageRangeInfo(start: span.start, end: span.end), barDuration: c.barDuration,
             songDuration: c.song.duration,
             anticipationLabel: MontageController.anticipationLabel, lanes: lanes, audioOnlyParts: c.draft?.audioOnlyParts ?? [],
