@@ -16,6 +16,8 @@ Cerrada 25/11/2026 con visto bueno de Jorge tras su prueba a mano. Pendiente de 
 
 Cerrada 26/11/2026 con visto bueno de Jorge; su prueba a mano contra el núcleo real, con las olas 1, 2 y 3 juntas, queda para una sesión aparte. Desvíos GR11-GR19 en `docs/flutter/desvios.md` (GR15 resuelto: Flutter gira el fotograma, validado por Jorge).
 - [ ] **Ola 4 · Montaje:** Montaje y hoja «Encuadre» (`pantallas/montaje.md`).
+
+Integrada el 27/11/2026; pendiente del visto bueno de Jorge sobre las parejas referencia/Flutter. Para Jorge (hardware/criterio): sincronía audio-vídeo ±1 fotograma, exportación real a −14 LUFS, arrastre con ratón y trackpad, `framingFrame` con vídeo real (M1).
 - [ ] **Ola 5 · Cierre:** empaquetado de Mac y de Windows (recursos, DLL), mensajes del núcleo por código en todas las áreas que falten, pasada única en el PC x64 al final (tras validar todas las olas en el Mac), borrado de `App/`, `WinApp/Web`, `Tools/webdev` y `FrameRelay` en JPEG, CODEMAP y `CLAUDE.md`.
 
 Cada ola: contrato del área (fixtures → DTO) antes que la pantalla; partes en paralelo si no se pisan; validación con la lista de `orquestador.md`; `tf-qa` una vez; todo se valida primero en el Mac (el PC x64 solo cuando todo esté validado: pasada única al final, con lo pendiente de Windows acumulado en una lista); visto bueno de Jorge sobre las parejas referencia/Flutter.

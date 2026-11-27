@@ -155,6 +155,17 @@ Montaje D9 (M1) no se repite: ver la fila M1 de los heredados.
 | W-2 | En Windows `MediaFoundationCameraProvider` describía (abría) la cámara en cada enumeración (~480 ms con 122 formatos) y Grabar enumeraba en el actor principal en cada snapshot, sondeo y apertura. Ahora `FormatCache` por id e `identities()` barato (~2 ms) (c562ec5) | cerrado, validado por Jorge en el PC (27/11/2026) |
 | GR19 | El enlace de la Biblioteca `openTakeViewer` (ola 1) abre ya el visor de la ola 3 con `TakeViewerHost`: título «Toma N · parte», mejor y borrar por `library.markBest`/`library.deleteTake`, 1:1 con `ProjectRecordingsView.swift:92-109` (c24e68d) | interfaz en Dart |
 
+## Cierre de la ola 4 (Montaje)
+
+| Id | Qué | Estado |
+| --- | --- | --- |
+| MO2, MO7 | Resueltos en código en `833541c` (`MontageSnapshot.autoPartId`; `reveal` selecciona el fichero). Constan en la tabla de arriba | resuelto (`833541c`) |
+| MO9 | `montage.seek` no aplica el snapshot de la respuesta: la posición llega por `montage.position` y el cursor no reconstruye el snapshot (envío cada 120 ms más uno final) | interfaz en Dart |
+| MO10 | Arrastre de una marca de corte sin ajuste al pulso en vivo: `AppCore` no ofrece `draggedCutTime`, así que el ajuste se aplica al soltar con `moveCut` | abierto (hueco de núcleo: falta un cálculo en vivo; decide Jorge si se añade) |
+| MO11 | Modo «seguir» de la hoja «Encuadre» sin caja en vivo: no se dibuja la caja durante el seguimiento | abierto |
+| MO12 | Opciones de fps y de resolución de la exportación: las ofrece el núcleo (`export.options`); la interfaz no añade las suyas. Detalle por concretar: `Temp/flutter/ola4-estado.md` solo lo nombra | abierto |
+| MO13 | `MontagePreviewColumn` y la lista de temas siguen el orden de Biblioteca (título), no el de SwiftUI (`createdAt` descendente). Ver `ref/montaje/DIFERENCIAS.md` | aceptado |
+
 ## Notas de plataforma
 
 Anfitrión de la 7f en macOS; no son desvíos de núcleo.
