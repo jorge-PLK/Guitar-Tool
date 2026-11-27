@@ -78,7 +78,45 @@ step_app() {
 step_test() { rps test.ps1 || return 1; echo "test:"; summary; }
 # models: tests con inferencia real (TF_MODEL_TESTS=1) sobre el clon f7, CPU y DirectML, de uno en uno (PC-3).
 #   pc.sh models [--provider cpu|dml|both] [--only <subcadena del test>] [--timeout <s por test>]
-step_models() { rps models.ps1 $models_args || { summary; return 1; }; echo "models:"; summary; }
+# Fixtures de audio T1-T3/Platero que los tests pesados leen del repo y no estan versionados (Probes/**/out, ~/Music): se suben
+# por scp al clon f7 del PC (Platero a Vendor/models-win/platero), solo si falta o el tamano difiere (~2 GB la primera vez).
+upload_fixture() {   # upload_fixture <ruta local> <destino Windows con />; devuelve 0 si lo subio, 3 si ya estaba
+  local src="$1" dst="$2" size rsize
+  size="$(stat -f %z "$src")"
+  rsize="$("${SSH[@]}" "stat -c %s '/d/${dst#D:/}' 2>/dev/null" </dev/null | tr -d '\r')"
+  [ "$rsize" = "$size" ] && return 3
+  "${SSH[@]}" "mkdir -p \"\$(dirname '/d/${dst#D:/}')\"" </dev/null >>"$log" 2>&1
+  scp -q -o BatchMode=yes "$src" "$PC_HOST:$dst" </dev/null >>"$log" 2>&1 || { echo "scp fallo: $src"; return 1; }
+  return 0
+}
+models_fixtures() {
+  local f rc n=0 up=0 list x k
+  local mus="$HOME/Music/ToneForge/El roce de tu cuerpo - Platero Y Tu/stems/guitar.wav"
+  local p4=Probes/P4-modelos t=Probes/testaudio/out s=Probes/P4-modelos/bs_roformer_sw/out/conv/coremlpub_cpu_gpu
+  list="$(
+    for x in T1 T2 T3; do echo "$t/$x/mix.wav"; for k in bass guitar other piano; do echo "$s/$x/$k.wav"; done; done
+    echo "$s/T1/drums.wav"
+    ls "$t"/T1/guitar_parts/*.wav "$p4"/adtof/out/act/torch/T?.npy "$p4"/adtof/out/hits/torch/T1/*.txt \
+       "$p4"/btc/out/lab/*/T?_stems.lab "$p4"/beat_this/out/beats/coreml_comm/*.txt
+  )"
+  while IFS= read -r f; do
+    [ -f "$f" ] || { echo "falta en el Mac: $f"; return 1; }
+    n=$((n + 1)); upload_fixture "$f" "$PC_P9_WIN/f7/$f"; rc=$?
+    [ "$rc" = 0 ] && up=$((up + 1)); [ "$rc" = 1 ] && return 1
+  done <<< "$list"
+  n=$((n + 1)); upload_fixture "$mus" "D:/Personal/Guitar-Tool/Vendor/models-win/platero/guitar.wav"; rc=$?
+  [ "$rc" = 0 ] && up=$((up + 1)); [ "$rc" = 1 ] && return 1
+  echo "fixtures: $n ficheros, $up subidos"
+}
+# Los .swift de Packages/ modificados y sin commit se copian al clon f7 (sync solo trae lo commiteado); el siguiente sync los pisa.
+models_overlay() {
+  local f
+  while IFS= read -r f; do
+    [ -n "$f" ] && [ -f "$f" ] || continue
+    scp -q -o BatchMode=yes "$f" "$PC_HOST:$PC_P9_WIN/f7/$f" </dev/null >>"$log" 2>&1 || { echo "scp fallo: $f"; return 1; }
+  done < <(git diff --name-only HEAD -- 'Packages/*.swift')
+}
+step_models() { models_overlay || return 1; models_fixtures || return 1; rps models.ps1 $models_args || { summary; return 1; }; echo "models:"; summary; }
 step_selftest() { rps selftest.ps1 -Code "${PC_SELFTEST_CODE:-1}" || return 1; }
 step_fetch() {
   local n=0 f

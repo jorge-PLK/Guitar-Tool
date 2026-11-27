@@ -77,7 +77,7 @@ $passes = @()
 if ($Provider -in @("cpu", "both")) { $passes += ,@("cpu", $OrtCpu, "cpu") }
 if ($Provider -in @("dml", "both")) { $passes += ,@("dml", $OrtDml, "DirectML") }
 $bad = 0
-$metricRe = "dB|argmax|fixture|golpes|\[7|PESADO|logits|notas|s/min|proveedor|transcribe|pico"
+$metricRe = "dB|argmax|fixture|golpes|\[7|PESADO|logits|notas|s/min|proveedor|transcribe|pico|pulsos"
 foreach ($ps in $passes) {
     $env:TF_ORT_DLL = $ps[1]
     $env:TF_ONNX_PROVIDER = $ps[2]
