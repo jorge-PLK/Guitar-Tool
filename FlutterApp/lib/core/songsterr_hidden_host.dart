@@ -2,10 +2,12 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform;
 import 'package:webview_all/webview_all.dart' as wv;
 
 import 'core_client.dart' show Json;
 import 'host_services.dart';
+import 'songsterr_overlay_page.dart';
 
 /// Página oculta que usa [HiddenSongsterrHost]: un WebView sin ventana. Se sustituye por un falso en tests.
 abstract class HiddenWebPage {
@@ -31,13 +33,25 @@ typedef HiddenWebPageFactory = Future<HiddenWebPage> Function();
 /// Modo elegido: `OffscreenWebViewSession` de `webview_all` (solo macOS). No necesita widget en el árbol (ni
 /// `Overlay` ni host a nivel de app, así que no toca el layout), se cierra de forma determinista y usa un
 /// almacén privado aislado. Los modos `offstage` y `zero` de P9 también valen, pero exigen montar un widget.
-/// Windows (WebView2): sin sesión offscreen en el plugin; responde `unsupported` hasta medir un host montado.
+/// Windows (WebView2): sin sesión offscreen en el plugin; monta un `TfWebView` invisible en el `Overlay` raíz
+/// ([OverlayWebPage]). Otras plataformas: `unsupported`.
 /// `showPreview` y `hidePreview` siguen sin soporte. `cancelled` no se emite: el puente no trae cancelación.
 class HiddenSongsterrHost implements SongsterrHost {
   HiddenSongsterrHost({
     HiddenWebPageFactory? pageFactory,
     this.pollInterval = const Duration(milliseconds: 250),
-  }) : _factory = pageFactory ?? OffscreenWebPage.create;
+    TargetPlatform Function()? platform,
+    HiddenWebPageFactory? windowsFactory,
+  }) : _factory = pageFactory ?? _byPlatform(platform ?? (() => defaultTargetPlatform), windowsFactory);
+
+  static HiddenWebPageFactory _byPlatform(TargetPlatform Function() platform, HiddenWebPageFactory? windows) {
+    return () => switch (platform()) {
+          TargetPlatform.macOS => OffscreenWebPage.create(),
+          TargetPlatform.windows => (windows ?? OverlayWebPage.create)(),
+          _ => Future<HiddenWebPage>.error(
+              const HostError('unsupported', 'Carga oculta no disponible en esta plataforma.')),
+        };
+  }
 
   final HiddenWebPageFactory _factory;
   final Duration pollInterval;
