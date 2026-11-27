@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -48,8 +50,34 @@ class _Ctx {
   List<MockCall> calls(String m) => core.calls.where((MockCall c) => c.method == m).toList();
 }
 
-Future<_Ctx> _pump(WidgetTester t, {Json? open, bool withFrame = true}) async {
-  final MockCore core = MockCore()
+/// Núcleo cuyas respuestas de `montage.framingFrame` se resuelven a mano.
+class _GatedCore extends MockCore {
+  final List<({double time, Completer<void> done})> reqs = <({double time, Completer<void> done})>[];
+  int _inFlight = 0;
+  int maxInFlight = 0;
+
+  @override
+  Future<T> call<T>(String method, Object? params, T Function(Json) decode) async {
+    if (method != 'montage.framingFrame') return super.call(method, params, decode);
+    final Completer<void> c = Completer<void>();
+    reqs.add((time: ((params! as Map<Object?, Object?>)['time']! as num).toDouble(), done: c));
+    maxInFlight = math.max(maxInFlight, ++_inFlight);
+    try {
+      await c.future;
+    } finally {
+      _inFlight--;
+    }
+    return super.call(method, params, decode);
+  }
+}
+
+Future<void> _flush(WidgetTester t) async {
+  await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 5)));
+  await t.pump();
+}
+
+Future<_Ctx> _pump(WidgetTester t, {Json? open, bool withFrame = true, MockCore? core0}) async {
+  final MockCore core = (core0 ?? MockCore())
     ..result('montage.open', open ?? _readyFixed())
     ..result('montage.close', <String, Object?>{})
     ..result('montage.setFraming', open ?? _readyFixed())
@@ -117,7 +145,6 @@ void main() {
   testWidgets('abre y pide el fotograma en la mitad de la presencia', (t) async {
     final _Ctx x = await _pump(t);
     expect(find.text('Encuadre · Guitarra'), findsOneWidget);
-    expect(x.calls('montage.framingFrame'), isEmpty);
     await _settle(t);
     final List<MockCall> req = x.calls('montage.framingFrame');
     expect(req.length, 1);
@@ -127,17 +154,66 @@ void main() {
     await expectLater(find.byKey(const ValueKey<String>('sheet')), matchesGoldenFile('goldens/encuadre-fijo.png'));
   });
 
-  testWidgets('debounce: varias pasadas del deslizador de instante, una sola petición', (t) async {
-    final _Ctx x = await _pump(t);
-    await _settle(t);
-    final Finder slider = find.byType(TfSlider).first;
-    await t.drag(slider, const Offset(40, 0));
-    await t.drag(slider, const Offset(-90, 0));
-    await t.drag(slider, const Offset(30, 0));
-    await t.pump(const Duration(milliseconds: 40));
-    expect(x.calls('montage.framingFrame').length, 1);
-    await _settle(t);
-    expect(x.calls('montage.framingFrame').length, 2);
+  testWidgets('instante en vivo: una petición en vuelo y al resolver se pide solo el último instante', (t) async {
+    final _GatedCore core = _GatedCore();
+    await _pump(t, core0: core);
+    await _flush(t);
+    expect(core.reqs.length, 1); // la inicial, al abrir
+    core.reqs[0].done.complete();
+    await _flush(t);
+
+    final TestGesture g = await t.startGesture(t.getCenter(find.byType(TfSlider).first));
+    await g.moveBy(const Offset(40, 0)); // supera la holgura del gesto
+    await g.moveBy(const Offset(5, 0));
+    await t.pump();
+    await _flush(t);
+    expect(core.reqs.length, 2); // la primera pasada pide al instante
+    await g.moveBy(const Offset(-90, 0));
+    await t.pump();
+    await g.moveBy(const Offset(30, 0));
+    await t.pump();
+    await _flush(t);
+    expect(core.reqs.length, 2); // nada en paralelo mientras la primera vuela
+    expect(core.maxInFlight, 1);
+    final double last = t.widget<TfSlider>(find.byType(TfSlider).first).value;
+    expect(core.reqs[1].time, isNot(closeTo(last, 1e-9)));
+
+    core.reqs[1].done.complete();
+    await _flush(t);
+    expect(core.reqs.length, 3);
+    expect(core.reqs[2].time, closeTo(last, 1e-9));
+    await g.up();
+    core.reqs[2].done.complete();
+    await _flush(t);
+    expect(core.reqs.length, 3);
+    expect(core.maxInFlight, 1);
+  });
+
+  testWidgets('respuesta tras cerrar la hoja: sin excepción ni setState', (t) async {
+    final _GatedCore core = _GatedCore();
+    await _pump(t, core0: core);
+    await _flush(t);
+    expect(core.reqs.length, 1);
+    await t.pumpWidget(const SizedBox());
+    core.reqs[0].done.complete();
+    await _flush(t);
+    expect(t.takeException(), isNull);
+  });
+
+  testWidgets('un error en una petición no bloquea la siguiente', (t) async {
+    final _GatedCore core = _GatedCore();
+    await _pump(t, core0: core);
+    await _flush(t);
+    core.reqs[0].done.completeError(const CoreError('no-frame', 'sin imagen'));
+    await _flush(t);
+    expect(find.text('Sin imagen en este instante'), findsOneWidget);
+
+    await t.drag(find.byType(TfSlider).first, const Offset(40, 0));
+    await _flush(t);
+    expect(core.reqs.length, 2);
+    core.reqs[1].done.complete();
+    await _flush(t);
+    expect(find.text('Sin imagen en este instante'), findsNothing);
   });
 
   testWidgets('arrastre de la caja envía setFraming con manualBox', (t) async {

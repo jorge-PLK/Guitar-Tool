@@ -165,6 +165,7 @@ Montaje D9 (M1) no se repite: ver la fila M1 de los heredados.
 | MO11 | Modo «seguir» de la hoja «Encuadre» sin caja en vivo: no se dibuja la caja durante el seguimiento | resuelto en 8cc6eb1: `AppCore` tiene `montage.framingBox` (solo lectura: caja efectiva con overrides de modo, caja manual, zoom y desplazamiento, sin guardar); la hoja lo pide en follow mientras se arrastra el desplazamiento o se mueve el zoom; el análisis simulado (`MontageSimulation.swift`) trae una trayectoria de 4 claves |
 | MO12 | Opciones de fps y de resolución de la exportación: las ofrece el núcleo (`export.options`); la interfaz no añade las suyas. Detalle por concretar: `Temp/flutter/ola4-estado.md` solo lo nombra | aceptado, sin hueco: Flutter usa `export.options` del núcleo (720p, 1080p y 4K; 24, 25, 30, 50 y 60 fps más el valor actual); las dos diferencias con SwiftUI van a favor de Flutter: enseña la resolución guardada aunque no sea de la lista y en Windows solo ofrece H.264 |
 | MO13 | `MontagePreviewColumn` y la lista de temas siguen el orden de Biblioteca (título), no el de SwiftUI (`createdAt` descendente). Ver `ref/montaje/DIFERENCIAS.md` | aceptado |
+| MO14 | Hoja «Encuadre»: el fotograma se actualiza en vivo al arrastrar «Instante» (una petición en vuelo, gana la última; `montage_live_query.dart`); SwiftUI esperaba a soltar (debounce de 80 ms). Decisión de Jorge, 27/11/2026 | aceptado |
 
 ## Notas de plataforma
 

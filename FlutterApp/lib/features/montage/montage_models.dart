@@ -155,6 +155,9 @@ class MontageFrame {
   /// `themeFolder/result.path`; si la carpeta del tema no se conoce, la ruta relativa tal cual.
   final String absolutePath;
 
+  /// Versión del fichero (el núcleo lo reescribe en la misma ruta en cada petición).
+  int get version => result.version;
+
   /// Carpeta del tema (`projectsFolder/folderName`), nula si la biblioteca aún no la conoce.
   final String? themeFolder;
 }

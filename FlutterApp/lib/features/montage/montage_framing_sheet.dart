@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,6 +12,7 @@ import '../../widgets/tf_buttons.dart';
 import '../../widgets/tf_sheet.dart';
 import '../../widgets/tf_slider.dart';
 import '../../widgets/tf_switch.dart';
+import 'montage_frame_image.dart';
 import 'montage_framing_controls.dart';
 import 'montage_framing_follow_controls.dart';
 import 'montage_live_query.dart';
@@ -44,9 +44,11 @@ class _MontageFramingSheetState extends ConsumerState<MontageFramingSheet> {
 
   double _time = 0;
   MontageFrame? _frame;
-  Timer? _frameTimer;
   Timer? _followTimer;
-  int _seq = 0;
+  late final MontageLiveQuery<double, MontageFrame> _frameQuery = MontageLiveQuery<double, MontageFrame>(
+    fetch: (double t) => _store.framingFrame(widget.takeId, t),
+    onResult: _onFrame,
+  );
 
   // Arrastre en curso.
   Rect? _dragBase;
@@ -91,24 +93,28 @@ class _MontageFramingSheetState extends ConsumerState<MontageFramingSheet> {
 
   @override
   void dispose() {
-    _frameTimer?.cancel();
     _followTimer?.cancel();
+    _frameQuery.reset();
+    _evictFrame(_frame);
     super.dispose();
   }
 
-  void _scheduleFrame() {
-    _frameTimer?.cancel();
-    _frameTimer = Timer(_debounce, _requestFrame);
-  }
+  /// Pide el fotograma del instante actual: una petición en vuelo y gana la última (también durante el arrastre).
+  void _scheduleFrame() => _frameQuery.push(_time);
 
-  Future<void> _requestFrame() async {
-    final int seq = ++_seq;
-    final MontageFrame? f = await _store.framingFrame(widget.takeId, _time);
-    if (!mounted || seq != _seq || f == null) return;
+  void _onFrame(MontageFrame f) {
+    if (!mounted) return;
+    final MontageFrame? old = _frame;
     setState(() {
       _frame = f;
       _liveBox = null;
     });
+    _evictFrame(old);
+  }
+
+  /// Libera de la caché de imágenes el fotograma anterior (misma ruta, otra versión) para no acumular bitmaps.
+  void _evictFrame(MontageFrame? f) {
+    if (f != null) unawaited(framingFrameImage(f.absolutePath, f.version).evict());
   }
 
   MontageFramingInfo? _info(MontageState s) {
@@ -202,7 +208,7 @@ class _MontageFramingSheetState extends ConsumerState<MontageFramingSheet> {
         );
     if (f == null) return empty();
     if (widget.frameBuilder != null) return widget.frameBuilder!(f);
-    return Image.file(File(f.absolutePath), fit: BoxFit.fill, gaplessPlayback: true, errorBuilder: (_, _, _) => empty());
+    return Image(image: framingFrameImage(f.absolutePath, f.version), fit: BoxFit.fill, gaplessPlayback: true, errorBuilder: (_, _, _) => empty());
   }
 
   @override
