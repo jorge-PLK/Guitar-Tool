@@ -222,6 +222,54 @@ void main() {
     expect(find.byType(TfPrimaryButton), findsOneWidget);
   });
 
+  Json withStatus(String status, double progress, {int? samples, int? detected, String? error}) {
+    final Json j = _fx('open.result');
+    final Map<String, Object?> f = ((j['framing']! as List).first! as Map<Object?, Object?>).cast<String, Object?>();
+    f
+      ..remove('samples')
+      ..remove('detected')
+      ..remove('error');
+    j['framing'] = <Object?>[
+      <String, Object?>{
+        ...f,
+        'status': status,
+        'progress': progress,
+        'samples': ?samples,
+        'detected': ?detected,
+        'error': ?error,
+      },
+    ];
+    return j;
+  }
+
+  bool reanalyzeEnabled(WidgetTester t) => t
+      .widget<TfSecondaryButton>(find.widgetWithText(TfSecondaryButton, 'Reanalizar'))
+      .onPressed != null;
+
+  final Map<String, (Json, String, bool)> cases = <String, (Json, String, bool)>{
+    'queued': (withStatus('pending', 0), 'En cola para analizar la guitarra…', true),
+    'analyzing': (withStatus('analyzing', 0.42), 'Analizando la guitarra… 42 %', false),
+    'ready con detecciones': (
+      withStatus('ready', 1, samples: 20, detected: 17),
+      'Guitarra detectada en 17 de 20 muestras.',
+      true,
+    ),
+    'ready sin detección': (
+      withStatus('ready', 1, samples: 20, detected: 0),
+      'Sin detección: se usa el fotograma entero, centrado. Puedes colocar la caja a mano.',
+      true,
+    ),
+    'failed': (withStatus('failed', 0, error: 'sin vídeo'), 'No se pudo analizar la toma (sin vídeo).', true),
+  };
+  for (final MapEntry<String, (Json, String, bool)> e in cases.entries) {
+    testWidgets('estado del análisis: ${e.key}', (t) async {
+      await _pump(t, open: e.value.$1);
+      await _settle(t);
+      expect(find.text(e.value.$2), findsOneWidget);
+      expect(reanalyzeEnabled(t), e.value.$3);
+    });
+  }
+
   testWidgets('sin imagen muestra el texto', (t) async {
     await _pump(t, withFrame: false);
     await _settle(t);

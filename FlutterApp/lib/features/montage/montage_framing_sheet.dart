@@ -10,7 +10,6 @@ import '../../theme/fmt.dart';
 import '../../theme/tokens.dart';
 import '../../theme/typography.dart';
 import '../../widgets/tf_buttons.dart';
-import '../../widgets/tf_progress.dart';
 import '../../widgets/tf_sheet.dart';
 import '../../widgets/tf_slider.dart';
 import '../../widgets/tf_switch.dart';
@@ -196,7 +195,6 @@ class _MontageFramingSheetState extends ConsumerState<MontageFramingSheet> {
     final bool follow = info?.mode == 'follow';
     final MontageFramingStatus? status = state.framingStatus(widget.takeId);
     final bool analyzing = status == MontageFramingStatus.analyzing;
-    final bool busy = analyzing || status == MontageFramingStatus.pending;
     final String title = l.montageFramingTitle(lane?.partName ?? '');
     final double zoom = _zoom ?? info?.followZoom ?? 1;
     final MontageOffsetInfo offset = _dragOffset ?? _offset ?? info?.followOffset ?? const MontageOffsetInfo(x: 0, y: 0);
@@ -234,15 +232,7 @@ class _MontageFramingSheetState extends ConsumerState<MontageFramingSheet> {
                     ),
                   ],
                 ),
-                if (busy)
-                  Row(
-                    spacing: TfSpace.s10,
-                    children: <Widget>[
-                      const TfSpinner.small(),
-                      // TODO(l10n): texto de estado del análisis («Analizando la guitarra… NN %»): sin clave en ola4-claves.
-                      Expanded(child: TfProgress(value: state.framingProgress(widget.takeId) ?? 0)),
-                    ],
-                  ),
+                _statusLine(l, state),
                 FramingFrameArea(
                   aspect: _aspect,
                   box: _effectiveBox(info),
@@ -311,13 +301,41 @@ class _MontageFramingSheetState extends ConsumerState<MontageFramingSheet> {
     );
   }
 
+  /// Línea de estado del análisis (FS `status`): sin dato o en cola → «en cola».
+  Widget _statusLine(AppLocalizations l, MontageState state) {
+    final MontageFramingStatus? s = state.framingStatus(widget.takeId);
+    final ({int? samples, int? detected, String? error}) d = state.framingDetails(widget.takeId);
+    final String text;
+    final Color color;
+    switch (s) {
+      case MontageFramingStatus.analyzing:
+        text = l.montageFramingStatusAnalyzing(((state.framingProgress(widget.takeId) ?? 0) * 100).round());
+        color = TfColors.accent;
+      case MontageFramingStatus.ready:
+        if ((d.detected ?? 0) == 0) {
+          text = l.montageFramingStatusNoDetection;
+          color = TfColors.accent;
+        } else {
+          text = l.montageFramingStatusDetected(d.detected ?? 0, d.samples ?? 0);
+          color = TfColors.muted;
+        }
+      case MontageFramingStatus.failed:
+        text = l.montageFramingStatusFailed(d.error ?? '');
+        color = TfColors.danger;
+      case MontageFramingStatus.pending || MontageFramingStatus.unknown || null:
+        text = l.montageFramingStatusQueued;
+        color = TfColors.muted;
+    }
+    return Text(text, style: TfText.body(TfSize.font12).copyWith(color: color));
+  }
+
   double _instantMax(MontageLaneInfo lane) => lane.take.end > lane.take.start + 0.1 ? lane.take.end : lane.take.start + 0.1;
 
   List<Widget> _followControls(AppLocalizations l, double zoom, MontageOffsetInfo offset) {
     String sign(double v) => '${v < 0 ? '-' : '+'}${v.abs().toStringAsFixed(2)}';
     return <Widget>[
       FramingSliderRow(
-        title: 'Zoom', // TODO(l10n): título visible del deslizador (solo hay clave de semántica).
+        title: l.montageFramingZoomLabel,
         semanticLabel: l.montageFramingZoom(zoom.toStringAsFixed(2)),
         value: zoom,
         min: _zoomMin,
@@ -329,7 +347,7 @@ class _MontageFramingSheetState extends ConsumerState<MontageFramingSheet> {
         },
       ),
       FramingSliderRow(
-        title: 'Desplazamiento X', // TODO(l10n)
+        title: l.montageFramingOffsetXLabel,
         semanticLabel: l.montageFramingOffsetX(sign(offset.x)),
         value: offset.x,
         min: -_offsetMax,
@@ -341,7 +359,7 @@ class _MontageFramingSheetState extends ConsumerState<MontageFramingSheet> {
         },
       ),
       FramingSliderRow(
-        title: 'Desplazamiento Y', // TODO(l10n)
+        title: l.montageFramingOffsetYLabel,
         semanticLabel: l.montageFramingOffsetY(sign(offset.y)),
         value: offset.y,
         min: -_offsetMax,

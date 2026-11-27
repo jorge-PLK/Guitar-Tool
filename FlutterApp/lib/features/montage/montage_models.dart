@@ -79,6 +79,16 @@ class MontageState {
     return null;
   }
 
+  /// Muestras, detecciones y error del análisis de una toma (evento vivo, si no snapshot).
+  ({int? samples, int? detected, String? error}) framingDetails(String takeId) {
+    final live = framingLive[takeId];
+    if (live != null) return (samples: live.samples, detected: live.detected, error: live.error);
+    for (final f in snapshot?.framing ?? const <MontageFramingInfo>[]) {
+      if (f.takeId == takeId) return (samples: f.samples, detected: f.detected, error: f.error);
+    }
+    return (samples: null, detected: null, error: null);
+  }
+
   /// Alguna toma en `analyzing`: la pantalla deshabilita «Exportar».
   bool get isAnalyzing {
     final s = snapshot;
