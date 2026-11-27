@@ -14,6 +14,8 @@ import '../../widgets/tf_sheet.dart';
 import '../../widgets/tf_slider.dart';
 import '../../widgets/tf_switch.dart';
 import 'montage_framing_controls.dart';
+import 'montage_framing_follow_controls.dart';
+import 'montage_live_query.dart';
 import 'montage_store.dart';
 import 'widgets/framing_box_painter.dart';
 
@@ -38,9 +40,7 @@ class _MontageFramingSheetState extends ConsumerState<MontageFramingSheet> {
   static const double _width = 760;
   static const double _instantValueWidth = 44;
   static const double _defaultAspect = 16 / 9;
-  static const double _zoomMin = 0.5;
-  static const double _zoomMax = 3;
-  static const double _offsetMax = 0.5;
+  static const double _offsetMax = FramingFollowControls.offsetMax;
 
   double _time = 0;
   MontageFrame? _frame;
@@ -58,6 +58,16 @@ class _MontageFramingSheetState extends ConsumerState<MontageFramingSheet> {
   // Valores locales del modo seguir mientras se mueven los deslizadores.
   double? _zoom;
   MontageOffsetInfo? _offset;
+
+  // Caja del modo seguir calculada por el núcleo durante el gesto; se suelta al llegar el fotograma nuevo.
+  Rect? _liveBox;
+  late final MontageLiveQuery<({double zoom, MontageOffsetInfo offset}), MontageFramingBoxResult> _live =
+      MontageLiveQuery<({double zoom, MontageOffsetInfo offset}), MontageFramingBoxResult>(
+    fetch: (a) => _store.framingBox(widget.takeId, _frame?.result.time ?? _time, followZoom: a.zoom, followOffset: a.offset),
+    onResult: (MontageFramingBoxResult r) {
+      if (mounted) setState(() => _liveBox = _boxOf(r.box));
+    },
+  );
 
   MontageStore get _store => ref.read(montageStoreProvider.notifier);
 
@@ -95,7 +105,10 @@ class _MontageFramingSheetState extends ConsumerState<MontageFramingSheet> {
     final int seq = ++_seq;
     final MontageFrame? f = await _store.framingFrame(widget.takeId, _time);
     if (!mounted || seq != _seq || f == null) return;
-    setState(() => _frame = f);
+    setState(() {
+      _frame = f;
+      _liveBox = null;
+    });
   }
 
   MontageFramingInfo? _info(MontageState s) {
@@ -105,7 +118,11 @@ class _MontageFramingSheetState extends ConsumerState<MontageFramingSheet> {
     return null;
   }
 
+  /// Caja del modo seguir mientras se arrastra el desplazamiento o el zoom: `montage.framingBox` con los valores en curso.
+  void _liveFollow(double zoom, MontageOffsetInfo offset) => _live.push((zoom: zoom, offset: offset));
+
   Future<void> _apply({String? mode, MontageBoxInfo? box, double? zoom, MontageOffsetInfo? offset}) async {
+    _live.reset();
     await _store.setFraming(widget.takeId, mode: mode, manualBox: box, followZoom: zoom, followOffset: offset);
     if (!mounted) return;
     setState(() {
@@ -125,7 +142,7 @@ class _MontageFramingSheetState extends ConsumerState<MontageFramingSheet> {
   Rect _effectiveBox(MontageFramingInfo? info) {
     final MontageBoxInfo? m = info?.manualBox;
     if (_dragBox != null) return _dragBox!;
-    if (info?.mode == 'follow') return _boxOf(_frame?.result.box);
+    if (info?.mode == 'follow') return _liveBox ?? _boxOf(_frame?.result.box);
     return _boxOf(m ?? _frame?.result.box);
   }
 
@@ -152,10 +169,12 @@ class _MontageFramingSheetState extends ConsumerState<MontageFramingSheet> {
     if (info?.mode == 'follow') {
       final MontageOffsetInfo? base = _offsetBase;
       if (base == null) return;
-      setState(() => _dragOffset = MontageOffsetInfo(
-            x: FramingBoxMath.clampTo(base.x + dx, -_offsetMax, _offsetMax),
-            y: FramingBoxMath.clampTo(base.y + dy, -_offsetMax, _offsetMax),
-          ));
+      final MontageOffsetInfo o = MontageOffsetInfo(
+        x: FramingBoxMath.clampTo(base.x + dx, -_offsetMax, _offsetMax),
+        y: FramingBoxMath.clampTo(base.y + dy, -_offsetMax, _offsetMax),
+      );
+      setState(() => _dragOffset = o);
+      _liveFollow(_zoom ?? info?.followZoom ?? 1, o);
       return;
     }
     final Rect? base = _dragBase;
@@ -232,7 +251,7 @@ class _MontageFramingSheetState extends ConsumerState<MontageFramingSheet> {
                     ),
                   ],
                 ),
-                _statusLine(l, state),
+                FramingStatusLine(state: state, takeId: widget.takeId),
                 FramingFrameArea(
                   aspect: _aspect,
                   box: _effectiveBox(info),
@@ -274,7 +293,20 @@ class _MontageFramingSheetState extends ConsumerState<MontageFramingSheet> {
                     style: TfText.body(TfSize.font12).copyWith(color: TfColors.muted),
                   )
                 else
-                  ..._followControls(l, zoom, offset),
+                  FramingFollowControls(
+                    zoom: zoom,
+                    offset: offset,
+                    onZoom: (double v) {
+                      setState(() => _zoom = v);
+                      _liveFollow(v, offset);
+                      _commitFollowSoon();
+                    },
+                    onOffset: (MontageOffsetInfo o) {
+                      setState(() => _offset = o);
+                      _liveFollow(zoom, o);
+                      _commitFollowSoon();
+                    },
+                  ),
                 Row(
                   spacing: TfSpace.s12,
                   children: <Widget>[
@@ -301,76 +333,5 @@ class _MontageFramingSheetState extends ConsumerState<MontageFramingSheet> {
     );
   }
 
-  /// Línea de estado del análisis (FS `status`): sin dato o en cola → «en cola».
-  Widget _statusLine(AppLocalizations l, MontageState state) {
-    final MontageFramingStatus? s = state.framingStatus(widget.takeId);
-    final ({int? samples, int? detected, String? error}) d = state.framingDetails(widget.takeId);
-    final String text;
-    final Color color;
-    switch (s) {
-      case MontageFramingStatus.analyzing:
-        text = l.montageFramingStatusAnalyzing(((state.framingProgress(widget.takeId) ?? 0) * 100).round());
-        color = TfColors.accent;
-      case MontageFramingStatus.ready:
-        if ((d.detected ?? 0) == 0) {
-          text = l.montageFramingStatusNoDetection;
-          color = TfColors.accent;
-        } else {
-          text = l.montageFramingStatusDetected(d.detected ?? 0, d.samples ?? 0);
-          color = TfColors.muted;
-        }
-      case MontageFramingStatus.failed:
-        text = l.montageFramingStatusFailed(d.error ?? '');
-        color = TfColors.danger;
-      case MontageFramingStatus.pending || MontageFramingStatus.unknown || null:
-        text = l.montageFramingStatusQueued;
-        color = TfColors.muted;
-    }
-    return Text(text, style: TfText.body(TfSize.font12).copyWith(color: color));
-  }
-
   double _instantMax(MontageLaneInfo lane) => lane.take.end > lane.take.start + 0.1 ? lane.take.end : lane.take.start + 0.1;
-
-  List<Widget> _followControls(AppLocalizations l, double zoom, MontageOffsetInfo offset) {
-    String sign(double v) => '${v < 0 ? '-' : '+'}${v.abs().toStringAsFixed(2)}';
-    return <Widget>[
-      FramingSliderRow(
-        title: l.montageFramingZoomLabel,
-        semanticLabel: l.montageFramingZoom(zoom.toStringAsFixed(2)),
-        value: zoom,
-        min: _zoomMin,
-        max: _zoomMax,
-        valueText: '×${zoom.toStringAsFixed(2)}',
-        onChanged: (double v) {
-          setState(() => _zoom = v);
-          _commitFollowSoon();
-        },
-      ),
-      FramingSliderRow(
-        title: l.montageFramingOffsetXLabel,
-        semanticLabel: l.montageFramingOffsetX(sign(offset.x)),
-        value: offset.x,
-        min: -_offsetMax,
-        max: _offsetMax,
-        valueText: sign(offset.x),
-        onChanged: (double v) {
-          setState(() => _offset = MontageOffsetInfo(x: v, y: offset.y));
-          _commitFollowSoon();
-        },
-      ),
-      FramingSliderRow(
-        title: l.montageFramingOffsetYLabel,
-        semanticLabel: l.montageFramingOffsetY(sign(offset.y)),
-        value: offset.y,
-        min: -_offsetMax,
-        max: _offsetMax,
-        valueText: sign(offset.y),
-        onChanged: (double v) {
-          setState(() => _offset = MontageOffsetInfo(x: offset.x, y: v));
-          _commitFollowSoon();
-        },
-      ),
-      Text(l.montageFramingFollowHelp, style: TfText.body(TfSize.font12).copyWith(color: TfColors.muted)),
-    ];
-  }
 }

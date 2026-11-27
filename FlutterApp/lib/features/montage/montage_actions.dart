@@ -26,6 +26,47 @@ extension MontageActions on MontageStore {
 
   Future<bool> moveCut(String id, double time) => act('montage.moveCut', MontageCutMoveParams(id: id, time: time).toJson());
 
+  /// Consulta de solo lectura (`montage.snapCut`): tiempo de [id] ajustado al pulso y a los vecinos. No toca el estado.
+  /// `null` si falló (el error queda en `actionError`).
+  Future<double?> snapCut(String id, double time) async {
+    try {
+      final r = await _core.call('montage.snapCut', MontageSnapCutParams(id: id, time: time).toJson(), MontageSnapCutResult.fromJson);
+      return r.time;
+    } catch (e) {
+      _fail(e);
+      return null;
+    }
+  }
+
+  /// Consulta de solo lectura (`montage.framingBox`): caja efectiva en [time] con los overrides dados. No toca el estado.
+  /// `null` si falló; con éxito, `box` nulo = sin caja.
+  Future<MontageFramingBoxResult?> framingBox(
+    String takeId,
+    double time, {
+    String? mode,
+    MontageBoxInfo? manualBox,
+    double? followZoom,
+    MontageOffsetInfo? followOffset,
+  }) async {
+    try {
+      return await _core.call(
+        'montage.framingBox',
+        MontageFramingBoxParams(
+          takeId: takeId,
+          time: time,
+          mode: mode,
+          manualBox: manualBox,
+          followZoom: followZoom,
+          followOffset: followOffset,
+        ).toJson(),
+        MontageFramingBoxResult.fromJson,
+      );
+    } catch (e) {
+      _fail(e);
+      return null;
+    }
+  }
+
   Future<bool> setCutPart(String id, String? partId) =>
       act('montage.setCutPart', MontageCutPartParams(id: id, partId: partId).toJson());
 

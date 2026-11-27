@@ -83,7 +83,8 @@ extension MontageServices {
                     progress(Double(i) / 4)
                 }
                 return FramingAnalysis(fingerprint: GuitarFramer.fingerprint(video: video), frameWidth: 1920, frameHeight: 1080,
-                                       samples: 40, detected: 38, fixed: FramingBox(x: 0.3, y: 0.2, width: 0.4, height: 0.5), track: [])
+                                       samples: 40, detected: 38, fixed: FramingBox(x: 0.3, y: 0.2, width: 0.4, height: 0.5),
+                                       track: (0..<4).map { FramingKey(time: Double($0) * 4, box: FramingBox(x: 0.25 + 0.03 * Double($0), y: 0.2, width: 0.4, height: 0.5)) })
             },
             mix: { job, progress in try await MontageMixer.mix(job, progress: progress) },
             export: { _, _, settings, url, progress in

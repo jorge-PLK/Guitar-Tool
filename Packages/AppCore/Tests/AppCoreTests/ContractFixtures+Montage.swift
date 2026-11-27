@@ -95,6 +95,7 @@ final class ContractFixturesMontageTests: XCTestCase {
         let add = try await rig.dumpStable("montage.addCut", "{\"time\":3,\"partId\":\"\(part)\",\"exact\":true}")
         let added = try XCTUnwrap(add["result"] as? [String: Any], "\(add)")
         let cutId = try XCTUnwrap(added["cutId"] as? String)
+        try await rig.dumpStable("montage.snapCut", "{\"id\":\"\(cutId)\",\"time\":3.3}")
         try await rig.dumpStable("montage.moveCut", "{\"id\":\"\(cutId)\",\"time\":3.5}")
         try await rig.dumpStable("montage.setCutPart", "{\"id\":\"\(cutId)\"}")
         try await rig.dumpStable("montage.removeCut", "{\"id\":\"\(cutId)\"}")
@@ -110,6 +111,7 @@ final class ContractFixturesMontageTests: XCTestCase {
         try await rig.dumpStable("montage.setFraming",
                            "{\"takeId\":\"\(t1)\",\"mode\":\"fixed\",\"manualBox\":{\"x\":0.1,\"y\":0.1,\"width\":0.5,\"height\":0.5}}")
         try await rig.dumpStable("montage.framingFrame", "{\"takeId\":\"\(t1)\",\"time\":3}")
+        try await rig.dumpStable("montage.framingBox", "{\"takeId\":\"\(t1)\",\"time\":3,\"followZoom\":1.4}")
         try await rig.dumpStable("montage.setFraming",
                            "{\"takeId\":\"\(t1)\",\"mode\":\"follow\",\"followZoom\":1.4,\"followOffset\":{\"x\":0.1,\"y\":-0.1}}",
                            name: "montage.setFraming.follow")
@@ -241,6 +243,8 @@ final class ContractFixturesMontageTests: XCTestCase {
         _ = await router.handle("{\"id\":1,\"method\":\"montage.setFraming\",\"params\":{\"takeId\":\"\(t1)\",\"mode\":\"follow\",\"followZoom\":1.4,\"followOffset\":{\"x\":0.1,\"y\":-0.1}}}")
         await settle(world)
         try await rig.dumpStable("montage.framingFrame", "{\"takeId\":\"\(t1)\",\"time\":3}", name: "montage.framingFrame.framing-follow")
+        try await rig.dumpStable("montage.framingBox", "{\"takeId\":\"\(t1)\",\"time\":3,\"followZoom\":2,\"followOffset\":{\"x\":0.05,\"y\":0}}",
+                           name: "montage.framingBox.framing-follow")
         let follow = try await currentSnapshot(world)
         XCTAssertEqual(follow.framing.first { $0.takeId == t1 }?.mode, "follow")
         try writeState(rig, "framing-follow", follow, event: true)

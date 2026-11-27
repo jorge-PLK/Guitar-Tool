@@ -210,6 +210,24 @@ void main() {
     expect((p['followOffset'] as Map<Object?, Object?>)['x'] as double, closeTo(0.2, 0.01));
   });
 
+  testWidgets('modo seguir: cambiar el zoom mueve la caja al valor de framingBox', (t) async {
+    final _Ctx x = await _pump(t, open: _fx('open.framing-follow.result'));
+    x.core.result('montage.framingBox', _fx('framingBox.framing-follow.result'));
+    await _settle(t);
+    await t.drag(find.byType(TfSlider).at(1), const Offset(30, 0));
+    await t.pump();
+    await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 5)));
+    await t.pump();
+    final List<MockCall> q = x.calls('montage.framingBox');
+    expect(q, isNotEmpty);
+    final Map<Object?, Object?> p = q.first.params! as Map<Object?, Object?>;
+    expect(p['takeId'], _take);
+    expect(p['followZoom'], isNotNull);
+    final FramingFrameArea area = t.widget<FramingFrameArea>(find.byType(FramingFrameArea));
+    expect(area.box.width, closeTo(0.2, 1e-9));
+    expect(area.box.left, closeTo(0.4225, 1e-9));
+  });
+
   testWidgets('Restablecer y Reanalizar llaman al store', (t) async {
     final _Ctx x = await _pump(t);
     await _settle(t);

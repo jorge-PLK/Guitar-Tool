@@ -245,6 +245,8 @@ Fichero: `AC/MontageMethods.swift`.
 | `montage.reanalyze` | `MontageTakeParams` | `MontageSnapshot` | :450 | Repite el análisis de encuadre. |
 | `montage.rotateTake` | `MontageTakeParams` | `MontageSnapshot` | :454 | Gira la toma 90 grados. |
 | `montage.framingFrame` | `MontageFramingFrameParams` | `MontageFramingFrameResult` | :458 (impl. :509; escritura PNG `AC/MontageController.swift:829-853`) | Escribe un PNG sin compresión (lado mayor 1280) del fotograma de la toma en `time` y devuelve su ruta y la caja efectiva. |
+| `montage.snapCut` | `MontageCutMoveParams` | `MontageCutTimeResult` | `AC/MontageMethods.swift` (impl. `snapCut`) | Solo lectura (MO10): posición de un corte arrastrado a `time`, ajustada al pulso y sin pasar de los vecinos (`MontageController.draggedCutTime`). No guarda ni emite `montage.state`; `id` desconocido devuelve `time` tal cual. |
+| `montage.framingBox` | `MontageFramingBoxParams` | `MontageFramingBoxResult` | `AC/MontageMethods.swift` (impl. `framingBox`) | Solo lectura (MO11): caja efectiva en `time` aplicando a una copia del encuadre guardado los overrides indicados (misma semántica que `montage.setFraming`). No guarda ni emite estado. |
 | `montage.play` | `Empty` | `MontageSnapshot` | :461 | Reproduce (pausa Backing antes). |
 | `montage.pause` | `Empty` | `MontageSnapshot` | :464 | Pausa. |
 | `montage.seek` | `MontageSeekParams` | `MontageSnapshot` | :465 | Salta a `seconds` en tiempo del **tema** (se recorta a `span`; `AC/MontageController.swift:743-751`). |
@@ -280,11 +282,13 @@ Unidades: «tema» = segundos de la canción; «vídeo» = segundos del vídeo m
 - `MontageTakeParams` :286 `takeId: String`.
 - `MontageSetFramingParams` :287 `takeId: String`; opcionales: `mode: String` (`fixed|follow`), `manualBox: MontageBoxInfo`, `clearManualBox: Bool` (true borra la caja manual; se aplica antes que `manualBox`), `followZoom: Double` (>0 finito), `followOffset: MontageOffsetInfo`.
 - `MontageFramingFrameParams` :296 `takeId: String`, `time: Double` (tema, s).
+- `MontageFramingBoxParams` `takeId: String`, `time: Double` (tema, s); opcionales como `MontageSetFramingParams`: `mode` (`fixed|follow`, otro valor = `bad-params`), `manualBox`, `clearManualBox`, `followZoom`, `followOffset`.
 - `MontageSeekParams` :297 `seconds: Double` (tema, s). `MontageFPSParams` :298 `fps: Double`.
 
 **Results**:
 - `MontageAddCutResult` :248: `cutId: String`, `snapshot: MontageSnapshot`.
 - `MontageFramingFrameResult` :253: `path: String` (relativa a la carpeta del tema, con `/`: `cache/montage/framing-<take>.png`; NO relativa a la carpeta de proyectos, a diferencia de otras rutas de medios), `width: Int`, `height: Int` (px), `time: Double` (s), `version: Int` (anti-caché), `box: MontageBoxInfo?` (normalizada 0...1 sobre la imagen ya girada; ausente si no hay).
+- `MontageCutTimeResult`: `time: Double` (tema, s). `MontageFramingBoxResult`: `box: MontageBoxInfo?` (normalizada 0...1; ausente si no hay, p. ej. modo `follow` sin trayectoria).
 - `MontageRevealResult` :265: `revealed: Bool`.
 
 **MontageSnapshot** (:201; sintetizado, opcionales omitidos si nil):

@@ -644,6 +644,74 @@ class MontageFramingFrameResult {
       };
 }
 
+/// Params de `montage.snapCut`: tiempo (tema) de un corte arrastrado; no guarda nada.
+@immutable
+class MontageSnapCutParams {
+  const MontageSnapCutParams({required this.id, required this.time});
+  factory MontageSnapCutParams.fromJson(Json j) => MontageSnapCutParams(id: j['id'] as String, time: (j['time'] as num).toDouble());
+  final String id;
+  final double time;
+  Json toJson() => {'id': id, 'time': time};
+}
+
+/// `montage.snapCut`: tiempo ajustado al pulso y a los cortes vecinos.
+@immutable
+class MontageSnapCutResult {
+  const MontageSnapCutResult({required this.time});
+  factory MontageSnapCutResult.fromJson(Json j) => MontageSnapCutResult(time: (j['time'] as num).toDouble());
+  final double time;
+  Json toJson() => {'time': time};
+}
+
+/// Params de `montage.framingBox`: caja efectiva en `time` con overrides sobre una copia del encuadre; no guarda nada.
+@immutable
+class MontageFramingBoxParams {
+  const MontageFramingBoxParams({
+    required this.takeId,
+    required this.time,
+    this.mode,
+    this.manualBox,
+    this.clearManualBox,
+    this.followZoom,
+    this.followOffset,
+  });
+  factory MontageFramingBoxParams.fromJson(Json j) => MontageFramingBoxParams(
+        takeId: j['takeId'] as String,
+        time: (j['time'] as num).toDouble(),
+        mode: j['mode'] as String?,
+        manualBox: j['manualBox'] == null ? null : MontageBoxInfo.fromJson(j['manualBox'] as Json),
+        clearManualBox: j['clearManualBox'] as bool?,
+        followZoom: (j['followZoom'] as num?)?.toDouble(),
+        followOffset: j['followOffset'] == null ? null : MontageOffsetInfo.fromJson(j['followOffset'] as Json),
+      );
+  final String takeId;
+  final double time;
+  final String? mode;
+  final MontageBoxInfo? manualBox;
+  final bool? clearManualBox;
+  final double? followZoom;
+  final MontageOffsetInfo? followOffset;
+  Json toJson() => {
+        'takeId': takeId,
+        'time': time,
+        if (mode != null) 'mode': mode,
+        if (manualBox != null) 'manualBox': manualBox!.toJson(),
+        if (clearManualBox != null) 'clearManualBox': clearManualBox,
+        if (followZoom != null) 'followZoom': followZoom,
+        if (followOffset != null) 'followOffset': followOffset!.toJson(),
+      };
+}
+
+/// `montage.framingBox`. Sin `box` = sin caja (fotograma entero).
+@immutable
+class MontageFramingBoxResult {
+  const MontageFramingBoxResult({this.box});
+  factory MontageFramingBoxResult.fromJson(Json j) =>
+      MontageFramingBoxResult(box: j['box'] == null ? null : MontageBoxInfo.fromJson(j['box'] as Json));
+  final MontageBoxInfo? box;
+  Json toJson() => {if (box != null) 'box': box!.toJson()};
+}
+
 /// `montage.reveal`.
 @immutable
 class MontageRevealResult {

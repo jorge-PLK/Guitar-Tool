@@ -300,6 +300,18 @@ struct MontageSetFramingParams: Decodable, Sendable {
     var followOffset: MontageOffsetInfo?
 }
 struct MontageFramingFrameParams: Decodable, Sendable { var takeId: String; var time: Double }
+/// Consulta en vivo (solo lectura): caja efectiva en `time` con overrides sin guardar; mismos campos que `MontageSetFramingParams`.
+struct MontageFramingBoxParams: Decodable, Sendable {
+    var takeId: String
+    var time: Double
+    var mode: String?
+    var manualBox: MontageBoxInfo?
+    var clearManualBox: Bool?
+    var followZoom: Double?
+    var followOffset: MontageOffsetInfo?
+}
+struct MontageFramingBoxResult: Codable, Sendable, Equatable { var box: MontageBoxInfo? }
+struct MontageCutTimeResult: Codable, Sendable, Equatable { var time: Double }
 struct MontageSeekParams: Decodable, Sendable { var seconds: Double }
 struct MontageFPSParams: Decodable, Sendable { var fps: Double }
 
@@ -440,17 +452,19 @@ final class MontageService {
         }
         router.register("montage.setFraming") { [self] (p: MontageSetFramingParams) -> MontageSnapshot in
             let take = try Self.id(p.takeId, "takeId")
-            if let m = p.mode, FramingMode(rawValue: m) == nil { throw RPCError(code: "bad-params", message: "«mode» no es fixed ni follow: \(m)") }
+            try Self.validateFramingMode(p.mode)
             return try await with { c in
                 c.updateFraming(take) { f in
-                    if let m = p.mode, let mode = FramingMode(rawValue: m) { f.mode = mode }
-                    if p.clearManualBox == true { f.manualBox = nil }
-                    if let b = p.manualBox { f.manualBox = NormalizedRect(x: b.x, y: b.y, width: b.width, height: b.height) }
-                    if let z = p.followZoom, z.isFinite, z > 0 { f.followZoom = z }
-                    if let o = p.followOffset { f.followOffset = FramingOffset(x: o.x, y: o.y) }
+                    Self.applyFraming(&f, mode: p.mode, clearManualBox: p.clearManualBox, manualBox: p.manualBox,
+                                      followZoom: p.followZoom, followOffset: p.followOffset)
                 }
             }
         }
+        router.register("montage.snapCut") { [self] (p: MontageCutMoveParams) -> MontageCutTimeResult in
+            let id = try Self.id(p.id, "id")
+            return try await snapCut(id, p.time)
+        }
+        router.register("montage.framingBox") { [self] (p: MontageFramingBoxParams) -> MontageFramingBoxResult in try await framingBox(p) }
         router.register("montage.resetFraming") { [self] (p: MontageTakeParams) -> MontageSnapshot in
             let take = try Self.id(p.takeId, "takeId")
             return try await with { $0.resetFraming(take) }
@@ -515,6 +529,35 @@ final class MontageService {
         if p.partId != nil || p.exact == true { id = c.addCut(at: p.time, partID: part, exact: p.exact ?? false) } else { id = c.addCut(at: p.time) }
         stateChanged()
         return MontageAddCutResult(cutId: id.uuidString, snapshot: snapshot(c))
+    }
+
+    nonisolated private static func validateFramingMode(_ m: String?) throws {
+        if let m, FramingMode(rawValue: m) == nil { throw RPCError(code: "bad-params", message: "«mode» no es fixed ni follow: \(m)") }
+    }
+
+    /// Aplicación de los overrides de encuadre, compartida por `setFraming` (guarda) y `framingBox` (solo lectura).
+    nonisolated private static func applyFraming(_ f: inout TakeFraming, mode: String?, clearManualBox: Bool?, manualBox: MontageBoxInfo?,
+                                                 followZoom: Double?, followOffset: MontageOffsetInfo?) {
+        if let m = mode, let mode = FramingMode(rawValue: m) { f.mode = mode }
+        if clearManualBox == true { f.manualBox = nil }
+        if let b = manualBox { f.manualBox = NormalizedRect(x: b.x, y: b.y, width: b.width, height: b.height) }
+        if let z = followZoom, z.isFinite, z > 0 { f.followZoom = z }
+        if let o = followOffset { f.followOffset = FramingOffset(x: o.x, y: o.y) }
+    }
+
+    /// Solo lectura: no toca el estado ni emite `montage.state`. Un corte desconocido devuelve `time` tal cual (como `draggedCutTime`).
+    private func snapCut(_ id: UUID, _ time: Double) throws -> MontageCutTimeResult {
+        guard let c = current else { throw Self.notOpen }
+        return MontageCutTimeResult(time: c.draggedCutTime(id, to: time))
+    }
+
+    private func framingBox(_ p: MontageFramingBoxParams) throws -> MontageFramingBoxResult {
+        let take = try Self.id(p.takeId, "takeId")
+        try Self.validateFramingMode(p.mode)
+        guard let c = current else { throw Self.notOpen }
+        var f = c.framing(for: take)
+        Self.applyFraming(&f, mode: p.mode, clearManualBox: p.clearManualBox, manualBox: p.manualBox, followZoom: p.followZoom, followOffset: p.followOffset)
+        return MontageFramingBoxResult(box: c.effectiveBox(takeID: take, at: p.time, framing: f).map(Self.box))
     }
 
     private func framingFrame(_ p: MontageFramingFrameParams) async throws -> MontageFramingFrameResult {

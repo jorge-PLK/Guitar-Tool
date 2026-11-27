@@ -49,6 +49,7 @@ Future<Rig> pump(WidgetTester t, {String open = 'open.result', Json? snapshot}) 
     ..result('montage.removeCut', fx(open))
     ..result('montage.moveLane', snapshot ?? fx(open))
     ..result('montage.moveCut', fx(open))
+    ..result('montage.snapCut', fx('snapCut.result'))
     ..result('montage.setCutPart', fx(open))
     ..result('montage.rotateTake', fx(open));
   final c = ProviderContainer(overrides: [coreClientProvider.overrideWithValue(core)]);
@@ -128,6 +129,31 @@ void main() {
     await settle(t);
     expect(r.methods, contains('montage.removeCut'));
     expect(find.byKey(const ValueKey('montage-cut-delete')), findsNothing);
+  });
+
+  testWidgets('arrastrar una marca la pinta en el tiempo de snapCut y al soltar llama a moveCut', (t) async {
+    final r = await pump(t, open: 'open.single.result');
+    r.core.handle('montage.snapCut', (_) => {'time': 6.5});
+    final snap = r.c.read(montageStoreProvider).snapshot!;
+    final w = t.getSize(find.byType(MontageTimelineArea)).width;
+    final mark = MontageTimelineGeometry(montageTimelineData(snap), w).cutMarkRect(0).center;
+    final g = await t.startGesture(areaPoint(t, mark.dx, mark.dy));
+    await g.moveBy(const Offset(20, 0));
+    await settle(t);
+    double painted() => t
+        .widgetList<CustomPaint>(find.byType(CustomPaint))
+        .map((c) => c.painter)
+        .whereType<MontageTimelinePainter>()
+        .single
+        .data
+        .cuts[0]
+        .time;
+    expect(r.methods, contains('montage.snapCut'));
+    expect(painted(), 6.5);
+    await g.up();
+    await settle(t);
+    expect(r.methods, contains('montage.moveCut'));
+    expect(painted(), isNot(6.5));
   });
 
   testWidgets('reordenar carril llama a moveLane; girar llama a rotateTake', (t) async {

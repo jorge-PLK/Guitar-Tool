@@ -34,6 +34,8 @@ final Map<String, _Codec> _results = {
   'addCut': _addCut,
   'framingFrame': _framingFrame,
   'reveal': _reveal,
+  'snapCut': (j) => MontageSnapCutResult.fromJson(j).toJson(),
+  'framingBox': (j) => MontageFramingBoxResult.fromJson(j).toJson(),
   'close': _voidResult,
 };
 
@@ -66,6 +68,8 @@ final Map<String, _Codec> _params = {
   'resetFraming': (j) => MontageTakeParams.fromJson(j).toJson(),
   'setFraming': (j) => MontageSetFramingParams.fromJson(j).toJson(),
   'framingFrame': (j) => MontageFramingFrameParams.fromJson(j).toJson(),
+  'snapCut': (j) => MontageSnapCutParams.fromJson(j).toJson(),
+  'framingBox': (j) => MontageFramingBoxParams.fromJson(j).toJson(),
   'seek': (j) => MontageSeekParams.fromJson(j).toJson(),
   'setPreviewFps': (j) => MontageFPSParams.fromJson(j).toJson(),
   'play': _empty,
@@ -152,6 +156,16 @@ void main() {
     expect(single.autoPartId, '00000000-0000-0000-0000-000000000001');
     final normal = MontageSnapshot.fromJson(await _load('montage.snapshot.result.json'));
     expect(normal.autoPartId, isNull);
+  });
+
+  test('snapCut y framingBox: valores de los fixtures', () async {
+    expect(MontageSnapCutResult.fromJson(await _load('montage.snapCut.result.json')).time, closeTo(3.3, 1e-9));
+    final p = MontageFramingBoxParams.fromJson(await _load('montage.framingBox.framing-follow.params.json'));
+    expect(p.followZoom, 2);
+    expect(p.followOffset?.x, closeTo(0.05, 1e-9));
+    final r = MontageFramingBoxResult.fromJson(await _load('montage.framingBox.framing-follow.result.json'));
+    expect(r.box?.width, closeTo(0.2, 1e-9));
+    expect(MontageFramingFrameResult.fromJson(await _load('montage.framingFrame.framing-follow.result.json')).box, isNotNull);
   });
 
   test('export running expone fase, progreso y stage', () async {

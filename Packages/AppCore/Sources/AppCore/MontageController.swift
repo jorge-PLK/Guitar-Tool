@@ -410,8 +410,11 @@ final class MontageController {
     private func notify() { onChange?() }
 
     /// Caja de la guitarra que se dibuja en la hoja «Encuadre»: con el ajuste manual, en el instante `t`.
-    func effectiveBox(takeID: UUID, at t: Double) -> NormalizedRect? {
-        let f = MontagePlanning.framing(state.framing(for: takeID), analysis: analyses[takeID])
+    func effectiveBox(takeID: UUID, at t: Double) -> NormalizedRect? { effectiveBox(takeID: takeID, at: t, framing: state.framing(for: takeID)) }
+
+    /// Igual que `effectiveBox(takeID:at:)` con un encuadre hipotético `framing` (consulta en vivo durante un arrastre; no guarda nada).
+    func effectiveBox(takeID: UUID, at t: Double, framing: TakeFraming) -> NormalizedRect? {
+        let f = MontagePlanning.framing(framing, analysis: analyses[takeID])
         return f.box(at: t).map { NormalizedRect(x: $0.x, y: $0.y, width: $0.width, height: $0.height) }
     }
 

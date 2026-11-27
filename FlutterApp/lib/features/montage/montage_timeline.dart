@@ -8,6 +8,7 @@ import 'package:toneforge/widgets/tf_card.dart';
 import 'package:toneforge/widgets/tf_popover.dart';
 
 import 'montage_cut_menu.dart';
+import 'montage_live_query.dart';
 import 'montage_store.dart';
 import 'montage_timeline_labels.dart';
 import 'montage_timeline_mapping.dart';
@@ -84,7 +85,14 @@ class MontageTimelineAreaState extends ConsumerState<MontageTimelineArea> {
   String? _markId; // marca pulsada (modo marca) o null (modo seek)
   bool _moved = false;
   bool _inPlane = false;
-  double? _dragTime;
+  double? _dragTime; // tiempo crudo bajo el puntero
+  double? _snapped; // último tiempo ajustado devuelto por `snapCut`
+  late final MontageLiveQuery<double, double> _snap = MontageLiveQuery<double, double>(
+    fetch: (t) => _store.snapCut(_markId!, t),
+    onResult: (t) {
+      if (mounted && _dragTime != null) setState(() => _snapped = t);
+    },
+  );
 
   MontageStore get _store => ref.read(montageStoreProvider.notifier);
 
@@ -104,6 +112,8 @@ class MontageTimelineAreaState extends ConsumerState<MontageTimelineArea> {
     _down = e.localPosition;
     _moved = false;
     _dragTime = null;
+    _snapped = null;
+    _snap.reset();
     final i = g.cutAt(e.localPosition);
     _markId = i == null ? null : widget.snapshot.cuts[i].id;
     _inPlane = i == null && (g.planeRect?.contains(e.localPosition) ?? false);
@@ -116,7 +126,9 @@ class MontageTimelineAreaState extends ConsumerState<MontageTimelineArea> {
     if (_markId == null) {
       _store.seek(g.xToTime(e.localPosition.dx));
     } else if (_moved) {
-      setState(() => _dragTime = g.xToTime(e.localPosition.dx));
+      final t = g.xToTime(e.localPosition.dx);
+      setState(() => _dragTime = t);
+      _snap.push(t);
     }
   }
 
@@ -127,8 +139,12 @@ class MontageTimelineAreaState extends ConsumerState<MontageTimelineArea> {
     final id = _markId;
     if (id != null) {
       if (_moved) {
+        _snap.reset();
         _store.moveCut(id, g.xToTime(e.localPosition.dx));
-        setState(() => _dragTime = null);
+        setState(() {
+          _dragTime = null;
+          _snapped = null;
+        });
       } else {
         openMenu(id);
       }
@@ -148,7 +164,7 @@ class MontageTimelineAreaState extends ConsumerState<MontageTimelineArea> {
     final base = montageTimelineData(s);
     final data = _dragTime == null || _markId == null
         ? base
-        : _withDrag(base, s.cuts.indexWhere((c) => c.id == _markId), _dragTime!);
+        : _withDrag(base, s.cuts.indexWhere((c) => c.id == _markId), _snapped ?? _dragTime!);
     return LayoutBuilder(builder: (context, box) {
       final g = MontageTimelineGeometry(data, box.maxWidth);
       final size = Size(box.maxWidth, g.totalHeight);

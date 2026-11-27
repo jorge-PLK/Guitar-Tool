@@ -883,6 +883,72 @@ final class MontageTests: XCTestCase {
         XCTAssertEqual(saved.montage?.export.resolution, .hd720)
     }
 
+    /// Consultas en vivo (MO10/MO11): `montage.snapCut` y `montage.framingBox` no cambian el estado.
+    func testLiveQueriesSnapCutAndFramingBoxAreReadOnly() async throws {
+        let rig = try makeRig()
+        let (b, _) = try makeBridge(rig)
+        let take = rig.takeIDs[0].uuidString
+        let closed = await call(b, "montage.snapCut", "{\"id\":\"\(UUID().uuidString)\",\"time\":1}")
+        XCTAssertEqual((closed["error"] as? [String: Any])?["code"] as? String, "not-open")
+        _ = await call(b, "montage.open", "{\"projectId\":\"\(rig.project.id.uuidString)\"}")
+        await waitUntil { b.montageService.current?.previewPhase == .ready && b.montageService.current?.isAnalyzing == false }
+        _ = await call(b, "montage.setLayout", "{\"layout\":\"single\"}")
+        let a1 = await call(b, "montage.addCut", "{\"time\":12,\"partId\":\"\(rig.partIDs[0].uuidString)\",\"exact\":true}")
+        let a2 = await call(b, "montage.addCut", "{\"time\":17,\"exact\":true}")
+        let first = try XCTUnwrap((a1["result"] as? [String: Any])?["cutId"] as? String)
+        let second = try XCTUnwrap((a2["result"] as? [String: Any])?["cutId"] as? String)
+        let c = try XCTUnwrap(b.montageService.current)
+        func cuts() async -> [[String: Any]] { ((await call(b, "montage.snapshot"))["result"] as? [String: Any])?["cuts"] as? [[String: Any]] ?? [] }
+        let before = await cuts()
+        XCTAssertEqual(before.count, 2)
+
+        // Ajuste: coincide con lo que SwiftUI usa en vivo, no pasa del vecino y no toca el estado.
+        let snapped = await call(b, "montage.snapCut", "{\"id\":\"\(second)\",\"time\":15.3}")
+        let t = try XCTUnwrap((snapped["result"] as? [String: Any])?["time"] as? Double, "\(snapped)")
+        XCTAssertEqual(t, c.draggedCutTime(UUID(uuidString: second)!, to: 15.3), accuracy: 1e-9)
+        let low = await call(b, "montage.snapCut", "{\"id\":\"\(second)\",\"time\":2}")
+        XCTAssertGreaterThan(try XCTUnwrap((low["result"] as? [String: Any])?["time"] as? Double), 12)
+        let high = await call(b, "montage.snapCut", "{\"id\":\"\(first)\",\"time\":500}")
+        XCTAssertLessThan(try XCTUnwrap((high["result"] as? [String: Any])?["time"] as? Double), 17)
+        let after = await cuts()
+        XCTAssertEqual(before.map { $0["time"] as? Double }, after.map { $0["time"] as? Double })
+        XCTAssertEqual(before.map { $0["id"] as? String }, after.map { $0["id"] as? String })
+        let badID = await call(b, "montage.snapCut", "{\"id\":\"x\",\"time\":1}")
+        XCTAssertEqual((badID["error"] as? [String: Any])?["code"] as? String, "bad-params")
+        // Caja: sin overrides == la de framingFrame; con overrides cambia sin guardar. (El análisis simulado no trae trayectoria: en modo
+        // follow la caja es nil con cualquier followZoom, así que la diferencia se comprueba con la caja manual.)
+        await waitUntil { b.montageService.current?.effectiveBox(takeID: rig.takeIDs[0], at: 5) != nil }
+        let snapBefore = await call(b, "montage.snapshot")
+        let frame = await call(b, "montage.framingFrame", "{\"takeId\":\"\(take)\",\"time\":5}")
+        let stored = try XCTUnwrap((frame["result"] as? [String: Any])?["box"] as? [String: Double], "\(frame)")
+        let same = await call(b, "montage.framingBox", "{\"takeId\":\"\(take)\",\"time\":5}")
+        XCTAssertEqual((same["result"] as? [String: Any])?["box"] as? [String: Double], stored)
+        let follow = await call(b, "montage.framingBox", "{\"takeId\":\"\(take)\",\"time\":5,\"mode\":\"follow\",\"followZoom\":2.5}")
+        XCTAssertNil(follow["error"], "\(follow)")
+        _ = await call(b, "montage.setFraming", "{\"takeId\":\"\(take)\",\"mode\":\"follow\"}")
+        let snapFollow = await call(b, "montage.snapshot")
+        let f0 = await call(b, "montage.framingBox", "{\"takeId\":\"\(take)\",\"time\":5}")
+        let f1 = await call(b, "montage.framingBox", "{\"takeId\":\"\(take)\",\"time\":5,\"followZoom\":2.5}")
+        let b0 = try XCTUnwrap((f0["result"] as? [String: Any])?["box"] as? [String: Double], "\(f0)")
+        let b1 = try XCTUnwrap((f1["result"] as? [String: Any])?["box"] as? [String: Double], "\(f1)")
+        XCTAssertNotEqual(b0, b1)
+        let snapFollowAfter = await call(b, "montage.snapshot")
+        XCTAssertEqual(NSDictionary(dictionary: snapFollow["result"] as? [String: Any] ?? [:]),
+                       NSDictionary(dictionary: snapFollowAfter["result"] as? [String: Any] ?? [:]))
+        let manual = await call(b, "montage.framingBox", "{\"takeId\":\"\(take)\",\"time\":5,\"mode\":\"fixed\",\"manualBox\":{\"x\":0.1,\"y\":0.1,\"width\":0.5,\"height\":0.5}}")
+        XCTAssertEqual(((manual["result"] as? [String: Any])?["box"] as? [String: Double])?["width"], 0.5)
+        XCTAssertNotEqual((manual["result"] as? [String: Any])?["box"] as? [String: Double], stored)
+        let snapAfter = await call(b, "montage.snapshot")
+        XCTAssertEqual(NSDictionary(dictionary: snapFollow["result"] as? [String: Any] ?? [:]),
+                       NSDictionary(dictionary: snapAfter["result"] as? [String: Any] ?? [:]))
+
+        let badMode = await call(b, "montage.framingBox", "{\"takeId\":\"\(take)\",\"time\":5,\"mode\":\"nope\"}")
+        XCTAssertEqual((badMode["error"] as? [String: Any])?["code"] as? String, "bad-params")
+        let badTake = await call(b, "montage.framingBox", "{\"takeId\":\"x\",\"time\":5}")
+        XCTAssertEqual((badTake["error"] as? [String: Any])?["code"] as? String, "bad-params")
+        await b.closeMontage()
+    }
+
     /// MO7: `autoPartId` solo con plano único; es una parte candidata a la rítmica; sin plano único la clave no sale.
     func testSnapshotAutoPartIdOnlyWithSingleLayout() async throws {
         let rig = try makeRig()
