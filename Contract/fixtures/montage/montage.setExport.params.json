@@ -1,0 +1,9 @@
+{
+  "container" : "mp4",
+  "fps" : 25,
+  "resolution" : {
+    "height" : 720,
+    "width" : 1280
+  },
+  "trackWAVs" : false
+}

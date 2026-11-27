@@ -1,0 +1,183 @@
+{
+  "anticipationLabel" : "0,5 s",
+  "artist" : "Banda",
+  "audioOnlyParts" : [
+
+  ],
+  "barDuration" : 2,
+  "canvasLabel" : "1920 × 1080",
+  "caption" : false,
+  "cutCandidates" : [
+    "00000000-0000-0000-0000-000000000001"
+  ],
+  "cutGaps" : false,
+  "cuts" : [
+
+  ],
+  "export" : {
+    "canExport" : true,
+    "codec" : "hevc",
+    "container" : "mp4",
+    "effectiveCodec" : "hevc",
+    "fps" : 25,
+    "limiter" : true,
+    "normalize" : true,
+    "options" : {
+      "codecs" : [
+        "hevc",
+        "h264"
+      ],
+      "containers" : [
+        "mov",
+        "mp4"
+      ],
+      "fps" : [
+        24,
+        25,
+        30,
+        50,
+        60
+      ],
+      "resolutions" : [
+        {
+          "height" : 720,
+          "width" : 1280
+        },
+        {
+          "height" : 1080,
+          "width" : 1920
+        },
+        {
+          "height" : 2160,
+          "width" : 3840
+        }
+      ]
+    },
+    "resolution" : {
+      "height" : 720,
+      "width" : 1280
+    },
+    "size" : {
+      "height" : 720,
+      "width" : 1280
+    },
+    "trackWAVs" : false
+  },
+  "exportStatus" : {
+    "phase" : "idle",
+    "progress" : 0
+  },
+  "framing" : [
+    {
+      "detected" : 38,
+      "followOffset" : {
+        "x" : 0,
+        "y" : 0
+      },
+      "followZoom" : 1,
+      "mode" : "follow",
+      "progress" : 1,
+      "samples" : 40,
+      "status" : "ready",
+      "takeId" : "00000000-0000-0000-0000-000000000002"
+    }
+  ],
+  "hasPlan" : true,
+  "hasVideo" : true,
+  "isAnalyzing" : false,
+  "isPortrait" : false,
+  "isSingleShot" : false,
+  "keepAspectApplies" : false,
+  "keepVideoAspect" : true,
+  "lanes" : [
+    {
+      "hasVideo" : true,
+      "id" : "00000000-0000-0000-0000-000000000001",
+      "isSolo" : false,
+      "partName" : "Guitarra",
+      "presence" : [
+        {
+          "end" : 5,
+          "start" : 2
+        }
+      ],
+      "rotation" : 90,
+      "take" : {
+        "end" : 5,
+        "start" : 2
+      },
+      "takeId" : "00000000-0000-0000-0000-000000000002"
+    }
+  ],
+  "layout" : "side",
+  "missingParts" : [
+
+  ],
+  "planeShots" : [
+    {
+      "black" : false,
+      "end" : 5,
+      "partId" : "00000000-0000-0000-0000-000000000001",
+      "start" : 2
+    }
+  ],
+  "preview" : {
+    "audio" : {
+      "file" : "preview-fixture.wav",
+      "phase" : "ready",
+      "progress" : 1
+    },
+    "delivered" : 4,
+    "duration" : 3,
+    "fps" : 15,
+    "frameP50Ms" : 1,
+    "frameP95Ms" : 1,
+    "height" : 360,
+    "lastFrameMillis" : 1,
+    "maxDimension" : 640,
+    "phase" : "ready",
+    "skipped" : 0,
+    "videos" : [
+
+    ],
+    "width" : 640
+  },
+  "projectId" : "00000000-0000-0000-0000-000000000003",
+  "sections" : [
+    {
+      "end" : 2,
+      "id" : "00000000-0000-0000-0000-000000000004",
+      "name" : "Estrofa",
+      "solo" : false,
+      "start" : 0.5
+    }
+  ],
+  "segments" : [
+    {
+      "end" : 5,
+      "fadeIn" : true,
+      "fadeOut" : true,
+      "start" : 2
+    }
+  ],
+  "showPartLabels" : false,
+  "singleRhythmCandidates" : [
+    "00000000-0000-0000-0000-000000000001"
+  ],
+  "singleRhythmPartId" : "00000000-0000-0000-0000-000000000001",
+  "songDuration" : 8,
+  "span" : {
+    "end" : 5,
+    "start" : 2
+  },
+  "title" : "Tema",
+  "transport" : {
+    "playing" : false,
+    "position" : 2,
+    "span" : {
+      "end" : 5,
+      "start" : 2
+    },
+    "videoPosition" : 0
+  }
+}

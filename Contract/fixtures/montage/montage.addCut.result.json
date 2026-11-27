@@ -1,0 +1,195 @@
+{
+  "cutId" : "00000000-0000-0000-0000-000000000001",
+  "snapshot" : {
+    "anticipationLabel" : "0,5 s",
+    "artist" : "Banda",
+    "audioOnlyParts" : [
+
+    ],
+    "autoPartId" : "00000000-0000-0000-0000-000000000002",
+    "barDuration" : 2,
+    "canvasLabel" : "1080 × 1920",
+    "caption" : false,
+    "cutCandidates" : [
+      "00000000-0000-0000-0000-000000000002"
+    ],
+    "cutGaps" : false,
+    "cuts" : [
+      {
+        "covered" : true,
+        "eligible" : [
+          "00000000-0000-0000-0000-000000000002"
+        ],
+        "id" : "00000000-0000-0000-0000-000000000001",
+        "partId" : "00000000-0000-0000-0000-000000000002",
+        "time" : 3
+      }
+    ],
+    "export" : {
+      "canExport" : true,
+      "codec" : "hevc",
+      "container" : "mov",
+      "effectiveCodec" : "hevc",
+      "fps" : 30,
+      "limiter" : true,
+      "normalize" : true,
+      "options" : {
+        "codecs" : [
+          "hevc",
+          "h264"
+        ],
+        "containers" : [
+          "mov",
+          "mp4"
+        ],
+        "fps" : [
+          24,
+          25,
+          30,
+          50,
+          60
+        ],
+        "resolutions" : [
+          {
+            "height" : 720,
+            "width" : 1280
+          },
+          {
+            "height" : 1080,
+            "width" : 1920
+          },
+          {
+            "height" : 2160,
+            "width" : 3840
+          }
+        ]
+      },
+      "resolution" : {
+        "height" : 1080,
+        "width" : 1920
+      },
+      "size" : {
+        "height" : 1920,
+        "width" : 1080
+      },
+      "trackWAVs" : true
+    },
+    "exportStatus" : {
+      "phase" : "idle",
+      "progress" : 0
+    },
+    "framing" : [
+      {
+        "detected" : 38,
+        "followOffset" : {
+          "x" : 0,
+          "y" : 0
+        },
+        "followZoom" : 1,
+        "mode" : "fixed",
+        "progress" : 1,
+        "samples" : 40,
+        "status" : "ready",
+        "takeId" : "00000000-0000-0000-0000-000000000003"
+      }
+    ],
+    "hasPlan" : true,
+    "hasVideo" : true,
+    "isAnalyzing" : false,
+    "isPortrait" : true,
+    "isSingleShot" : true,
+    "keepAspectApplies" : true,
+    "keepVideoAspect" : true,
+    "lanes" : [
+      {
+        "hasVideo" : true,
+        "id" : "00000000-0000-0000-0000-000000000002",
+        "isSolo" : false,
+        "partName" : "Guitarra",
+        "presence" : [
+          {
+            "end" : 5,
+            "start" : 2
+          }
+        ],
+        "rotation" : 90,
+        "take" : {
+          "end" : 5,
+          "start" : 2
+        },
+        "takeId" : "00000000-0000-0000-0000-000000000003"
+      }
+    ],
+    "layout" : "single",
+    "missingParts" : [
+
+    ],
+    "planeShots" : [
+      {
+        "black" : false,
+        "end" : 5,
+        "partId" : "00000000-0000-0000-0000-000000000002",
+        "start" : 2
+      }
+    ],
+    "preview" : {
+      "audio" : {
+        "file" : "preview-fixture.wav",
+        "phase" : "ready",
+        "progress" : 1
+      },
+      "delivered" : 4,
+      "duration" : 3,
+      "fps" : 15,
+      "frameP50Ms" : 1,
+      "frameP95Ms" : 1,
+      "height" : 640,
+      "lastFrameMillis" : 1,
+      "maxDimension" : 640,
+      "phase" : "ready",
+      "skipped" : 0,
+      "videos" : [
+
+      ],
+      "width" : 360
+    },
+    "projectId" : "00000000-0000-0000-0000-000000000004",
+    "sections" : [
+      {
+        "end" : 2,
+        "id" : "00000000-0000-0000-0000-000000000005",
+        "name" : "Estrofa",
+        "solo" : false,
+        "start" : 0.5
+      }
+    ],
+    "segments" : [
+      {
+        "end" : 5,
+        "fadeIn" : true,
+        "fadeOut" : true,
+        "start" : 2
+      }
+    ],
+    "showPartLabels" : false,
+    "singleRhythmCandidates" : [
+      "00000000-0000-0000-0000-000000000002"
+    ],
+    "singleRhythmPartId" : "00000000-0000-0000-0000-000000000002",
+    "songDuration" : 8,
+    "span" : {
+      "end" : 5,
+      "start" : 2
+    },
+    "title" : "Tema",
+    "transport" : {
+      "playing" : false,
+      "position" : 2,
+      "span" : {
+        "end" : 5,
+        "start" : 2
+      },
+      "videoPosition" : 0
+    }
+  }
+}

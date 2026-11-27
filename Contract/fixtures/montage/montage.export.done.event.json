@@ -1,0 +1,19 @@
+{
+  "phase" : "done",
+  "progress" : 1,
+  "result" : {
+    "clippedFiles" : [
+
+    ],
+    "codec" : "hevc",
+    "finalLUFS" : -14.00000021474019,
+    "finalTruePeakDB" : -9.3365138841415831,
+    "limitedByPeak" : false,
+    "limiterApplied" : false,
+    "limiterEnabled" : true,
+    "limiterMaxReductionDB" : 0,
+    "limiterOutOfTolerance" : false,
+    "normalized" : true,
+    "path" : "/private/<dir>/Projects/Banda - Tema/video/Banda - Tema-side.mp4"
+  }
+}

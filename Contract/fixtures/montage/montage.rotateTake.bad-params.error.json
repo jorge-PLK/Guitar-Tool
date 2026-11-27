@@ -1,0 +1,4 @@
+{
+  "code" : "bad-params",
+  "message" : "«takeId» no es un UUID."
+}
