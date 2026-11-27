@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:toneforge/features/montage/montage_preview.dart';
+import 'package:toneforge/l10n/app_localizations.dart';
 import 'package:toneforge/widgets/tf_slider.dart';
 
 Future<void> pump(
@@ -11,13 +12,17 @@ Future<void> pump(
   VoidCallback? onToggle,
   ValueChanged<Duration>? onSeek,
   ValueChanged<Duration>? onSeekEnd,
+  Duration rangeStart = Duration.zero,
 }) async {
   tester.view.physicalSize = const Size(420, 560);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   await tester.pumpWidget(Directionality(
     textDirection: TextDirection.ltr,
-    child: RepaintBoundary(
+    child: Localizations(
+      locale: const Locale('es'),
+      delegates: AppLocalizations.localizationsDelegates,
+      child: RepaintBoundary(
       child: MontagePreviewColumn(
         textureId: null,
         frameSize: null,
@@ -31,7 +36,9 @@ Future<void> pump(
         onTogglePlay: onToggle ?? () {},
         onSeek: onSeek ?? (_) {},
         onSeekEnd: onSeekEnd,
+        rangeStart: rangeStart,
       ),
+    ),
     ),
   ));
 }
@@ -75,6 +82,12 @@ void main() {
     final double port = tester.getSize(find.byType(AspectRatio)).aspectRatio;
     expect(port, closeTo(9 / 16, 0.01));
     expect(find.text('Vista previa · 9:16'), findsOneWidget);
+  });
+
+  testWidgets('rangeStart es el mínimo del slider', (tester) async {
+    await pump(tester, rangeStart: const Duration(seconds: 10));
+    expect(slider(tester).min, 10000);
+    expect(slider(tester).max, 200000);
   });
 
   testWidgets('arrastrar el slider llama a onSeek y al soltar a onSeekEnd', (tester) async {

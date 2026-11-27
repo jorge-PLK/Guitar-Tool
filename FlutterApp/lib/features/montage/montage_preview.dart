@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import 'package:toneforge/l10n/app_localizations.dart';
 import 'package:toneforge/theme/icons.dart';
 import 'package:toneforge/theme/tokens.dart';
 import 'package:toneforge/theme/typography.dart';
@@ -23,8 +24,11 @@ class MontagePreviewColumn extends StatelessWidget {
     required this.onTogglePlay,
     required this.onSeek,
     this.onSeekEnd,
-    this.title = 'Vista previa', // TODO(l10n): montagePreviewTitle
+    this.rangeStart = Duration.zero,
   });
+
+  /// Mínimo del deslizador (SwiftUI `span.start...span.end`).
+  final Duration rangeStart;
 
   final int? textureId;
   final Size? frameSize;
@@ -39,9 +43,6 @@ class MontagePreviewColumn extends StatelessWidget {
   final ValueChanged<Duration> onSeek;
   final ValueChanged<Duration>? onSeekEnd;
 
-  /// Título de la cabecera («Vista previa»); pendiente de clave ARB.
-  final String title;
-
   static String _mmss(Duration d) {
     final int t = d.inSeconds < 0 ? 0 : d.inSeconds;
     return '${(t ~/ 60).toString().padLeft(2, '0')}:${(t % 60).toString().padLeft(2, '0')}';
@@ -55,7 +56,9 @@ class MontagePreviewColumn extends StatelessWidget {
     final TextStyle sub = TfText.body(TfSize.font13).copyWith(color: TfColors.muted);
     final TextStyle clock = TfText.body(TfSize.font13, TfWeight.regular, true).copyWith(color: TfColors.muted);
     final double maxMs = duration.inMilliseconds.toDouble();
-    final double posMs = position.inMilliseconds.toDouble().clamp(0, maxMs).toDouble();
+    final double minMs = rangeStart.inMilliseconds.toDouble();
+    final double sliderMax = maxMs <= minMs ? minMs + 1 : maxMs;
+    final double posMs = position.inMilliseconds.toDouble().clamp(minMs, sliderMax).toDouble();
     final String right = sectionLabel == null
         ? _mmss(position)
         : '${_mmss(position)} · $sectionLabel';
@@ -68,7 +71,7 @@ class MontagePreviewColumn extends StatelessWidget {
           Row(
             spacing: TfSpace.s8,
             children: <Widget>[
-              Flexible(child: Text('$title · $canvasLabel', style: head, maxLines: 1, overflow: TextOverflow.ellipsis)),
+              Flexible(child: Text(AppLocalizations.of(context).montagePreviewTitle(canvasLabel), style: head, maxLines: 1, overflow: TextOverflow.ellipsis)),
               const Spacer(),
               Flexible(child: Text(right, style: sub, maxLines: 1, overflow: TextOverflow.ellipsis)),
             ],
@@ -102,8 +105,8 @@ class MontagePreviewColumn extends StatelessWidget {
               Expanded(
                 child: TfSlider(
                   value: posMs,
-                  min: 0,
-                  max: maxMs <= 0 ? 1 : maxMs,
+                  min: minMs,
+                  max: sliderMax,
                   onChanged: ready ? (double v) => onSeek(_ms(v)) : null,
                   onChangeEnd: ready && onSeekEnd != null ? (double v) => onSeekEnd!(_ms(v)) : null,
                 ),
