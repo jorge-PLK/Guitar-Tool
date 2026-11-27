@@ -195,6 +195,8 @@ int32_t tfmf_writer_create(const uint16_t *path, const TFMFWriterConfig *c, void
     IMFMediaType_SetGUID(vo, &MF_MT_MAJOR_TYPE, &MFMediaType_Video);
     IMFMediaType_SetGUID(vo, &MF_MT_SUBTYPE, c->codec == TFMF_CODEC_HEVC ? &MFVideoFormat_HEVC : &MFVideoFormat_H264);
     IMFMediaType_SetUINT32(vo, &MF_MT_AVG_BITRATE, (UINT32)c->videoBitrate);
+    // H.264 perfil High como AVFoundation en el Mac (antes el codificador elegía Constrained Baseline).
+    if (c->codec != TFMF_CODEC_HEVC) IMFMediaType_SetUINT32(vo, &MF_MT_MPEG2_PROFILE, 100 /* eAVEncH264VProfile_High */);
     IMFMediaType_SetUINT32(vo, &MF_MT_INTERLACE_MODE, MFVideoInterlace_Progressive);
     set_pair((IMFAttributes *)vo, &MF_MT_FRAME_SIZE, (UINT32)c->width, (UINT32)c->height);
     set_pair((IMFAttributes *)vo, &MF_MT_FRAME_RATE, (UINT32)c->fpsNum, (UINT32)c->fpsDen);
@@ -522,6 +524,20 @@ int32_t tfmf_reader_audio(void *reader, TFMFAudioChunk *chunk, int32_t *eos) {
         chunk->frames = (int32_t)(len / (4u * (DWORD)rd->channels));
         return S_OK;
     }
+}
+
+int32_t tfmf_reader_seek(void *reader, int64_t time100ns) {
+    TFMFReader *rd = (TFMFReader *)reader;
+    static const GUID timeFormat = {0, 0, 0, {0, 0, 0, 0, 0, 0, 0, 0}};   // GUID_NULL: unidades de 100 ns
+    PROPVARIANT pv;
+    ensure_com();
+    reader_unlock(rd);
+    PropVariantInit(&pv);
+    pv.vt = VT_I8;
+    pv.hVal.QuadPart = time100ns < 0 ? 0 : time100ns;
+    HRESULT hr = IMFSourceReader_SetCurrentPosition(rd->r, &timeFormat, &pv);
+    PropVariantClear(&pv);
+    return hr;
 }
 
 void tfmf_reader_release(void *reader) {

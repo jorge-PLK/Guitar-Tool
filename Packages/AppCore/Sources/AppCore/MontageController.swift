@@ -250,6 +250,7 @@ final class MontageController {
         analysisTask?.cancel()
         pausedSongTime = songTime
         audio.shutdown()
+        services.releaseTakeFrames()
         isPlaying = false
         // Salir con una exportación en curso la cancela (borra lo a medias).
         exportTask?.cancel()

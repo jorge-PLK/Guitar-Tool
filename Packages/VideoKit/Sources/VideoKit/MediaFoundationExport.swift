@@ -90,7 +90,7 @@ extension MontageExporter {
                 do {
                     return try MediaFoundationMuxer(url: url, config: .init(
                         width: settings.width, height: settings.height, fps: fps, codec: settings.codec,
-                        videoBitrate: MediaFoundationMuxer.defaultBitrate(width: settings.width, height: settings.height, fps: fps, codec: settings.codec),
+                        videoBitrate: MediaFoundationMuxer.exportBitrate(width: settings.width, height: settings.height, fps: fps, codec: settings.codec),
                         audio: channels > 0 ? .init(sampleRate: sr, channels: channels, bytesPerSecond: MontageExporter.aacBytesPerSecond(channels: channels)) : nil,
                         realTime: false))
                 } catch { throw MontageError.write("\(error)") }

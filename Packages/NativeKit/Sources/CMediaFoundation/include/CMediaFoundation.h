@@ -88,6 +88,9 @@ int32_t tfmf_reader_open(const uint16_t *path, int32_t wantVideo, int32_t wantAu
 int32_t tfmf_reader_video(void *reader, TFMFVideoFrame *frame, int32_t *eos);
 /// Siguiente trozo de audio (válido hasta la siguiente llamada). `eos` = 1 al final.
 int32_t tfmf_reader_audio(void *reader, TFMFAudioChunk *chunk, int32_t *eos);
+/// Salta a `time100ns` (marca del lector): el siguiente fotograma o trozo sale del punto de acceso anterior (en H.264, el
+/// fotograma clave previo), no necesariamente de ese instante exacto.
+int32_t tfmf_reader_seek(void *reader, int64_t time100ns);
 void tfmf_reader_release(void *reader);
 
 // --- Cámaras ---------------------------------------------------------------------------------------------------------

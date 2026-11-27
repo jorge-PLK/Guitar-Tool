@@ -283,6 +283,15 @@ final class MediaFoundationMuxer {
 
     /// Bitrate de vídeo por defecto (decisión propia): 0,10 bits por píxel y fotograma en H.264 y 0,07 en HEVC
     /// (1080p30: 6,2 y 4,4 Mb/s).
+    /// Bits por píxel y fotograma de la exportación de montaje en H.264: el Mac (AVFoundation) da ~14,1 Mb/s en 1080p30, y
+    /// aquí se escala con píxeles × fps. Decisión de Jorge (27/11/2026): igualar al Mac.
+    static let exportH264BitsPerPixel = 14_100_000.0 / (1920 * 1080 * 30)
+
+    static func exportBitrate(width: Int, height: Int, fps: Double, codec: MontageCodec) -> Int {
+        codec == .hevc ? defaultBitrate(width: width, height: height, fps: fps, codec: codec)
+                       : Int(Double(width * height) * max(1, fps) * exportH264BitsPerPixel)
+    }
+
     static func defaultBitrate(width: Int, height: Int, fps: Double, codec: MontageCodec) -> Int {
         Int(Double(width * height) * max(1, fps) * (codec == .hevc ? 0.07 : 0.10))
     }

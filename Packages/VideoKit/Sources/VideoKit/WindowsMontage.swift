@@ -83,21 +83,34 @@ final class TakeVideoFile: @unchecked Sendable {
     }
 }
 
-/// Lectura secuencial de un fichero: el fotograma visible en un PTS del tema (el último con marca ≤ t). Vuelve a abrir
-/// el fichero si se pide un instante anterior al actual (la exportación siempre avanza; la vista previa puede saltar).
+/// Lectura de un fichero: el fotograma visible en un PTS del tema (el último con marca ≤ t). Avanza decodificando en
+/// secuencia; si el instante pedido queda a más de `seekAhead` por delante o está por detrás del actual, salta con
+/// `IMFSourceReader::SetCurrentPosition` (cae en el fotograma clave anterior) y decodifica hacia delante hasta él. La
+/// exportación siempre avanza (nunca salta); la vista previa y la hoja «Encuadre» saltan. `seekAhead = .infinity` =
+/// sin saltos (solo secuencial y, al retroceder, volver a abrir desde el principio).
 final class TakeFrameReader: @unchecked Sendable {
+    /// Salto hacia delante a partir de ~1 GOP (las tomas se graban con un fotograma clave por segundo) y media más.
+    static let defaultSeekAhead = 1.5
+
     let file: TakeVideoFile
     let rotation: VideoRotation
+    private let seekAhead: Double
     private var reader: UnsafeMutableRawPointer?
     private var eos = false
     /// Fotograma actual (NV12 copiado) y su versión BGRA girada, hecha solo si se pide.
     private var current: (pts: Double, nv12: FramePixelBuffer)?
     private var currentBGRA: FramePixelBuffer?
     private var pending: (pts: Double, nv12: FramePixelBuffer)?
+    /// Saltos hechos con `tfmf_reader_seek` (tests y medidas).
+    private(set) var seekCount = 0
 
-    init(file: TakeVideoFile, rotation: VideoRotation) {
+    /// PTS del tema del fotograma elegido en la última llamada a `frame(at:)`.
+    var currentPTS: Double? { current?.pts }
+
+    init(file: TakeVideoFile, rotation: VideoRotation, seekAhead: Double = TakeFrameReader.defaultSeekAhead) {
         self.file = file
         self.rotation = rotation
+        self.seekAhead = seekAhead
     }
 
     deinit { if let reader { tfmf_reader_release(reader) } }
@@ -111,13 +124,37 @@ final class TakeFrameReader: @unchecked Sendable {
         pending = nil
     }
 
-    private func next() throws -> (pts: Double, nv12: FramePixelBuffer)? {
-        if reader == nil {
-            var info = TFMFReaderInfo()
-            var r: UnsafeMutableRawPointer?
-            try MF.check(MF.withWidePath(file.url) { tfmf_reader_open($0, 1, 0, &r, &info) }, "abrir vídeo \(file.url.lastPathComponent)")
-            reader = r
+    private func openIfNeeded() throws {
+        guard reader == nil else { return }
+        var info = TFMFReaderInfo()
+        var r: UnsafeMutableRawPointer?
+        try MF.check(MF.withWidePath(file.url) { tfmf_reader_open($0, 1, 0, &r, &info) }, "abrir vídeo \(file.url.lastPathComponent)")
+        reader = r
+    }
+
+    /// Salta a `t` (PTS del tema). Si el lector cae después de `t` (marca de acceso posterior) retrocede más hasta caer
+    /// antes, o hasta el principio, donde un primer fotograma posterior a `t` es que aún no hay imagen.
+    private func jump(to t: Double) throws {
+        var margin = 0.0
+        while true {
+            try openIfNeeded()
+            let target = max(0, t - file.shift - margin)
+            try MF.check(tfmf_reader_seek(reader, Int64(target * 1e7)), "buscar en \(file.url.lastPathComponent)")
+            seekCount += 1
+            eos = false
+            current = nil
+            currentBGRA = nil
+            pending = try next()
+            if let p = pending, p.pts > t + frameLookupEpsilon, target > 0 {
+                margin = margin == 0 ? 1 : margin * 2
+                continue
+            }
+            return
         }
+    }
+
+    private func next() throws -> (pts: Double, nv12: FramePixelBuffer)? {
+        try openIfNeeded()
         guard !eos else { return nil }
         var f = TFMFVideoFrame()
         var end: Int32 = 0
@@ -136,7 +173,12 @@ final class TakeFrameReader: @unchecked Sendable {
 
     /// Fotograma BGRA (girado) visible en el PTS del tema `t`; `nil` si el fichero no tiene ninguno hasta `t`.
     func frame(at t: Double) throws -> FramePixelBuffer? {
-        if let c = current, t < c.pts - frameLookupEpsilon { reset() }
+        if let c = current, t < c.pts - frameLookupEpsilon {
+            if seekAhead.isFinite { try jump(to: t) } else { reset() }
+        } else if seekAhead.isFinite {
+            let last = pending?.pts ?? current?.pts ?? file.available.lowerBound
+            if t - last > seekAhead { try jump(to: t) }
+        }
         while true {
             if pending == nil { pending = try next() }
             guard let p = pending, p.pts <= t + frameLookupEpsilon else { break }
