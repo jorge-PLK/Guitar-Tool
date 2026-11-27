@@ -33,7 +33,8 @@
 | `FlutterApp/test/support/harness.dart`, `shell_harness.dart` | Arneses de test para widgets y para la carcasa |
 | `FlutterApp/test/theme/no_literals_test.dart` | Prohíbe literales de texto de cara al usuario en `lib/`; exención con `// tf-literal-ok: <motivo>` |
 | `FlutterApp/test/flutter_test_config.dart` (Fase 7f, 1421aa5) | Salta la comparación de goldens fuera de macOS (el render de fuentes difiere en Windows); los goldens se generan y comparan solo en el Mac |
-| `FlutterApp/lib/core/songsterr_hidden_host.dart` (Fase 7f, 053579a) | `HiddenSongsterrHost`: host de Songsterr oculto del cliente Flutter; serializa las cargas, sondea el script de listo y traduce los errores HTTP con su código. En Windows sigue respondiendo `unsupported` hasta medir un host WebView2 montado (TB7b: el núcleo no cancela cargas). Test `HostBrokerLoadTests` |
+| `FlutterApp/lib/core/songsterr_hidden_host.dart` (Fase 7f, 053579a) | `HiddenSongsterrHost`: host de Songsterr oculto del cliente Flutter; serializa las cargas, sondea el script de listo y traduce los errores HTTP con su código. Elige host por plataforma (`platform` y `windowsFactory` inyectables); en Windows usa `OverlayWebPage` (e0997b2). Test `HostBrokerLoadTests` |
+| `FlutterApp/lib/core/songsterr_overlay_page.dart` (Fase 7f, e0997b2) | `OverlayWebPage` (implementa `HiddenWebPage`) y `findRootOverlay`: `TfWebView` invisible (1200x800, opacidad 0) en el `Overlay` raíz para cargar Songsterr en Windows (desvío W3) |
 | `FlutterApp/test/**/goldens/` | Goldens; se regeneran con `TF_UPDATE_GOLDENS=1` |
 
 Ejecución: `Tools/test.sh FlutterApp <ruta|nombre>` filtra los tests por ruta o por nombre.

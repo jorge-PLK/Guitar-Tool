@@ -26,9 +26,9 @@ Pendiente de Windows para la pasada del PC (se acumula aquí):
 - *Ola 1 (L2):* comprobar que borrar un tema abierto en Backing no falla por bloqueo NTFS.
 - *Ola 1:* `URL.path` devuelve `/` en `proposedProjectsFolder` (Known Folder Music\ToneForge); comprobar la ruta que ve Dart.
 - *Ola 1:* `displayPath` no abrevia HOME en Windows.
-- *Prueba a mano 26/11, W-1:* los helpers (yt-dlp, Deno, ffmpeg) salen «no disponible»: no están junto al exe (falta el empaquetado).
+- [x] *Prueba a mano 26/11, W-1:* los helpers (yt-dlp, Deno, ffmpeg) salían «no disponible». Hecho en 2b624b1 (se buscan junto al exe anfitrión; test `ExternalSourcesHelpersTests`); validado por Jorge en el PC el 27/11/2026.
 - *Prueba a mano 26/11, W-2:* la webcam se ve en Ajustes pero Grabar no la reconoce; tarda en conectar.
-- *Prueba a mano 26/11, W-3:* Songsterr `load` en Windows responde `unsupported`: falta montar un host WebView2.
+- [x] *Prueba a mano 26/11, W-3:* Songsterr `load` en Windows respondía `unsupported`. Hecho en e0997b2 (`TfWebView` invisible en el `Overlay` raíz; desvío W3); validado por Jorge en el PC el 27/11/2026.
 - *Prueba a mano 26/11, GR5:* sin vídeo de toma en Windows (ola 5).
 - *Prueba a mano 26/11:* fixtures T1/Platero ausentes en el PC: 8 saltos en `pc.sh models`.
 - *Prueba a mano 26/11:* tests de AppCore en Windows: falta repetir dos pasadas completas en el PC tras cc137db (tolerancias de reloj de `RecordTests` y `TakeViewTests`).
