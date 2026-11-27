@@ -167,6 +167,27 @@ void main() {
     await expectLater(find.byType(RepaintBoundary).first, matchesGoldenFile('goldens/montage_timeline_lanes.png'));
   });
 
+  testWidgets('banda del tramo con datos reales: tema de 250 s, compás de 2 s, tramo completo (golden)', (tester) async {
+    const spanEnd = 250.0;
+    final axis = MontageTimelineData.axisFor(spanStart: 0, spanEnd: spanEnd, songDuration: spanEnd, barDuration: 2);
+    final d = MontageTimelineData(
+      axisStart: axis.start,
+      axisEnd: axis.end,
+      spanStart: 0,
+      spanEnd: spanEnd,
+      barDuration: 2,
+      fadeIn: false,
+      fadeOut: true,
+      sections: const [MontageSectionData(name: 'Intro', start: 0, end: 40)],
+      lanes: const [MontageLaneData(take: TimeSpan(0, 250), presence: [TimeSpan(0, 250)])],
+      cursor: null,
+    );
+    // x(2) = 2 / 250 * 810 ≈ 6,5 px: fundido fino en el extremo, centro al 35 %.
+    expect(MontageTimelineGeometry(d, 810).timeToX(2), closeTo(6.48, 0.01));
+    await _pump(tester, d, width: 810);
+    await expectLater(find.byType(RepaintBoundary).first, matchesGoldenFile('goldens/montage_timeline_band_real.png'));
+  });
+
   testWidgets('carril Plano con dos cortes, uno cubierto y otro no (golden)', (tester) async {
     await _pump(
       tester,
