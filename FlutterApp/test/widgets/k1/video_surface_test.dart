@@ -84,12 +84,12 @@ void main() {
 
     testWidgets('.channel toma el id del FrameChannel; sin textura, placeholder', (WidgetTester t) async {
       final FrameChannel ok = FrameChannel(FrameChannelId.camera, createTexture: (_) => 5, disposeTexture: (_) {})
-        ..create();
+        ..acquire();
       await t.pumpWidget(host(TfVideoSurface.channel(ok, frameSize: frame)));
       expect(t.widget<Texture>(find.byType(Texture)).textureId, 5);
 
       final FrameChannel none = FrameChannel(FrameChannelId.camera, createTexture: (_) => -1, disposeTexture: (_) {})
-        ..create();
+        ..acquire();
       await t.pumpWidget(host(TfVideoSurface.channel(none, frameSize: frame, placeholder: const SizedBox(key: marker))));
       expect(find.byType(Texture), findsNothing);
       expect(find.byKey(marker), findsOneWidget);

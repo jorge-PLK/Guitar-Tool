@@ -27,12 +27,21 @@ class FrameChannel {
   final int Function(int) _create;
   final void Function(int) _dispose;
   int? _textureId;
+  int _refs = 0;
 
   /// Id de la textura, o nulo si no está creada o no hay texturas.
   int? get textureId => _textureId;
 
-  /// Registra la textura; devuelve su id o −1 (sin texturas). Idempotente mientras exista.
-  int create() {
+  /// Propietarios actuales de la textura.
+  int get holders => _refs;
+
+  /// Toma una referencia: la primera registra la textura; las siguientes comparten el mismo id.
+  /// Devuelve el id o −1 (sin texturas). Cada `acquire` se empareja con un único `release`.
+  ///
+  /// Con conteo, el orden «el State nuevo hace `acquire` antes de que el viejo haga `release`» (Flutter
+  /// sustituye un elemento así) no da de baja la textura que el nuevo va a pintar.
+  int acquire() {
+    _refs++;
     final current = _textureId;
     if (current != null) return current;
     final t = _create(id.value);
@@ -40,8 +49,11 @@ class FrameChannel {
     return t;
   }
 
-  void dispose() {
-    if (_textureId == null) return;
+  /// Suelta una referencia; la textura se da de baja solo al soltar la última. Un `release` de más se ignora.
+  void release() {
+    if (_refs == 0) return;
+    _refs--;
+    if (_refs > 0 || _textureId == null) return;
     _textureId = null;
     _dispose(id.value);
   }

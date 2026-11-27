@@ -180,7 +180,7 @@ class TakeViewerStore extends Notifier<TakeViewerState> {
         s.cancel();
       }
       _scrub.reset();
-      _channel?.dispose();
+      _channel?.release();
       _channel = null;
       if (_live) {
         unawaited(_core.call('takeview.close', const <String, Object?>{}, (_) {}).catchError((Object _) {}));
@@ -363,13 +363,19 @@ class TakeViewerStore extends Notifier<TakeViewerState> {
   void _attachChannel() {
     final ch = ref.read(frameChannelProvider(FrameChannelId.take));
     if (ch == null) return;
-    final id = ch.create();
-    _channel = ch;
+    if (_channel == null) {
+      _channel = ch;
+    } else {
+      // Ya adquirido: no se cuenta dos veces.
+      state = ch.textureId != null ? state.copyWith(textureId: ch.textureId) : state.copyWith(clearTexture: true);
+      return;
+    }
+    final id = ch.acquire();
     state = id >= 0 ? state.copyWith(textureId: id) : state.copyWith(clearTexture: true);
   }
 
   void _releaseChannel() {
-    _channel?.dispose();
+    _channel?.release();
     _channel = null;
   }
 }

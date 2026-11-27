@@ -16,8 +16,8 @@ import 'package:toneforge/widgets/tf_video_surface.dart';
 
 /// Vista previa de la cámara de Ajustes (VS:286-321): 16:9, fondo negro, radio 10, borde `fieldLine`.
 ///
-/// Pinta la textura del canal `camera` (la crea y la suelta este widget; es idempotente y el store de
-/// Grabar no la usa a la vez porque la previa se para al salir de la pestaña) con el tamaño y la
+/// Pinta la textura del canal `camera` (la toma y la suelta este widget con `acquire`/`release`; el conteo
+/// evita que la baja de una pantalla mate la textura de la siguiente) con el tamaño y la
 /// rotación del store. Sin canal (`--mock`) o simulada: barras de color.
 class CameraPreviewBox extends ConsumerStatefulWidget {
   const CameraPreviewBox({super.key});
@@ -28,10 +28,11 @@ class CameraPreviewBox extends ConsumerStatefulWidget {
 
 class _CameraPreviewBoxState extends ConsumerState<CameraPreviewBox> {
   FrameChannel? _channel;
+  bool _held = false;
 
   @override
   void dispose() {
-    _channel?.dispose();
+    if (_held) _channel?.release();
     super.dispose();
   }
 
@@ -41,9 +42,13 @@ class _CameraPreviewBoxState extends ConsumerState<CameraPreviewBox> {
     if (p == null) return const Center(child: TfSpinner.small());
     switch (p.state) {
       case PreviewState.live:
-        _channel ??= ref.read(frameChannelProvider(FrameChannelId.camera));
+        if (!_held) {
+          _channel = ref.read(frameChannelProvider(FrameChannelId.camera));
+          _channel?.acquire();
+          _held = true;
+        }
         return TfVideoSurface(
-          textureId: _channel?.create(),
+          textureId: _channel?.textureId,
           frameSize: s.frameSize,
           rotation: p.rotation,
           placeholder: const ColorBars(),

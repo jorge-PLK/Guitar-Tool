@@ -186,19 +186,16 @@ class _PreviewHost extends ConsumerStatefulWidget {
 
 class _PreviewHostState extends ConsumerState<_PreviewHost> {
   FrameChannel? _channel;
-  int? _textureId;
 
   @override
   void initState() {
     super.initState();
-    _channel = ref.read(frameChannelProvider(FrameChannelId.montage));
-    final int? t = _channel?.create();
-    _textureId = t != null && t >= 0 ? t : null;
+    _channel = ref.read(frameChannelProvider(FrameChannelId.montage))?..acquire();
   }
 
   @override
   void dispose() {
-    _channel?.dispose();
+    _channel?.release();
     super.dispose();
   }
 
@@ -222,7 +219,7 @@ class _PreviewHostState extends ConsumerState<_PreviewHost> {
             }
           }
           return MontagePreviewColumn(
-            textureId: _textureId,
+            textureId: _channel?.textureId,
             frameSize: p.width > 0 && p.height > 0 ? Size(p.width.toDouble(), p.height.toDouble()) : null,
             portrait: widget.state.isPortrait,
             canvasLabel: widget.state.canvasLabel,

@@ -29,7 +29,7 @@ void main() {
     addTearDown(c.dispose);
     final got = c.read(frameChannelProvider(FrameChannelId.camera));
     expect(got, same(fake));
-    expect(got!.create(), 9);
+    expect(got!.acquire(), 9);
     expect(created, [FrameChannelId.camera.value]);
     expect(c.read(frameChannelProvider(FrameChannelId.take)), isNull);
   });

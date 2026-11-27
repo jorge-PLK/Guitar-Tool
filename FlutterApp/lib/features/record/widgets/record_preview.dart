@@ -16,7 +16,7 @@ import 'package:toneforge/widgets/tf_video_surface.dart';
 
 /// Vista de cámara de Grabar (RV:360-458). Caja 16:9 que ocupa el espacio libre, radio 16, borde `line`.
 ///
-/// El canal de fotogramas `camera` lo crea (`FrameChannel.create`, idempotente) y lo suelta (`dispose`) este
+/// El canal de fotogramas `camera` lo toma (`FrameChannel.acquire`, una vez por State) y lo suelta (`release`) este
 /// widget con estado: la textura solo existe mientras la vista previa está en pantalla. Lee todo de
 /// `recordStoreProvider`; «Rotar» llama a `rotateCamera()`.
 class RecordPreview extends ConsumerStatefulWidget {
@@ -28,10 +28,11 @@ class RecordPreview extends ConsumerStatefulWidget {
 
 class _RecordPreviewState extends ConsumerState<RecordPreview> {
   FrameChannel? _channel;
+  bool _held = false;
 
   @override
   void dispose() {
-    _channel?.dispose();
+    if (_held) _channel?.release();
     super.dispose();
   }
 
@@ -41,9 +42,13 @@ class _RecordPreviewState extends ConsumerState<RecordPreview> {
     if (cam == null) return const Center(child: TfSpinner.small());
     switch (cam.state) {
       case CameraState.live:
-        _channel ??= ref.read(frameChannelProvider(FrameChannelId.camera));
+        if (!_held) {
+          _channel = ref.read(frameChannelProvider(FrameChannelId.camera));
+          _channel?.acquire();
+          _held = true;
+        }
         return TfVideoSurface(
-          textureId: _channel?.create(),
+          textureId: _channel?.textureId,
           frameSize: s.cameraFrameSize,
           rotation: s.cameraRotation,
           placeholder: PreviewPlaceholder(text: l.record_previewSimulated(cam.name ?? l.record_previewSimulatedName)),

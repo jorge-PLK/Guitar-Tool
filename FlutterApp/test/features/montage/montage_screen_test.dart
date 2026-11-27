@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:toneforge/contract/library.dart';
+import 'package:toneforge/contract/montage.dart';
 import 'package:toneforge/core/core_client.dart' show CoreError, Json;
 import 'package:toneforge/core/core_providers.dart';
 import 'package:toneforge/core/frame_channel.dart';
@@ -139,6 +140,17 @@ Future<void> _pump(WidgetTester t, MockCore core, {bool select = true, Size size
   await _settle(t);
 }
 
+class _FixedReady extends MontageStore {
+  _FixedReady(this.snapshot);
+  final MontageSnapshot snapshot;
+
+  @override
+  MontageState build() => MontageState(projectId: _pid, snapshot: snapshot);
+
+  @override
+  Future<void> close() async {}
+}
+
 class _Loading extends MontageStore {
   @override
   MontageState build() => const MontageState(projectId: _pid, loading: true);
@@ -161,6 +173,60 @@ Future<void> _golden(WidgetTester t, String name) =>
 List<String> _methods(MockCore c) => <String>[for (final MockCall m in c.calls) m.method];
 
 void main() {
+  testWidgets('sustituir la pantalla en el mismo frame no da de baja la textura que pinta la nueva', (t) async {
+    await t.runAsync(loadTfFonts);
+    setTestSurface(t, const Size(1440, 900));
+    final Set<int> live = <int>{};
+    final FrameChannel channel = FrameChannel(
+      FrameChannelId.montage,
+      createTexture: (_) {
+        live.add(11);
+        return 11;
+      },
+      disposeTexture: (_) => live.remove(11),
+    );
+    final Json open = _ready();
+    open['preview'] = <String, Object?>{...(open['preview']! as Map).cast<String, Object?>(), 'phase': 'ready'};
+    final ProviderContainer c = ProviderContainer(overrides: [
+      coreClientProvider.overrideWithValue(_core(open: open)),
+      libraryStoreProvider.overrideWith(_FakeLibrary.new),
+      // Estado fijo: el `close` de la pantalla vieja no debe vaciar el tema de la nueva.
+      montageStoreProvider.overrideWith(() => _FixedReady(MontageSnapshot.fromJson(open))),
+      frameChannelProvider(FrameChannelId.montage).overrideWithValue(channel),
+    ]);
+    addTearDown(c.dispose);
+    c.read(selectedProjectProvider.notifier).select(_pid);
+    Widget host(int n) => UncontrolledProviderScope(
+          container: c,
+          child: WidgetsApp(
+            color: TfColors.bg,
+            locale: const Locale('es'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            pageRouteBuilder: <T>(RouteSettings s, WidgetBuilder b) =>
+                PageRouteBuilder<T>(settings: s, pageBuilder: (c, a, b2) => b(c)),
+            home: DefaultTextStyle(
+              style: TfText.body().copyWith(color: TfColors.text),
+              child: KeyedSubtree(key: ValueKey<int>(n), child: const MontageScreen()),
+            ),
+          ),
+        );
+    await t.pumpWidget(host(1));
+    await _settle(t);
+    expect(live, <int>{11});
+    expect(t.widget<Texture>(find.byType(Texture)).textureId, 11);
+
+    await t.pumpWidget(host(2));
+    await _settle(t);
+    expect(live, <int>{11}, reason: 'la textura sigue registrada tras sustituir');
+    expect(t.widget<Texture>(find.byType(Texture)).textureId, 11);
+    expect(channel.holders, 1);
+
+    await t.pumpWidget(const SizedBox());
+    expect(live, isEmpty);
+    expect(channel.holders, 0);
+  });
+
   testWidgets('sin tema: selector con los temas con tomas', (t) async {
     final MockCore core = _core();
     await _pump(t, core, select: false);
