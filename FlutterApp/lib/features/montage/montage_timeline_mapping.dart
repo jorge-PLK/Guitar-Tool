@@ -2,13 +2,9 @@ import 'package:toneforge/contract/montage.dart';
 
 import 'widgets/montage_timeline_painter.dart';
 
-/// Cursor fuera del eje: el painter de la tarjeta dibuja siempre un cursor; el real va en una capa
-/// aparte (la única que escucha la posición a 30 Hz), así que el painter grande lo recibe oculto.
-const double montageHiddenCursor = -1e9;
-
 /// Snapshot de Montaje -> datos de la línea de tiempo (MV:521-537). Puro y sin estado.
-/// [cursor] es la posición en segundos del tema; sin ella el cursor queda oculto.
-MontageTimelineData montageTimelineData(MontageSnapshot s, {double cursor = montageHiddenCursor}) {
+/// [cursor] es la posición en segundos del tema; sin ella (null) no se dibuja cursor: lo pone una capa aparte (30 Hz).
+MontageTimelineData montageTimelineData(MontageSnapshot s, {double? cursor}) {
   final axis = MontageTimelineData.axisFor(
     spanStart: s.span.start,
     spanEnd: s.span.end,

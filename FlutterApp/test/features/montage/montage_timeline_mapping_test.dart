@@ -22,7 +22,7 @@ void main() {
     expect(d.showPlane, isFalse);
     expect(d.cuts, isEmpty);
     expect(d.missingCount, s.missingParts.length);
-    expect(d.cursor, montageHiddenCursor);
+    expect(d.cursor, isNull);
     expect(d.lanes.first.take, TimeSpan(s.lanes.first.take.start, s.lanes.first.take.end));
   });
 

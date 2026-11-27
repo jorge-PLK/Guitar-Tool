@@ -87,7 +87,7 @@ class MontageTimelineData {
     this.planeShots = const [],
     this.cuts = const [],
     this.gaps = const [],
-    this.cursor = 0,
+    this.cursor,
   });
 
   final double axisStart, axisEnd;
@@ -109,7 +109,8 @@ class MontageTimelineData {
 
   /// Huecos cortados («Cortar huecos sin tomas»): rayados.
   final List<TimeSpan> gaps;
-  final double cursor;
+  /// Posición del cursor en segundos; null = sin cursor (en pantalla lo dibuja una capa aparte a 30 Hz).
+  final double? cursor;
 
   /// Eje (MV:524-528): tramo con margen del 10 % (mín. un compás), dentro del tema.
   static TimeSpan axisFor({
@@ -233,10 +234,10 @@ class MontageTimelinePainter extends CustomPainter {
       canvas.drawRect(r, Paint()..color = TfColors.bg.withValues(alpha: _dimGap));
       _dashedRect(canvas, r, 0, TfColors.muted.withValues(alpha: _dashLine), 2, 3);
     }
-    canvas.drawRect(
-      Rect.fromLTWH(g.timeToX(data.cursor) - _cursorWidth / 2, 0, _cursorWidth, h),
-      Paint()..color = TfColors.text,
-    );
+    final cursor = data.cursor;
+    if (cursor != null) {
+      canvas.drawRect(Rect.fromLTWH(g.timeToX(cursor) - _cursorWidth / 2, 0, _cursorWidth, h), Paint()..color = TfColors.text);
+    }
     canvas.restore();
   }
 

@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:toneforge/features/montage/widgets/montage_timeline_painter.dart';
@@ -33,6 +35,7 @@ MontageTimelineData _data({
   List<MontageCutMark> cuts = const [],
   List<MontagePlaneShot> shots = const [],
   List<TimeSpan> gaps = const [],
+  double? cursor = 52,
 }) {
   final axis = MontageTimelineData.axisFor(spanStart: 10, spanEnd: 100, songDuration: 110, barDuration: 2);
   return MontageTimelineData(
@@ -50,7 +53,7 @@ MontageTimelineData _data({
     planeShots: shots,
     cuts: cuts,
     gaps: gaps,
-    cursor: 52,
+    cursor: cursor,
   );
 }
 
@@ -130,6 +133,33 @@ void main() {
       expect(g.cutAt(const Offset(10, 60)), isNull);
       expect(MontageTimelineGeometry(_data(), 540).cutAt(r.center), isNull);
     });
+  });
+
+  testWidgets('el cursor solo se pinta con cursor (sin cursor la columna queda como el fondo)', (tester) async {
+    Future<(Color, Color)> probe(double? cursor) async {
+      final d = _data(cursor: cursor);
+      final g = MontageTimelineGeometry(d, 600);
+      final rec = ui.PictureRecorder();
+      final size = Size(600, g.totalHeight);
+      MontageTimelinePainter(d).paint(Canvas(rec), size);
+      final img = await rec.endRecording().toImage(600, size.height.ceil());
+      final bytes = (await img.toByteData())!;
+      Color at(double x, double y) {
+        final o = ((y.floor() * 600) + x.floor()) * 4;
+        return Color.fromARGB(bytes.getUint8(o + 3), bytes.getUint8(o), bytes.getUint8(o + 1), bytes.getUint8(o + 2));
+      }
+
+      final x = g.timeToX(52);
+      return (at(x, 1), at(x + 10, 1));
+    }
+
+    final (con, conOtro) = (await tester.runAsync(() => probe(52)))!;
+    final (sin, _) = (await tester.runAsync(() => probe(null)))!;
+    expect(con.a, 1.0);
+    expect(con == conOtro, isFalse);
+    expect(sin == con, isFalse);
+    expect(sin == conOtro, isTrue);
+    expect(MontageTimelinePainter(_data()).shouldRepaint(MontageTimelinePainter(_data(cursor: null))), isTrue);
   });
 
   testWidgets('3 carriles (sin toma, solista, huecos rayados) y cursor (golden)', (tester) async {
