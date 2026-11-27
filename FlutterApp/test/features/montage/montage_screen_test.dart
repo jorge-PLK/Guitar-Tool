@@ -222,6 +222,32 @@ void main() {
     expect(find.text('Sin salida de audio'), findsOneWidget);
   });
 
+  testWidgets('cambiar el tema elegido reabre el montaje; null vuelve al selector', (t) async {
+    const String other = '00000000-0000-0000-0000-000000000009';
+    final MockCore core = _core();
+    await t.runAsync(loadTfFonts);
+    setTestSurface(t, const Size(1440, 900));
+    final ProviderContainer c = _container(core);
+    c.read(selectedProjectProvider.notifier).select(_pid);
+    await t.pumpWidget(_app(c));
+    await _settle(t);
+    List<Object?> opens() => <Object?>[
+          for (final MockCall m in core.calls)
+            if (m.method == 'montage.open') (m.params as Map)['projectId'],
+        ];
+    expect(opens(), <Object?>[_pid]);
+    c.read(selectedProjectProvider.notifier).select(_pid);
+    await _settle(t);
+    expect(opens(), <Object?>[_pid]);
+    c.read(selectedProjectProvider.notifier).select(other);
+    await _settle(t);
+    expect(opens(), <Object?>[_pid, other]);
+    c.read(selectedProjectProvider.notifier).select(null);
+    await _settle(t);
+    expect(find.text('Elige un tema'), findsOneWidget);
+    expect(_methods(core), contains('montage.close'));
+  });
+
   testWidgets('al salir se llama a montage.close', (t) async {
     final MockCore core = _core();
     await _pump(t, core);

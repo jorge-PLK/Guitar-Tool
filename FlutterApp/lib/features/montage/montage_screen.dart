@@ -53,6 +53,14 @@ class _MontageScreenState extends ConsumerState<MontageScreen> {
         unawaited(_store.open(id).catchError((Object _) {}));
       }
     });
+    ref.listenManual<String?>(selectedProjectProvider, (String? prev, String? next) {
+      if (next == prev) return;
+      if (next == null) {
+        unawaited(_store.close().catchError((Object _) {}));
+      } else if (ref.read(montageStoreProvider).projectId != next) {
+        unawaited(_store.open(next).catchError((Object _) {}));
+      }
+    });
   }
 
   @override

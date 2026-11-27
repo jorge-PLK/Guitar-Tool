@@ -1493,10 +1493,6 @@
   "@settings_tools_updateDone": {"description":"Ajustes Fuentes externas: resultado de actualizar (AppModel.swift:677).","placeholders":{"version":{"type":"String"}}},
   "settings_tools_upToDate": "Ya tienes la última versión ({version}).",
   "@settings_tools_upToDate": {"description":"Ajustes Fuentes externas: ya estaba al día (AppModel.swift:678).","placeholders":{"version":{"type":"String"}}},
-  "montageAnchor": "",
-  "@montageAnchor": {
-    "description": "Ancla del bloque montage: añade las claves del área debajo, en orden alfabético; no edites otros bloques."
-  },
   "montageAddCut": "Añadir corte",
   "montageAddCutHelp": "Crea un corte en la posición de la vista previa",
   "montageAudioOnlyParts": "Sin vídeo (solo audio, sin recuadro): {parts}.",

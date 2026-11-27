@@ -132,6 +132,7 @@ class _LabelsState extends State<MontageTimelineLabels> {
       ]),
     );
     return DragTarget<String>(
+      hitTestBehavior: HitTestBehavior.opaque,
       onWillAcceptWithDetails: (d) {
         setState(() => _over = lane.id);
         return d.data != lane.id;
@@ -144,6 +145,7 @@ class _LabelsState extends State<MontageTimelineLabels> {
       builder: (context, _, _) => Draggable<String>(
         key: ValueKey('montage-lane-${lane.id}'),
         data: lane.id,
+        hitTestBehavior: HitTestBehavior.opaque,
         maxSimultaneousDrags: 1,
         onDragStarted: () => setState(() => _dragging = lane.id),
         onDragEnd: (_) => setState(() => _dragging = null),
