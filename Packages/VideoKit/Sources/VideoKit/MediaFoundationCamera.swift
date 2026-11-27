@@ -22,6 +22,13 @@ public final class MediaFoundationCameraProvider: CameraProviding, @unchecked Se
     /// Windows no tiene cámara por defecto: la primera que enumera Media Foundation.
     public func defaultCamera() -> CameraDevice? { cameras().first }
 
+    public func camera(id: String) -> CameraDevice? {
+        guard let i = Self.identities().first(where: { $0.id == id }) else { return nil }
+        return FormatCache.shared.device(id: i.id, name: i.name)
+    }
+
+    public func hasCamera(id: String) -> Bool { Self.isPresent(id: id) }
+
     public func setChangeHandler(_ handler: (@Sendable () -> Void)?) {
         let old = lock.withLock { () -> UnsafeMutableRawPointer? in
             self.handler = handler
@@ -47,13 +54,44 @@ public final class MediaFoundationCameraProvider: CameraProviding, @unchecked Se
     /// diálogo que pedir desde una aplicación sin empaquetar).
     public static func ensureAccess() async -> Bool { tfmf_camera_access() != 0 }
 
-    static func list() -> [CameraDevice] {
+    /// Identificador y nombre de cada cámara, sin sus formatos: `MFEnumDeviceSources` solo (barato).
+    static func identities() -> [(id: String, name: String)] {
         let n = tfmf_camera_list(nil, 0)
         guard n > 0 else { return [] }
         var infos = [TFMFCameraInfo](repeating: TFMFCameraInfo(), count: Int(n))
         let got = infos.withUnsafeMutableBufferPointer { tfmf_camera_list($0.baseAddress, n) }
         guard got > 0 else { return [] }
-        return infos.prefix(Int(min(got, n))).map { describe(id: MF.string($0.id), name: MF.string($0.name)) }
+        return infos.prefix(Int(min(got, n))).map { (MF.string($0.id), MF.string($0.name)) }
+    }
+
+    /// Cámaras con formatos. Describir una abre el dispositivo y recorre sus tipos nativos (~480 ms con una C925e y 122
+    /// formatos, medido en el PC, W-2): se hace una vez por cámara y se reutiliza (`FormatCache`). Enumerar sin más cuesta
+    /// lo de `identities()`; Grabar lo pide en cada instantánea, en el sondeo y al abrir, todo en el actor principal.
+    static func list() -> [CameraDevice] {
+        let ids = identities()
+        let devices = ids.map { FormatCache.shared.device(id: $0.id, name: $0.name) }
+        FormatCache.shared.keep(Set(ids.map(\.id)))
+        return devices
+    }
+
+    /// ¿Está conectada? Sin describirla.
+    static func isPresent(id: String) -> Bool { identities().contains { $0.id == id } }
+
+    /// Descripciones ya hechas por identificador (compartidas por todos los proveedores y capturas del proceso). Una
+    /// descripción sin formatos (cámara ocupada o fallo transitorio) no se guarda: se reintenta en la siguiente.
+    final class FormatCache: @unchecked Sendable {
+        static let shared = FormatCache()
+        private let lock = NSLock()
+        private var devices: [String: CameraDevice] = [:]
+
+        func device(id: String, name: String) -> CameraDevice {
+            if let hit = lock.withLock({ devices[id] }), hit.name == name { return hit }
+            let d = MediaFoundationCameraProvider.describe(id: id, name: name)
+            if !d.formats.isEmpty { lock.withLock { devices[id] = d } }
+            return d
+        }
+
+        func keep(_ ids: Set<String>) { lock.withLock { devices = devices.filter { ids.contains($0.key) } } }
     }
 
     /// Formatos sin repetir (mismo tamaño y rangos de fps): el primero, prefiriendo los sin comprimir (NV12, YUY2) a
@@ -112,7 +150,9 @@ public final class MediaFoundationCameraCapture: CameraCapture, @unchecked Senda
     static let frequency = QPCTime.frequency(timebase: HostClock.timebase)
 
     public init(cameraID: String) throws {
-        guard let d = MediaFoundationCameraProvider.list().first(where: { $0.id == cameraID }) else { throw CameraError.notFound(cameraID) }
+        guard let i = MediaFoundationCameraProvider.identities().first(where: { $0.id == cameraID }) else { throw CameraError.notFound(cameraID) }
+        let d = MediaFoundationCameraProvider.FormatCache.shared.device(id: i.id, name: i.name)
+        guard !d.formats.isEmpty else { throw CameraError.noFormats(cameraID) }
         camera = d
     }
 

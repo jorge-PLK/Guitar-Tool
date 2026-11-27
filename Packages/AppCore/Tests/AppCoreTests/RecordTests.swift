@@ -618,6 +618,37 @@ final class RecordTests: XCTestCase {
         _ = await call(r.router, "record.close")
     }
 
+    #if os(Windows)
+    /// Diagnóstico W-2 (PC con webcam): Grabar con las cámaras del sistema, sin y con la cámara guardada en Ajustes.
+    func testSystemCameraOpensInRecordDiagnostic() async throws {
+        for chosen in [false, true] {
+            let r = try await makeRig(cameras: .system())
+            if chosen, let first = RecordCameraSource.system()?.provider.cameras().first {
+                let store = ProfileStore(url: r.support.appendingPathComponent("profile.json"))
+                var p = try store.load()
+                p.video?.cameraUID = first.id
+                try store.save(p)
+                await r.bridge.studyService.audioService?.controller().reloadProfile()
+            }
+            let t0 = Date()
+            _ = try await snap(r, "record.open")
+            var s = try await snap(r, "record.state")
+            var firstSnap = Date().timeIntervalSince(t0) * 1000
+            var worst = 0.0
+            while s.camera.state != "live", Date().timeIntervalSince(t0) < 20 {
+                try await Task.sleep(nanoseconds: 50_000_000)
+                let t = Date()
+                s = try await snap(r, "record.state")
+                worst = max(worst, Date().timeIntervalSince(t) * 1000)
+            }
+            print("W2 Grabar elegida=\(chosen): estado \(s.camera.state) tras \(Date().timeIntervalSince(t0) * 1000) ms (primer snapshot \(firstSnap) ms, peor snapshot \(worst) ms) nombre=\(s.camera.name ?? "-") mensaje=\(s.camera.message ?? "-") lista=\(s.camera.cameras.count) chosenId=\(s.camera.chosenId ?? "-")")
+            firstSnap = 0
+            XCTAssertEqual(s.camera.state, "live", "\(s.camera.message ?? "")")
+            _ = await call(r.router, "record.close")
+        }
+    }
+    #endif
+
     func testPollCameraMethodReevaluatesCamera() async throws {
         let provider = SimulatedCameraProvider(cameras: [])
         let r = try await makeRig(cameras: .simulated(provider: provider))

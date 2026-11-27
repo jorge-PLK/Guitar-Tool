@@ -1,5 +1,6 @@
 #if os(Windows)
 import Foundation
+import WinSDK
 import XCTest
 @testable import VideoKit
 
@@ -64,6 +65,120 @@ final class MediaFoundationWindowsTests: XCTestCase {
         XCTAssertThrowsError(try MediaFoundationCameraCapture(cameraID: "no-existe")) { e in
             XCTAssertEqual(e as? CameraError, .notFound("no-existe"))
         }
+    }
+
+    /// Diagnóstico W-2 (con cámara conectada): tiempos de enumerar, resolver por id, permiso y abrir; ids estables.
+    func testCameraOpenTimingAndIdsDiagnostic() async throws {
+        func ms(_ b: () -> Void) -> Double { let t = Date(); b(); return Date().timeIntervalSince(t) * 1000 }
+        let provider = MediaFoundationCameraProvider()
+        var cams: [CameraDevice] = []
+        let tList = ms { cams = provider.cameras() }
+        let tList2 = ms { cams = provider.cameras() }
+        print("W2 lista: \(cams.count) cámaras, \(tList) ms (2ª \(tList2) ms)")
+        guard let cam = cams.first else { return }
+        print("W2 id=\(cam.id) nombre=\(cam.name) formatos=\(cam.formats.count)")
+        var found: CameraDevice?
+        let tById = ms { found = provider.camera(id: cam.id) }
+        _ = tById
+        print("W2 camera(id:) \(found != nil) en \(tById) ms")
+        XCTAssertNotNil(found)
+        // Regresión W-2: tras la primera descripción (abre el dispositivo, ~0,5 s) enumerar, resolver por id y comprobar
+        // presencia no vuelven a abrirlo; Grabar lo hace en cada instantánea y sondeo, en el actor principal.
+        XCTAssertLessThan(tList2, 150, "cameras() repetido reabre la cámara")
+        XCTAssertLessThan(tById, 150, "camera(id:) reabre la cámara")
+        var present = false
+        let tHas = ms { present = provider.hasCamera(id: cam.id) }
+        print("W2 hasCamera \(present) en \(tHas) ms")
+        XCTAssertTrue(present)
+        XCTAssertLessThan(tHas, 150)
+        XCTAssertFalse(provider.hasCamera(id: "no-existe"))
+        XCTAssertNil(provider.camera(id: "no-existe"))
+        let t0 = Date()
+        let access = await MediaFoundationCameraProvider.ensureAccess()
+        print("W2 ensureAccess \(access) en \(Date().timeIntervalSince(t0) * 1000) ms")
+        let t1 = Date()
+        let cap = try MediaFoundationCameraCapture(cameraID: cam.id)
+        let t2 = Date()
+        let n = NSLock(); nonisolated(unsafe) var frames = 0
+        let f = try cap.start(CameraRequest(width: 1280, height: 720, fps: 30)) { _ in n.withLock { frames += 1 } }
+        let t3 = Date()
+        try await Task.sleep(nanoseconds: 500_000_000)
+        let before = n.withLock { frames }
+        var during: [CameraDevice] = []
+        let tDuring = ms { during = provider.cameras() }
+        print("W2 con captura abierta: \(during.count) cámaras, formatos \(during.first?.formats.count ?? -1), \(tDuring) ms; fotogramas durante la enumeración: \(n.withLock { frames } - before)")
+        var second: MediaFoundationCameraCapture?
+        do { second = try MediaFoundationCameraCapture(cameraID: cam.id); print("W2 segunda captura init ok") } catch { print("W2 segunda captura init: \(error)") }
+        _ = second
+        try await Task.sleep(nanoseconds: 500_000_000)
+        cap.stop()
+        print("W2 init capture \(t2.timeIntervalSince(t1) * 1000) ms, start \(t3.timeIntervalSince(t2) * 1000) ms, \(f.width)x\(f.height)@\(f.fps), fotogramas en 1 s: \(n.withLock { frames })")
+    }
+
+    /// Diagnóstico W-2: abrir la captura mientras otro hilo enumera sin parar (Ajustes, snapshots y sondeo de Grabar).
+    func testCaptureStartWhileEnumeratingDiagnostic() throws {
+        final class Flag: @unchecked Sendable { private let l = NSLock(); private var v = true; var on: Bool { get { l.withLock { v } } set { l.withLock { v = newValue } } } }
+        let provider = MediaFoundationCameraProvider()
+        guard let cam = provider.cameras().first else { return }
+        let flag = Flag()
+        let enumerator = Thread { while flag.on { _ = provider.cameras().first?.formats.count } }
+        enumerator.start()
+        var report: [String] = []
+        for i in 0..<6 {
+            let t0 = Date()
+            do {
+                let found = provider.camera(id: cam.id)
+                let cap = try MediaFoundationCameraCapture(cameraID: cam.id)
+                let f = try cap.start(CameraRequest(width: 1280, height: 720, fps: 30)) { _ in }
+                report.append("#\(i) ok \(f.width)x\(f.height) formatos(camera(id:))=\(found?.formats.count ?? -1) \(Int(Date().timeIntervalSince(t0) * 1000)) ms")
+                Thread.sleep(forTimeInterval: 0.3); cap.stop()
+            } catch { report.append("#\(i) FALLO \(error) \(Int(Date().timeIntervalSince(t0) * 1000)) ms") }
+        }
+        flag.on = false
+        print("W2 concurrente: " + report.joined(separator: " | "))
+    }
+
+    /// Diagnóstico W-2: dos capturas a la vez de la misma cámara (vista previa de Ajustes + Grabar).
+    func testTwoCapturesSameCameraDiagnostic() throws {
+        let provider = MediaFoundationCameraProvider()
+        guard let cam = provider.cameras().first else { return }
+        let a = try MediaFoundationCameraCapture(cameraID: cam.id)
+        _ = try a.start(CameraRequest(width: 1280, height: 720, fps: 30)) { _ in }
+        defer { a.stop() }
+        let t0 = Date()
+        do {
+            let b = try MediaFoundationCameraCapture(cameraID: cam.id)
+            defer { b.stop() }
+            let f = try b.start(CameraRequest(width: 1280, height: 720, fps: 30)) { _ in }
+            print("W2 segunda captura simultánea: ok \(f.width)x\(f.height) \(Int(Date().timeIntervalSince(t0) * 1000)) ms")
+        } catch { print("W2 segunda captura simultánea: FALLO \(error) \(Int(Date().timeIntervalSince(t0) * 1000)) ms") }
+    }
+
+    /// Diagnóstico W-2: enumerar y abrir desde un hilo con COM de apartamento (STA, como el hilo de interfaz de Flutter).
+    func testCameraFromSTAThreadDiagnostic() throws {
+        final class Box: @unchecked Sendable { var s = "" }
+        let box = Box()
+        let done = DispatchSemaphore(value: 0)
+        let t = Thread {
+            let hr = CoInitializeEx(nil, DWORD(COINIT_APARTMENTTHREADED.rawValue))
+            let t0 = Date()
+            let cams = MediaFoundationCameraProvider().cameras()
+            let ms = Date().timeIntervalSince(t0) * 1000
+            var open = "sin cámara"
+            if let c = cams.first {
+                do {
+                    let cap = try MediaFoundationCameraCapture(cameraID: c.id)
+                    let f = try cap.start(CameraRequest(width: 1280, height: 720, fps: 30)) { _ in }
+                    Thread.sleep(forTimeInterval: 0.5); cap.stop()
+                    open = "abrió \(f.width)x\(f.height)"
+                } catch { open = "falló al abrir: \(error)" }
+            }
+            box.s = "W2 STA CoInitializeEx=0x\(String(UInt32(bitPattern: hr), radix: 16)) cámaras=\(cams.count) formatos=\(cams.first?.formats.count ?? -1) \(ms) ms; \(open)"
+            done.signal()
+        }
+        t.start()
+        done.wait()
+        print(box.s)
     }
 
     /// Contrato de las marcas: `MFGetSystemTime` (QPC en 100 ns, la escala de `MFSampleExtension_DeviceTimestamp`)
