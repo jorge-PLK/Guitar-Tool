@@ -1,4 +1,7 @@
 import Foundation
+#if os(Windows)
+import WinSDK
+#endif
 import SourceKit
 import Store
 
@@ -45,12 +48,36 @@ final class ExternalSources {
         if let p = environment[environmentKey], !p.isEmpty {
             bundle = URL(fileURLWithPath: p, isDirectory: true)
         } else {
-            bundle = Bundle.main.executableURL?.deletingLastPathComponent()
-                ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
+            bundle = resolveBundleDirectory(candidates: hostDirectoryCandidates())
         }
         let support = supportDir?.appendingPathComponent("Helpers", isDirectory: true)
             ?? SourceKit.HelperLocator.defaultSupportDirectory
         return ExternalSources(bundleDirectory: bundle, supportDirectory: support)
+    }
+
+    /// Carpetas donde buscar los helpers, por orden: la del ejecutable según Foundation, en Windows la del `.exe` anfitrión
+    /// (`GetModuleFileNameW(NULL)`: el core vive en `AppCoreFFI.dll` dentro del proceso de Flutter y `Bundle.main` no es fiable
+    /// ahí) y el directorio de trabajo.
+    nonisolated static func hostDirectoryCandidates() -> [URL] {
+        var out: [URL] = []
+        if let u = Bundle.main.executableURL { out.append(u.deletingLastPathComponent()) }
+        #if os(Windows)
+        var buffer = [UInt16](repeating: 0, count: 32_768)
+        let n = Int(GetModuleFileNameW(nil, &buffer, DWORD(buffer.count)))
+        if n > 0 {
+            let path = String(decoding: buffer[0..<n], as: UTF16.self)
+            out.append(URL(fileURLWithPath: path).deletingLastPathComponent())
+        }
+        #endif
+        out.append(URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true))
+        return out
+    }
+
+    /// La primera carpeta candidata que contiene el yt-dlp embebido; si ninguna, la primera.
+    nonisolated static func resolveBundleDirectory(candidates: [URL]) -> URL {
+        let name = SourceKit.HelperLocator.fileName("yt-dlp")
+        return candidates.first { isRunnable($0.appendingPathComponent(name).path) }
+            ?? candidates.first ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
     }
 
     /// Como `SourceKit.HelperLocator.isRunnable` (interna): Mac, ejecutable; Windows, basta que exista el `.exe`.
@@ -110,8 +137,11 @@ final class ExternalSources {
         let loc = await locator()
         var info = ExternalToolsInfo()
         if let c = try? loc.ytDlp() { info.ytDlpVersion = c.version; info.ytDlpOrigin = c.origin }
-        info.denoVersion = await firstLine(of: try? loc.deno(), args: ["--version"]).flatMap { word($0, 1) }
-        info.ffmpegVersion = await firstLine(of: try? loc.ffmpeg(), args: ["-version"]).flatMap { word($0, 2) }
+        // En paralelo: en Windows el primer arranque de cada helper tarda segundos (antivirus) y `tools.info` tiene tope en Dart.
+        async let deno = firstLine(of: try? loc.deno(), args: ["--version"])
+        async let ffmpeg = firstLine(of: try? loc.ffmpeg(), args: ["-version"])
+        info.denoVersion = await deno.flatMap { word($0, 1) }
+        info.ffmpegVersion = await ffmpeg.flatMap { word($0, 2) }
         return info
     }
 
