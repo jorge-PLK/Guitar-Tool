@@ -481,6 +481,44 @@ final class VideoConversionTests: XCTestCase {    // MARK: MP4 sintéticos
         XCTAssertEqual(last["epoch"] as? Int, epoch)
         await v.bridge.closeTakeView()
     }
+
+    // MARK: política de Windows con el sondeo real
+
+    /// Política de Windows (`#if os(Windows)` de `platformPolicy`) emulada en el Mac.
+    func windowsEngine() -> VideoConversionEngine {
+        var h = Self.hooks(ScriptedProcessRunner())
+        h.needsConversion = { $0.codec != .h264 }
+        h.assumeNeedsWhenUnprobed = true
+        let jobs = JobEngine(root: nil, profileStore: ProfileStore(url: FileManager.default.temporaryDirectory.appendingPathComponent("p-\(UUID().uuidString).json")),
+                             indexURL: nil, services: { fatalError("no se usa") })
+        return VideoConversionEngine(jobs: jobs, hooks: h)
+    }
+
+    /// Las tomas reales HEVC de «El roce» (se salta si no está la copia de prueba): con la política de Windows piden conversión.
+    func testWindowsPolicyConvertsRealHEVCTakes() throws {
+        let root = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Music/ToneForge-prueba-7f/El roce de tu cuerpo - Platero Y Tu/takes")
+        let dirs = (try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)) ?? []
+        let files = dirs.map { $0.appendingPathComponent("video.mov") }.filter { FileManager.default.fileExists(atPath: $0.path) }
+        try XCTSkipIf(files.isEmpty, "sin copia de prueba de «El roce»")
+        let engine = windowsEngine()
+        for f in files { XCTAssertTrue(engine.needsConversion(f), f.path) }
+    }
+
+    /// Un sondeo fallido (no es MP4) o un fichero sin leer no se da por bueno en silencio en Windows.
+    func testWindowsUnprobedVideoIsNotAssumedFine() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("videoconv-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: dir) }
+        let junk = dir.appendingPathComponent("video.mov")
+        try Data(repeating: 7, count: 200).write(to: junk)
+        XCTAssertTrue(windowsEngine().needsConversion(junk))
+        XCTAssertTrue(windowsEngine().needsConversion(dir.appendingPathComponent("missing.mov")))
+        // Mac: igual que antes, no se convierte.
+        var mac = Self.hooks(ScriptedProcessRunner())
+        mac.assumeNeedsWhenUnprobed = false
+        let jobs = JobEngine(root: nil, profileStore: ProfileStore(url: dir.appendingPathComponent("p.json")), indexURL: nil, services: { fatalError("no se usa") })
+        XCTAssertFalse(VideoConversionEngine(jobs: jobs, hooks: mac).needsConversion(junk))
+    }
 }
 
 // MARK: - Puerta del montaje
@@ -521,6 +559,30 @@ extension MontageTests {
         XCTAssertTrue(ready)
         XCTAssertTrue(c.videoStates.isEmpty)
         XCTAssertTrue(c.canExport)
+        c.close()
+    }
+
+    /// Causa medida en el PC con «El roce»: una parte con vídeo y presencia vacía (solo sin sección «Solo») sigue en el
+    /// plan y el compositor abre su fichero; la puerta tiene que preguntar también por ella (antes la saltaba y el HEVC
+    /// llegaba sin convertir a Media Foundation, HRESULT 0xC00D5212).
+    func testMontageGateCoversPartsWithEmptyPresence() async throws {
+        let rig = try makeRig()
+        var project = rig.project
+        project.sections = [Section(name: "Estrofa", start: 4, end: 16)]
+        try ProjectFile.save(project, to: rig.folder)
+        let c = try makeController(rig, services: .simulated())
+        let solo = rig.takeIDs[2]
+        var asked = Set<UUID>()
+        c.videoGate = { id, _ in
+            asked.insert(id)
+            return id == solo ? .converting(nil) : .ready
+        }
+        c.open()
+        await waitUntil { c.previewPhase == .converting }
+        XCTAssertTrue(c.lanes.first { $0.takeID == solo }?.presence.isEmpty ?? false, "el solo no tiene presencia")
+        XCTAssertTrue(asked.contains(solo), "la puerta pregunta por el solo aunque no tenga presencia")
+        XCTAssertEqual(c.previewPhase, .converting)
+        XCTAssertFalse(c.canExport)
         c.close()
     }
 

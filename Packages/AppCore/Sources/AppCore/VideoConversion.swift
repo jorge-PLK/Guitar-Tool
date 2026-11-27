@@ -128,9 +128,21 @@ final class VideoConversionEngine: @unchecked Sendable {
         /// simulan en cualquier sistema.
         var replace: @Sendable (_ original: URL, _ converted: URL) throws -> Void = { try FileOps.atomicReplace($0, with: $1) }
 
+        /// ¿Y si el sondeo falla o no hay pista de vídeo? Windows: sí se intenta convertir (ffmpeg lee más que el parser de
+        /// `moov`, y un fallo allí es visible); Mac: no (lee de serie, quien lo lea dará su error).
+        var assumeNeedsWhenUnprobed: Bool = platformAssumeNeedsWhenUnprobed
+
+        static var platformAssumeNeedsWhenUnprobed: Bool {
+            #if os(Windows)
+            true
+            #else
+            false
+            #endif
+        }
+
         static var platformPolicy: @Sendable (TakeVideoProbe) -> Bool {
             #if os(Windows)
-            { $0.codec == .hevc }
+            { $0.codec != .h264 }
             #else
             { _ in false }
             #endif
@@ -217,12 +229,23 @@ final class VideoConversionEngine: @unchecked Sendable {
 
     func needsConversion(_ url: URL) -> Bool {
         let a = try? FileManager.default.attributesOfItem(atPath: url.path)
-        guard let size = (a?[.size] as? NSNumber)?.int64Value else { return false }
+        // Sin tamaño legible no se descarta el vídeo: se sondea igual (y sin caché).
+        let size = (a?[.size] as? NSNumber)?.int64Value
         let date = (a?[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
-        if let v = lock.withLock({ verdicts[url.path] }), v.size == size, v.date == date { return v.needs }
-        // Ilegible (no es MP4, sin vídeo): no se convierte; quien lo lea dará su propio error.
-        let needs = ((try? TakeVideoProbe.read(url)) ?? nil).map(hooks.needsConversion) ?? false
-        lock.withLock { verdicts[url.path] = (size, date, needs) }
+        if let size, let v = lock.withLock({ verdicts[url.path] }), v.size == size, v.date == date { return v.needs }
+        let probe: TakeVideoProbe?
+        do { probe = try TakeVideoProbe.read(url) } catch {
+            // Sondeo fallido: no se da por bueno en silencio (en Windows, ffmpeg sí sabe leerlo; si tampoco, el trabajo
+            // falla con un mensaje visible). Sin caché: se reintenta en la siguiente consulta.
+            FileHandle.standardError.write(Data("VideoConversion: no se pudo sondear \(url.path): \(error)\n".utf8))
+            return hooks.assumeNeedsWhenUnprobed
+        }
+        guard let probe else {
+            FileHandle.standardError.write(Data("VideoConversion: \(url.path) sin pista de vídeo\n".utf8))
+            return hooks.assumeNeedsWhenUnprobed
+        }
+        let needs = hooks.needsConversion(probe)
+        if let size { lock.withLock { verdicts[url.path] = (size, date, needs) } }
         return needs
     }
 
