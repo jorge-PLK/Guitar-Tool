@@ -83,12 +83,12 @@ Vienen del apartado 9 de las fichas de `pantallas/`. La clase sigue [decisiones-
 | GR10 | Grabar | `record.pollCamera` aditivo en `AppCore` (`RecordMethods.swift:363`); SwiftUI sondea la cámara cada 2 s en reposo (`RecordController.swift:483`). La interfaz sondea siempre en reposo (`opened && phase == idle`), 1:1 con SwiftUI; el núcleo decide por estado. Decisión de Jorge, 25/11/2026 | núcleo (resuelto) | 3 | `RecordController.swift:483` |
 | GR8 | Visor | Audio del visor en el Mac: SwiftUI usa la salida del sistema, `AppCore` la del perfil. Resuelto por robustez: la del perfil en las dos plataformas (un solo camino de audio); Jorge lo comprueba de oído | interfaz en Dart (resuelto) | 3 | g:G8 |
 | MO1 | Montaje | Cancelar la exportación: `cancelled` se trata como reposo | interfaz en Dart | 4 | m:D1 |
-| MO2 | Montaje | `reveal` debe seleccionar el fichero exportado, no abrir la carpeta (depende de T3 en Windows) | hueco claro | 4 | m:D2 |
+| MO2 | Montaje | `reveal` debe seleccionar el fichero exportado, no abrir la carpeta (depende de T3 en Windows) | resuelto en código (833541c): selecciona el fichero si la exportación está en `done` y existe; en Windows se usó `explorer.exe /select,` en vez de `SHOpenFolderAndSelectItems` (sin COM ni shell32, igual que `openFolder` con `Process`; robusto y con menos overhead, aceptado por el orquestador); falta comprobarlo en Windows | 4 | m:D2 |
 | MO3 | Montaje | Fila «Formato» solo si `export.options.codecs.count > 1` | interfaz en Dart | 4 | m:D3 |
 | MO4 | Montaje | Vista previa por píxeles: fps por defecto y sincronía (el canal `montage` ya va a 60 fps) | se mide (P9, prueba 3) | 4 | m:D4 |
 | MO5 | Montaje | `audioError` sin mostrar en SwiftUI y sí en la web. Resuelto por fiabilidad: se muestra como aviso bajo la cabecera | interfaz en Dart (resuelto) | 4 | m:D5 |
 | MO6 | Montaje | Fotograma de encuadre: `Image.file` con ruta relativa al tema | interfaz en Dart | 4 | m:D6 |
-| MO7 | Montaje | «Automática ({parte})»: el snapshot debe traer el id de la parte automática | hueco claro | 4 | m:D7 |
+| MO7 | Montaje | «Automática ({parte})»: el snapshot debe traer el id de la parte automática | resuelto en código (833541c): `MontageSnapshot.autoPartId` | 4 | m:D7 |
 | MO8 | Montaje | «Finder» / «Explorador»: texto por plataforma en ARB | interfaz en Dart | 4 | m:D8 |
 | AJ1 | Ajustes · Vídeo | Cámaras reales del Mac por `AppCore` (`video.cameras` vacío): es A1 | hueco claro | 3 | a:1, A1 |
 | AJ2 | Ajustes · Biblioteca | Cambio de carpeta en caliente: `host.chooseFolder` + `library.relocate`, no `host.pickProjectsFolder`; tras mover se queda en Ajustes; es B2 | hueco claro | 1 | a:2, B2 |

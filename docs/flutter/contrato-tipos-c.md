@@ -252,7 +252,7 @@ Fichero: `AC/MontageMethods.swift`.
 | `montage.startExport` | `Empty` | `MontageSnapshot` | :473 | Inicia la exportación (mezcla y codificación). |
 | `montage.cancelExport` | `Empty` | `MontageSnapshot` | :482 | Cancela (fase `cancelled`). |
 | `montage.dismissExport` | `Empty` | `MontageSnapshot` | :483 | Descarta el resultado/error (vuelve a `idle` si no hay exportación en curso). |
-| `montage.reveal` | `Empty` | `MontageRevealResult` | :484 (impl. :517) | Abre la **carpeta** `video/` del tema (la crea si falta), no el fichero. |
+| `montage.reveal` | `Empty` | `MontageRevealResult` | :484 (impl. :517) | Si la exportación está en `done` y el fichero existe, lo **selecciona** en el gestor de archivos (macOS `open -R <fichero>`; Windows `explorer.exe /select,<ruta>`); si no, abre la carpeta `video/` del tema (la crea si falta) como antes. |
 
 | Evento | Payload | emit | Cadencia |
 |---|---|---|---|
@@ -301,6 +301,7 @@ Unidades: «tema» = segundos de la canción; «vídeo» = segundos del vídeo m
 | `caption`, `showPartLabels`, `keepVideoAspect`, `cutGaps` | Bool | no | |
 | `singleRhythmPartId` | String | sí | |
 | `singleRhythmCandidates` | [String] | no | Ids de parte. |
+| `autoPartId` | String | sí | Parte que el plano único usa sin elección manual: primera parte no solista de `plan.parts` (o la primera si todas son solistas). Solo con layout `single` y `single-landscape`; omitida en el resto. Independiente de `singleRhythmPartId` (sirve para «Automática ({parte})»). Fixture `Contract/fixtures/montage/montage.snapshot.single.result.json`. |
 | `hasPlan`, `hasVideo` | Bool | no | |
 | `span` | MontageRangeInfo | no | Tramo del montaje (tema, s). |
 | `barDuration` | Double (s) | no | |
@@ -332,7 +333,7 @@ Unidades: «tema» = segundos de la canción; «vídeo» = segundos del vídeo m
 - `MontageResolutionInfo` :99 `{width, height: Int}` (px).
 - `MontageExportOptions` :104 `{codecs: [String], containers: [String], resolutions: [MontageResolutionInfo], fps: [Double]}`; en Windows `codecs` solo `h264`.
 - `MontageExportInfo` :127 `{codec, effectiveCodec, container: String, resolution: MontageResolutionInfo, size: MontageResolutionInfo (final según layout), fps: Double, normalize, limiter, trackWAVs: Bool, options: MontageExportOptions, canExport: Bool}`. `codec` = guardado (puede ser `hevc`); `effectiveCodec` = el que se usará.
-- `MontageExportEvent` :144 `{phase: String (idle|running|done|failed|cancelled), stage: String? (solo running: «Mezclando el audio» o «Codificando el vídeo»), progress: Double (0...1; mezcla ocupa el primer 15 %), message: String? (solo failed), result: MontageExportResultInfo? (solo done)}`. También es `MontageSnapshot.exportStatus`.
+- `MontageExportEvent` :144 `{phase: String (idle|running|done|failed|cancelled), stage: String? (solo running; texto del núcleo: «Mezclando el audio» o «Codificando el vídeo»), progress: Double (0...1; mezcla ocupa el primer 15 %), message: String? (solo failed), result: MontageExportResultInfo? (solo done)}`. También es `MontageSnapshot.exportStatus`.
 - `MontageExportResultInfo` :112 `{path: String (ABSOLUTA, `r.url.path`, no relativa), tracksDirectory: String? (absoluta), finalLUFS: Double? (LUFS), finalTruePeakDB: Double (dBTP), normalized, limitedByPeak, limiterEnabled, limiterApplied: Bool, limiterMaxReductionDB: Double (dB), limiterOutOfTolerance: Bool, clippedFiles: [String], codec: String}`.
 - `MontageFramingEvent` :153 `{takeId, status (como arriba), progress: Double, samples: Int?, detected: Int?, error: String?}`.
 - `MontagePreviewInfo` :171 `{phase: String (none|preparing|ready|error), error: String?, audio: MontageAudioInfo, fps: Double, maxDimension: Int (640), width, height: Int (tamaño de fotogramas), duration: Double? (vídeo, s), delivered, skipped: Int, lastFrameMillis: Double (ms), frameP50Ms, frameP95Ms: Double (ms; 512 últimos)}`.
