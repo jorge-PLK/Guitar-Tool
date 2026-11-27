@@ -13,8 +13,11 @@ Future<void> pump(
   ValueChanged<Duration>? onSeek,
   ValueChanged<Duration>? onSeekEnd,
   Duration rangeStart = Duration.zero,
+  Duration position = const Duration(seconds: 65),
+  Duration duration = const Duration(seconds: 200),
+  double width = 420,
 }) async {
-  tester.view.physicalSize = const Size(420, 560);
+  tester.view.physicalSize = Size(width, 560);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   await tester.pumpWidget(Directionality(
@@ -29,8 +32,8 @@ Future<void> pump(
         portrait: portrait,
         canvasLabel: portrait ? '9:16' : '16:9',
         sectionLabel: 'Estrofa',
-        position: const Duration(seconds: 65),
-        duration: const Duration(seconds: 200),
+        position: position,
+        duration: duration,
         playing: playing,
         ready: ready,
         onTogglePlay: onToggle ?? () {},
@@ -50,8 +53,8 @@ void main() {
     int taps = 0;
     await pump(tester, onToggle: () => taps++);
     expect(find.text('Vista previa · 16:9'), findsOneWidget);
-    expect(find.text('01:05 · Estrofa'), findsOneWidget);
-    expect(find.text('01:05 / 03:20'), findsOneWidget);
+    expect(find.text('1:05 · Estrofa'), findsOneWidget);
+    expect(find.textContaining('1:05 / 3:20', findRichText: true), findsOneWidget);
     expect(slider(tester).onChanged, isNotNull);
     await tester.tap(find.byKey(const ValueKey<String>('montage-play')));
     expect(taps, 1);
@@ -104,5 +107,19 @@ void main() {
     expect(seeks, isNotEmpty);
     expect(seeks.last, greaterThan(const Duration(seconds: 100)));
     expect(ends, hasLength(1));
+  });
+
+  testWidgets('formato m:ss y sección en la cabecera', (tester) async {
+    await pump(tester, position: const Duration(seconds: 2), duration: const Duration(seconds: 5));
+    expect(find.text('0:02 · Estrofa'), findsOneWidget);
+    expect(find.textContaining('0:02 / 0:05', findRichText: true), findsOneWidget);
+  });
+
+  testWidgets('columna estrecha: cabecera en dos líneas', (tester) async {
+    await pump(tester, width: 260);
+    final Offset a = tester.getTopLeft(find.text('Vista previa · 16:9'));
+    final Offset b = tester.getTopLeft(find.text('1:05 · Estrofa'));
+    expect(b.dy, greaterThan(a.dy));
+    expect(b.dx, a.dx);
   });
 }

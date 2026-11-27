@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:toneforge/l10n/app_localizations.dart';
+import 'package:toneforge/theme/fmt.dart';
 import 'package:toneforge/theme/icons.dart';
 import 'package:toneforge/theme/tokens.dart';
 import 'package:toneforge/theme/typography.dart';
@@ -43,39 +44,28 @@ class MontagePreviewColumn extends StatelessWidget {
   final ValueChanged<Duration> onSeek;
   final ValueChanged<Duration>? onSeekEnd;
 
-  static String _mmss(Duration d) {
-    final int t = d.inSeconds < 0 ? 0 : d.inSeconds;
-    return '${(t ~/ 60).toString().padLeft(2, '0')}:${(t % 60).toString().padLeft(2, '0')}';
-  }
+  static String _t(Duration d) => TfFmt.duration(d.inMilliseconds / 1000);
 
   Duration _ms(double v) => Duration(milliseconds: v.round());
 
   @override
   Widget build(BuildContext context) {
-    final TextStyle head = TfText.body(TfSize.font13, TfWeight.semibold).copyWith(color: TfColors.text);
     final TextStyle sub = TfText.body(TfSize.font13).copyWith(color: TfColors.muted);
-    final TextStyle clock = TfText.body(TfSize.font13, TfWeight.regular, true).copyWith(color: TfColors.muted);
+    final TextStyle clock = TfText.body(TfSize.font13, TfWeight.regular, true).copyWith(color: TfColors.text);
+    final TextStyle clockMuted = clock.copyWith(color: TfColors.muted);
     final double maxMs = duration.inMilliseconds.toDouble();
     final double minMs = rangeStart.inMilliseconds.toDouble();
     final double sliderMax = maxMs <= minMs ? minMs + 1 : maxMs;
     final double posMs = position.inMilliseconds.toDouble().clamp(minMs, sliderMax).toDouble();
-    final String right = sectionLabel == null
-        ? _mmss(position)
-        : '${_mmss(position)} · $sectionLabel';
+    final String title = AppLocalizations.of(context).montagePreviewTitle(canvasLabel);
+    final String right = sectionLabel == null ? _t(position) : '${_t(position)} · $sectionLabel';
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: TfSpace.s20, vertical: TfSpace.s16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         spacing: TfSpace.s12,
         children: <Widget>[
-          Row(
-            spacing: TfSpace.s8,
-            children: <Widget>[
-              Flexible(child: Text(AppLocalizations.of(context).montagePreviewTitle(canvasLabel), style: head, maxLines: 1, overflow: TextOverflow.ellipsis)),
-              const Spacer(),
-              Flexible(child: Text(right, style: sub, maxLines: 1, overflow: TextOverflow.ellipsis)),
-            ],
-          ),
+          _Header(title: title, time: right, style: sub),
           Expanded(
             child: Center(
               child: AspectRatio(
@@ -111,7 +101,14 @@ class MontagePreviewColumn extends StatelessWidget {
                   onChangeEnd: ready && onSeekEnd != null ? (double v) => onSeekEnd!(_ms(v)) : null,
                 ),
               ),
-              Text('${_mmss(position)} / ${_mmss(duration)}', style: clock),
+              Text.rich(
+                TextSpan(children: <InlineSpan>[
+                  TextSpan(text: _t(position), style: clock),
+                  TextSpan(text: ' / ${_t(duration)}', style: clockMuted),
+                ]),
+                maxLines: 1,
+                softWrap: false,
+              ),
             ],
           ),
         ],
@@ -147,5 +144,50 @@ class _PlayButton extends StatelessWidget {
     );
     if (!enabled) button = Opacity(opacity: TfOpacity.disabled, child: button);
     return button;
+  }
+}
+
+/// Una línea si cabe; si no, dos líneas (título arriba, tiempo debajo), como `ViewThatFits` de MV:330.
+class _Header extends StatelessWidget {
+  const _Header({required this.title, required this.time, required this.style});
+
+  final String title;
+  final String time;
+  final TextStyle style;
+
+  double _w(BuildContext context, String t) {
+    final TextPainter p = TextPainter(
+      text: TextSpan(text: t, style: style),
+      textDirection: TextDirection.ltr,
+      textScaler: MediaQuery.textScalerOf(context),
+      maxLines: 1,
+    )..layout();
+    final double w = p.width;
+    p.dispose();
+    return w;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(builder: (BuildContext context, BoxConstraints c) {
+      final bool oneLine = _w(context, title) + TfSpace.s12 + _w(context, time) <= c.maxWidth;
+      if (oneLine) {
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: <Widget>[
+            Text(title, style: style, maxLines: 1, softWrap: false),
+            Text(time, style: style, maxLines: 1, softWrap: false),
+          ],
+        );
+      }
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        spacing: TfSpace.s2,
+        children: <Widget>[
+          Text(title, style: style, maxLines: 1, overflow: TextOverflow.ellipsis),
+          Text(time, style: style, maxLines: 1, overflow: TextOverflow.ellipsis),
+        ],
+      );
+    });
   }
 }
