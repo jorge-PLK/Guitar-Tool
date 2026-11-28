@@ -107,16 +107,48 @@ extension MontageExporter {
                     FileHandle.standardError.write(Data("PROFILE total \(total) fotogramas en \(String(format: "%.2f", s)) s (\(String(format: "%.2f", s * 1000 / Double(max(1, total)))) ms/fotograma)\n\(ExportProfile.report())\n".utf8))
                 }
             }
+            // Tres hilos si la fuente lo permite: el productor decodifica y convierte las tomas por delante, un segundo
+            // hilo compone (Direct2D) sobre un anillo de fotogramas y este hilo convierte a NV12, codifica y escribe el
+            // audio. `TF_EXPORT_SERIAL` fuerza el bucle de un hilo (medidas).
+            var partStages: [FramePipeline<FramePixelBuffer?>] = []
+            var composeStage: FramePipeline<FramePixelBuffer>?
+            let piped = ProcessInfo.processInfo.environment["TF_EXPORT_SERIAL"] == nil ? frames as? any PipelinedFrameSource : nil
+            if let piped {
+                // Un hilo lector por parte (lectores independientes) y `composeWorkers` hilos compositores, cada uno con su
+                // renderizador; el fotograma `i` se arma en orden (turno) con el estado y la toma `i` de cada parte.
+                let stages = (0..<piped.partCount).map { p in
+                    FramePipeline<FramePixelBuffer?>(count: total) { try piped.partSource(part: p, frame: $0) }
+                }
+                let turn = Turn()
+                let ring = OutputRing(size: Self.composeQueue + Self.composeWorkers + 3) { piped.makeOutput() }
+                let composed = FramePipeline<FramePixelBuffer>(count: total, capacity: Self.composeQueue, workers: Self.composeWorkers) { i, w in
+                    let input: MontageSourceFrame = try turn.take(i) {
+                        var sources: [Int: FramePixelBuffer] = [:]
+                        for (p, st) in stages.enumerated() { if let pb = try st.next() { sources[p] = pb } }
+                        return MontageSourceFrame(state: piped.frameState(at: Double(i) / fps), sources: sources)
+                    }
+                    let out = ring.buffer(i)
+                    try piped.compose(input, into: out, worker: w)
+                    return out
+                }
+                partStages = stages
+                composeStage = composed
+                stages.forEach { $0.start() }
+                composed.start()
+            }
+            defer { partStages.forEach { $0.stop() }; composeStage?.stop() }
             for i in 0..<total {
                 if isCancelled { throw CancellationError() }
                 let pb: FramePixelBuffer
-                do { pb = try frames.frame(i) } catch { throw MontageError.composition("\(error)") }
+                do {
+                    if let composeStage { pb = try ExportProfile.measure(.wait) { try composeStage.next() } } else { pb = try frames.frame(i) }
+                } catch is CancellationError { throw CancellationError() } catch { throw MontageError.composition("\(error)") }
                 let t0 = MF.ticks(Double(i) / fps), t1 = MF.ticks(Double(i + 1) / fps)
                 do { try muxer?.writeVideo(pb, time: t0, duration: t1 - t0) } catch { throw MontageError.write("\(error)") }
                 if channels > 0 {
                     let until = i == total - 1 ? audioFrames : min(audioFrames, Int((Double(i + 1) / fps * Double(sr)).rounded()))
                     if until > audioDone {
-                        try Self.writeAudio(muxer, pcm, channels: channels, from: audioDone, to: until, sampleRate: sr)
+                        try ExportProfile.measure(.audio) { try Self.writeAudio(muxer, pcm, channels: channels, from: audioDone, to: until, sampleRate: sr) }
                         audioDone = until
                     }
                 }
@@ -128,6 +160,43 @@ extension MontageExporter {
             do { try muxer?.finalize() } catch { throw MontageError.write("\(error)") }
             muxer = nil
             return total
+        }
+
+        /// Fotogramas en cola entre el compositor y el escritor.
+        static let composeQueue = 4
+        /// Hilos compositores en paralelo (un renderizador Direct2D cada uno).
+        /// Un solo compositor: con 2 la completa tarda lo mismo (81,5 s frente a 81,2 s) y cuesta un segundo dispositivo D3D.
+        static let composeWorkers = 1
+
+        /// Turno para armar los fotogramas en orden aunque varios hilos compongan a la vez.
+        final class Turn: @unchecked Sendable {
+            private let cond = NSCondition()
+            private var current = 0
+            func take<T>(_ i: Int, _ body: () throws -> T) throws -> T {
+                cond.lock()
+                while current != i { cond.wait() }
+                cond.unlock()
+                defer { cond.lock(); current += 1; cond.broadcast(); cond.unlock() }
+                return try body()
+            }
+        }
+
+        /// Anillo de fotogramas de salida reutilizados (evita reservar y poner a cero 8 MB por fotograma). El fotograma
+        /// `i` ocupa la posición `i % size`; con `size` > cola + 2 el escritor ya lo soltó cuando se reutiliza.
+        /// Supone que `muxer.writeVideo` no retiene el búfer al volver: `tfmf_writer_video` copia los píxeles a un
+        /// `MFCreateMemoryBuffer` antes de `WriteSample` (CMediaFoundation.c), y la conversión a NV12 es síncrona.
+        final class OutputRing: @unchecked Sendable {
+            private var buffers: [FramePixelBuffer?]
+            private let make: () -> FramePixelBuffer
+            init(size: Int, make: @escaping () -> FramePixelBuffer) { buffers = Array(repeating: nil, count: size); self.make = make }
+            /// Solo desde el hilo compositor.
+            func buffer(_ i: Int) -> FramePixelBuffer {
+                let k = i % buffers.count
+                if let b = buffers[k] { return b }
+                let b = make()
+                buffers[k] = b
+                return b
+            }
         }
 
         static func writeAudio(_ muxer: MediaFoundationMuxer?, _ pcm: [Int16], channels: Int, from: Int, to: Int, sampleRate: Int) throws {

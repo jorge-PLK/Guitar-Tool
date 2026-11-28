@@ -25,6 +25,74 @@ final class MediaFoundationExportTests: XCTestCase {
         }
     }
 
+    /// Gris distinto por fotograma, repartido entre una parte (lector) y un compositor, como `MontagePreview`.
+    struct LevelFrames: PipelinedFrameSource {
+        var frameCount = 45
+        var duration = 1.5
+        var width = 320, height = 180
+        static func level(_ i: Int) -> UInt8 { UInt8(30 + (i * 37) % 200) }
+        func frame(_ i: Int) throws -> FramePixelBuffer { try compose(sourceFrame(i)) }
+        func sourceFrame(_ index: Int) throws -> MontageSourceFrame {
+            MontageSourceFrame(state: frameState(at: Double(index) / 30), sources: try partSource(part: 0, frame: index).map { [0: $0] } ?? [:])
+        }
+        func compose(_ input: MontageSourceFrame) throws -> FramePixelBuffer {
+            let out = makeOutput()
+            try compose(input, into: out, worker: 0)
+            return out
+        }
+        func makeOutput() -> FramePixelBuffer { FramePixelBuffer(pixelFormat: .bgra, width: width, height: height) }
+        func compose(_ input: MontageSourceFrame, into out: FramePixelBuffer, worker: Int) throws {
+            let v = try XCTUnwrap(input.sources[0]).baseAddress.load(as: UInt8.self)
+            out.fill(b: v, g: v, r: v)
+        }
+        var partCount: Int { 1 }
+        func frameState(at videoTime: Double) -> MontageFrameState { MontageFrameState(boxes: [], fade: 1, captionOpacity: 0) }
+        func partSource(part: Int, frame index: Int) throws -> FramePixelBuffer? {
+            let pb = makeOutput()
+            let v = Self.level(index)
+            pb.fill(b: v, g: v, r: v)
+            return pb
+        }
+    }
+
+    /// Misma fuente sin `PipelinedFrameSource`: fuerza el bucle serie.
+    struct SerialOnly: MontageFrameSource {
+        let base: LevelFrames
+        var frameCount: Int { base.frameCount }
+        var duration: Double { base.duration }
+        func frame(_ i: Int) throws -> FramePixelBuffer { try base.frame(i) }
+    }
+
+    /// La canalización por hilos de `MuxJob` (lectores + compositor + anillo) escribe los mismos fotogramas y en el mismo
+    /// orden que el bucle serie: nº de fotogramas igual y el gris de cada fotograma decodificado sigue a su índice.
+    func testPipelinedExportMatchesSerialFramesAndOrder() async throws {
+        let dir = try TestWav.tempDir("MediaFoundationExportTests")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let src = LevelFrames()
+        var levels: [[Int]] = []
+        for (name, source) in [("serie", SerialOnly(base: src) as any MontageFrameSource), ("hilos", src as any MontageFrameSource)] {
+            let url = dir.appendingPathComponent("\(name).mp4")
+            let s = try await MontageExporter.write(frames: source, mixURL: nil,
+                                                    settings: .init(codec: .h264, width: 320, height: 180, fps: 30, container: .mp4), to: url, progress: nil)
+            XCTAssertEqual(s.frames, src.frameCount, name)
+            var ys: [Int] = []
+            try MediaFoundationReader.forEachFrame(url) { _, _, f in
+                ys.append(Int(f.baseAddress.load(fromByteOffset: 90 * f.bytesPerRow + 160, as: UInt8.self)))
+                return true
+            }
+            XCTAssertEqual(ys.count, src.frameCount, name)
+            levels.append(ys)
+        }
+        XCTAssertEqual(levels[0].count, levels[1].count)
+        for i in 0..<min(levels[0].count, levels[1].count) {
+            // Gris BGRA v → luma ≈ 16 + 219·v/255; la tolerancia cubre la pérdida del códec, no un orden distinto
+            // (niveles contiguos distan ≥ 37 en BGRA).
+            let expected = 16.0 + 219.0 * Double(LevelFrames.level(i)) / 255.0
+            XCTAssertEqual(Double(levels[1][i]), expected, accuracy: 14, "fotograma \(i) con hilos")
+            XCTAssertEqual(Double(levels[1][i]), Double(levels[0][i]), accuracy: 8, "fotograma \(i) hilos frente a serie")
+        }
+    }
+
     /// WAV de 16 bits a mano: seno de 440 Hz a 0,1 con un clic de 1 ms a 0,9 en t = 1,000 s.
     static func clickWav(_ url: URL, sampleRate sr: Int, seconds: Int = 2) throws {
         let n = seconds * sr

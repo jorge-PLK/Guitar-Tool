@@ -459,7 +459,12 @@ public final class MontagePreview: MontagePreviewing, MontageFrameSource, @unche
     let tracks: [[MontageTrackPlan.Range]]
     private let readers: [[TakeFrameReader]]
     private let renderer: Direct2DMontageRenderer
-    private let lock = NSLock()
+    /// Renderizadores extra para componer en paralelo en la exportación (uno por hilo compositor, creados al pedirlos).
+    private var extraRenderers: [Int: Direct2DMontageRenderer] = [:]
+    /// Cada parte tiene su cerrojo de lectura (un hilo por parte en la exportación) y cada renderizador el suyo.
+    private let partLocks: [NSLock]
+    private let renderLocks = (0..<8).map { _ in NSLock() }
+    private let extraLock = NSLock()
 
     init(timeline: MontageTimeline, caption: MontageCaption?, fps: Double, renderSize: CGSize, videos: [LoadedTakeVideo],
          tracks: [[MontageTrackPlan.Range]], audio: [MontagePreviewAudio]) throws {
@@ -469,6 +474,7 @@ public final class MontagePreview: MontagePreviewing, MontageFrameSource, @unche
         self.renderSize = renderSize
         self.tracks = tracks
         readers = videos.map { $0.readers() }
+        partLocks = videos.map { _ in NSLock() }
         audioTracks = audio
         renderer = try Direct2DMontageRenderer()
     }
@@ -482,19 +488,97 @@ public final class MontagePreview: MontagePreviewing, MontageFrameSource, @unche
 
     /// Fotograma compuesto (BGRA, `renderSize`) en `videoTime` s del vídeo.
     public func frame(at videoTime: Double) throws -> FramePixelBuffer {
-        try lock.withLock {
-            let state = timeline.state(at: timeline.timeMap.songTime(videoTime: videoTime))
-            var sources: [Int: FramePixelBuffer] = [:]
-            for box in state.boxes where sources[box.partIndex] == nil && box.partIndex < tracks.count {
-                guard let r = MontageTrackPlan.range(at: videoTime, in: tracks[box.partIndex]) else { continue }
-                if let pb = try readers[box.partIndex][r.source].frame(at: r.sourceTime(at: videoTime)) { sources[box.partIndex] = pb }
+        try compose(sources(at: videoTime))
+    }
+
+    /// Primera etapa: estado del fotograma y tomas visibles en BGRA girado (decodificar + copiar + NV12 a BGRA). Solo
+    /// toca los lectores. Los búferes devueltos no se mutan después.
+    func sources(at videoTime: Double) throws -> MontageSourceFrame {
+        let state = frameState(at: videoTime)
+        var sources: [Int: FramePixelBuffer] = [:]
+        for box in state.boxes where sources[box.partIndex] == nil && box.partIndex < tracks.count {
+            if let pb = try partSource(part: box.partIndex, at: videoTime) { sources[box.partIndex] = pb }
+        }
+        return MontageSourceFrame(state: state, sources: sources)
+    }
+
+    func frameState(at videoTime: Double) -> MontageFrameState {
+        ExportProfile.measure(.lookup) { timeline.state(at: timeline.timeMap.songTime(videoTime: videoTime)) }
+    }
+
+    /// Número de partes (lectores independientes: se pueden leer en hilos distintos).
+    var partCount: Int { tracks.count }
+
+    /// Toma de la parte `part` en `videoTime` (BGRA girado) o `nil` si no hay imagen. Un hilo por parte a la vez.
+    func partSource(part: Int, at videoTime: Double) throws -> FramePixelBuffer? {
+        try partLocks[part].withLock {
+            guard let r = ExportProfile.measure(.lookup, { MontageTrackPlan.range(at: videoTime, in: tracks[part]) }) else { return nil }
+            return try readers[part][r.source].frame(at: r.sourceTime(at: videoTime))
+        }
+    }
+
+    func partSource(part: Int, frame index: Int) throws -> FramePixelBuffer? {
+        let t = Double(index) / fps
+        guard frameState(at: t).boxes.contains(where: { $0.partIndex == part }) else { return nil }
+        return try partSource(part: part, at: t)
+    }
+
+    /// Segunda etapa: compone con Direct2D en un fotograma nuevo.
+    func compose(_ input: MontageSourceFrame) throws -> FramePixelBuffer {
+        let out = ExportProfile.measure(.alloc) { makeOutput() }
+        try compose(input, into: out)
+        return out
+    }
+
+    private func renderer(_ worker: Int) throws -> Direct2DMontageRenderer {
+        if worker == 0 { return renderer }
+        return try extraLock.withLock {
+            if let r = extraRenderers[worker] { return r }
+            let r = try Direct2DMontageRenderer()
+            extraRenderers[worker] = r
+            return r
+        }
+    }
+
+    /// Fotograma de salida BGRA del tamaño de render.
+    func makeOutput() -> FramePixelBuffer {
+        FramePixelBuffer(pixelFormat: .bgra, width: Int(renderSize.width), height: Int(renderSize.height))
+    }
+
+    /// Compone sobre `out` (se sobrescribe entero: fondo, recuadros y fundido). El renderizador solo se usa aquí, desde
+    /// un hilo a la vez (cerrojo propio).
+    func compose(_ input: MontageSourceFrame, into out: FramePixelBuffer, worker: Int = 0) throws {
+        let renderer = try renderer(worker)
+        try renderLocks[worker % renderLocks.count].withLock {
+            try ExportProfile.measure(.compose) {
+                try renderer.render(input.state, timeline: timeline, caption: caption, into: out) { input.sources[$0] }
             }
-            let out = FramePixelBuffer(pixelFormat: .bgra, width: Int(renderSize.width), height: Int(renderSize.height))
-            try ExportProfile.measure(.compose) { try renderer.render(state, timeline: timeline, caption: caption, into: out) { sources[$0] } }
-            return out
         }
     }
 
     func frame(_ index: Int) throws -> FramePixelBuffer { try frame(at: Double(index) / fps) }
+
+    func sourceFrame(_ index: Int) throws -> MontageSourceFrame { try sources(at: Double(index) / fps) }
 }
+
+/// Estado de un fotograma y sus tomas ya en BGRA: lo que pasa del hilo productor al consumidor.
+struct MontageSourceFrame: @unchecked Sendable {
+    let state: MontageFrameState
+    let sources: [Int: FramePixelBuffer]
+}
+
+/// Fuente de fotogramas en etapas para exportar con varios hilos: `sourceFrame` (decodificar/convertir) y `compose`
+/// (componer); `frame(_:)` = `compose(sourceFrame(_:))`.
+protocol PipelinedFrameSource: MontageFrameSource {
+    func sourceFrame(_ index: Int) throws -> MontageSourceFrame
+    func compose(_ input: MontageSourceFrame) throws -> FramePixelBuffer
+    func makeOutput() -> FramePixelBuffer
+    /// `worker` elige el renderizador (0 = el de la vista previa); cada uno solo se usa desde un hilo a la vez.
+    func compose(_ input: MontageSourceFrame, into out: FramePixelBuffer, worker: Int) throws
+    var partCount: Int { get }
+    func frameState(at videoTime: Double) -> MontageFrameState
+    func partSource(part: Int, frame index: Int) throws -> FramePixelBuffer?
+}
+
+extension MontagePreview: PipelinedFrameSource {}
 #endif

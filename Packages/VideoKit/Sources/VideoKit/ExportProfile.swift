@@ -6,7 +6,7 @@ import Foundation
 /// de reloj de pared sumados entre hilos (con trabajo en paralelo la suma supera la duración real).
 enum ExportProfile {
     enum Phase: Int, CaseIterable {
-        case decode, copy, toBGRA, rotate, compose, toNV12, encode
+        case decode, copy, toBGRA, rotate, compose, toNV12, encode, audio, wait, alloc, lookup
         var label: String {
             switch self {
             case .decode: "decodificar (MF ReadSample)"
@@ -16,6 +16,10 @@ enum ExportProfile {
             case .compose: "componer (Direct2D)"
             case .toNV12: "BGRA a NV12"
             case .encode: "codificar (WriteSample)"
+            case .audio: "audio (AAC)"
+            case .wait: "espera del consumidor (cola vacia)"
+            case .alloc: "reservar fotograma de salida"
+            case .lookup: "estado y busqueda de tomas"
             }
         }
     }
