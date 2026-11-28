@@ -3523,4 +3523,20 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get error_unknown => 'Unknown error';
+
+  @override
+  String get audioErrorNotConnected =>
+      'Could not play: the audio output is not connected. Check it in Settings.';
+
+  @override
+  String get audioErrorSampleRate =>
+      'Could not play: the audio output runs at a different sample rate.';
+
+  @override
+  String get audioErrorBusy =>
+      'Could not play: another application is using the audio output.';
+
+  @override
+  String get audioErrorUnavailable =>
+      'Could not play: the audio output does not open.';
 }

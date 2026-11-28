@@ -137,7 +137,11 @@ final class MontageController {
     private(set) var previewPhase = PreviewPhase.none
     private(set) var previewError: String?
     private(set) var audioPhase = AudioPhase.none
-    private(set) var audioError: String?
+    private(set) var audioError: String? {
+        didSet { if audioError == nil { audioErrorCode = nil } }
+    }
+    /// Código estable de `audioError` (`audioErrorCode(_:)`); nil cuando no hay error.
+    private(set) var audioErrorCode: String?
     private(set) var audioProgress = 0.0
     /// Clave del WAV cargado y fichero (nil: sin audio).
     private(set) var previewAudioKey: String?
@@ -652,7 +656,7 @@ final class MontageController {
         audio.seek(to: composer.videoTime(songTime: t))
         setPreview(.ready)
         if wasPlaying {
-            do { try audio.play(); isPlaying = true; startFrameLoop() } catch { isPlaying = false; audioError = Self.playError(error) }
+            do { try audio.play(); isPlaying = true; startFrameLoop() } catch { isPlaying = false; setPlayError(error) }
         } else {
             requestStill()
         }
@@ -665,8 +669,9 @@ final class MontageController {
         notify()
     }
 
-    private static func playError(_ error: Error) -> String {
-        "No se pudo reproducir: la salida de audio no abre (\((error as? LocalizedError)?.errorDescription ?? "\(error)"))."
+    private func setPlayError(_ error: Error) {
+        audioError = AudioErrorText.playMessage(error)
+        audioErrorCode = AudioErrorText.code(error)
     }
 
     /// Clave de la mezcla de la vista previa: todo lo que cambia el WAV (tramos, pistas con su fichero, volumen y presencia).
@@ -753,7 +758,8 @@ final class MontageController {
                 previewAudioURL = nil
                 try? audio.load(url: nil, duration: duration)
                 audioPhase = .error
-                audioError = "No se pudo mezclar el audio de la vista previa (\(error))."
+                audioError = "No se pudo mezclar el audio de la vista previa (\(AudioErrorText.describe(error)))."
+                audioErrorCode = AudioErrorText.code(error)
                 return
             }
         }
@@ -769,7 +775,8 @@ final class MontageController {
             previewAudioURL = nil
             try? audio.load(url: nil, duration: duration)
             audioPhase = .error
-            audioError = "No se pudo abrir el audio de la vista previa (\(error))."
+            audioError = "No se pudo abrir el audio de la vista previa (\(AudioErrorText.describe(error)))."
+            audioErrorCode = AudioErrorText.code(error)
         }
     }
 
@@ -797,9 +804,9 @@ final class MontageController {
         do {
             try audio.play()
         } catch {
-            audioError = Self.playError(error)
+            setPlayError(error)
             notify()
-            throw RPCError(code: "audio-unavailable", message: audioError ?? "")
+            throw AudioErrorText.playRPCError(error, message: audioError ?? "")
         }
         audioError = nil
         isPlaying = true

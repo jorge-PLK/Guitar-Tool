@@ -5856,6 +5856,30 @@ abstract class AppLocalizations {
   /// In es, this message translates to:
   /// **'Error desconocido'**
   String get error_unknown;
+
+  /// No description provided for @audioErrorNotConnected.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo reproducir: la salida de audio no está conectada. Revísala en Ajustes.'**
+  String get audioErrorNotConnected;
+
+  /// No description provided for @audioErrorSampleRate.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo reproducir: la salida de audio funciona a otra frecuencia de muestreo.'**
+  String get audioErrorSampleRate;
+
+  /// No description provided for @audioErrorBusy.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo reproducir: otra aplicación está usando la salida de audio.'**
+  String get audioErrorBusy;
+
+  /// No description provided for @audioErrorUnavailable.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo reproducir: la salida de audio no abre.'**
+  String get audioErrorUnavailable;
 }
 
 class _AppLocalizationsDelegate

@@ -1634,5 +1634,9 @@
   "@errorAnchor": {
     "description": "Ancla del bloque error: añade las claves del área debajo, en orden alfabético; no edites otros bloques."
   },
-  "error_unknown": "Error desconocido"
+  "error_unknown": "Error desconocido",
+  "audioErrorNotConnected": "No se pudo reproducir: la salida de audio no está conectada. Revísala en Ajustes.",
+  "audioErrorSampleRate": "No se pudo reproducir: la salida de audio funciona a otra frecuencia de muestreo.",
+  "audioErrorBusy": "No se pudo reproducir: otra aplicación está usando la salida de audio.",
+  "audioErrorUnavailable": "No se pudo reproducir: la salida de audio no abre."
 }

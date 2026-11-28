@@ -377,6 +377,16 @@ void main() {
     expect(find.text('Sin salida de audio'), findsOneWidget);
   });
 
+  testWidgets('aviso de audio con código: texto localizado, no el crudo', (t) async {
+    final Json open = _ready();
+    final Json transport = Map<String, Object?>.from(open['transport']! as Map)
+      ..['audioError'] = 'notConnected("uid")'
+      ..['audioErrorCode'] = 'not-connected';
+    await _pump(t, _core(open: <String, Object?>{...open, 'transport': transport}));
+    expect(find.textContaining('la salida de audio no está conectada'), findsOneWidget);
+    expect(find.textContaining('notConnected'), findsNothing);
+  });
+
   testWidgets('cambiar el tema elegido reabre el montaje; null vuelve al selector', (t) async {
     const String other = '00000000-0000-0000-0000-000000000009';
     final MockCore core = _core();

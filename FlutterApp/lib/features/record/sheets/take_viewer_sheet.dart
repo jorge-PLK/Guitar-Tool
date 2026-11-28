@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../contract/record_state.dart';
+import '../../../core/audio_error_text.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../theme/icons.dart';
 import '../../../theme/tokens.dart';
@@ -144,7 +145,7 @@ class TakeViewerSheet extends ConsumerWidget {
   /// Error del visor (TV:287): del núcleo (`message`, sin códigos propios del visor) o del audio de la toma.
   static String? _errorText(AppLocalizations l, TakeViewerState s) {
     final String? audio = s.audioError;
-    if (audio != null) return l.takeview_errPrepare(audio);
+    if (audio != null) return audioErrorText(l, s.audioErrorCode, null) ?? l.takeview_errPrepare(audio);
     final e = s.error;
     if (e != null) return l.takeview_errPrepare(e.message);
     if (s.video == TakeVideoState.error && s.videoMessage != null) return l.takeview_errPrepare(s.videoMessage!);

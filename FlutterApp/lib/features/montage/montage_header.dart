@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:toneforge/contract/montage.dart';
+import 'package:toneforge/core/audio_error_text.dart';
 import 'package:toneforge/features/montage/montage_models.dart';
 import 'package:toneforge/l10n/app_localizations.dart';
 import 'package:toneforge/theme/tokens.dart';
@@ -70,7 +71,9 @@ class MontageNotices extends StatelessWidget {
     final AppLocalizations l = AppLocalizations.of(context);
     final MontageSnapshot s = state.snapshot!;
     final String? previewError = s.preview.phase == MontagePreviewPhase.error ? s.preview.error : null;
-    final String? audioError = s.transport.audioError;
+    final String? audioError = s.transport.audioError == null
+        ? null
+        : audioErrorText(l, s.transport.audioErrorCode, s.transport.audioError);
     // Errores del núcleo: sin claves por `code` en el ARB, cae a `message`.
     final String? action = state.actionError?.message;
     final List<Widget> lines = <Widget>[

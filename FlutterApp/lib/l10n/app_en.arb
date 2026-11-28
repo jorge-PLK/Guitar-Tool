@@ -1634,5 +1634,9 @@
   "@errorAnchor": {
     "description": "Anchor for the error block: add this area's keys below, in alphabetical order; do not edit other blocks."
   },
-  "error_unknown": "Unknown error"
+  "error_unknown": "Unknown error",
+  "audioErrorNotConnected": "Could not play: the audio output is not connected. Check it in Settings.",
+  "audioErrorSampleRate": "Could not play: the audio output runs at a different sample rate.",
+  "audioErrorBusy": "Could not play: another application is using the audio output.",
+  "audioErrorUnavailable": "Could not play: the audio output does not open."
 }

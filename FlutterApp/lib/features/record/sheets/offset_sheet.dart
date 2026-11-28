@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../contract/record_state.dart';
+import '../../../core/audio_error_text.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../theme/icons.dart';
 import '../../../theme/tokens.dart';
@@ -161,7 +162,10 @@ class _OffsetSheetState extends ConsumerState<OffsetSheet> {
   }
 
   static String? _error(AppLocalizations l, TakeViewerState v) {
-    final String? m = v.audioError ?? v.error?.message;
+    if (v.audioError != null) {
+      return audioErrorText(l, v.audioErrorCode, null) ?? l.record_offsetLoadError(v.audioError!);
+    }
+    final String? m = v.error?.message;
     return m == null ? null : l.record_offsetLoadError(m);
   }
 }

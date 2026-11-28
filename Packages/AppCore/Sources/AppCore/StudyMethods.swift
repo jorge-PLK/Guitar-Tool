@@ -60,6 +60,8 @@ struct StudyTransport: Codable, Sendable {
     var channels: [StudyChannel]
     var anySolo: Bool
     var audioError: String?
+    /// `not-connected` | `sample-rate-mismatch` | `busy` | `unavailable`; nil si `audioError` es nil.
+    var audioErrorCode: String?
     /// Nombre del aparato de salida (8.6d-C): igual que `study.open.audio.outputName`; ya al abrir también en Windows (8.6d-A).
     var outputName: String
 }
@@ -482,7 +484,7 @@ final class StudyService {
             metronome: StudyMetronome(on: p.metronomeOn, gainDB: p.metronomeGainDB, available: s.hasBeatGrid),
             loop: c.loop.map { StudyLoop(start: $0.lowerBound, end: $0.upperBound, name: c.loopName, span: c.loopIsSpan) },
             masterGainDB: c.masterGainDB, channels: channels(s), anySolo: c.anyStemSolo, audioError: c.audioError,
-            outputName: c.audio.outputName)
+            audioErrorCode: c.audioErrorCode, outputName: c.audio.outputName)
     }
 
     func snapshot(_ s: StudySession, _ c: BackingController) -> StudyOpenResult {

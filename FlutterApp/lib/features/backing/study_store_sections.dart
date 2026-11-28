@@ -149,6 +149,7 @@ extension StudyStoreSections on StudyStore {
       anySolo: t.anySolo,
       audioError: t.audioError,
       outputName: t.outputName,
+      audioErrorCode: t.audioErrorCode,
     );
   }
 

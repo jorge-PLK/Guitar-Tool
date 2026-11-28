@@ -199,6 +199,8 @@ struct MontageTransportInfo: Codable, Sendable, Equatable {
     var videoPosition: Double
     var span: MontageRangeInfo
     var audioError: String?
+    /// `not-connected` | `sample-rate-mismatch` | `busy` | `unavailable`; nil si `audioError` es nil.
+    var audioErrorCode: String?
 }
 
 struct MontageSnapshot: Codable, Sendable, Equatable {
@@ -704,7 +706,8 @@ final class MontageService {
                 lastFrameMillis: c.previewStats.lastFrameMillis, frameP50Ms: c.previewStats.percentile(0.5),
                 frameP95Ms: c.previewStats.percentile(0.95), videos: videoStatuses(c)),
             transport: MontageTransportInfo(playing: c.isPlaying, position: c.songTime, videoPosition: c.videoPosition,
-                                            span: MontageRangeInfo(start: span.start, end: span.end), audioError: c.audioError))
+                                            span: MontageRangeInfo(start: span.start, end: span.end), audioError: c.audioError,
+                                            audioErrorCode: c.audioErrorCode))
     }
 
     static func exportEvent(_ p: MontageController.ExportPhase) -> MontageExportEvent {

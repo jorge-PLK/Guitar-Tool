@@ -16,6 +16,8 @@ final class BackingController {
     private(set) var loadError: String?
     /// Último fallo al abrir la salida de audio o al reproducir (nil si va bien).
     private(set) var audioError: String?
+    /// Código estable de `audioError` (`audioErrorCode(_:)`); nil cuando no hay error.
+    private(set) var audioErrorCode: String?
     /// Bucle activo (no se guarda: cada sesión empieza sin bucle).
     private(set) var loop: ClosedRange<Double>?
     private(set) var loopName: String?
@@ -68,8 +70,10 @@ final class BackingController {
         do {
             try audio.prepare(firstTrack: first.url)
             audioError = nil
+            audioErrorCode = nil
         } catch {
-            audioError = "No se pudo abrir la salida de audio (\(Self.describe(error)))."
+            audioError = AudioErrorText.openMessage(error)
+            audioErrorCode = AudioErrorText.code(error)
         }
         for kind in session.mixerStems where tracks.contains(where: { $0.id == kind.rawValue }) {
             apply(session.mix(for: kind), to: kind.rawValue)
@@ -131,10 +135,12 @@ final class BackingController {
         do {
             try player.play()
             audioError = nil
+            audioErrorCode = nil
         } catch {
-            let message = "No se pudo reproducir: la salida de audio no abre (\(Self.describe(error)))."
+            let message = AudioErrorText.playMessage(error)
             audioError = message
-            throw RPCError(code: "audio-unavailable", message: message)
+            audioErrorCode = AudioErrorText.code(error)
+            throw AudioErrorText.playRPCError(error, message: message)
         }
     }
 

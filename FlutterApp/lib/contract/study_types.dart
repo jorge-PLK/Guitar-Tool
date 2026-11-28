@@ -110,6 +110,7 @@ final class StudyTransport {
     required this.anySolo,
     required this.audioError,
     required this.outputName,
+    this.audioErrorCode,
   });
 
   factory StudyTransport.fromJson(Json j) => StudyTransport(
@@ -127,6 +128,7 @@ final class StudyTransport {
         anySolo: _b(j['anySolo']),
         audioError: _sn(j['audioError']),
         outputName: _s(j['outputName']),
+        audioErrorCode: _sn(j['audioErrorCode']),
       );
 
   final bool playing;
@@ -143,6 +145,8 @@ final class StudyTransport {
   final bool anySolo;
   final String? audioError;
   final String outputName;
+  /// `not-connected`, `sample-rate-mismatch`, `busy`, `unavailable`; otro valor o nulo: usa `audioError`.
+  final String? audioErrorCode;
 }
 
 final class StudyAudioInfo {

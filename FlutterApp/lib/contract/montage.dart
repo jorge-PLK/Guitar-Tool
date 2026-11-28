@@ -414,25 +414,29 @@ class MontagePreviewInfo {
 /// Transporte. `position` = tema; `videoPosition` = vídeo.
 @immutable
 class MontageTransportInfo {
-  const MontageTransportInfo({required this.playing, required this.position, required this.videoPosition, required this.span, this.audioError});
+  const MontageTransportInfo({required this.playing, required this.position, required this.videoPosition, required this.span, this.audioError, this.audioErrorCode});
   factory MontageTransportInfo.fromJson(Json j) => MontageTransportInfo(
         playing: j['playing'] as bool,
         position: (j['position'] as num).toDouble(),
         videoPosition: (j['videoPosition'] as num).toDouble(),
         span: MontageRangeInfo.fromJson(j['span'] as Json),
         audioError: j['audioError'] as String?,
+        audioErrorCode: j['audioErrorCode'] as String?,
       );
   final bool playing;
   final double position;
   final double videoPosition;
   final MontageRangeInfo span;
   final String? audioError;
+  /// `not-connected`, `sample-rate-mismatch`, `busy`, `unavailable`; otro valor o nulo: usa `audioError`.
+  final String? audioErrorCode;
   Json toJson() => {
         'playing': playing,
         'position': position,
         'videoPosition': videoPosition,
         'span': span.toJson(),
         if (audioError != null) 'audioError': audioError,
+        if (audioErrorCode != null) 'audioErrorCode': audioErrorCode,
       };
 }
 

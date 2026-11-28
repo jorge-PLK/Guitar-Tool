@@ -66,7 +66,7 @@ public typealias AudioIORenderHandler = @Sendable (AudioIOBuffer) -> Void
 /// Recibe un bloque de entrada (todos los canales del dispositivo de entrada).
 public typealias AudioIOCaptureHandler = @Sendable (AudioIOBuffer) -> Void
 
-public enum AudioIOError: Error, Equatable, Sendable {
+public enum AudioIOError: Error, Equatable, Sendable, LocalizedError {
     case alreadyRunning
     case noInput
     case device(String)
@@ -74,6 +74,22 @@ public enum AudioIOError: Error, Equatable, Sendable {
     case notConnected(String)
     /// El dispositivo no aceptó la frecuencia de trabajo (mini-spec Fase 3, «Frecuencia»).
     case sampleRateMismatch(device: Double, requested: Double)
+
+    /// Texto para el usuario: nunca lleva el UID ni el nombre del caso.
+    public var errorDescription: String? {
+        func khz(_ x: Double) -> String {
+            String(format: x.truncatingRemainder(dividingBy: 1000) == 0 ? "%.0f" : "%.1f", x / 1000)
+                .replacingOccurrences(of: ".", with: ",")
+        }
+        switch self {
+        case .alreadyRunning: return "El dispositivo ya está en uso."
+        case .noInput: return "No hay dispositivo de entrada elegido."
+        case .device(let s): return "Error del dispositivo: \(s)."
+        case .notConnected: return "El dispositivo no está conectado."
+        case let .sampleRateMismatch(device, requested):
+            return "El dispositivo está a \(khz(device)) kHz y la frecuencia de trabajo es \(khz(requested)) kHz."
+        }
+    }
 }
 
 /// Por qué se cortó una sesión en marcha. Se avisa en cualquier hilo (nunca en el de E/S); la sesión ya

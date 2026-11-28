@@ -111,6 +111,8 @@ struct TakeViewSnapshot: Codable, Sendable, Equatable {
     var epoch: Int
     var outputName: String
     var audioError: String?
+    /// `not-connected` | `sample-rate-mismatch` | `busy` | `unavailable`; nil si `audioError` es nil.
+    var audioErrorCode: String?
     /// Fase 7c: el vídeo aún no se puede ver (convirtiéndose a H.264, convertido pero con el original aún en uso por otro
     /// programa, o fallido); nil = listo. El progreso vivo está en `jobs.progress` con la clave `video.jobId`; el cambio
     /// con el visor abierto llega por `takeview.video`.
@@ -163,6 +165,7 @@ final class TakeViewSession {
     private(set) var backingOn = true
     private(set) var epoch = 0
     private(set) var audioError: String?
+    private(set) var audioErrorCode: String?
     var clock = TakeViewClock()
     /// FC1: formato del vídeo de la toma (nil = sin vídeo).
     var videoWidth: Int?
@@ -172,7 +175,7 @@ final class TakeViewSession {
     var player: StudyPlayer { audio.player }
 
     init(projectId: UUID, takeId: UUID, audio: StudyAudio, duration: Double, songStart: Double, base: Double,
-         backingIDs: [String], hasBacking: Bool, audioError: String?,
+         backingIDs: [String], hasBacking: Bool, audioError: String?, audioErrorCode: String? = nil,
          restartMargin: Double = TakeViewConstants.restartMargin, isOffset: Bool = false) {
         self.restartMargin = restartMargin
         self.isOffset = isOffset
@@ -186,6 +189,7 @@ final class TakeViewSession {
         self.backingIDs = backingIDs
         self.hasBacking = hasBacking
         self.audioError = audioError
+        self.audioErrorCode = audioErrorCode
     }
 
     var isPlaying: Bool { player.isPlaying }
@@ -203,10 +207,12 @@ final class TakeViewSession {
         do {
             try player.play()
             audioError = nil
+            audioErrorCode = nil
         } catch {
-            let message = "No se pudo reproducir: la salida de audio no abre (\(BackingController.describe(error)))."
+            let message = AudioErrorText.playMessage(error)
             audioError = message
-            throw RPCError(code: "audio-unavailable", message: message)
+            audioErrorCode = AudioErrorText.code(error)
+            throw AudioErrorText.playRPCError(error, message: message)
         }
         bump()
     }
@@ -353,7 +359,7 @@ final class TakeViewService {
     func snapshot(_ s: TakeViewSession) -> TakeViewSnapshot {
         TakeViewSnapshot(projectId: s.projectId.uuidString, takeId: s.takeId.uuidString, duration: s.duration, songStart: s.songStart,
                          hasBacking: s.hasBacking, backingOn: s.backingOn, playing: s.isPlaying, position: s.position,
-                         epoch: s.epoch, outputName: s.audio.outputName, audioError: s.audioError,
+                         epoch: s.epoch, outputName: s.audio.outputName, audioError: s.audioError, audioErrorCode: s.audioErrorCode,
                          video: videoConversion.flatMap { TakeVideoStatusInfo(takeId: s.takeId, state: $0.currentState(takeId: s.takeId)) },
                          videoWidth: s.videoWidth, videoHeight: s.videoHeight, videoRotation: s.videoRotation)
     }
@@ -429,7 +435,7 @@ final class TakeViewService {
         }
         // Parada exacta al final de la toma por muestras, en el reproductor (el ticker solo actualiza el estado).
         audio.player.endTime = base + duration
-        let audioError = Self.prepare(audio, first: first)
+        let (audioError, audioErrorCode) = Self.prepare(audio, first: first)
         audio.player.seek(to: base)
         let layout = ProjectLayout(folder: folder)
         #if canImport(AVFoundation)
@@ -443,7 +449,8 @@ final class TakeViewService {
                         + (take.punches ?? []).map { $0.videoFile.map { layout.url(relative: $0) } },
                      title: "\(project.song.title) · vídeo de la toma")
         let session = TakeViewSession(projectId: pid, takeId: tid, audio: audio, duration: duration, songStart: start, base: base,
-                                      backingIDs: ids, hasBacking: !backing.tracks.isEmpty, audioError: audioError)
+                                      backingIDs: ids, hasBacking: !backing.tracks.isEmpty, audioError: audioError,
+                                      audioErrorCode: audioErrorCode)
         if take.videoFile != nil, let f = take.videoFormat {
             session.videoWidth = f.width
             session.videoHeight = f.height
@@ -469,7 +476,7 @@ final class TakeViewService {
             throw RPCError(code: "load-failed", message: "No se pudo preparar la toma (\(BackingController.describe(error))).")
         }
         audio.player.endTime = duration
-        let audioError = Self.prepare(audio, first: src.audioURL)
+        let (audioError, audioErrorCode) = Self.prepare(audio, first: src.audioURL)
         audio.player.seek(to: 0)
         #if canImport(AVFoundation)
         await startVideo(audioURL: src.audioURL, songStart: src.songStart, videoURL: src.videoURL, punches: src.punches,
@@ -477,7 +484,7 @@ final class TakeViewService {
         #endif
         requestVideo(takeId: src.takeId, files: src.videoURLs, title: "Vídeo de la toma")
         let session = TakeViewSession(projectId: src.projectId, takeId: src.takeId, audio: audio, duration: duration,
-                                      songStart: src.songStart, base: 0, backingIDs: [], hasBacking: false, audioError: audioError,
+                                      songStart: src.songStart, base: 0, backingIDs: [], hasBacking: false, audioError: audioError, audioErrorCode: audioErrorCode,
                                       restartMargin: TakeViewConstants.offsetRestartMargin, isOffset: true)
         if src.videoWidth > 0, src.videoHeight > 0 {
             session.videoWidth = src.videoWidth
@@ -507,11 +514,11 @@ final class TakeViewService {
         return StudyAudio(mode: options.audio, output: output)
     }
 
-    private static func prepare(_ audio: StudyAudio, first: URL) -> String? {
+    private static func prepare(_ audio: StudyAudio, first: URL) -> (message: String?, code: String?) {
         do { try audio.prepare(firstTrack: first) } catch {
-            return "No se pudo abrir la salida de audio (\(BackingController.describe(error)))."
+            return (AudioErrorText.openMessage(error), AudioErrorText.code(error))
         }
-        return nil
+        return (nil, nil)
     }
 
     private func install(_ s: TakeViewSession) -> TakeViewSnapshot {

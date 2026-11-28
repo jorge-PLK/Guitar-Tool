@@ -34,7 +34,8 @@ class TakeViewerState {
     this.epoch = 0,
     this.outputName = '',
     this.audioError,
-    this.video = TakeVideoState.none,
+    this.audioErrorCode,
+    this.video =TakeVideoState.none,
     this.videoProgress,
     this.videoMessage,
     this.videoWidth,
@@ -62,6 +63,7 @@ class TakeViewerState {
   final int epoch;
   final String outputName;
   final String? audioError;
+  final String? audioErrorCode;
   final TakeVideoState video;
   /// Fracción 0…1 de la conversión a H.264; nula si no se conoce.
   final double? videoProgress;
@@ -111,6 +113,7 @@ class TakeViewerState {
     int? epoch,
     String? outputName,
     String? audioError,
+    String? audioErrorCode,
     bool clearAudioError = false,
     TakeVideoState? video,
     double? videoProgress,
@@ -140,6 +143,7 @@ class TakeViewerState {
         epoch: epoch ?? this.epoch,
         outputName: outputName ?? this.outputName,
         audioError: clearAudioError ? null : (audioError ?? this.audioError),
+        audioErrorCode: clearAudioError ? null : (audioErrorCode ?? this.audioErrorCode),
         video: video ?? this.video,
         videoProgress: clearVideoStatus ? null : (videoProgress ?? this.videoProgress),
         videoMessage: clearVideoStatus ? null : (videoMessage ?? this.videoMessage),
@@ -313,6 +317,7 @@ class TakeViewerStore extends Notifier<TakeViewerState> {
       epoch: s.epoch,
       outputName: s.outputName,
       audioError: s.audioError,
+      audioErrorCode: s.audioErrorCode,
       clearAudioError: s.audioError == null,
       videoWidth: s.videoWidth,
       videoHeight: s.videoHeight,

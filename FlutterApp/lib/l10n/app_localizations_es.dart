@@ -3539,4 +3539,20 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get error_unknown => 'Error desconocido';
+
+  @override
+  String get audioErrorNotConnected =>
+      'No se pudo reproducir: la salida de audio no está conectada. Revísala en Ajustes.';
+
+  @override
+  String get audioErrorSampleRate =>
+      'No se pudo reproducir: la salida de audio funciona a otra frecuencia de muestreo.';
+
+  @override
+  String get audioErrorBusy =>
+      'No se pudo reproducir: otra aplicación está usando la salida de audio.';
+
+  @override
+  String get audioErrorUnavailable =>
+      'No se pudo reproducir: la salida de audio no abre.';
 }
