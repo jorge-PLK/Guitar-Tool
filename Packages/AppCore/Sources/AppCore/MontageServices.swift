@@ -70,12 +70,11 @@ struct MontageServices: Sendable {
         takeFrame: { video, audioURL, t in
             #if os(Windows)
             // Un `TakePreview` por toma entre llamadas: abrir el fichero y llevar el lector hasta `t` cuesta más que el salto.
-            let preview = try await WindowsTakePreviewCache.shared.preview(video: video, audioURL: audioURL)
+            let preview = try await TakePreviewCache.shared.preview(video: video, audioURL: audioURL)
             return try preview.frame(at: t - video.take.start, videoOffset: video.videoOffset)
             #elseif canImport(AVFoundation)
-            // M1 (parte 3): en el Mac, el mismo `TakePreview` (plan de tramos, punches, giro) con `AVAssetImageGenerator`.
-            let preview = try await TakePreview.load(audioURL: audioURL, songStart: video.take.start, videoURL: video.url,
-                                                     punches: video.punches, rotation: video.rotation)
+            // M1 (parte 3): en el Mac, el mismo `TakePreview` en caché (plan de tramos, punches, giro) con `AVAssetImageGenerator`.
+            let preview = try await TakePreviewCache.shared.preview(video: video, audioURL: audioURL)
             guard let image = try await preview.frame(at: t - video.take.start, videoOffset: video.videoOffset) else { return nil }
             return try MacMontageComposer.bgra(image)
             #else
@@ -83,9 +82,7 @@ struct MontageServices: Sendable {
             #endif
         },
         releaseTakeFrames: {
-            #if os(Windows)
-            WindowsTakePreviewCache.shared.clear()
-            #endif
+            TakePreviewCache.shared.clear()
         },
         analyze: { video, progress in try await GuitarFramer.analyze(video: video, progress: progress) },
         mix: { job, progress in try await MontageMixer.mix(job, progress: progress) },
@@ -95,17 +92,64 @@ struct MontageServices: Sendable {
         })
 }
 
-#if os(Windows)
-/// `TakePreview` por toma para la hoja «Encuadre» (`takeFrame`): se reutiliza mientras no cambien el audio, los ficheros
-/// de vídeo (ruta, tamaño y fecha: la conversión HEVC→H.264 que sustituye `video.mov` los cambia), los punches ni el giro.
-/// Pocas entradas (un lector abierto por fichero): al pasar de `maxEntries` se sueltan todas.
-final class WindowsTakePreviewCache: @unchecked Sendable {
-    static let shared = WindowsTakePreviewCache()
-    static let maxEntries = 4
+/// Caché con carga única por clave: acierto devuelve la misma instancia; dos fallos simultáneos con la misma clave comparten
+/// una sola carga (Task en vuelo). Pocas entradas (un lector abierto por fichero): al pasar de `maxEntries` se sueltan todas.
+final class LoadOnceCache<Value: Sendable>: @unchecked Sendable {
+    let maxEntries: Int
     private let lock = NSLock()
-    private var entries: [String: TakePreview] = [:]
+    private var entries: [String: Value] = [:]
+    private var inFlight: [String: Task<Value, Error>] = [:]
 
-    private static func stamp(_ url: URL?) -> String {
+    init(maxEntries: Int) { self.maxEntries = maxEntries }
+
+    var count: Int { lock.withLock { entries.count } }
+
+    func value(key: String, load: @escaping @Sendable () async throws -> Value) async throws -> Value {
+        let (hit, task): (Value?, Task<Value, Error>?) = lock.withLock {
+            if let hit = entries[key] { return (hit, nil) }
+            if let f = inFlight[key] { return (nil, f) }
+            let task = Task { try await load() }
+            inFlight[key] = task
+            return (nil, task)
+        }
+        if let hit { return hit }
+        guard let task else { throw CancellationError() }
+        let made: Value
+        do { made = try await task.value } catch {
+            lock.withLock { if inFlight[key] == task { inFlight[key] = nil } }
+            throw error
+        }
+        return lock.withLock {
+            if inFlight[key] == task { inFlight[key] = nil }
+            if let hit = entries[key] { return hit }
+            if entries.count >= maxEntries { entries.removeAll() }
+            entries[key] = made
+            return made
+        }
+    }
+
+    /// Vacía lo guardado; una carga en vuelo termina pero su resultado se guarda al llegar (clave nueva tras el vaciado).
+    func clear() { lock.withLock { entries.removeAll() } }
+}
+
+/// `TakePreview` por toma para la hoja «Encuadre» (`takeFrame`), en Mac y Windows: se reutiliza mientras no cambien el audio,
+/// los ficheros de vídeo (ruta, tamaño y fecha: la conversión HEVC→H.264 que sustituye `video.mov` los cambia), los punches
+/// ni el giro. `TakePreview.frame(at:)` es seguro en paralelo sobre la misma instancia (estado inmutable; un
+/// `AVAssetImageGenerator` por llamada), así que no hace falta serializar por entrada.
+final class TakePreviewCache: @unchecked Sendable {
+    static let shared = TakePreviewCache()
+    static let maxEntries = 4
+    typealias Loader = @Sendable (_ video: MontagePartVideo, _ audioURL: URL) async throws -> TakePreview
+
+    private let cache = LoadOnceCache<TakePreview>(maxEntries: TakePreviewCache.maxEntries)
+    private let loader: Loader
+
+    init(loader: @escaping Loader = { video, audioURL in
+        try await TakePreview.load(audioURL: audioURL, songStart: video.take.start, videoURL: video.url,
+                                   punches: video.punches, rotation: video.rotation)
+    }) { self.loader = loader }
+
+    static func stamp(_ url: URL?) -> String {
         guard let url else { return "-" }
         let a = try? FileManager.default.attributesOfItem(atPath: url.path)
         let size = (a?[.size] as? NSNumber)?.int64Value ?? -1
@@ -118,22 +162,17 @@ final class WindowsTakePreviewCache: @unchecked Sendable {
             + video.punches.map { "\($0.start),\($0.end),\($0.videoOffset)," + stamp($0.videoURL) }).joined(separator: ";")
     }
 
+    var count: Int { cache.count }
+
     func preview(video: MontagePartVideo, audioURL: URL) async throws -> TakePreview {
-        let key = Self.key(video: video, audioURL: audioURL)
-        if let hit = lock.withLock({ entries[key] }) { return hit }
-        let made = try await TakePreview.load(audioURL: audioURL, songStart: video.take.start, videoURL: video.url,
-                                              punches: video.punches, rotation: video.rotation)
-        return lock.withLock {
-            if let hit = entries[key] { return hit }
-            if entries.count >= Self.maxEntries { entries.removeAll() }
-            entries[key] = made
-            return made
-        }
+        let loader = loader
+        return try await cache.value(key: Self.key(video: video, audioURL: audioURL)) { try await loader(video, audioURL) }
     }
 
-    func clear() { lock.withLock { entries.removeAll() } }
+    func clear() { cache.clear() }
 }
 
+#if os(Windows)
 /// `MontagePreview` de VideoKit (Direct2D) como compositor de la vista previa.
 final class WindowsMontageComposer: MontageComposing, @unchecked Sendable {
     private let preview: MontagePreview
