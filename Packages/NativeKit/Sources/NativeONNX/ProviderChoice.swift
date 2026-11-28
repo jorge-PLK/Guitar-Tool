@@ -1,5 +1,8 @@
 import Foundation
 import NativePlatform
+#if os(Windows)
+import WinSDK
+#endif
 
 // Elección del proveedor de ONNX Runtime (plan, Mini-spec del port, «Modelos y aceleración»; parte 7.8).
 // Tipos puros: corren también en el Mac con sesiones simuladas.
@@ -345,6 +348,41 @@ public enum OnnxDevelopmentModels {
                              environment: [String: String] = ProcessInfo.processInfo.environment) -> URL? {
         let url = directory(folder, environment: environment).appendingPathComponent("model.onnx")
         return FileManager.default.fileExists(atPath: url.path) ? url : nil
+    }
+
+    /// Subcarpeta junto al ejecutable donde la build de Windows deja los modelos empaquetados (`models\<carpeta>\model.onnx`).
+    public static let bundledSubdirectory = "models"
+
+    /// Carpeta del `.exe` anfitrión (`GetModuleFileNameW(NULL)`: el core vive en una DLL dentro del proceso de Flutter).
+    public static func hostExecutableDirectory() -> URL? {
+        #if os(Windows)
+        var buffer = [UInt16](repeating: 0, count: 32_768)
+        let n = Int(GetModuleFileNameW(nil, &buffer, DWORD(buffer.count)))
+        guard n > 0 else { return nil }
+        return URL(fileURLWithPath: String(decoding: buffer[0..<n], as: UTF16.self)).deletingLastPathComponent()
+        #else
+        return Bundle.main.executableURL?.deletingLastPathComponent()
+        #endif
+    }
+
+    /// Rutas candidatas a `model.onnx`, por orden: `TF_MODELS_DIR` (solo si la variable está), empaquetado junto al
+    /// ejecutable (`<exe>\models\<carpeta>`) y `C:\tf-models`.
+    public static func candidates(_ folder: String,
+                                  environment: [String: String] = ProcessInfo.processInfo.environment,
+                                  executableDirectory: URL? = hostExecutableDirectory()) -> [URL] {
+        var roots: [URL] = []
+        if let dir = environment[environmentKey], !dir.isEmpty { roots.append(URL(fileURLWithPath: dir, isDirectory: true)) }
+        if let exe = executableDirectory { roots.append(exe.appendingPathComponent(bundledSubdirectory, isDirectory: true)) }
+        roots.append(URL(fileURLWithPath: defaultDirectory, isDirectory: true))
+        return roots.map { $0.appendingPathComponent(folder, isDirectory: true).appendingPathComponent("model.onnx") }
+    }
+
+    /// Primer `model.onnx` existente de `candidates`; si ninguno existe devuelve nil y `searched` lista lo probado.
+    public static func resolve(_ folder: String,
+                               environment: [String: String] = ProcessInfo.processInfo.environment,
+                               executableDirectory: URL? = hostExecutableDirectory()) -> URL? {
+        candidates(folder, environment: environment, executableDirectory: executableDirectory)
+            .first { FileManager.default.fileExists(atPath: $0.path) }
     }
 
     /// Float32 crudos de un fichero de la carpeta (entradas y referencias del Mac).

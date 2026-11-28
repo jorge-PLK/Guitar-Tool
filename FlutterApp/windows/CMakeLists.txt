@@ -120,6 +120,18 @@ foreach(_tf_helper yt-dlp.exe deno.exe ffmpeg.exe)
   install(PROGRAMS "${TF_HELPERS_DIR}/${_tf_helper}" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}" COMPONENT Runtime)
 endforeach()
 
+# Modelo de pose («Seguir la guitarra»): <exe>\models\pose\model.onnx (OnnxDevelopmentModels.resolve lo busca ahi sin
+# variables de entorno). Carpeta de modelos de Windows por -DTF_MODELS_WIN_DIR=...; por defecto Vendor/models-win
+# (no versionada; Tools/flutter/fetch-pose-model.sh la rellena en el Mac, pc.sh sync la sube al clon del PC).
+if(NOT TF_MODELS_WIN_DIR)
+  set(TF_MODELS_WIN_DIR "${TF_REPO_ROOT}/Vendor/models-win")
+endif()
+if(EXISTS "${TF_MODELS_WIN_DIR}/pose/model.onnx")
+  install(FILES "${TF_MODELS_WIN_DIR}/pose/model.onnx" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}/models/pose" COMPONENT Runtime)
+else()
+  message(WARNING "Falta ${TF_MODELS_WIN_DIR}/pose/model.onnx: la app no incluira «Seguir la guitarra» (Tools/flutter/fetch-pose-model.sh)")
+endif()
+
 # tf-separate.exe (swift build -c release --product tf-separate en Packages/StemKit, ver Tools/win/build.sh).
 # Ruta por -DTF_SEPARATE_EXE=...; si no, busca bajo Packages/StemKit/.build.
 if(NOT TF_SEPARATE_EXE)

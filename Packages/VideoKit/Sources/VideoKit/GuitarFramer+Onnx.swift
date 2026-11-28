@@ -95,11 +95,16 @@ public extension GuitarFramer {
 }
 
 extension GuitarFramer {
-    /// MoveNet desde `modelURL` o desde la carpeta de desarrollo (`OnnxDevelopmentModels`, carpeta `pose`).
-    static func poseDetector(modelURL: URL?) throws -> MoveNetPoseDetector {
-        guard let url = modelURL ?? OnnxDevelopmentModels.model(MoveNetPose.modelFolder) else {
-            let expected = OnnxDevelopmentModels.directory(MoveNetPose.modelFolder).appendingPathComponent("model.onnx")
-            throw GuitarFramerError.read("sin modelo de pose en \(expected.path)")
+    /// MoveNet desde `modelURL`, `TF_MODELS_DIR`, el empaquetado junto al .exe (`models\pose`) o `C:\tf-models`
+    /// (`OnnxDevelopmentModels.resolve`, carpeta `pose`).
+    static func poseDetector(modelURL: URL?,
+                             environment: [String: String] = ProcessInfo.processInfo.environment,
+                             executableDirectory: URL? = OnnxDevelopmentModels.hostExecutableDirectory()) throws -> MoveNetPoseDetector {
+        guard let url = modelURL ?? OnnxDevelopmentModels.resolve(MoveNetPose.modelFolder, environment: environment,
+                                                                  executableDirectory: executableDirectory) else {
+            let tried = OnnxDevelopmentModels.candidates(MoveNetPose.modelFolder, environment: environment,
+                                                         executableDirectory: executableDirectory).map(\.path)
+            throw GuitarFramerError.read("sin modelo de pose; rutas probadas: \(tried.joined(separator: ", "))")
         }
         return MoveNetPoseDetector(model: try OnnxPoseModel(modelURL: url))
     }

@@ -64,7 +64,16 @@ rps() {
 }
 summary() { sed 's/^TF:/  /' "$last"; }
 
-step_sync() { rps sync.ps1 -Branch "$PC_BRANCH" || return 1; echo "sync:"; summary; }
+step_sync() { rps sync.ps1 -Branch "$PC_BRANCH" || return 1; echo "sync:"; summary; pose_model || return 1; }
+# Modelo de pose en el clon f7 (Vendor/models-win/pose/model.onnx, no versionado): lo empaqueta el CMake de la app.
+pose_model() {
+  local src=Probes/P8-windows/ort-models/out/pose/model.onnx rc
+  [ -f "$src" ] || { echo "pose: falta $src en el Mac (la app saldra sin Seguir la guitarra)"; return 0; }
+  upload_fixture "$src" "$PC_P9_WIN/f7/Vendor/models-win/pose/model.onnx"; rc=$?
+  [ "$rc" = 1 ] && return 1
+  [ "$rc" = 0 ] && echo "pose: modelo subido a f7/Vendor/models-win/pose" || echo "pose: modelo ya estaba en f7"
+  return 0
+}
 step_core() { rps core.ps1 || return 1; echo "core:"; grep -v '^TF:swift' "$last" | sed 's/^TF:/  /'; }
 step_app() {
   rps app.ps1 || return 1
